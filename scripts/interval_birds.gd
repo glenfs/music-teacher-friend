@@ -33,7 +33,7 @@ const MODE_INTERVAL := 0
 const MODE_CHORD := 1
 const MODE_SIGHT := 2
 const MODE_READ := 3
-const MODE_TEACHER := 4
+const MODE_NOTE_CHASE := 4
 const STAFF_LEFT_X := 56.0
 const STAFF_LINE_WIDTH := 360.0
 const STAFF_TOP_LINE_Y := 80.0
@@ -74,8 +74,43 @@ const BIRD_TEXTURE_PATH := "res://assets/birds/chicken.png"
 const TUTORIAL_CHICKEN_PATH := "res://assets/birds/chicken.svg"
 const BIRD_TINT := Color(1.0, 1.0, 1.0, 1.0)
 const UI_FONT_PATH := "res://assets/fonts/Righteous-Regular.ttf"
-const SUCCESS_SFX_PATH := "res://assets/audio/sfx/success.mp3"
-const FAIL_SFX_PATH := "res://assets/audio/sfx/fail.mp3"
+const UI_CLICK_SFX_PATH := "res://assets/audio/sfx/ui-basic-click.wav"
+const UI_SIGHT_ANSWER_CLICK_SFX_PATH := "res://assets/audio/sfx/ui-basic-click-2-glass.wav"
+const CORRECT_SFX_PATH := "res://assets/audio/sfx/correct.mp3"
+const WRONG_CHOICE_SFX_PATH := "res://assets/audio/sfx/wrong-choice.wav"
+const FAIL_GAMEOVER_SFX_PATH := "res://assets/audio/sfx/fail.mp3"
+const WIN_FANFARE_SFX_PATH := "res://assets/audio/sfx/fanfare-2-rpg.wav"
+const MODULE_COMPLETE_SFX_PATH := "res://assets/audio/sfx/module-complete.wav"
+const NEW_QUESTION_SFX_PATH := "res://assets/audio/sfx/new_question.wav"
+const POWERUP_SFX_PATH := "res://assets/audio/sfx/powerup.wav"
+const TRANSITION_WHOOSH_SFX_PATH := "res://assets/audio/sfx/transition-whoosh-sound.wav"
+const NOTE_CHASE_BGM_PATH := "res://assets/audio/sfx/module-complete.wav"
+const NOTE_CHASE_NOTE_COLORS := [
+	Color(1.0, 0.47, 0.73, 0.97), # pink
+	Color(0.34, 0.58, 0.98, 0.97), # blue
+	Color(0.35, 0.95, 0.95, 0.97), # cyan
+	Color(0.66, 0.46, 0.96, 0.97), # purple
+	Color(0.54, 0.35, 0.92, 0.97), # violet
+	Color(0.13, 0.58, 0.25, 0.97), # dark green
+	Color(0.96, 0.66, 0.36, 0.97) # warm orange
+]
+const NOTE_CHASE_STAFF_COLORS := [
+	Color(1.0, 0.84, 0.40, 0.96),
+	Color(0.45, 0.86, 1.0, 0.96),
+	Color(1.0, 0.62, 0.78, 0.96),
+	Color(0.58, 0.95, 0.66, 0.96),
+	Color(0.83, 0.62, 1.0, 0.96)
+]
+const NOTE_CHASE_THEME_TINTS := [
+	Color(1.0, 1.0, 1.0, 1.0),
+	Color(0.86, 0.94, 1.0, 1.0),
+	Color(1.0, 0.90, 0.96, 1.0),
+	Color(0.90, 1.0, 1.0, 1.0),
+	Color(0.94, 0.90, 1.0, 1.0),
+	Color(0.92, 0.88, 1.0, 1.0),
+	Color(0.88, 1.0, 0.90, 1.0)
+]
+const PIANO_SAMPLED_DIR := "res://assets/audio/piano/sampled"
 const TEACHER_DATA_PATH := "user://teacher_data.json"
 const TEACHER_EXPORT_DIR := "user://exports"
 const TUTORIAL_CUE_CHORDS := [
@@ -118,10 +153,21 @@ var _audio_stream: AudioStreamGenerator
 var _playback: AudioStreamGeneratorPlayback
 var _piano_player: AudioStreamPlayer
 var _sfx_player: AudioStreamPlayer
+var _ui_sfx_player: AudioStreamPlayer
+var _music_player: AudioStreamPlayer
 var _piano_samples: Dictionary = {}
 var _chord_players: Array[AudioStreamPlayer] = []
-var _success_sfx: AudioStream
-var _fail_sfx: AudioStream
+var _ui_click_sfx: AudioStream
+var _ui_sight_answer_click_sfx: AudioStream
+var _correct_sfx: AudioStream
+var _wrong_choice_sfx: AudioStream
+var _fail_gameover_sfx: AudioStream
+var _win_fanfare_sfx: AudioStream
+var _module_complete_sfx: AudioStream
+var _new_question_sfx: AudioStream
+var _powerup_sfx: AudioStream
+var _transition_whoosh_sfx: AudioStream
+var _note_chase_bgm: AudioStream
 var _ui_font: Font
 
 var _home_panel: VBoxContainer
@@ -136,8 +182,6 @@ var _home_mode_label: Label
 var _home_mode_buttons_row: HBoxContainer
 var _home_q_row: HBoxContainer
 var _home_start_button: Button
-var _home_teacher_box: VBoxContainer
-var _home_teacher_open_button: Button
 var _question_spin: SpinBox
 var _mode_buttons: Dictionary = {}
 var _ear_mode_buttons: Dictionary = {}
@@ -145,6 +189,7 @@ var _ear_mode_row: HBoxContainer
 var _interval_options_box: VBoxContainer
 var _chord_options_box: VBoxContainer
 var _sight_options_box: VBoxContainer
+var _note_chase_options_box: VBoxContainer
 var _read_options_box: VBoxContainer
 var _clef_buttons: Dictionary = {}
 var _selected_clef := "Treble"
@@ -164,6 +209,11 @@ var _chord_group_buttons: Dictionary = {}
 var _selected_chord_group := 1
 var _degree_toggles: Dictionary = {}
 var _include_minor_toggle: CheckButton
+var _note_chase_note_toggles: Dictionary = {}
+var _note_chase_clef_buttons: Dictionary = {}
+var _note_chase_speed_option: OptionButton
+var _note_chase_selected_notes: Array[String] = ["C", "E", "G"]
+var _note_chase_clef_mode := "Both" # Treble | Bass | Both
 var _home_material_buttons: Array[Button] = []
 
 var _status_label: Label
@@ -173,6 +223,34 @@ var _meta_label: Label
 var _lives_label: Label
 var _streak_label: Label
 var _xp_label: Label
+var _note_chase_target_label: Label
+var _note_chase_speed_label: Label
+var _note_chase_combo_label: Label
+var _note_chase_shield_label: Label
+var _note_chase_level_label: Label
+var _note_chase_target_box: PanelContainer
+var _note_chase_speed_box: PanelContainer
+var _note_chase_combo_box: PanelContainer
+var _note_chase_shield_box: PanelContainer
+var _note_chase_side_panel: PanelContainer
+var _note_chase_side_target_box: PanelContainer
+var _note_chase_side_speed_box: PanelContainer
+var _note_chase_side_combo_box: PanelContainer
+var _note_chase_side_shield_box: PanelContainer
+var _note_chase_side_target_label: Label
+var _note_chase_side_speed_label: Label
+var _note_chase_side_combo_label: Label
+var _note_chase_side_shield_label: Label
+var _note_chase_bottom_row: HBoxContainer
+var _note_chase_bottom_spacer: Control
+var _note_chase_bottom_target_box: PanelContainer
+var _note_chase_bottom_speed_box: PanelContainer
+var _note_chase_bottom_combo_box: PanelContainer
+var _note_chase_bottom_shield_box: PanelContainer
+var _note_chase_bottom_target_label: RichTextLabel
+var _note_chase_bottom_speed_label: RichTextLabel
+var _note_chase_bottom_combo_label: RichTextLabel
+var _note_chase_bottom_shield_label: RichTextLabel
 var _hud_left_box: PanelContainer
 var _hud_right_box: PanelContainer
 var _hud_center_box: PanelContainer
@@ -184,7 +262,13 @@ var _staff_area: Control
 var _staff_note: Panel
 var _staff_chord_notes: Array[Panel] = []
 var _staff_clef_label: Label
+var _note_chase_clef_clone: Label
+var _note_chase_fail_line: ColorRect
+var _note_chase_overlay: ColorRect
+var _note_chase_overlay_label: Label
+var _note_chase_staff_frame: Panel
 var _staff_lines: Array[ColorRect] = []
+var _note_chase_staff_clone_lines: Array[ColorRect] = []
 var _staff_line_number_labels: Array[Label] = []
 var _staff_ledger_lines: Array[ColorRect] = []
 var _staff_preview_ledgers: Array[ColorRect] = []
@@ -206,6 +290,7 @@ var _chord_buttons: Dictionary = {}
 var _sight_key_buttons: Dictionary = {}
 var _sight_chord_choice_buttons: Array[Button] = []
 var _replay_button: Button
+var _round_start_button: Button
 var _slow_toggle: CheckBox
 var _end_button: Button
 var _restart_button: Button
@@ -228,7 +313,6 @@ var _tutorial_bubble: PanelContainer
 var _tutorial_bubble_label: Label
 var _tutorial_bubble_tail: Panel
 var _tutorial_chicken: TextureRect
-var _teacher_panel: VBoxContainer
 var _teacher_students_list: ItemList
 var _teacher_name_edit: LineEdit
 var _teacher_age_spin: SpinBox
@@ -299,6 +383,30 @@ var _streak := 0
 var _xp := 0
 var _is_prompt_playing := false
 var _accepting_answer := false
+var _awaiting_round_start := false
+var _note_chase_running := false
+var _note_chase_staff_scroll_x := 0.0
+var _note_chase_spawn_timer := 0.0
+var _note_chase_spawn_interval := 1.2
+var _note_chase_scroll_speed := 95.0
+var _note_chase_base_spawn_interval := 1.2
+var _note_chase_base_scroll_speed := 95.0
+var _note_chase_speed_stage := 0
+var _note_chase_correct_streak := 0
+var _note_chase_wrongs := 0
+var _note_chase_correct_clicks := 0
+var _note_chase_spawned := 0
+var _note_chase_active_notes: Array[Dictionary] = []
+var _note_chase_fever_active := false
+var _note_chase_fever_timer := 0.0
+var _note_chase_boss_active := false
+var _note_chase_boss_timer := 0.0
+var _note_chase_boss_last_stage := -1
+var _note_chase_last_theme_stage := -1
+var _note_chase_clef_switch_cd := 0.0
+var _note_chase_freeze_timer := 0.0
+var _note_chase_shield_timer := 0.0
+var _note_chase_combo_mult := 1
 var _bird_home_global_position := Vector2.ZERO
 var _bird_home_ready := false
 var _quiz_active := false
@@ -324,7 +432,6 @@ func _ready() -> void:
 	_rng.randomize()
 	_build_ui()
 	_setup_audio()
-	_load_teacher_data()
 	_on_mode_selected()
 	_show_home()
 	call_deferred("_post_layout_init")
@@ -341,6 +448,8 @@ func _exit_tree() -> void:
 			p.stop()
 	if _sfx_player != null:
 		_sfx_player.stop()
+	if _ui_sfx_player != null:
+		_ui_sfx_player.stop()
 	if _audio_player != null:
 		_audio_player.stop()
 
@@ -354,12 +463,18 @@ func _notification(what: int) -> void:
 			call_deferred("_position_tutorial_end_buttons")
 
 
+func _process(delta: float) -> void:
+	_update_note_chase(delta)
+	if _selected_mode == MODE_NOTE_CHASE and _game_panel != null and _game_panel.visible:
+		_note_chase_realign_staff_frame()
+
+
 func _update_game_card_layout() -> void:
 	if _game_card == null:
 		return
 	var vp := get_viewport_rect().size
 	var target_w := maxi(840.0, vp.x - 70.0)
-	var target_h := clampf(vp.y * 0.72, 420.0, 560.0)
+	var target_h := clampf(vp.y * 0.60, 360.0, 480.0)
 	_game_card.custom_minimum_size = Vector2(target_w, target_h)
 
 
@@ -411,7 +526,7 @@ func _build_ui() -> void:
 	_home_hub_row.add_theme_constant_override("separation", 10)
 	_home_panel.add_child(_home_hub_row)
 
-	for hub_name in ["Practice", "Learn", "Teacher Dashboard"]:
+	for hub_name in ["Practice", "Learn"]:
 		var hub_btn := Button.new()
 		hub_btn.text = hub_name
 		hub_btn.custom_minimum_size = Vector2(190, 40)
@@ -448,6 +563,14 @@ func _build_ui() -> void:
 	_home_mode_buttons_row.add_child(sight_mode_btn)
 	_mode_buttons["Sight"] = sight_mode_btn
 	_home_material_buttons.append(sight_mode_btn)
+
+	var chase_mode_btn := Button.new()
+	chase_mode_btn.text = "Note Chase"
+	chase_mode_btn.custom_minimum_size = Vector2(140, 36)
+	chase_mode_btn.pressed.connect(_on_mode_button_pressed.bind(MODE_NOTE_CHASE))
+	_home_mode_buttons_row.add_child(chase_mode_btn)
+	_mode_buttons["Chase"] = chase_mode_btn
+	_home_material_buttons.append(chase_mode_btn)
 
 	var read_mode_btn := Button.new()
 	read_mode_btn.text = "Read Notation"
@@ -489,26 +612,6 @@ func _build_ui() -> void:
 	_question_spin.value = 10
 	_question_spin.custom_minimum_size = Vector2(90, 32)
 	_home_q_row.add_child(_question_spin)
-
-	_home_teacher_box = VBoxContainer.new()
-	_home_teacher_box.add_theme_constant_override("separation", 8)
-	_home_panel.add_child(_home_teacher_box)
-	var teacher_title := Label.new()
-	teacher_title.text = "Teacher Dashboard"
-	teacher_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_home_teacher_box.add_child(teacher_title)
-	var teacher_desc := Label.new()
-	teacher_desc.text = "Create and manage students, books, pieces, and technical progress."
-	teacher_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	teacher_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_home_teacher_box.add_child(teacher_desc)
-	_home_teacher_open_button = Button.new()
-	_home_teacher_open_button.text = "Open Teacher Dashboard"
-	_home_teacher_open_button.custom_minimum_size = Vector2(260, 46)
-	_home_teacher_open_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_home_teacher_open_button.pressed.connect(_on_teacher_open_pressed)
-	_home_teacher_box.add_child(_home_teacher_open_button)
-	_home_material_buttons.append(_home_teacher_open_button)
 
 	_interval_options_box = VBoxContainer.new()
 	_interval_options_box.add_theme_constant_override("separation", 6)
@@ -705,6 +808,72 @@ func _build_ui() -> void:
 	range_row.add_child(upper_plus)
 	_home_material_buttons.append(upper_plus)
 
+	_note_chase_options_box = VBoxContainer.new()
+	_note_chase_options_box.add_theme_constant_override("separation", 6)
+	_home_panel.add_child(_note_chase_options_box)
+	var chase_title := Label.new()
+	chase_title.text = "Note Chase Setup"
+	chase_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_note_chase_options_box.add_child(chase_title)
+	var chase_note_row := HBoxContainer.new()
+	chase_note_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	chase_note_row.add_theme_constant_override("separation", 6)
+	_note_chase_options_box.add_child(chase_note_row)
+	var chase_note_label := Label.new()
+	chase_note_label.text = "Target Notes (max 3):"
+	chase_note_row.add_child(chase_note_label)
+	for n in ["C", "D", "E", "F", "G", "A", "B"]:
+		var t := Button.new()
+		t.toggle_mode = true
+		t.text = n
+		t.custom_minimum_size = Vector2(44, 32)
+		t.button_pressed = _note_chase_selected_notes.has(n)
+		t.pressed.connect(_on_note_chase_note_toggled.bind(n))
+		chase_note_row.add_child(t)
+		_note_chase_note_toggles[n] = t
+		_home_material_buttons.append(t)
+	var chase_clef_row := HBoxContainer.new()
+	chase_clef_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	chase_clef_row.add_theme_constant_override("separation", 8)
+	_note_chase_options_box.add_child(chase_clef_row)
+	var chase_clef_label := Label.new()
+	chase_clef_label.text = "Clef:"
+	chase_clef_row.add_child(chase_clef_label)
+	var chase_treble_btn := Button.new()
+	chase_treble_btn.text = "Treble"
+	chase_treble_btn.custom_minimum_size = Vector2(100, 32)
+	chase_treble_btn.pressed.connect(_on_note_chase_clef_mode_pressed.bind("Treble"))
+	chase_clef_row.add_child(chase_treble_btn)
+	_note_chase_clef_buttons["Treble"] = chase_treble_btn
+	_home_material_buttons.append(chase_treble_btn)
+	var chase_bass_btn := Button.new()
+	chase_bass_btn.text = "Bass"
+	chase_bass_btn.custom_minimum_size = Vector2(100, 32)
+	chase_bass_btn.pressed.connect(_on_note_chase_clef_mode_pressed.bind("Bass"))
+	chase_clef_row.add_child(chase_bass_btn)
+	_note_chase_clef_buttons["Bass"] = chase_bass_btn
+	_home_material_buttons.append(chase_bass_btn)
+	var chase_both_btn := Button.new()
+	chase_both_btn.text = "Both"
+	chase_both_btn.custom_minimum_size = Vector2(100, 32)
+	chase_both_btn.pressed.connect(_on_note_chase_clef_mode_pressed.bind("Both"))
+	chase_clef_row.add_child(chase_both_btn)
+	_note_chase_clef_buttons["Both"] = chase_both_btn
+	_home_material_buttons.append(chase_both_btn)
+	var chase_speed_row := HBoxContainer.new()
+	chase_speed_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	chase_speed_row.add_theme_constant_override("separation", 8)
+	_note_chase_options_box.add_child(chase_speed_row)
+	var chase_speed_label := Label.new()
+	chase_speed_label.text = "Speed:"
+	chase_speed_row.add_child(chase_speed_label)
+	_note_chase_speed_option = OptionButton.new()
+	_note_chase_speed_option.add_item("Slow", 0)
+	_note_chase_speed_option.add_item("Normal", 1)
+	_note_chase_speed_option.add_item("Fast", 2)
+	_note_chase_speed_option.selected = 1
+	chase_speed_row.add_child(_note_chase_speed_option)
+
 	_read_options_box = VBoxContainer.new()
 	_read_options_box.add_theme_constant_override("separation", 6)
 	_home_panel.add_child(_read_options_box)
@@ -764,16 +933,49 @@ func _build_ui() -> void:
 	_game_panel.add_child(hud_row)
 
 	_hud_left_box = PanelContainer.new()
-	_hud_left_box.custom_minimum_size = Vector2(186, 50)
+	_hud_left_box.custom_minimum_size = Vector2(230, 60)
 	hud_row.add_child(_hud_left_box)
 
 	var hud_left_v := VBoxContainer.new()
 	hud_left_v.alignment = BoxContainer.ALIGNMENT_CENTER
+	hud_left_v.add_theme_constant_override("separation", 6)
 	_hud_left_box.add_child(hud_left_v)
 	_lives_label = Label.new()
 	_lives_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lives_label.add_theme_font_size_override("font_size", 20)
 	hud_left_v.add_child(_lives_label)
+	_note_chase_target_box = PanelContainer.new()
+	_note_chase_target_box.custom_minimum_size = Vector2(222, 28)
+	hud_left_v.add_child(_note_chase_target_box)
+	_note_chase_target_label = Label.new()
+	_note_chase_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_target_label.add_theme_font_size_override("font_size", 15)
+	_note_chase_target_box.add_child(_note_chase_target_label)
+	_note_chase_speed_box = PanelContainer.new()
+	_note_chase_speed_box.custom_minimum_size = Vector2(222, 26)
+	hud_left_v.add_child(_note_chase_speed_box)
+	_note_chase_speed_label = Label.new()
+	_note_chase_speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_speed_label.add_theme_font_size_override("font_size", 14)
+	_note_chase_speed_box.add_child(_note_chase_speed_label)
+	_note_chase_combo_box = PanelContainer.new()
+	_note_chase_combo_box.custom_minimum_size = Vector2(222, 26)
+	hud_left_v.add_child(_note_chase_combo_box)
+	_note_chase_combo_label = Label.new()
+	_note_chase_combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_combo_label.add_theme_font_size_override("font_size", 14)
+	_note_chase_combo_box.add_child(_note_chase_combo_label)
+	_note_chase_shield_box = PanelContainer.new()
+	_note_chase_shield_box.custom_minimum_size = Vector2(222, 26)
+	hud_left_v.add_child(_note_chase_shield_box)
+	_note_chase_shield_label = Label.new()
+	_note_chase_shield_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_shield_label.add_theme_font_size_override("font_size", 14)
+	_note_chase_shield_box.add_child(_note_chase_shield_label)
+	_note_chase_target_box.visible = false
+	_note_chase_speed_box.visible = false
+	_note_chase_combo_box.visible = false
+	_note_chase_shield_box.visible = false
 
 	_hud_center_box = PanelContainer.new()
 	_hud_center_box.custom_minimum_size = Vector2(360, 74)
@@ -793,7 +995,7 @@ func _build_ui() -> void:
 	hud_center_v.add_child(_progress_label)
 
 	_hud_right_box = PanelContainer.new()
-	_hud_right_box.custom_minimum_size = Vector2(212, 74)
+	_hud_right_box.custom_minimum_size = Vector2(170, 74)
 	hud_row.add_child(_hud_right_box)
 
 	var hud_right_v := VBoxContainer.new()
@@ -808,6 +1010,10 @@ func _build_ui() -> void:
 	_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_xp_label.add_theme_font_size_override("font_size", 18)
 	hud_right_v.add_child(_xp_label)
+	_note_chase_level_label = Label.new()
+	_note_chase_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_note_chase_level_label.add_theme_font_size_override("font_size", 20)
+	hud_right_v.add_child(_note_chase_level_label)
 
 	_status_label = Label.new()
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -825,6 +1031,13 @@ func _build_ui() -> void:
 	_replay_button.custom_minimum_size = Vector2(130, 44)
 	_replay_button.pressed.connect(_on_replay_pressed)
 	_control_row.add_child(_replay_button)
+
+	_round_start_button = Button.new()
+	_round_start_button.text = "Start Round"
+	_round_start_button.custom_minimum_size = Vector2(150, 44)
+	_round_start_button.visible = false
+	_round_start_button.pressed.connect(_on_round_start_pressed)
+	_control_row.add_child(_round_start_button)
 
 	_slow_toggle = CheckBox.new()
 	_slow_toggle.text = "Slow Mode"
@@ -858,6 +1071,93 @@ func _build_ui() -> void:
 	_sight_side_controls.alignment = BoxContainer.ALIGNMENT_CENTER
 	sight_staff_row.add_child(_sight_side_controls)
 
+	_note_chase_side_panel = PanelContainer.new()
+	_note_chase_side_panel.custom_minimum_size = Vector2(240, 170)
+	_note_chase_side_panel.visible = false
+	_sight_side_controls.add_child(_note_chase_side_panel)
+	var nc_side_v := VBoxContainer.new()
+	nc_side_v.add_theme_constant_override("separation", 6)
+	_note_chase_side_panel.add_child(nc_side_v)
+	_note_chase_side_target_box = PanelContainer.new()
+	_note_chase_side_target_box.custom_minimum_size = Vector2(224, 30)
+	nc_side_v.add_child(_note_chase_side_target_box)
+	_note_chase_side_target_label = Label.new()
+	_note_chase_side_target_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_side_target_label.add_theme_font_size_override("font_size", 15)
+	_note_chase_side_target_box.add_child(_note_chase_side_target_label)
+	_note_chase_side_speed_box = PanelContainer.new()
+	_note_chase_side_speed_box.custom_minimum_size = Vector2(224, 28)
+	nc_side_v.add_child(_note_chase_side_speed_box)
+	_note_chase_side_speed_label = Label.new()
+	_note_chase_side_speed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_side_speed_label.add_theme_font_size_override("font_size", 14)
+	_note_chase_side_speed_box.add_child(_note_chase_side_speed_label)
+	_note_chase_side_combo_box = PanelContainer.new()
+	_note_chase_side_combo_box.custom_minimum_size = Vector2(224, 28)
+	nc_side_v.add_child(_note_chase_side_combo_box)
+	_note_chase_side_combo_label = Label.new()
+	_note_chase_side_combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_side_combo_label.add_theme_font_size_override("font_size", 14)
+	_note_chase_side_combo_box.add_child(_note_chase_side_combo_label)
+	_note_chase_side_shield_box = PanelContainer.new()
+	_note_chase_side_shield_box.custom_minimum_size = Vector2(224, 28)
+	nc_side_v.add_child(_note_chase_side_shield_box)
+	_note_chase_side_shield_label = Label.new()
+	_note_chase_side_shield_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_note_chase_side_shield_label.add_theme_font_size_override("font_size", 14)
+	_note_chase_side_shield_box.add_child(_note_chase_side_shield_label)
+
+	_note_chase_bottom_row = HBoxContainer.new()
+	_note_chase_bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_note_chase_bottom_row.add_theme_constant_override("separation", 8)
+	_note_chase_bottom_row.visible = false
+	_note_chase_bottom_spacer = Control.new()
+	_note_chase_bottom_spacer.custom_minimum_size = Vector2(0, 8)
+	_note_chase_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_note_chase_bottom_spacer.visible = false
+	_sight_container.add_child(_note_chase_bottom_spacer)
+	_sight_container.add_child(_note_chase_bottom_row)
+
+	_note_chase_bottom_target_box = PanelContainer.new()
+	_note_chase_bottom_target_box.custom_minimum_size = Vector2(170, 38)
+	_note_chase_bottom_row.add_child(_note_chase_bottom_target_box)
+	_note_chase_bottom_target_label = RichTextLabel.new()
+	_note_chase_bottom_target_label.bbcode_enabled = true
+	_note_chase_bottom_target_label.fit_content = true
+	_note_chase_bottom_target_label.scroll_active = false
+	_note_chase_bottom_target_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_bottom_target_box.add_child(_note_chase_bottom_target_label)
+
+	_note_chase_bottom_speed_box = PanelContainer.new()
+	_note_chase_bottom_speed_box.custom_minimum_size = Vector2(170, 38)
+	_note_chase_bottom_row.add_child(_note_chase_bottom_speed_box)
+	_note_chase_bottom_speed_label = RichTextLabel.new()
+	_note_chase_bottom_speed_label.bbcode_enabled = true
+	_note_chase_bottom_speed_label.fit_content = true
+	_note_chase_bottom_speed_label.scroll_active = false
+	_note_chase_bottom_speed_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_bottom_speed_box.add_child(_note_chase_bottom_speed_label)
+
+	_note_chase_bottom_combo_box = PanelContainer.new()
+	_note_chase_bottom_combo_box.custom_minimum_size = Vector2(170, 38)
+	_note_chase_bottom_row.add_child(_note_chase_bottom_combo_box)
+	_note_chase_bottom_combo_label = RichTextLabel.new()
+	_note_chase_bottom_combo_label.bbcode_enabled = true
+	_note_chase_bottom_combo_label.fit_content = true
+	_note_chase_bottom_combo_label.scroll_active = false
+	_note_chase_bottom_combo_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_bottom_combo_box.add_child(_note_chase_bottom_combo_label)
+
+	_note_chase_bottom_shield_box = PanelContainer.new()
+	_note_chase_bottom_shield_box.custom_minimum_size = Vector2(170, 38)
+	_note_chase_bottom_row.add_child(_note_chase_bottom_shield_box)
+	_note_chase_bottom_shield_label = RichTextLabel.new()
+	_note_chase_bottom_shield_label.bbcode_enabled = true
+	_note_chase_bottom_shield_label.fit_content = true
+	_note_chase_bottom_shield_label.scroll_active = false
+	_note_chase_bottom_shield_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_bottom_shield_box.add_child(_note_chase_bottom_shield_label)
+
 	_staff_clef_label = Label.new()
 	_staff_clef_label.text = "𝄞"
 	_staff_clef_label.position = Vector2(16, STAFF_TOP_LINE_Y - 36)
@@ -865,14 +1165,31 @@ func _build_ui() -> void:
 	_staff_clef_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_staff_area.add_child(_staff_clef_label)
 
+	_note_chase_clef_clone = Label.new()
+	_note_chase_clef_clone.text = _staff_clef_label.text
+	_note_chase_clef_clone.position = _staff_clef_label.position + Vector2(STAFF_LINE_WIDTH, 0)
+	_note_chase_clef_clone.add_theme_font_size_override("font_size", 132)
+	_note_chase_clef_clone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_clef_clone.visible = false
+	_staff_area.add_child(_note_chase_clef_clone)
+
 	for i in 5:
 		var line := ColorRect.new()
 		line.color = Color(1.0, 1.0, 1.0, 0.95)
-		line.custom_minimum_size = Vector2(STAFF_LINE_WIDTH, 2)
+		line.size = Vector2(STAFF_LINE_WIDTH, 2)
 		line.position = Vector2(STAFF_LEFT_X, STAFF_TOP_LINE_Y + (i * STAFF_LINE_GAP_Y))
 		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_staff_area.add_child(line)
 		_staff_lines.append(line)
+
+		var line_clone := ColorRect.new()
+		line_clone.color = line.color
+		line_clone.size = line.size
+		line_clone.position = line.position + Vector2(STAFF_LINE_WIDTH + 120.0, 0.0)
+		line_clone.visible = false
+		line_clone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_staff_area.add_child(line_clone)
+		_note_chase_staff_clone_lines.append(line_clone)
 
 		var n_lbl := Label.new()
 		n_lbl.text = str(5 - i)
@@ -882,6 +1199,54 @@ func _build_ui() -> void:
 		n_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_staff_area.add_child(n_lbl)
 		_staff_line_number_labels.append(n_lbl)
+
+	_note_chase_fail_line = ColorRect.new()
+	_note_chase_fail_line.color = Color(1.0, 0.36, 0.46, 0.95)
+	_note_chase_fail_line.size = Vector2(3, (STAFF_LINE_GAP_Y * 4.0) + 22.0)
+	_note_chase_fail_line.position = Vector2(STAFF_LEFT_X + 8.0, STAFF_TOP_LINE_Y - 10.0)
+	_note_chase_fail_line.visible = false
+	_note_chase_fail_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_fail_line.z_index = 125
+	_staff_area.add_child(_note_chase_fail_line)
+
+	_note_chase_staff_frame = Panel.new()
+	_note_chase_staff_frame.position = Vector2(STAFF_LEFT_X - 22.0, 8.0)
+	_note_chase_staff_frame.size = Vector2(448, 252)
+	_note_chase_staff_frame.visible = false
+	_note_chase_staff_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_staff_frame.z_index = 110
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0, 0, 0, 0.0)
+	frame_style.corner_radius_top_left = 10
+	frame_style.corner_radius_top_right = 10
+	frame_style.corner_radius_bottom_left = 10
+	frame_style.corner_radius_bottom_right = 10
+	frame_style.border_width_left = 2
+	frame_style.border_width_top = 2
+	frame_style.border_width_right = 2
+	frame_style.border_width_bottom = 2
+	frame_style.border_color = Color(0.95, 0.84, 0.42, 0.82)
+	_note_chase_staff_frame.add_theme_stylebox_override("panel", frame_style)
+	_staff_area.add_child(_note_chase_staff_frame)
+
+	_note_chase_overlay = ColorRect.new()
+	_note_chase_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_note_chase_overlay.color = Color(0.03, 0.05, 0.04, 0.28)
+	_note_chase_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_note_chase_overlay.visible = false
+	_note_chase_overlay.z_index = 180
+	_staff_area.add_child(_note_chase_overlay)
+
+	_note_chase_overlay_label = Label.new()
+	_note_chase_overlay_label.set_anchors_preset(PRESET_FULL_RECT)
+	_note_chase_overlay_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_note_chase_overlay_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_note_chase_overlay_label.add_theme_font_size_override("font_size", 32)
+	_note_chase_overlay_label.add_theme_color_override("font_color", Color(1.0, 0.96, 0.86, 1.0))
+	_note_chase_overlay_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.75))
+	_note_chase_overlay_label.add_theme_constant_override("outline_size", 6)
+	_note_chase_overlay_label.text = ""
+	_note_chase_overlay.add_child(_note_chase_overlay_label)
 
 	_staff_note = Panel.new()
 	_staff_note.size = Vector2(26, 18)
@@ -899,9 +1264,10 @@ func _build_ui() -> void:
 
 	for i in range(6):
 		var pl := ColorRect.new()
-		pl.color = Color(0.95, 0.8, 0.35, 0.95)
-		pl.size = Vector2(42, 2)
+		pl.color = Color(0.03, 0.03, 0.03, 1.0)
+		pl.size = Vector2(70, 2)
 		pl.visible = false
+		pl.z_index = 130
 		pl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_staff_area.add_child(pl)
 		_staff_preview_ledgers.append(pl)
@@ -962,309 +1328,6 @@ func _build_ui() -> void:
 		sight_chord_row.add_child(sc_btn)
 		_answer_buttons.append(sc_btn)
 		_sight_chord_choice_buttons.append(sc_btn)
-
-	_teacher_panel = VBoxContainer.new()
-	_teacher_panel.visible = false
-	_teacher_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_teacher_panel.add_theme_constant_override("separation", 10)
-	_game_panel.add_child(_teacher_panel)
-
-	var teacher_panel_title := Label.new()
-	teacher_panel_title.text = "Teacher Dashboard"
-	teacher_panel_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	teacher_panel_title.add_theme_font_size_override("font_size", 30)
-	_teacher_panel.add_child(teacher_panel_title)
-
-	var teacher_layout := HBoxContainer.new()
-	teacher_layout.add_theme_constant_override("separation", 12)
-	_teacher_panel.add_child(teacher_layout)
-
-	var teacher_left := VBoxContainer.new()
-	teacher_left.custom_minimum_size = Vector2(300, 0)
-	teacher_left.add_theme_constant_override("separation", 8)
-	teacher_layout.add_child(teacher_left)
-
-	var student_list_title := Label.new()
-	student_list_title.text = "Students"
-	teacher_left.add_child(student_list_title)
-
-	_teacher_filter_option = OptionButton.new()
-	_teacher_filter_option.add_item("All Students", 0)
-	_teacher_filter_option.add_item("Ear < 70%", 1)
-	_teacher_filter_option.add_item("Sight < 70%", 2)
-	_teacher_filter_option.add_item("Modules < 3", 3)
-	_teacher_filter_option.item_selected.connect(_on_teacher_filter_changed)
-	teacher_left.add_child(_teacher_filter_option)
-
-	_teacher_analytics_label = Label.new()
-	_teacher_analytics_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	teacher_left.add_child(_teacher_analytics_label)
-
-	_teacher_students_list = ItemList.new()
-	_teacher_students_list.custom_minimum_size = Vector2(300, 260)
-	_teacher_students_list.allow_reselect = true
-	_teacher_students_list.item_selected.connect(_on_teacher_student_selected)
-	teacher_left.add_child(_teacher_students_list)
-
-	var list_btn_row := HBoxContainer.new()
-	list_btn_row.add_theme_constant_override("separation", 8)
-	teacher_left.add_child(list_btn_row)
-	var new_student_btn := Button.new()
-	new_student_btn.text = "New Student"
-	new_student_btn.pressed.connect(_on_teacher_new_student_pressed)
-	list_btn_row.add_child(new_student_btn)
-	var delete_student_btn := Button.new()
-	delete_student_btn.text = "Delete Student"
-	delete_student_btn.pressed.connect(_on_teacher_delete_student_pressed)
-	list_btn_row.add_child(delete_student_btn)
-
-	var teacher_right_scroll := ScrollContainer.new()
-	teacher_right_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	teacher_right_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	teacher_layout.add_child(teacher_right_scroll)
-
-	var teacher_right := VBoxContainer.new()
-	teacher_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	teacher_right.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	teacher_right.add_theme_constant_override("separation", 8)
-	teacher_right_scroll.add_child(teacher_right)
-
-	_teacher_selected_student_label = Label.new()
-	_teacher_selected_student_label.text = "Selected Student: none"
-	_teacher_selected_student_label.add_theme_font_size_override("font_size", 18)
-	teacher_right.add_child(_teacher_selected_student_label)
-
-	_teacher_status_label = Label.new()
-	teacher_right.add_child(_teacher_status_label)
-
-	_teacher_tabs = TabContainer.new()
-	_teacher_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_teacher_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	teacher_right.add_child(_teacher_tabs)
-
-	var students_tab := VBoxContainer.new()
-	students_tab.name = "Students"
-	students_tab.add_theme_constant_override("separation", 8)
-	_teacher_tabs.add_child(students_tab)
-
-	var form_title := Label.new()
-	form_title.text = "Student Profile"
-	students_tab.add_child(form_title)
-
-	var name_age_row := HBoxContainer.new()
-	name_age_row.add_theme_constant_override("separation", 8)
-	students_tab.add_child(name_age_row)
-
-	var name_box := VBoxContainer.new()
-	name_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_age_row.add_child(name_box)
-	var name_lbl := Label.new()
-	name_lbl.text = "Student Name"
-	name_box.add_child(name_lbl)
-	_teacher_name_edit = LineEdit.new()
-	_teacher_name_edit.placeholder_text = "Enter full name"
-	name_box.add_child(_teacher_name_edit)
-
-	var age_box := VBoxContainer.new()
-	age_box.custom_minimum_size = Vector2(140, 0)
-	name_age_row.add_child(age_box)
-	var age_lbl := Label.new()
-	age_lbl.text = "Age"
-	age_box.add_child(age_lbl)
-	_teacher_age_spin = SpinBox.new()
-	_teacher_age_spin.min_value = 3
-	_teacher_age_spin.max_value = 100
-	_teacher_age_spin.step = 1
-	_teacher_age_spin.value = 10
-	age_box.add_child(_teacher_age_spin)
-
-	_teacher_level_edit = null
-
-	var book_part_row := HBoxContainer.new()
-	book_part_row.add_theme_constant_override("separation", 8)
-	students_tab.add_child(book_part_row)
-
-	var book_box := VBoxContainer.new()
-	book_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	book_part_row.add_child(book_box)
-	var book_lbl := Label.new()
-	book_lbl.text = "Active Method Book"
-	book_box.add_child(book_lbl)
-	_teacher_book_name_edit = LineEdit.new()
-	_teacher_book_name_edit.custom_minimum_size = Vector2(320, 0)
-	_teacher_book_name_edit.placeholder_text = "Book title"
-	book_box.add_child(_teacher_book_name_edit)
-
-	var part_box := VBoxContainer.new()
-	part_box.custom_minimum_size = Vector2(170, 0)
-	book_part_row.add_child(part_box)
-	var part_lbl := Label.new()
-	part_lbl.text = "Book Part / Unit"
-	part_box.add_child(part_lbl)
-	_teacher_book_part_edit = LineEdit.new()
-	_teacher_book_part_edit.placeholder_text = "Part/Unit"
-	part_box.add_child(_teacher_book_part_edit)
-
-	var student_btn_row := HBoxContainer.new()
-	student_btn_row.add_theme_constant_override("separation", 8)
-	students_tab.add_child(student_btn_row)
-	var save_student_btn := Button.new()
-	save_student_btn.text = "Save Student"
-	save_student_btn.pressed.connect(_on_teacher_save_student_pressed)
-	student_btn_row.add_child(save_student_btn)
-	var clear_form_btn := Button.new()
-	clear_form_btn.text = "Clear"
-	clear_form_btn.pressed.connect(_on_teacher_new_student_pressed)
-	student_btn_row.add_child(clear_form_btn)
-
-	var repertoire_tab := VBoxContainer.new()
-	repertoire_tab.name = "Repertoire"
-	repertoire_tab.add_theme_constant_override("separation", 8)
-	_teacher_tabs.add_child(repertoire_tab)
-
-	var pieces_header := HBoxContainer.new()
-	pieces_header.add_theme_constant_override("separation", 8)
-	repertoire_tab.add_child(pieces_header)
-	var pieces_lbl := Label.new()
-	pieces_lbl.text = "Active Repertoire Pieces"
-	pieces_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pieces_header.add_child(pieces_lbl)
-	var add_piece_btn := Button.new()
-	add_piece_btn.text = "+"
-	add_piece_btn.custom_minimum_size = Vector2(42, 32)
-	add_piece_btn.pressed.connect(_on_teacher_add_piece_row_pressed)
-	pieces_header.add_child(add_piece_btn)
-
-	_teacher_piece_fields_box = VBoxContainer.new()
-	_teacher_piece_fields_box.add_theme_constant_override("separation", 6)
-	repertoire_tab.add_child(_teacher_piece_fields_box)
-	_teacher_rebuild_piece_fields([])
-
-	var rep_save_row := HBoxContainer.new()
-	rep_save_row.add_theme_constant_override("separation", 8)
-	repertoire_tab.add_child(rep_save_row)
-	var rep_save_btn := Button.new()
-	rep_save_btn.text = "Save Repertoire"
-	rep_save_btn.pressed.connect(_on_teacher_save_student_pressed)
-	rep_save_row.add_child(rep_save_btn)
-	var rep_book_done_btn := Button.new()
-	rep_book_done_btn.text = "Book Done"
-	rep_book_done_btn.pressed.connect(_on_teacher_mark_book_done_pressed)
-	rep_save_row.add_child(rep_book_done_btn)
-
-	var assignments_tab := VBoxContainer.new()
-	assignments_tab.name = "Assignments"
-	assignments_tab.add_theme_constant_override("separation", 8)
-	_teacher_tabs.add_child(assignments_tab)
-
-	var assignment_title := Label.new()
-	assignment_title.text = "Assignments (Next Week)"
-	assignments_tab.add_child(assignment_title)
-
-	var assignment_row := HBoxContainer.new()
-	assignment_row.add_theme_constant_override("separation", 8)
-	assignments_tab.add_child(assignment_row)
-	_teacher_assignment_task_edit = LineEdit.new()
-	_teacher_assignment_task_edit.placeholder_text = "Task"
-	_teacher_assignment_task_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	assignment_row.add_child(_teacher_assignment_task_edit)
-	_teacher_assignment_due_edit = LineEdit.new()
-	_teacher_assignment_due_edit.placeholder_text = "Due YYYY-MM-DD"
-	_teacher_assignment_due_edit.custom_minimum_size = Vector2(140, 0)
-	assignment_row.add_child(_teacher_assignment_due_edit)
-	var add_assignment_btn := Button.new()
-	add_assignment_btn.text = "Add"
-	add_assignment_btn.pressed.connect(_on_teacher_add_assignment_pressed)
-	assignment_row.add_child(add_assignment_btn)
-
-	_teacher_assignments_list = ItemList.new()
-	_teacher_assignments_list.custom_minimum_size = Vector2(0, 120)
-	_teacher_assignments_list.allow_reselect = true
-	assignments_tab.add_child(_teacher_assignments_list)
-
-	var assignment_btn_row := HBoxContainer.new()
-	assignment_btn_row.add_theme_constant_override("separation", 8)
-	assignments_tab.add_child(assignment_btn_row)
-	var assignment_done_btn := Button.new()
-	assignment_done_btn.text = "Mark Done"
-	assignment_done_btn.pressed.connect(_on_teacher_mark_assignment_done_pressed)
-	assignment_btn_row.add_child(assignment_done_btn)
-	var assignment_remove_btn := Button.new()
-	assignment_remove_btn.text = "Remove"
-	assignment_remove_btn.pressed.connect(_on_teacher_remove_assignment_pressed)
-	assignment_btn_row.add_child(assignment_remove_btn)
-
-	var assignments_save_row := HBoxContainer.new()
-	assignments_save_row.add_theme_constant_override("separation", 8)
-	assignments_tab.add_child(assignments_save_row)
-	var assignments_save_btn := Button.new()
-	assignments_save_btn.text = "Save Assignments"
-	assignments_save_btn.pressed.connect(_on_teacher_save_student_pressed)
-	assignments_save_row.add_child(assignments_save_btn)
-
-	var progress_tab := VBoxContainer.new()
-	progress_tab.name = "Progress"
-	progress_tab.add_theme_constant_override("separation", 8)
-	_teacher_tabs.add_child(progress_tab)
-
-	var cards_row := HBoxContainer.new()
-	cards_row.add_theme_constant_override("separation", 8)
-	progress_tab.add_child(cards_row)
-	_teacher_progress_ear_label = Label.new()
-	_teacher_progress_ear_label.text = "Ear: 0%"
-	_teacher_progress_ear_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cards_row.add_child(_teacher_progress_ear_label)
-	_teacher_progress_sight_label = Label.new()
-	_teacher_progress_sight_label.text = "Sight: 0%"
-	_teacher_progress_sight_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cards_row.add_child(_teacher_progress_sight_label)
-	_teacher_progress_modules_label = Label.new()
-	_teacher_progress_modules_label.text = "Modules: 0"
-	_teacher_progress_modules_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cards_row.add_child(_teacher_progress_modules_label)
-
-	var progress_title := Label.new()
-	progress_title.text = "Student Progress Details"
-	progress_tab.add_child(progress_title)
-
-	_teacher_dashboard_text = RichTextLabel.new()
-	_teacher_dashboard_text.custom_minimum_size = Vector2(0, 260)
-	_teacher_dashboard_text.fit_content = false
-	_teacher_dashboard_text.scroll_active = true
-	progress_tab.add_child(_teacher_dashboard_text)
-
-	var export_row := HBoxContainer.new()
-	export_row.add_theme_constant_override("separation", 8)
-	progress_tab.add_child(export_row)
-	_teacher_export_csv_button = Button.new()
-	_teacher_export_csv_button.text = "Export CSV"
-	_teacher_export_csv_button.pressed.connect(_on_teacher_export_csv_pressed)
-	export_row.add_child(_teacher_export_csv_button)
-	_teacher_export_report_button = Button.new()
-	_teacher_export_report_button.text = "Export Parent Report"
-	_teacher_export_report_button.pressed.connect(_on_teacher_export_report_pressed)
-	export_row.add_child(_teacher_export_report_button)
-
-	_teacher_piece_note_dialog = AcceptDialog.new()
-	_teacher_piece_note_dialog.title = "Lesson Notes"
-	_teacher_piece_note_dialog.ok_button_text = "Save Notes"
-	_teacher_piece_note_dialog.confirmed.connect(_on_teacher_piece_notes_save_confirmed)
-	_teacher_panel.add_child(_teacher_piece_note_dialog)
-	var note_wrap := MarginContainer.new()
-	note_wrap.add_theme_constant_override("margin_left", 12)
-	note_wrap.add_theme_constant_override("margin_top", 12)
-	note_wrap.add_theme_constant_override("margin_right", 12)
-	note_wrap.add_theme_constant_override("margin_bottom", 12)
-	_teacher_piece_note_dialog.add_child(note_wrap)
-	_teacher_piece_note_edit = TextEdit.new()
-	_teacher_piece_note_edit.custom_minimum_size = Vector2(420, 180)
-	note_wrap.add_child(_teacher_piece_note_edit)
-
-	_teacher_piece_delete_confirm = ConfirmationDialog.new()
-	_teacher_piece_delete_confirm.title = "Delete Repertoire Entry"
-	_teacher_piece_delete_confirm.dialog_text = "Delete this piece entry?"
-	_teacher_piece_delete_confirm.confirmed.connect(_on_teacher_piece_delete_confirmed)
-	_teacher_panel.add_child(_teacher_piece_delete_confirm)
 
 	_sky_block = Control.new()
 	_sky_block.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1544,6 +1607,8 @@ func _build_ui() -> void:
 	_refresh_sight_mode_buttons()
 	_refresh_read_module_buttons()
 	_update_sight_range_ui()
+	_refresh_note_chase_note_toggles()
+	_refresh_note_chase_clef_buttons()
 
 	_result_overlay = ColorRect.new()
 	_result_overlay.set_anchors_preset(PRESET_FULL_RECT)
@@ -1638,6 +1703,19 @@ func _apply_pro_style() -> void:
 	_style_hud_box(_hud_left_box)
 	_style_hud_box(_hud_right_box)
 	_style_hud_box(_hud_center_box)
+	_style_note_chase_metric_box(_note_chase_target_box)
+	_style_note_chase_metric_box(_note_chase_speed_box)
+	_style_note_chase_metric_box(_note_chase_combo_box)
+	_style_note_chase_metric_box(_note_chase_shield_box)
+	_style_hud_box(_note_chase_side_panel)
+	_style_note_chase_metric_box(_note_chase_side_target_box)
+	_style_note_chase_metric_box(_note_chase_side_speed_box)
+	_style_note_chase_metric_box(_note_chase_side_combo_box)
+	_style_note_chase_metric_box(_note_chase_side_shield_box)
+	_style_note_chase_metric_box(_note_chase_bottom_target_box)
+	_style_note_chase_metric_box(_note_chase_bottom_speed_box)
+	_style_note_chase_metric_box(_note_chase_bottom_combo_box)
+	_style_note_chase_metric_box(_note_chase_bottom_shield_box)
 	_style_controls_recursive(self)
 	for btn in _home_material_buttons:
 		_style_material_button(btn)
@@ -1686,6 +1764,9 @@ func _style_controls_recursive(node: Node) -> void:
 			btn.add_theme_color_override("font_hover_color", Color(0.16, 0.10, 0.04))
 			btn.add_theme_color_override("font_pressed_color", Color(0.12, 0.08, 0.03))
 			_style_button(btn)
+			var click_call := Callable(self, "_on_any_ui_button_pressed")
+			if not btn.pressed.is_connected(click_call):
+				btn.pressed.connect(click_call)
 		elif child is CheckBox:
 			var cb := child as CheckBox
 			cb.add_theme_font_override("font", _ui_font)
@@ -1860,6 +1941,78 @@ func _style_hud_box(box: PanelContainer) -> void:
 	box.add_theme_stylebox_override("panel", sb)
 
 
+func _style_note_chase_metric_box(box: PanelContainer) -> void:
+	if box == null:
+		return
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.05, 0.07, 0.07, 0.72)
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.border_color = Color(0.96, 0.86, 0.40, 0.88)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	box.add_theme_stylebox_override("panel", sb)
+
+
+func _set_note_chase_metric_highlight(box: PanelContainer, active: bool) -> void:
+	if box == null:
+		return
+	var sb := box.get_theme_stylebox("panel")
+	if not (sb is StyleBoxFlat):
+		return
+	var s := (sb as StyleBoxFlat)
+	if active:
+		s.border_color = Color(0.48, 0.90, 1.0, 0.98)
+		s.bg_color = Color(0.08, 0.16, 0.18, 0.82)
+		s.border_width_left = 2
+		s.border_width_top = 2
+		s.border_width_right = 2
+		s.border_width_bottom = 2
+	else:
+		s.border_color = Color(0.96, 0.86, 0.40, 0.88)
+		s.bg_color = Color(0.05, 0.07, 0.07, 0.72)
+		s.border_width_left = 1
+		s.border_width_top = 1
+		s.border_width_right = 1
+		s.border_width_bottom = 1
+
+
+func _set_note_chase_top_text_only(enabled: bool) -> void:
+	var boxes: Array[PanelContainer] = [_hud_left_box, _hud_center_box, _hud_right_box]
+	for b in boxes:
+		if b == null:
+			continue
+		if enabled:
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = Color(0, 0, 0, 0.0)
+			sb.border_width_left = 0
+			sb.border_width_top = 0
+			sb.border_width_right = 0
+			sb.border_width_bottom = 0
+			sb.content_margin_left = 0
+			sb.content_margin_right = 0
+			sb.content_margin_top = 0
+			sb.content_margin_bottom = 0
+			b.add_theme_stylebox_override("panel", sb)
+		else:
+			_style_hud_box(b)
+
+
+func _set_note_chase_bottom_metric(label: RichTextLabel, icon_text: String, value_text: String) -> void:
+	if label == null:
+		return
+	label.clear()
+	label.append_text("[color=#F5DA70]%s[/color] [b][color=#6FEAFF]%s[/color][/b]" % [icon_text, value_text])
+
+
 func _result_box_show(title_text: String, subtitle_text: String) -> void:
 	_result_title.text = title_text
 	_result_subtitle.text = subtitle_text
@@ -1877,6 +2030,12 @@ func _post_layout_init() -> void:
 		_bird_home_ready = true
 	_reset_bird_position()
 	_start_bird_idle_anim()
+
+
+func _on_any_ui_button_pressed() -> void:
+	if _selected_mode == MODE_SIGHT and _quiz_active and _accepting_answer:
+		return
+	_play_ui_click_sfx()
 
 
 func _load_texture(path: String) -> Texture2D:
@@ -1901,8 +2060,29 @@ func _setup_audio() -> void:
 
 	_sfx_player = AudioStreamPlayer.new()
 	add_child(_sfx_player)
-	_success_sfx = _load_audio_stream(SUCCESS_SFX_PATH)
-	_fail_sfx = _load_audio_stream(FAIL_SFX_PATH)
+	_ui_sfx_player = AudioStreamPlayer.new()
+	add_child(_ui_sfx_player)
+	_music_player = AudioStreamPlayer.new()
+	_music_player.volume_db = -16.0
+	_music_player.autoplay = false
+	add_child(_music_player)
+	_ui_click_sfx = _load_audio_stream(UI_CLICK_SFX_PATH)
+	_ui_sight_answer_click_sfx = _load_audio_stream(UI_SIGHT_ANSWER_CLICK_SFX_PATH)
+	_correct_sfx = _load_audio_stream(CORRECT_SFX_PATH)
+	_wrong_choice_sfx = _load_audio_stream(WRONG_CHOICE_SFX_PATH)
+	_fail_gameover_sfx = _load_audio_stream(FAIL_GAMEOVER_SFX_PATH)
+	_win_fanfare_sfx = _load_audio_stream(WIN_FANFARE_SFX_PATH)
+	_module_complete_sfx = _load_audio_stream(MODULE_COMPLETE_SFX_PATH)
+	_new_question_sfx = _load_audio_stream(NEW_QUESTION_SFX_PATH)
+	_powerup_sfx = _load_audio_stream(POWERUP_SFX_PATH)
+	_transition_whoosh_sfx = _load_audio_stream(TRANSITION_WHOOSH_SFX_PATH)
+	_note_chase_bgm = _load_audio_stream(NOTE_CHASE_BGM_PATH)
+	if _note_chase_bgm is AudioStreamOggVorbis:
+		var ogg := _note_chase_bgm as AudioStreamOggVorbis
+		ogg.loop = true
+	elif _note_chase_bgm is AudioStreamMP3:
+		var mp3 := _note_chase_bgm as AudioStreamMP3
+		mp3.loop = true
 
 	_audio_stream = AudioStreamGenerator.new()
 	_audio_stream.mix_rate = 44100
@@ -1937,7 +2117,6 @@ func _on_mode_selected() -> void:
 	var is_ear := _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD
 	var practice_flow := _home_flow == "Practice"
 	var learn_flow := _home_flow == "Learn"
-	var teacher_flow := _home_flow == "Teacher Dashboard"
 
 	if _home_q_row != null:
 		_home_q_row.visible = practice_flow
@@ -1945,13 +2124,11 @@ func _on_mode_selected() -> void:
 		_home_mode_label.visible = practice_flow
 	if _home_mode_buttons_row != null:
 		_home_mode_buttons_row.visible = practice_flow
-	if _home_teacher_box != null:
-		_home_teacher_box.visible = teacher_flow
-
 	_ear_mode_row.visible = practice_flow and is_ear
 	_interval_options_box.visible = practice_flow and is_ear and _selected_mode == MODE_INTERVAL
 	_chord_options_box.visible = practice_flow and is_ear and _selected_mode == MODE_CHORD
 	_sight_options_box.visible = practice_flow and _selected_mode == MODE_SIGHT
+	_note_chase_options_box.visible = practice_flow and _selected_mode == MODE_NOTE_CHASE
 	_read_options_box.visible = learn_flow and _selected_mode == MODE_READ
 
 	if _home_start_button != null:
@@ -1967,6 +2144,7 @@ func _on_mode_selected() -> void:
 	_refresh_mode_buttons()
 	_refresh_ear_mode_buttons()
 	_refresh_clef_buttons()
+	_refresh_note_chase_clef_buttons()
 	_refresh_chord_group_buttons()
 	_refresh_sight_mode_buttons()
 	_refresh_read_module_buttons()
@@ -1974,32 +2152,25 @@ func _on_mode_selected() -> void:
 
 
 func _on_mode_button_pressed(mode: int) -> void:
-	if mode == MODE_TEACHER:
-		_home_flow = "Teacher Dashboard"
-		_selected_mode = MODE_TEACHER
-		_on_mode_selected()
-		return
 	if mode == MODE_SIGHT:
 		_selected_mode = MODE_SIGHT
+	elif mode == MODE_NOTE_CHASE:
+		_selected_mode = MODE_NOTE_CHASE
 	elif mode == MODE_READ:
 		_selected_mode = MODE_READ
 	else:
 		if _selected_mode != MODE_INTERVAL and _selected_mode != MODE_CHORD:
 			_selected_mode = MODE_INTERVAL
-	if _home_flow == "Teacher Dashboard":
-		_home_flow = "Practice"
 	_on_mode_selected()
 
 
 func _on_home_hub_pressed(hub_name: String) -> void:
 	_home_flow = hub_name
 	if hub_name == "Practice":
-		if _selected_mode != MODE_INTERVAL and _selected_mode != MODE_CHORD and _selected_mode != MODE_SIGHT:
+		if _selected_mode != MODE_INTERVAL and _selected_mode != MODE_CHORD and _selected_mode != MODE_SIGHT and _selected_mode != MODE_NOTE_CHASE:
 			_selected_mode = MODE_INTERVAL
-	elif hub_name == "Learn":
-		_selected_mode = MODE_READ
 	else:
-		_selected_mode = MODE_TEACHER
+		_selected_mode = MODE_READ
 	_on_mode_selected()
 
 
@@ -2034,13 +2205,78 @@ func _on_include_minor_toggled(enabled: bool) -> void:
 	_include_minor_intervals = enabled
 
 
+func _on_note_chase_note_toggled(note_name: String) -> void:
+	if not _note_chase_note_toggles.has(note_name):
+		return
+	var btn: Button = _note_chase_note_toggles[note_name]
+	if btn.button_pressed:
+		if _note_chase_selected_notes.has(note_name):
+			return
+		if _note_chase_selected_notes.size() >= 3:
+			btn.button_pressed = false
+			_home_info_label.text = "You can pick up to 3 target notes."
+			return
+		_note_chase_selected_notes.append(note_name)
+	else:
+		_note_chase_selected_notes.erase(note_name)
+		if _note_chase_selected_notes.is_empty():
+			btn.button_pressed = true
+			_note_chase_selected_notes.append(note_name)
+	_refresh_note_chase_note_toggles()
+
+
+func _refresh_note_chase_note_toggles() -> void:
+	for key in _note_chase_note_toggles.keys():
+		var btn: Button = _note_chase_note_toggles[key]
+		var selected := _note_chase_selected_notes.has(str(key))
+		btn.button_pressed = selected
+		var normal := StyleBoxFlat.new()
+		normal.corner_radius_top_left = 10
+		normal.corner_radius_top_right = 10
+		normal.corner_radius_bottom_left = 10
+		normal.corner_radius_bottom_right = 10
+		normal.border_width_left = 3
+		normal.border_width_top = 3
+		normal.border_width_right = 3
+		normal.border_width_bottom = 3
+		if selected:
+			normal.bg_color = Color(0.25, 0.18, 0.02, 1.0)
+			normal.border_color = Color(0.95, 0.90, 0.30, 1.0)
+			btn.add_theme_color_override("font_color", Color(0.98, 0.96, 0.82, 1.0))
+			btn.add_theme_color_override("font_hover_color", Color(0.98, 0.96, 0.82, 1.0))
+			btn.add_theme_color_override("font_pressed_color", Color(0.98, 0.96, 0.82, 1.0))
+		else:
+			normal.bg_color = Color(0.84, 0.74, 0.42, 0.96)
+			normal.border_color = Color(0.30, 0.23, 0.10, 0.68)
+			btn.add_theme_color_override("font_color", Color(0.20, 0.14, 0.06))
+			btn.add_theme_color_override("font_hover_color", Color(0.20, 0.14, 0.06))
+			btn.add_theme_color_override("font_pressed_color", Color(0.20, 0.14, 0.06))
+		btn.add_theme_stylebox_override("normal", normal)
+		var hover := normal.duplicate()
+		hover.bg_color = Color(0.93, 0.82, 0.46, 1.0) if not selected else Color(0.35, 0.25, 0.04, 1.0)
+		btn.add_theme_stylebox_override("hover", hover)
+		var pressed := normal.duplicate()
+		pressed.bg_color = Color(0.73, 0.61, 0.33, 1.0) if not selected else Color(0.20, 0.14, 0.02, 1.0)
+		btn.add_theme_stylebox_override("pressed", pressed)
+
+
 func _on_clef_button_pressed(clef_name: String) -> void:
 	_selected_clef = clef_name
+	if _note_chase_clef_clone != null:
+		_note_chase_clef_clone.text = "𝄢" if _selected_clef == "Bass" else "𝄞"
 	var bounds := _get_sight_step_bounds()
 	_sight_range_min_step = clampi(_sight_range_min_step, bounds.x, bounds.y)
 	_sight_range_max_step = clampi(_sight_range_max_step, _sight_range_min_step, bounds.y)
 	_refresh_clef_buttons()
+	_refresh_note_chase_clef_buttons()
 	_update_sight_range_ui()
+
+
+func _on_note_chase_clef_mode_pressed(mode_name: String) -> void:
+	_note_chase_clef_mode = mode_name
+	if mode_name == "Treble" or mode_name == "Bass":
+		_selected_clef = mode_name
+	_refresh_note_chase_clef_buttons()
 
 
 func _on_sight_mode_button_pressed(mode_name: String) -> void:
@@ -2065,20 +2301,7 @@ func _on_chord_group_button_pressed(group_id: int) -> void:
 
 
 func _on_teacher_open_pressed() -> void:
-	_selected_mode = MODE_TEACHER
-	_home_flow = "Teacher Dashboard"
-	_on_mode_selected()
-	_show_game()
-	_set_answer_buttons_enabled(false)
-	_quiz_active = false
-	_accepting_answer = false
-	_result_box_hide()
-	if _teacher_tabs != null:
-		_teacher_tabs.current_tab = 0
-	_refresh_teacher_students_list()
-	_teacher_update_dashboard_empty()
-	_teacher_refresh_selected_student_label()
-	_teacher_status_label.text = "Use Go Back to return Home."
+	_show_home()
 
 
 func _load_teacher_data() -> void:
@@ -3213,6 +3436,8 @@ func _refresh_mode_buttons() -> void:
 		_set_home_selection_state(_mode_buttons["Ear"], is_ear)
 	if _mode_buttons.has("Sight"):
 		_set_home_selection_state(_mode_buttons["Sight"], _selected_mode == MODE_SIGHT)
+	if _mode_buttons.has("Chase"):
+		_set_home_selection_state(_mode_buttons["Chase"], _selected_mode == MODE_NOTE_CHASE)
 	if _mode_buttons.has("Read"):
 		_set_home_selection_state(_mode_buttons["Read"], _selected_mode == MODE_READ)
 		_mode_buttons["Read"].visible = false
@@ -3234,6 +3459,12 @@ func _refresh_clef_buttons() -> void:
 	for clef_name in _clef_buttons.keys():
 		var btn: Button = _clef_buttons[clef_name]
 		_set_home_selection_state(btn, clef_name == _selected_clef)
+
+
+func _refresh_note_chase_clef_buttons() -> void:
+	for clef_name in _note_chase_clef_buttons.keys():
+		var btn: Button = _note_chase_clef_buttons[clef_name]
+		_set_home_selection_state(btn, clef_name == _note_chase_clef_mode)
 
 
 func _refresh_sight_mode_buttons() -> void:
@@ -3326,12 +3557,89 @@ func _current_post_answer_delay() -> float:
 
 
 func _refresh_meta_ui() -> void:
+	if _selected_mode == MODE_NOTE_CHASE:
+		_set_note_chase_top_text_only(true)
+		if _lives_label != null:
+			_lives_label.text = "Focus Hearts: %d / 5" % _lives
+		var target_text := "Targets: %s" % ", ".join(_note_chase_selected_notes)
+		var speed_text := "Speed: %.1fx" % _note_chase_speed_multiplier()
+		var combo_text := "Combo: x%d" % maxi(1, _note_chase_combo_mult)
+		var shield_text := ("%.1fs" % _note_chase_shield_timer) if _note_chase_shield_timer > 0.0 else "0s"
+		if _note_chase_target_label != null:
+			_note_chase_target_label.text = target_text
+		if _note_chase_speed_label != null:
+			_note_chase_speed_label.text = speed_text
+		if _note_chase_combo_label != null:
+			_note_chase_combo_label.text = combo_text
+		if _note_chase_shield_label != null:
+			_note_chase_shield_label.text = shield_text
+		if _note_chase_side_target_label != null:
+			_note_chase_side_target_label.text = target_text
+		if _note_chase_side_speed_label != null:
+			_note_chase_side_speed_label.text = speed_text
+		if _note_chase_side_combo_label != null:
+			_note_chase_side_combo_label.text = combo_text
+		if _note_chase_side_shield_label != null:
+			_note_chase_side_shield_label.text = shield_text
+		_set_note_chase_bottom_metric(_note_chase_bottom_target_label, "♪", ", ".join(_note_chase_selected_notes))
+		_set_note_chase_bottom_metric(_note_chase_bottom_speed_label, "⚡", "%.1fx" % _note_chase_speed_multiplier())
+		_set_note_chase_bottom_metric(_note_chase_bottom_combo_label, "xP", "x%d" % maxi(1, _note_chase_combo_mult))
+		_set_note_chase_bottom_metric(_note_chase_bottom_shield_label, "🛡", shield_text)
+		if _note_chase_level_label != null:
+			_note_chase_level_label.text = "Level %d" % (_note_chase_speed_stage + 1)
+		if _streak_label != null:
+			_streak_label.visible = false
+		if _xp_label != null:
+			_xp_label.visible = false
+		if _note_chase_target_box != null:
+			_note_chase_target_box.visible = false
+		if _note_chase_speed_box != null:
+			_note_chase_speed_box.visible = false
+		if _note_chase_combo_box != null:
+			_note_chase_combo_box.visible = false
+		if _note_chase_shield_box != null:
+			_note_chase_shield_box.visible = false
+		if _note_chase_side_panel != null:
+			_note_chase_side_panel.visible = false
+		if _note_chase_bottom_row != null:
+			_note_chase_bottom_row.visible = true
+		if _note_chase_bottom_spacer != null:
+			_note_chase_bottom_spacer.visible = true
+		_set_note_chase_metric_highlight(_note_chase_bottom_shield_box, _note_chase_shield_timer > 0.0)
+		return
+	_set_note_chase_top_text_only(false)
 	if _lives_label != null:
-		_lives_label.text = "Chicken Life: %d" % _lives
+		_lives_label.text = "Lives: %d" % _lives
 	if _streak_label != null:
 		_streak_label.text = "Streak: %d" % _streak
+		_streak_label.visible = true
 	if _xp_label != null:
 		_xp_label.text = "XP: %d" % _xp
+		_xp_label.visible = true
+	if _note_chase_target_label != null:
+		_note_chase_target_label.text = ""
+	if _note_chase_speed_label != null:
+		_note_chase_speed_label.text = ""
+	if _note_chase_combo_label != null:
+		_note_chase_combo_label.text = ""
+	if _note_chase_shield_label != null:
+		_note_chase_shield_label.text = ""
+	if _note_chase_level_label != null:
+		_note_chase_level_label.text = ""
+	if _note_chase_side_target_label != null:
+		_note_chase_side_target_label.text = ""
+	if _note_chase_side_speed_label != null:
+		_note_chase_side_speed_label.text = ""
+	if _note_chase_side_combo_label != null:
+		_note_chase_side_combo_label.text = ""
+	if _note_chase_side_shield_label != null:
+		_note_chase_side_shield_label.text = ""
+	if _note_chase_side_panel != null:
+		_note_chase_side_panel.visible = false
+	if _note_chase_bottom_row != null:
+		_note_chase_bottom_row.visible = false
+	if _note_chase_bottom_spacer != null:
+		_note_chase_bottom_spacer.visible = false
 
 
 func _init_session_stats() -> void:
@@ -3456,9 +3764,10 @@ func _session_performance_summary() -> String:
 
 
 func _on_start_quiz_pressed() -> void:
-	if _selected_mode == MODE_TEACHER:
-		_on_teacher_open_pressed()
-		return
+	_awaiting_round_start = false
+	if _round_start_button != null:
+		_round_start_button.visible = false
+		_round_start_button.disabled = true
 	if _selected_mode == MODE_READ:
 		_home_info_label.text = ""
 		_show_game()
@@ -3470,6 +3779,10 @@ func _on_start_quiz_pressed() -> void:
 		if _active_intervals.size() < 3:
 			_home_info_label.text = "Need at least 3 interval options."
 			return
+	elif _selected_mode == MODE_NOTE_CHASE:
+		if _note_chase_selected_notes.is_empty():
+			_home_info_label.text = "Pick at least one target note for Note Chase."
+			return
 	else:
 		_active_intervals = []
 
@@ -3478,7 +3791,7 @@ func _on_start_quiz_pressed() -> void:
 	_apply_answer_mode()
 	_score = 0
 	_question_index = 0
-	_lives = 3
+	_lives = 5 if _selected_mode == MODE_NOTE_CHASE else 3
 	_streak = 0
 	_xp = 0
 	_last_interval_signature = ""
@@ -3490,6 +3803,18 @@ func _on_start_quiz_pressed() -> void:
 	_refresh_meta_ui()
 	_result_box_hide()
 	_show_game()
+	if _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE:
+		_awaiting_round_start = true
+		if _round_start_button != null:
+			_round_start_button.visible = _selected_mode == MODE_SIGHT
+			_round_start_button.disabled = false
+		_apply_answer_mode()
+		_replay_button.disabled = true
+		if _selected_mode == MODE_NOTE_CHASE:
+			_status_label.text = ""
+		else:
+			_status_label.text = "Tap Start Round when you're ready."
+		return
 	await _begin_next_question()
 
 
@@ -3498,6 +3823,16 @@ func _on_end_quiz_pressed() -> void:
 	_quiz_active = false
 	_accepting_answer = false
 	_set_answer_buttons_enabled(false)
+	_awaiting_round_start = false
+	_note_chase_running = false
+	_note_chase_fever_active = false
+	_note_chase_boss_active = false
+	_stop_note_chase_music()
+	_set_note_chase_overlay("", false)
+	_clear_note_chase_visual_notes()
+	_set_note_chase_staff_scrolling(false)
+	if _round_start_button != null:
+		_round_start_button.visible = false
 	_replay_button.disabled = true
 	_status_label.text = "Back to home."
 	_result_box_hide()
@@ -3512,12 +3847,23 @@ func _on_restart_quiz_pressed() -> void:
 		return
 	_quiz_active = false
 	_accepting_answer = false
+	_note_chase_running = false
+	_note_chase_fever_active = false
+	_note_chase_boss_active = false
+	_stop_note_chase_music()
+	_set_note_chase_overlay("", false)
+	_clear_note_chase_visual_notes()
+	_set_note_chase_staff_scrolling(false)
 	_set_answer_buttons_enabled(false)
+	_awaiting_round_start = false
+	if _round_start_button != null:
+		_round_start_button.visible = false
+		_round_start_button.disabled = true
 	_replay_button.disabled = true
 	_status_label.text = "Restarting..."
 	_score = 0
 	_question_index = 0
-	_lives = 3
+	_lives = 5 if _selected_mode == MODE_NOTE_CHASE else 3
 	_streak = 0
 	_xp = 0
 	_last_interval_signature = ""
@@ -3527,6 +3873,17 @@ func _on_restart_quiz_pressed() -> void:
 	_refresh_meta_ui()
 	_result_box_hide()
 	_quiz_active = true
+	if _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE:
+		_awaiting_round_start = true
+		if _round_start_button != null:
+			_round_start_button.visible = _selected_mode == MODE_SIGHT
+			_round_start_button.disabled = false
+		_apply_answer_mode()
+		if _selected_mode == MODE_NOTE_CHASE:
+			_status_label.text = ""
+		else:
+			_status_label.text = "Tap Start Round when you're ready."
+		return
 	await _begin_next_question()
 
 
@@ -3565,14 +3922,16 @@ func _build_interval_choices(correct_id: String, pool: Array[String]) -> Array[S
 
 
 func _apply_answer_mode() -> void:
+	var gate_choices_for_round_start := _awaiting_round_start and (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
+
 	if _selected_mode == MODE_INTERVAL:
 		_prompt_label.text = "Choose the interval:"
 	elif _selected_mode == MODE_CHORD:
 		_prompt_label.text = "Choose the chord type:"
 	elif _selected_mode == MODE_READ:
 		_prompt_label.text = ""
-	elif _selected_mode == MODE_TEACHER:
-		_prompt_label.text = ""
+	elif _selected_mode == MODE_NOTE_CHASE:
+		_prompt_label.text = "Tap only target notes as they scroll."
 	else:
 		if _sight_mode == "Chords":
 			_prompt_label.text = "Choose the chord name:"
@@ -3581,15 +3940,19 @@ func _apply_answer_mode() -> void:
 		else:
 			_prompt_label.text = "Click the matching key:"
 
-	if _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ:
+	if _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE:
 		_replay_button.visible = false
+		if _round_start_button != null:
+			_round_start_button.visible = _selected_mode == MODE_SIGHT and _awaiting_round_start
 		_slow_toggle.visible = false
 		_sight_side_controls.visible = false
-		_control_row.visible = false
-		_prompt_label.visible = _selected_mode == MODE_SIGHT and _sight_mode == "Placement"
-		_status_label.visible = false
+		_control_row.visible = _selected_mode == MODE_SIGHT and _awaiting_round_start
+		_prompt_label.visible = ((_selected_mode == MODE_SIGHT and _sight_mode == "Placement") or _selected_mode == MODE_NOTE_CHASE) and not gate_choices_for_round_start
+		_status_label.visible = _selected_mode == MODE_SIGHT and _awaiting_round_start
 		_game_panel.add_theme_constant_override("separation", 2)
 		_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP if (_selected_mode == MODE_SIGHT and _sight_mode == "Placement") or _in_tutorial else Control.MOUSE_FILTER_IGNORE
+		if _sight_container != null:
+			_sight_container.alignment = BoxContainer.ALIGNMENT_BEGIN if _selected_mode == MODE_NOTE_CHASE else BoxContainer.ALIGNMENT_CENTER
 	else:
 		if _replay_button.get_parent() != _control_row:
 			if _replay_button.get_parent() != null:
@@ -3600,6 +3963,9 @@ func _apply_answer_mode() -> void:
 				_slow_toggle.get_parent().remove_child(_slow_toggle)
 			_control_row.add_child(_slow_toggle)
 		_replay_button.visible = true
+		if _round_start_button != null:
+			var needs_start := _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD or _selected_mode == MODE_SIGHT
+			_round_start_button.visible = needs_start and _awaiting_round_start
 		_slow_toggle.visible = true
 		_sight_side_controls.visible = true
 		_control_row.visible = true
@@ -3616,46 +3982,60 @@ func _apply_answer_mode() -> void:
 		_tutorial_end_button_col.visible = false
 
 	for btn in _interval_choice_buttons:
-		var is_active := _selected_mode == MODE_INTERVAL
+		var is_active := _selected_mode == MODE_INTERVAL and not gate_choices_for_round_start
 		btn.visible = is_active
 		btn.disabled = not is_active
 
 	for chord_name in CHORD_INTERVALS.keys():
 		if _chord_buttons.has(chord_name):
 			var chord_btn: Button = _chord_buttons[chord_name]
-			var show := _selected_mode == MODE_CHORD and _current_available_chord_types.has(chord_name)
+			var show := _selected_mode == MODE_CHORD and _current_available_chord_types.has(chord_name) and not gate_choices_for_round_start
 			chord_btn.visible = show
 			chord_btn.disabled = not show
 
 	for note_name in _sight_key_buttons.keys():
 		var k_btn: Button = _sight_key_buttons[note_name]
-		var show_key := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		var show_key := _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and not gate_choices_for_round_start
 		k_btn.visible = show_key
 		k_btn.disabled = not show_key
 		k_btn.modulate = Color(1, 1, 1, 1)
 
 	for i in _sight_chord_choice_buttons.size():
 		var sc_btn: Button = _sight_chord_choice_buttons[i]
-		var show_chord_choice := _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
+		var show_chord_choice := _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and not gate_choices_for_round_start
 		sc_btn.visible = show_chord_choice
 		sc_btn.disabled = not show_chord_choice
 		sc_btn.modulate = Color(1, 1, 1, 1)
 
-	_sight_container.visible = _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ
-	if _teacher_panel != null:
-		_teacher_panel.visible = _selected_mode == MODE_TEACHER
+	_sight_container.visible = _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE
+	if _selected_mode != MODE_NOTE_CHASE:
+		_set_note_chase_staff_scrolling(false)
+		_stop_note_chase_music()
+		_note_chase_apply_theme()
+		_set_note_chase_overlay("", false)
+	else:
+		# Show colorful fixed staff immediately on entering Note Chase, even before Start Round.
+		_set_note_chase_staff_scrolling(true)
+		_set_note_chase_overlay("Tap Start Round When You're Ready", _awaiting_round_start)
+	if _staff_note != null:
+		_staff_note.visible = _selected_mode != MODE_NOTE_CHASE
+	if _selected_mode == MODE_NOTE_CHASE:
+		for n in _staff_chord_notes:
+			n.visible = false
 	if _sky_block != null:
 		if _selected_mode == MODE_READ:
 			_sky_block.custom_minimum_size = Vector2(0, 118)
 		elif _selected_mode == MODE_SIGHT:
 			_sky_block.custom_minimum_size = Vector2(0, 16)
-		elif _selected_mode == MODE_TEACHER:
-			_sky_block.custom_minimum_size = Vector2(0, 0)
+		elif _selected_mode == MODE_NOTE_CHASE:
+			_sky_block.custom_minimum_size = Vector2(0, 42)
 		else:
 			_sky_block.custom_minimum_size = Vector2(0, 140)
 	if _staff_area != null:
 		if _selected_mode == MODE_READ:
 			_staff_area.custom_minimum_size = Vector2(470, 246)
+		elif _selected_mode == MODE_NOTE_CHASE:
+			_staff_area.custom_minimum_size = Vector2(500, 302)
 		else:
 			_staff_area.custom_minimum_size = Vector2(500, 320)
 	if _sight_top_spacer != null:
@@ -3679,21 +4059,48 @@ func _apply_answer_mode() -> void:
 		_start_sight_note_bounce()
 	else:
 		_stop_sight_note_bounce()
+	if _selected_mode == MODE_NOTE_CHASE:
+		if _streak_label != null:
+			_streak_label.visible = false
+		if _xp_label != null:
+			_xp_label.visible = false
+		if _note_chase_level_label != null:
+			_note_chase_level_label.visible = true
+		if _note_chase_target_label != null:
+			_note_chase_target_label.visible = true
+		if _note_chase_speed_label != null:
+			_note_chase_speed_label.visible = true
+		if _note_chase_combo_label != null:
+			_note_chase_combo_label.visible = true
+		if _note_chase_shield_label != null:
+			_note_chase_shield_label.visible = true
+	else:
+		if _note_chase_level_label != null:
+			_note_chase_level_label.visible = false
+		if _note_chase_target_label != null:
+			_note_chase_target_label.visible = false
+		if _note_chase_speed_label != null:
+			_note_chase_speed_label.visible = false
+		if _note_chase_combo_label != null:
+			_note_chase_combo_label.visible = false
+		if _note_chase_shield_label != null:
+			_note_chase_shield_label.visible = false
+		if _note_chase_bottom_row != null:
+			_note_chase_bottom_row.visible = false
 	if _selected_mode == MODE_READ:
 		call_deferred("_position_tutorial_button_row")
 		call_deferred("_position_tutorial_title")
 		call_deferred("_position_tutorial_end_buttons")
-	if _selected_mode == MODE_TEACHER:
-		_replay_button.visible = false
-		_slow_toggle.visible = false
-		_sight_side_controls.visible = false
-		_control_row.visible = false
-		_prompt_label.visible = false
-		_status_label.visible = false
 
 
 func _show_home() -> void:
+	_play_transition_whoosh_sfx()
 	_in_tutorial = false
+	_note_chase_running = false
+	_stop_note_chase_music()
+	_set_note_chase_overlay("", false)
+	_clear_note_chase_visual_notes()
+	_set_note_chase_staff_scrolling(false)
 	_home_card.visible = true
 	_home_panel.visible = true
 	_game_card.visible = false
@@ -3705,8 +4112,6 @@ func _show_home() -> void:
 	_hud_center_box.visible = false
 	if _tutorial_panel != null:
 		_tutorial_panel.visible = false
-	if _teacher_panel != null:
-		_teacher_panel.visible = false
 	if _tutorial_bubble != null:
 		_tutorial_bubble.visible = false
 	if _tutorial_bubble_tail != null:
@@ -3720,9 +4125,12 @@ func _show_home() -> void:
 	if _tutorial_chicken != null:
 		_tutorial_chicken.visible = false
 	_result_box_hide()
+	if _title_label != null:
+		_title_label.text = "Adagio Music Trainer"
 
 
 func _show_game() -> void:
+	_play_transition_whoosh_sfx()
 	_home_card.visible = false
 	_home_panel.visible = false
 	_game_card.visible = true
@@ -3736,17 +4144,6 @@ func _show_game() -> void:
 		_hud_left_box.visible = false
 		_hud_right_box.visible = false
 		_hud_center_box.visible = false
-	if _selected_mode == MODE_TEACHER:
-		_restart_button.visible = false
-		_hud_left_box.visible = false
-		_hud_right_box.visible = false
-		_hud_center_box.visible = false
-		_prompt_label.visible = false
-		_control_row.visible = false
-		_sight_container.visible = false
-		if _teacher_panel != null:
-			_teacher_panel.visible = true
-			_refresh_teacher_students_list()
 	if _tutorial_button_row != null:
 		_tutorial_button_row.visible = _selected_mode == MODE_READ
 		if _selected_mode == MODE_READ:
@@ -3758,6 +4155,8 @@ func _show_game() -> void:
 		call_deferred("_position_tutorial_end_buttons")
 	_end_button.move_to_front()
 	_restart_button.move_to_front()
+	if _title_label != null:
+		_title_label.text = "Note Catcher" if _selected_mode == MODE_NOTE_CHASE else "Adagio Music Trainer"
 
 
 func _start_read_module() -> void:
@@ -3766,6 +4165,10 @@ func _start_read_module() -> void:
 	_tutorial_module_recorded = false
 	_quiz_active = true
 	_accepting_answer = false
+	_awaiting_round_start = false
+	if _round_start_button != null:
+		_round_start_button.visible = false
+		_round_start_button.disabled = true
 	_replay_button.disabled = true
 	_restart_button.disabled = false
 	_score = 0
@@ -4068,6 +4471,7 @@ func _show_tutorial_step() -> void:
 			if not _tutorial_module_recorded:
 				_teacher_mark_module_completed()
 				_tutorial_module_recorded = true
+				_play_module_complete_sfx()
 			_tutorial_continue_button.visible = false
 			_tutorial_back_button.visible = false
 			if _tutorial_button_row != null:
@@ -4243,6 +4647,898 @@ func _play_tutorial_hmm(run_id: int = -1) -> void:
 	await _push_sine(196.0, 0.04)
 
 
+func _start_note_chase_round() -> void:
+	_note_chase_running = false
+	if _note_chase_clef_mode == "Treble" or _note_chase_clef_mode == "Bass":
+		_selected_clef = _note_chase_clef_mode
+	else:
+		_selected_clef = "Treble"
+	_refresh_note_chase_clef_buttons()
+	_refresh_clef_buttons()
+	_note_chase_staff_scroll_x = 0.0
+	_set_note_chase_staff_scrolling(true)
+	_note_chase_spawn_timer = 0.0
+	_note_chase_correct_clicks = 0
+	_note_chase_correct_streak = 0
+	_note_chase_wrongs = 0
+	_note_chase_speed_stage = 0
+	_note_chase_fever_active = false
+	_note_chase_fever_timer = 0.0
+	_note_chase_boss_active = false
+	_note_chase_boss_timer = 0.0
+	_note_chase_boss_last_stage = -1
+	_note_chase_last_theme_stage = -1
+	_note_chase_clef_switch_cd = 0.0
+	_note_chase_freeze_timer = 0.0
+	_note_chase_shield_timer = 0.0
+	_note_chase_combo_mult = 1
+	_note_chase_spawned = 0
+	_note_chase_active_notes.clear()
+	_clear_note_chase_visual_notes()
+	_apply_note_chase_speed_from_option()
+	_set_answer_buttons_enabled(false)
+	_accepting_answer = false
+	_replay_button.disabled = true
+	_restart_button.disabled = false
+	_score_label.text = "Score: 0"
+	_progress_label.text = ""
+	_status_label.text = "3"
+	await get_tree().create_timer(0.45).timeout
+	if not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+		return
+	_status_label.text = "2"
+	await get_tree().create_timer(0.45).timeout
+	if not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+		return
+	_status_label.text = "1"
+	await get_tree().create_timer(0.45).timeout
+	if not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+		return
+	_status_label.text = "Go!"
+	await _play_new_question_cue()
+	_start_note_chase_music()
+	_note_chase_running = true
+	_accepting_answer = true
+
+
+func _apply_note_chase_speed_from_option() -> void:
+	var mode_id := 1
+	if _note_chase_speed_option != null:
+		mode_id = _note_chase_speed_option.get_selected_id()
+	match mode_id:
+		0:
+			_note_chase_base_scroll_speed = 66.0
+			_note_chase_base_spawn_interval = 1.35
+		2:
+			_note_chase_base_scroll_speed = 104.0
+			_note_chase_base_spawn_interval = 1.00
+		_:
+			_note_chase_base_scroll_speed = 82.0
+			_note_chase_base_spawn_interval = 1.16
+	_note_chase_apply_speed_stage()
+
+
+func _note_chase_apply_speed_stage() -> void:
+	var multiplier := _note_chase_speed_multiplier()
+	_note_chase_scroll_speed = _note_chase_base_scroll_speed * multiplier
+	# Softer acceleration curve so difficulty ramps up less aggressively.
+	var spawn_mult := 1.0 + ((multiplier - 1.0) * 0.45)
+	_note_chase_spawn_interval = maxf(0.34, _note_chase_base_spawn_interval / maxf(1.0, spawn_mult))
+	_apply_note_chase_staff_colors()
+	_note_chase_apply_theme()
+	_note_chase_refresh_progress_text()
+	if _note_chase_speed_stage > 0 and _note_chase_speed_stage % 3 == 0 and _note_chase_boss_last_stage != _note_chase_speed_stage:
+		_note_chase_start_boss_round()
+	if _note_chase_last_theme_stage != _note_chase_speed_stage:
+		_note_chase_last_theme_stage = _note_chase_speed_stage
+		_play_note_chase_stage_motif(_note_chase_speed_stage)
+
+
+func _note_chase_speed_multiplier() -> float:
+	var stage := mini(_note_chase_speed_stage, 6)
+	var curve := [1.0, 1.22, 1.22, 1.55, 1.88, 2.22, 2.55]
+	return float(curve[stage])
+
+
+func _note_chase_points_per_note() -> int:
+	return 10 + (_note_chase_speed_stage * 2)
+
+
+func _set_note_chase_overlay(text: String, visible: bool) -> void:
+	if _note_chase_overlay == null or _note_chase_overlay_label == null:
+		return
+	_note_chase_overlay.visible = visible
+	_note_chase_overlay_label.text = text if visible else ""
+
+
+func _note_chase_stage_note_color() -> Color:
+	if NOTE_CHASE_NOTE_COLORS.is_empty():
+		return Color(0.99, 0.99, 0.99, 0.97)
+	return NOTE_CHASE_NOTE_COLORS[_note_chase_speed_stage % NOTE_CHASE_NOTE_COLORS.size()]
+
+
+func _note_chase_target_bias() -> float:
+	var selected_count := maxi(1, _note_chase_selected_notes.size())
+	var base := 0.72
+	if selected_count == 2:
+		base = 0.60
+	elif selected_count >= 3:
+		base = 0.48
+	if _note_chase_boss_active:
+		base += 0.10
+	return clampf(base, 0.35, 0.86)
+
+
+func _note_chase_decoy_chance() -> float:
+	if _note_chase_speed_stage < 2:
+		return 0.0
+	var c := 0.10 + (0.02 * float(_note_chase_speed_stage - 2))
+	if _note_chase_boss_active:
+		c += 0.08
+	return clampf(c, 0.0, 0.34)
+
+
+func _note_chase_rainbow_chance() -> float:
+	if _note_chase_speed_stage < 3:
+		return 0.0
+	var c := 0.07 + (0.01 * float(_note_chase_speed_stage - 3))
+	return clampf(c, 0.0, 0.16)
+
+
+func _note_chase_score_multiplier() -> float:
+	var mul := 1.0
+	if _note_chase_fever_active:
+		mul *= 2.0
+	if _note_chase_boss_active:
+		mul *= 2.0
+	mul *= float(maxi(1, _note_chase_combo_mult))
+	return mul
+
+
+func _note_chase_refresh_progress_text() -> void:
+	var parts: Array[String] = []
+	if _note_chase_freeze_timer > 0.0:
+		parts.append("Freeze %.1fs" % _note_chase_freeze_timer)
+	if _note_chase_fever_active:
+		parts.append("Fever %.1fs" % _note_chase_fever_timer)
+	if _note_chase_boss_active:
+		parts.append("Boss %.1fs" % _note_chase_boss_timer)
+	_progress_label.text = " | ".join(parts) if not parts.is_empty() else ""
+	_refresh_meta_ui()
+
+
+func _note_chase_start_fever() -> void:
+	_note_chase_fever_active = true
+	_note_chase_fever_timer = 5.0
+	_status_label.text = "Fever! 2x points"
+	_note_chase_refresh_progress_text()
+
+
+func _note_chase_start_boss_round() -> void:
+	_note_chase_boss_active = true
+	_note_chase_boss_timer = 20.0
+	_note_chase_boss_last_stage = _note_chase_speed_stage
+	_status_label.text = "Boss Round! Dense targets + bonus points"
+	_play_powerup_sfx()
+	_note_chase_refresh_progress_text()
+
+
+func _note_chase_apply_note_style(panel: Panel, is_target: bool, decoy: bool, rainbow: bool = false) -> void:
+	if panel == null:
+		return
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = _note_chase_stage_note_color() if not rainbow else NOTE_CHASE_NOTE_COLORS[_rng.randi_range(0, NOTE_CHASE_NOTE_COLORS.size() - 1)]
+	sb.corner_radius_top_left = 24
+	sb.corner_radius_top_right = 24
+	sb.corner_radius_bottom_left = 24
+	sb.corner_radius_bottom_right = 24
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	if rainbow:
+		sb.border_color = Color(1.0, 0.95, 0.55, 1.0)
+	elif is_target or decoy:
+		sb.border_color = Color(0.94, 0.80, 0.24, 0.95)
+	else:
+		sb.border_color = Color(0.0, 0.0, 0.0, 0.95)
+	panel.add_theme_stylebox_override("panel", sb)
+
+
+func _note_chase_fade_out_control(node: Control, duration: float = 0.22) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if node.has_meta("nc_fading") and bool(node.get_meta("nc_fading")):
+		return
+	node.set_meta("nc_fading", true)
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_SINE)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(node, "modulate:a", 0.0, duration)
+	tween.parallel().tween_property(node, "scale", node.scale * Vector2(0.96, 0.96), duration)
+
+
+func _note_chase_attach_ledgers(panel: Panel, step: int) -> void:
+	if panel == null:
+		return
+	var ledger_steps := _ledger_steps_for_note_step(step)
+	if ledger_steps.is_empty():
+		return
+	for s in ledger_steps:
+		var led := ColorRect.new()
+		led.color = Color(1.0, 0.47, 0.73, 1.0)
+		led.size = Vector2(64, 2)
+		var y_abs := _staff_center_y_for_step(s)
+		led.position = Vector2((panel.size.x * 0.5) - (led.size.x * 0.5), y_abs - panel.position.y - (led.size.y * 0.5))
+		led.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		led.z_index = 126
+		panel.add_child(led)
+
+
+func _note_chase_add_rainbow_aura(panel: Panel) -> void:
+	if panel == null:
+		return
+	var aura := Panel.new()
+	aura.size = panel.size + Vector2(20, 20)
+	aura.position = Vector2(-10, -10)
+	aura.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.0)
+	sb.corner_radius_top_left = 28
+	sb.corner_radius_top_right = 28
+	sb.corner_radius_bottom_left = 28
+	sb.corner_radius_bottom_right = 28
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.92, 0.45, 0.92)
+	aura.add_theme_stylebox_override("panel", sb)
+	panel.add_child(aura)
+	var tw := create_tween()
+	tw.set_loops()
+	tw.tween_property(aura, "modulate:a", 0.45, 0.35)
+	tw.tween_property(aura, "modulate:a", 1.0, 0.35)
+
+
+func _note_chase_spawn_pop_effect(center: Vector2, color: Color) -> void:
+	if _staff_area == null:
+		return
+	for i in range(7):
+		var b := Panel.new()
+		b.size = Vector2(8, 8)
+		b.position = center + Vector2(-4, -4)
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = color
+		sb.corner_radius_top_left = 8
+		sb.corner_radius_top_right = 8
+		sb.corner_radius_bottom_left = 8
+		sb.corner_radius_bottom_right = 8
+		b.add_theme_stylebox_override("panel", sb)
+		_staff_area.add_child(b)
+		var ang := (TAU * float(i) / 7.0) + _rng.randf_range(-0.22, 0.22)
+		var dist := 26.0 + _rng.randf() * 12.0
+		var target := b.position + Vector2(cos(ang), sin(ang)) * dist
+		var tw := create_tween()
+		tw.set_trans(Tween.TRANS_SINE)
+		tw.set_ease(Tween.EASE_OUT)
+		tw.tween_property(b, "position", target, 0.22)
+		tw.parallel().tween_property(b, "modulate:a", 0.0, 0.22)
+		tw.finished.connect(func() -> void:
+			if is_instance_valid(b):
+				b.queue_free()
+		)
+
+
+func _note_chase_spawn_note_name_text(center: Vector2, text: String, color: Color) -> void:
+	if _staff_area == null:
+		return
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.size = Vector2(56, 28)
+	lbl.position = center + Vector2(-28, -30)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.add_theme_font_size_override("font_size", 20)
+	lbl.add_theme_color_override("font_color", color)
+	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
+	lbl.add_theme_constant_override("outline_size", 4)
+	_staff_area.add_child(lbl)
+	var tw := create_tween()
+	tw.set_trans(Tween.TRANS_SINE)
+	tw.set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "position:y", lbl.position.y - 20.0, 0.34)
+	tw.parallel().tween_property(lbl, "modulate:a", 0.0, 0.34)
+	tw.finished.connect(func() -> void:
+		if is_instance_valid(lbl):
+			lbl.queue_free()
+	)
+
+
+func _note_chase_apply_level_reward() -> void:
+	_note_chase_combo_mult += 2
+	if _lives < 5:
+		_lives += 1
+		_status_label.text = "Level up! +1 Life | Combo x%d" % _note_chase_combo_mult
+	else:
+		_score += 25
+		_status_label.text = "Level up! +25 Bonus | Combo x%d" % _note_chase_combo_mult
+	_score_label.text = "Score: %d" % _score
+	_refresh_meta_ui()
+	_note_chase_refresh_progress_text()
+
+
+func _spawn_note_chase_special(kind: String) -> void:
+	if _staff_area == null:
+		return
+	var steps := _note_chase_step_pool()
+	var step := steps[_rng.randi_range(0, steps.size() - 1)]
+	var y := _staff_center_y_for_step(step)
+	var p := Panel.new()
+	p.custom_minimum_size = Vector2(34, 26)
+	p.size = Vector2(34, 26)
+	p.position = Vector2(_staff_area.size.x + 8.0, y - 13.0)
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.92, 0.92, 0.96, 0.96)
+	sb.corner_radius_top_left = 14
+	sb.corner_radius_top_right = 14
+	sb.corner_radius_bottom_left = 14
+	sb.corner_radius_bottom_right = 14
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = Color(0.08, 0.10, 0.16, 0.9)
+	if kind == "shield":
+		sb.border_color = Color(0.38, 0.78, 1.0, 1.0)
+	else:
+		sb.border_color = Color(1.0, 0.82, 0.35, 1.0)
+	p.add_theme_stylebox_override("panel", sb)
+	var icon := Label.new()
+	icon.set_anchors_preset(PRESET_FULL_RECT)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	icon.text = "🛡" if kind == "shield" else "🕒"
+	icon.add_theme_font_size_override("font_size", 18)
+	icon.add_theme_color_override("font_color", Color(0.08, 0.10, 0.16, 1.0))
+	p.add_child(icon)
+	p.gui_input.connect(_on_note_chase_note_gui_input.bind(p))
+	_staff_area.add_child(p)
+	_note_chase_active_notes.append({
+		"node": p,
+		"kind": kind,
+		"note": "Shield" if kind == "shield" else "Time",
+		"target": false,
+		"hit": false
+	})
+
+
+func _spawn_note_chase_clef_switch() -> void:
+	if _staff_area == null:
+		return
+	var next_clef := "Bass" if _selected_clef == "Treble" else "Treble"
+	var p := Panel.new()
+	p.custom_minimum_size = Vector2(44, 56)
+	p.size = Vector2(44, 56)
+	p.position = Vector2(_staff_area.size.x + 8.0, STAFF_TOP_LINE_Y + STAFF_LINE_GAP_Y - 18.0)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	sb.border_width_left = 0
+	sb.border_width_top = 0
+	sb.border_width_right = 0
+	sb.border_width_bottom = 0
+	p.add_theme_stylebox_override("panel", sb)
+	var lbl := Label.new()
+	lbl.set_anchors_preset(PRESET_FULL_RECT)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.text = "𝄢" if next_clef == "Bass" else "𝄞"
+	lbl.add_theme_font_size_override("font_size", 110)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.98, 0.86, 0.98))
+	p.add_child(lbl)
+	_staff_area.add_child(p)
+	_note_chase_active_notes.append({
+		"node": p,
+		"kind": "clef",
+		"next_clef": next_clef,
+		"triggered": false,
+		"hit": false
+	})
+	_note_chase_clef_switch_cd = 9.0 + _rng.randf() * 4.0
+
+
+func _note_chase_capture_targets_with_rainbow(skip_node: Panel) -> int:
+	var captured := 0
+	for i in range(_note_chase_active_notes.size()):
+		var n: Dictionary = _note_chase_active_notes[i]
+		if bool(n.get("hit", false)):
+			continue
+		var node_obj = n.get("node", null)
+		if node_obj == null or not is_instance_valid(node_obj):
+			continue
+		var p := node_obj as Panel
+		if p == null or p == skip_node:
+			continue
+		var kind := str(n.get("kind", "note"))
+		if kind != "note":
+			continue
+		var is_target := bool(n.get("target", false))
+		var is_rainbow := bool(n.get("rainbow", false))
+		if not is_target and not is_rainbow:
+			continue
+		_note_chase_spawn_pop_effect(p.position + (p.size * 0.5), Color(1.0, 0.92, 0.45, 1.0))
+		n["hit"] = true
+		_note_chase_active_notes[i] = n
+		_note_chase_fade_out_control(p, 0.16)
+		captured += 1
+	return captured
+
+
+func _note_chase_apply_theme() -> void:
+	if _sky_area != null:
+		if _selected_mode == MODE_NOTE_CHASE:
+			var tint: Color = NOTE_CHASE_THEME_TINTS[_note_chase_speed_stage % NOTE_CHASE_THEME_TINTS.size()]
+			_sky_area.modulate = tint
+		else:
+			_sky_area.modulate = Color(1, 1, 1, 1)
+
+
+func _play_note_chase_stage_motif(stage: int) -> void:
+	if _selected_mode != MODE_NOTE_CHASE or not _quiz_active:
+		return
+	var motifs := [
+		[60, 64, 67],
+		[62, 65, 69],
+		[64, 67, 71],
+		[65, 69, 72],
+		[67, 71, 74],
+		[69, 72, 76],
+		[71, 74, 77]
+	]
+	var pick: Array = motifs[stage % motifs.size()]
+	for midi_note in pick:
+		await _play_note(int(midi_note), 0.07)
+		await _push_silence(0.012)
+
+
+func _apply_note_chase_staff_colors() -> void:
+	if _staff_lines.is_empty():
+		return
+	var colorize := _selected_mode == MODE_NOTE_CHASE
+	for i in range(_staff_lines.size()):
+		var line := _staff_lines[i]
+		if line != null:
+			if colorize and not NOTE_CHASE_STAFF_COLORS.is_empty():
+				var c: Color = NOTE_CHASE_STAFF_COLORS[(i + _note_chase_speed_stage) % NOTE_CHASE_STAFF_COLORS.size()]
+				line.color = c
+			else:
+				line.color = Color(1.0, 1.0, 1.0, 0.95)
+		if i < _note_chase_staff_clone_lines.size():
+			var clone := _note_chase_staff_clone_lines[i]
+			if clone != null:
+				if colorize and not NOTE_CHASE_STAFF_COLORS.is_empty():
+					var cc: Color = NOTE_CHASE_STAFF_COLORS[(i + _note_chase_speed_stage) % NOTE_CHASE_STAFF_COLORS.size()]
+					clone.color = cc
+				else:
+					clone.color = Color(1.0, 1.0, 1.0, 0.95)
+
+
+func _note_chase_step_for_letter(letter: String) -> int:
+	for step in range(0, 9):
+		if _staff_step_name_for_clef(step, _selected_clef) == letter:
+			return step
+	return 4
+
+
+func _note_chase_step_pool() -> Array[int]:
+	var pool: Array[int] = []
+	if _selected_clef == "Bass":
+		# Start with octave 3 + 4 area, add octave 2 after first streak.
+		for s in range(-4, 6):
+			pool.append(s)
+		if _note_chase_speed_stage >= 1:
+			for s in range(6, 13):
+				pool.append(s)
+	else:
+		# Start with octave 4; add octave 5 after first streak.
+		for s in range(4, 11):
+			pool.append(s)
+		if _note_chase_speed_stage >= 1:
+			for s in range(-3, 4):
+				pool.append(s)
+	if pool.is_empty():
+		pool = [4, 5, 6, 7, 8]
+	return pool
+
+
+func _spawn_note_chase_note() -> void:
+	if _staff_area == null:
+		return
+	if _note_chase_speed_stage >= 1 and _rng.randf() < 0.035:
+		_spawn_note_chase_special("shield")
+		return
+	if _note_chase_speed_stage >= 2 and _rng.randf() < 0.03:
+		_spawn_note_chase_special("freeze")
+		return
+	if _note_chase_clef_mode == "Both" and _note_chase_speed_stage >= 2 and _note_chase_clef_switch_cd <= 0.0 and _rng.randf() < 0.08:
+		_spawn_note_chase_clef_switch()
+		return
+	var steps := _note_chase_step_pool()
+	var target_steps: Array[int] = []
+	var non_target_steps: Array[int] = []
+	for s in steps:
+		var n_name := _staff_step_name_for_clef(s, _selected_clef)
+		if _note_chase_selected_notes.has(n_name):
+			target_steps.append(s)
+		else:
+			non_target_steps.append(s)
+	var prefer_target := _rng.randf() < _note_chase_target_bias()
+	var step := steps[_rng.randi_range(0, steps.size() - 1)]
+	if prefer_target and not target_steps.is_empty():
+		step = target_steps[_rng.randi_range(0, target_steps.size() - 1)]
+	elif not non_target_steps.is_empty():
+		step = non_target_steps[_rng.randi_range(0, non_target_steps.size() - 1)]
+	var note_name := _staff_step_name_for_clef(step, _selected_clef)
+	var is_target := _note_chase_selected_notes.has(note_name)
+	var y := _staff_center_y_for_step(step)
+	var decoy_chance := _note_chase_decoy_chance()
+	var is_decoy := (not is_target) and (_rng.randf() < decoy_chance)
+	var is_rainbow := false
+	if is_target and _rng.randf() < _note_chase_rainbow_chance():
+		is_rainbow = true
+
+	var p := Panel.new()
+	p.custom_minimum_size = Vector2(32, 22)
+	p.size = Vector2(32, 22)
+	p.position = Vector2(_staff_area.size.x + 8.0, y - 11.0)
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	_note_chase_apply_note_style(p, is_target, is_decoy, is_rainbow)
+	_note_chase_attach_ledgers(p, step)
+	if is_rainbow:
+		_note_chase_add_rainbow_aura(p)
+	p.gui_input.connect(_on_note_chase_note_gui_input.bind(p))
+	_staff_area.add_child(p)
+	_note_chase_active_notes.append({
+		"node": p,
+		"note": note_name,
+		"target": is_target,
+		"kind": "note",
+		"decoy": is_decoy,
+		"rainbow": is_rainbow,
+		"decoy_timer": 1.0 if is_decoy else 0.0,
+		"hit": false
+	})
+	_question_index += 1
+	_note_chase_refresh_progress_text()
+
+
+func _on_note_chase_note_gui_input(event: InputEvent, note_panel: Panel) -> void:
+	if not _note_chase_running or not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+		return
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	for i in range(_note_chase_active_notes.size()):
+		var n: Dictionary = _note_chase_active_notes[i]
+		if n.get("node", null) != note_panel:
+			continue
+		if bool(n.get("hit", false)):
+			return
+		var click_cd := float(n.get("click_cd", 0.0))
+		if click_cd > 0.0:
+			return
+		var kind := str(n.get("kind", "note"))
+		var note_text := str(n.get("note", ""))
+		var pop_center := note_panel.position + (note_panel.size * 0.5)
+		_note_chase_spawn_note_name_text(pop_center, note_text, Color(1.0, 0.96, 0.88, 1.0))
+		if kind == "shield":
+			n["hit"] = true
+			_note_chase_shield_timer = maxf(_note_chase_shield_timer, 10.0)
+			_status_label.text = "Shield active: 10s"
+			_play_success_sfx()
+			_note_chase_spawn_pop_effect(pop_center, Color(0.42, 0.86, 1.0, 1.0))
+			if note_panel != null:
+				note_panel.queue_free()
+			_note_chase_active_notes[i] = n
+			_note_chase_refresh_progress_text()
+			return
+		if kind == "freeze":
+			n["hit"] = true
+			_note_chase_freeze_timer = maxf(_note_chase_freeze_timer, 2.0)
+			_status_label.text = "Time Freeze!"
+			_play_powerup_sfx()
+			_note_chase_spawn_pop_effect(pop_center, Color(1.0, 0.86, 0.36, 1.0))
+			if note_panel != null:
+				note_panel.queue_free()
+			_note_chase_active_notes[i] = n
+			_note_chase_refresh_progress_text()
+			return
+		if kind != "note":
+			return
+		var is_target := bool(n.get("target", false))
+		var is_rainbow := bool(n.get("rainbow", false))
+		var pop_color := _note_chase_stage_note_color()
+		if is_rainbow:
+			pop_color = Color(1.0, 0.92, 0.45, 1.0)
+		elif not is_target:
+			pop_color = Color(0.92, 0.36, 0.36, 1.0)
+		if is_target:
+			n["hit"] = true
+			_note_chase_spawn_pop_effect(pop_center, pop_color)
+			var gained := int(round(float(_note_chase_points_per_note()) * _note_chase_score_multiplier()))
+			var captured_extra := 0
+			if is_rainbow and _note_chase_speed_stage >= 3:
+				captured_extra = _note_chase_capture_targets_with_rainbow(note_panel)
+				gained += 5
+				gained += int(round(float(captured_extra * _note_chase_points_per_note()) * _note_chase_score_multiplier()))
+			_score += gained
+			_note_chase_correct_clicks += 1
+			_note_chase_correct_streak += 1
+			if is_rainbow:
+				_status_label.text = "Rainbow! +%d (captured %d)" % [gained, captured_extra]
+			else:
+				_status_label.text = "Nice! %s +%d" % [str(n.get("note", "")), gained]
+			_play_success_sfx()
+			if _note_chase_correct_streak == 8 or _note_chase_correct_streak == 16 or _note_chase_correct_streak == 24:
+				_note_chase_start_fever()
+			if _note_chase_correct_streak > 0 and _note_chase_correct_streak % 8 == 0:
+				var prev_mult := _note_chase_speed_multiplier()
+				_note_chase_speed_stage = mini(6, _note_chase_speed_stage + 1)
+				_note_chase_apply_speed_stage()
+				_note_chase_apply_level_reward()
+				var new_mult := _note_chase_speed_multiplier()
+				if _note_chase_speed_stage == 2:
+					_status_label.text = "Decoys unlocked!"
+				elif new_mult > prev_mult:
+					_status_label.text = "Speed up!"
+				else:
+					_status_label.text = "Level up!"
+				_play_powerup_sfx()
+		else:
+			# Wrong click: keep note moving, no life cost.
+			if _note_chase_shield_timer > 0.0:
+				_status_label.text = "Shield blocked wrong"
+			else:
+				_score -= 6
+				_note_chase_combo_mult = maxi(1, _note_chase_combo_mult - 1)
+				_status_label.text = "Wrong note."
+				_play_fail_sfx()
+			n["click_cd"] = 0.28
+			_note_chase_active_notes[i] = n
+			_score_label.text = "Score: %d" % _score
+			_note_chase_refresh_progress_text()
+			return
+		if note_panel != null and bool(n.get("hit", false)):
+			note_panel.queue_free()
+		_note_chase_active_notes[i] = n
+		_score_label.text = "Score: %d" % _score
+		_note_chase_refresh_progress_text()
+		return
+
+
+func _update_note_chase(delta: float) -> void:
+	if not _note_chase_running or not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+		return
+	_update_note_chase_staff_scroll(delta)
+	_note_chase_clef_switch_cd = maxf(0.0, _note_chase_clef_switch_cd - delta)
+	_note_chase_freeze_timer = maxf(0.0, _note_chase_freeze_timer - delta)
+	_note_chase_shield_timer = maxf(0.0, _note_chase_shield_timer - delta)
+	if _note_chase_fever_active:
+		_note_chase_fever_timer = maxf(0.0, _note_chase_fever_timer - delta)
+		if _note_chase_fever_timer <= 0.0:
+			_note_chase_fever_active = false
+	if _note_chase_boss_active:
+		_note_chase_boss_timer = maxf(0.0, _note_chase_boss_timer - delta)
+		if _note_chase_boss_timer <= 0.0:
+			_note_chase_boss_active = false
+			_status_label.text = "Boss clear!"
+	_note_chase_refresh_progress_text()
+	if _note_chase_freeze_timer <= 0.0:
+		_note_chase_spawn_timer -= delta
+	var effective_spawn_interval := _note_chase_spawn_interval
+	if _note_chase_boss_active:
+		effective_spawn_interval *= 0.62
+	if _note_chase_spawn_timer <= 0.0:
+		_spawn_note_chase_note()
+		_note_chase_spawned += 1
+		_note_chase_spawn_timer = effective_spawn_interval
+
+	var still_active: Array[Dictionary] = []
+	for item in _note_chase_active_notes:
+		var n: Dictionary = item
+		var node_obj = n.get("node", null)
+		if node_obj == null or not is_instance_valid(node_obj):
+			continue
+		var panel := node_obj as Panel
+		if panel == null:
+			continue
+		var kind := str(n.get("kind", "note"))
+		var hit := bool(n.get("hit", false))
+		if not hit:
+			var click_cd := float(n.get("click_cd", 0.0))
+			if click_cd > 0.0:
+				n["click_cd"] = maxf(0.0, click_cd - delta)
+			if kind == "clef":
+				if _note_chase_freeze_timer <= 0.0:
+					panel.position.x -= _note_chase_scroll_speed * delta
+				var trigger_x := STAFF_LEFT_X + ((_staff_area.size.x - STAFF_LEFT_X) * 0.50)
+				if not bool(n.get("triggered", false)) and panel.position.x <= trigger_x:
+					n["triggered"] = true
+					var next_clef := str(n.get("next_clef", "Treble"))
+					_selected_clef = next_clef
+					_refresh_clef_buttons()
+					_refresh_note_chase_clef_buttons()
+					_status_label.text = "Clef switched to %s" % next_clef
+					if _staff_clef_label != null and _staff_clef_label.visible:
+						_staff_clef_label.text = "𝄢" if _selected_clef == "Bass" else "𝄞"
+					_note_chase_fade_out_control(panel, 0.22)
+				if panel.position.x + panel.size.x < STAFF_LEFT_X - 30.0:
+					panel.queue_free()
+					continue
+				if bool(n.get("triggered", false)) and panel.modulate.a <= 0.02:
+					panel.queue_free()
+					continue
+				still_active.append(n)
+				continue
+			var decoy_timer := float(n.get("decoy_timer", 0.0))
+			if decoy_timer > 0.0:
+				decoy_timer = maxf(0.0, decoy_timer - delta)
+				n["decoy_timer"] = decoy_timer
+				if decoy_timer <= 0.0 and bool(n.get("decoy", false)):
+					n["decoy"] = false
+					_note_chase_apply_note_style(panel, bool(n.get("target", false)), false, bool(n.get("rainbow", false)))
+			if _note_chase_freeze_timer <= 0.0:
+				panel.position.x -= _note_chase_scroll_speed * delta
+			var miss_x := STAFF_LEFT_X + 8.0
+			if _note_chase_fail_line != null and _note_chase_fail_line.visible:
+				miss_x = _note_chase_fail_line.position.x
+			if panel.position.x + panel.size.x < miss_x:
+				if not bool(n.get("missed", false)):
+					n["missed"] = true
+					if bool(n.get("target", false)):
+						if _note_chase_shield_timer > 0.0:
+							_status_label.text = "Shield blocked miss"
+						else:
+							_score -= 3
+							_note_chase_correct_streak = 0
+							_note_chase_fever_active = false
+							_note_chase_fever_timer = 0.0
+							_note_chase_wrongs += 1
+							_note_chase_combo_mult = maxi(1, _note_chase_combo_mult - 1)
+							_status_label.text = "Missed target note."
+							_play_fail_sfx()
+							_score_label.text = "Score: %d" % _score
+					_note_chase_fade_out_control(panel, 0.24)
+				if panel.modulate.a <= 0.02:
+					panel.queue_free()
+					continue
+				still_active.append(n)
+				continue
+			still_active.append(n)
+		else:
+			panel.queue_free()
+	_note_chase_active_notes = still_active
+
+	if _note_chase_wrongs >= 5:
+		_note_chase_running = false
+		_quiz_active = false
+		_accepting_answer = false
+		_set_answer_buttons_enabled(false)
+		_replay_button.disabled = true
+		_restart_button.disabled = false
+		_status_label.text = ""
+		var fail_perf := "Score: %d | Wrongs: %d/5" % [_score, _note_chase_wrongs]
+		_progress_label.text = fail_perf
+		_home_info_label.text = fail_perf
+		await _play_gameover_fail_sfx()
+		_result_box_show("Game Over", fail_perf)
+		_stop_note_chase_music()
+		_set_note_chase_staff_scrolling(false)
+		return
+
+	if _note_chase_speed_stage >= 6 and not _note_chase_boss_active:
+		_note_chase_running = false
+		_quiz_active = false
+		_accepting_answer = false
+		_set_answer_buttons_enabled(false)
+		_replay_button.disabled = true
+		_restart_button.disabled = false
+		_status_label.text = "Complete!"
+		var perf := "Final Score: %d | Reached max level speed" % _score
+		_progress_label.text = perf
+		_home_info_label.text = perf
+		_result_box_show("Complete", perf)
+		_stop_note_chase_music()
+		await _play_win_fanfare_sfx()
+		_set_note_chase_staff_scrolling(false)
+
+
+func _clear_note_chase_visual_notes() -> void:
+	for item in _note_chase_active_notes:
+		var n: Dictionary = item
+		var node_obj = n.get("node", null)
+		if node_obj == null or not is_instance_valid(node_obj):
+			continue
+		var panel := node_obj as Panel
+		if panel != null:
+			panel.queue_free()
+	_note_chase_active_notes.clear()
+
+
+func _set_note_chase_staff_scrolling(enabled: bool) -> void:
+	if _staff_lines.is_empty():
+		return
+	var segment := maxf(STAFF_LINE_WIDTH + 120.0, _staff_area.size.x - STAFF_LEFT_X - 4.0)
+	for i in range(_staff_lines.size()):
+		var line := _staff_lines[i]
+		if line == null:
+			continue
+		line.position.x = STAFF_LEFT_X
+		line.size.x = segment
+		line.visible = true
+		if i < _note_chase_staff_clone_lines.size():
+			var clone := _note_chase_staff_clone_lines[i]
+			if clone != null:
+				clone.visible = false
+				clone.size.x = segment
+				clone.position = Vector2(STAFF_LEFT_X + segment - 1.0, line.position.y)
+	_apply_note_chase_staff_colors()
+	if _staff_clef_label != null:
+		_staff_clef_label.visible = true
+		_staff_clef_label.position.x = STAFF_LEFT_X + 12.0 if enabled else 16.0
+		_staff_clef_label.modulate = Color(1, 1, 1, 1)
+		_staff_clef_label.scale = Vector2.ONE
+		_staff_clef_label.set_meta("nc_fading", false)
+	if _note_chase_fail_line != null:
+		_note_chase_fail_line.visible = _selected_mode == MODE_NOTE_CHASE
+		_note_chase_fail_line.position.x = STAFF_LEFT_X + 8.0
+	_note_chase_realign_staff_frame()
+	if _note_chase_clef_clone != null:
+		# In Note Chase we only show clef once at round start.
+		_note_chase_clef_clone.visible = false
+
+
+func _note_chase_realign_staff_frame() -> void:
+	if _note_chase_staff_frame == null or _staff_area == null:
+		return
+	_note_chase_staff_frame.visible = _selected_mode == MODE_NOTE_CHASE
+	if not _note_chase_staff_frame.visible:
+		return
+	var left_x := STAFF_LEFT_X - 22.0
+	var right_x := _staff_area.size.x - 8.0
+	if _hud_left_box != null and _hud_right_box != null:
+		var left_global := _hud_left_box.global_position.x
+		var right_global := _hud_right_box.global_position.x + _hud_right_box.size.x
+		left_x = left_global - _staff_area.global_position.x
+		right_x = right_global - _staff_area.global_position.x
+	var top_pad := 6.0
+	var bottom_pad := 10.0
+	var frame_h := maxf(250.0, _staff_area.size.y - top_pad - bottom_pad)
+	_note_chase_staff_frame.position = Vector2(left_x, top_pad)
+	_note_chase_staff_frame.size = Vector2(maxf(360.0, right_x - left_x), frame_h)
+
+
+func _update_note_chase_staff_scroll(delta: float) -> void:
+	if _staff_lines.is_empty():
+		return
+	if _staff_clef_label != null:
+		if _staff_clef_label.visible:
+			if _note_chase_freeze_timer <= 0.0:
+				_staff_clef_label.position.x -= _note_chase_scroll_speed * 0.55 * delta
+			if _staff_clef_label.position.x + 42.0 < STAFF_LEFT_X:
+				_note_chase_fade_out_control(_staff_clef_label, 0.28)
+			if _staff_clef_label.has_meta("nc_fading") and bool(_staff_clef_label.get_meta("nc_fading")) and _staff_clef_label.modulate.a <= 0.02:
+				_staff_clef_label.visible = false
+	if _note_chase_clef_clone != null:
+		_note_chase_clef_clone.visible = false
+
+
 func _begin_next_question() -> void:
 	if not _quiz_active:
 		return
@@ -4297,6 +5593,7 @@ func _finish_quiz() -> void:
 	var perf := _session_performance_summary()
 	_home_info_label.text = perf
 	_result_box_show("Complete", perf)
+	await _play_win_fanfare_sfx()
 	var score_pct := (float(_score) / float(maxi(1, _total_questions))) * 100.0
 	_play_completion_reaction(score_pct)
 
@@ -4414,6 +5711,25 @@ func _on_replay_pressed() -> void:
 		_replay_button.disabled = false
 
 
+func _on_round_start_pressed() -> void:
+	if not _quiz_active or _is_prompt_playing or not _awaiting_round_start:
+		return
+	_awaiting_round_start = false
+	_set_note_chase_overlay("", false)
+	if _round_start_button != null:
+		_round_start_button.visible = false
+		_round_start_button.disabled = true
+	if _selected_mode == MODE_NOTE_CHASE:
+		await _start_note_chase_round()
+		return
+	await _begin_next_question()
+
+
+func _maybe_play_powerup_on_streak() -> void:
+	if _streak > 0 and _streak % 3 == 0:
+		_play_powerup_sfx()
+
+
 func _build_chord_notes(root_midi: int, chord_quality: String, inversion: int) -> Array[int]:
 	var raw_intervals: Array = CHORD_INTERVALS[chord_quality]
 	var intervals: Array[int] = []
@@ -4484,6 +5800,7 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 	if is_correct:
 		_score += 1
 		_streak += 1
+		_maybe_play_powerup_on_streak()
 		_xp += 10 + mini(_streak, 10)
 		_record_question_correct()
 		_status_label.text = "Correct! It was %s." % _interval_display_name(_current_interval_id)
@@ -4518,6 +5835,7 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 		_progress_label.text = "Final Score: %d / %d | XP: %d" % [_score, _question_index, _xp]
 		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
 		_home_info_label.text = _session_performance_summary()
+		await _play_gameover_fail_sfx()
 		_result_box_show("Game Over", "No lives left. Restart or Go Back.")
 		return
 
@@ -4542,6 +5860,7 @@ func _on_chord_chosen(choice_quality: String) -> void:
 	if is_correct:
 		_score += 1
 		_streak += 1
+		_maybe_play_powerup_on_streak()
 		_xp += 10 + mini(_streak, 10)
 		_record_question_correct()
 		_status_label.text = "Correct! It was %s." % _current_chord_quality
@@ -4576,6 +5895,7 @@ func _on_chord_chosen(choice_quality: String) -> void:
 		_progress_label.text = "Final Score: %d / %d | XP: %d" % [_score, _question_index, _xp]
 		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
 		_home_info_label.text = _session_performance_summary()
+		await _play_gameover_fail_sfx()
 		_result_box_show("Game Over", "No lives left. Restart or Go Back.")
 		return
 
@@ -4589,6 +5909,7 @@ func _on_sight_key_chosen(note_name: String) -> void:
 		return
 	if not _quiz_active or not _accepting_answer:
 		return
+	_play_sight_answer_click_sfx()
 
 	_accepting_answer = false
 	_set_answer_buttons_enabled(false)
@@ -4600,6 +5921,7 @@ func _on_sight_key_chosen(note_name: String) -> void:
 	if is_correct:
 		_score += 1
 		_streak += 1
+		_maybe_play_powerup_on_streak()
 		_xp += 10 + mini(_streak, 10)
 		_record_question_correct()
 		_status_label.text = "Correct! That note is %s." % _current_sight_note
@@ -4635,6 +5957,7 @@ func _on_sight_key_chosen(note_name: String) -> void:
 		_progress_label.text = "Final Score: %d / %d | XP: %d" % [_score, _question_index, _xp]
 		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
 		_home_info_label.text = _session_performance_summary()
+		await _play_gameover_fail_sfx()
 		_result_box_show("Game Over", "No lives left. Restart or Go Back.")
 		return
 
@@ -4648,6 +5971,7 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 		return
 	if not _quiz_active or not _accepting_answer:
 		return
+	_play_sight_answer_click_sfx()
 	if choice_idx < 0 or choice_idx >= _current_sight_chord_choices.size():
 		return
 	var chosen_name := _current_sight_chord_choices[choice_idx]
@@ -4667,6 +5991,7 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 	if is_correct:
 		_score += 1
 		_streak += 1
+		_maybe_play_powerup_on_streak()
 		_xp += 10 + mini(_streak, 10)
 		_record_question_correct()
 		_status_label.text = "Correct! It is %s." % _current_sight_chord_name
@@ -4701,6 +6026,7 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 		_progress_label.text = "Final Score: %d / %d | XP: %d" % [_score, _question_index, _xp]
 		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
 		_home_info_label.text = _session_performance_summary()
+		await _play_gameover_fail_sfx()
 		_result_box_show("Game Over", "No lives left. Restart or Go Back.")
 		return
 
@@ -4741,6 +6067,13 @@ func _place_note_from_local_point(local: Vector2, resolve_drop: bool) -> void:
 
 
 func _on_staff_area_gui_input(event: InputEvent) -> void:
+	if _selected_mode == MODE_NOTE_CHASE and _quiz_active and _awaiting_round_start:
+		if event is InputEventMouseButton:
+			var mb0 := event as InputEventMouseButton
+			if mb0.button_index == MOUSE_BUTTON_LEFT and mb0.pressed:
+				_on_round_start_pressed()
+				accept_event()
+				return
 	if not _is_placement_drag_context_active():
 		return
 	if event is InputEventMouseButton:
@@ -4869,8 +6202,24 @@ func _nearest_staff_step_from_center_y(center_y: float) -> int:
 	return clampi(step, bounds.x, bounds.y)
 
 
+func _staff_center_y_for_step(step: int) -> float:
+	var y := STAFF_TOP_LINE_Y + float(step) * STAFF_STEP_Y
+	# Keep ledger notes visually centered: lower notes slightly higher, upper notes slightly lower.
+	if step > STAFF_BOTTOM_LINE_STEP:
+		y -= 2.0
+	elif step < STAFF_TOP_LINE_STEP:
+		y += 1.0
+	# Treble D4 (space below first line): raise it so top edge sits close to first line.
+	if _selected_clef == "Treble" and step == 9:
+		y -= 4.0
+	# G5 should sit slightly lower so it kisses the top line more naturally.
+	if _selected_clef == "Treble" and step == -1:
+		y += 2.0
+	return y
+
+
 func _snap_note_to_step(step: int, keep_current_x: bool = false) -> void:
-	var center_y := STAFF_TOP_LINE_Y + float(step) * STAFF_STEP_Y
+	var center_y := _staff_center_y_for_step(step)
 	_staff_note.scale = _note_scale_for_y(center_y)
 	var px := STAFF_NOTE_SNAP_X
 	if keep_current_x:
@@ -4887,7 +6236,7 @@ func _reset_placement_note_to_side() -> void:
 	if _staff_note == null:
 		return
 	var bounds := _effective_sight_step_bounds()
-	var home_center_y := STAFF_TOP_LINE_Y + float(clampi(bounds.y - 2, bounds.x, bounds.y)) * STAFF_STEP_Y
+	var home_center_y := _staff_center_y_for_step(clampi(bounds.y - 2, bounds.x, bounds.y))
 	_staff_note.scale = _note_scale_for_y(home_center_y)
 	_staff_note.modulate = Color(1, 1, 1, 1)
 	_staff_note.visible = true
@@ -4920,6 +6269,7 @@ func _resolve_sight_placement_drop(step: int) -> void:
 	if is_correct:
 		_score += 1
 		_streak += 1
+		_maybe_play_powerup_on_streak()
 		_xp += 10 + mini(_streak, 10)
 		_record_question_correct()
 		_staff_note.modulate = ok_green
@@ -4975,6 +6325,7 @@ func _resolve_sight_placement_drop(step: int) -> void:
 		_progress_label.text = "Final Score: %d / %d | XP: %d" % [_score, _question_index, _xp]
 		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
 		_home_info_label.text = _session_performance_summary()
+		await _play_gameover_fail_sfx()
 		_result_box_show("Game Over", "No lives left. Restart or Go Back.")
 		return
 
@@ -5084,6 +6435,22 @@ func _ledger_steps_for_note_step(step: int) -> Array[int]:
 		while s2 >= bottom:
 			out.append(s2)
 			s2 -= 2
+	# For notes in spaces outside the staff, keep only one ledger (the lower one).
+	if step % 2 != 0 and (step < STAFF_TOP_LINE_STEP or step > STAFF_BOTTOM_LINE_STEP) and out.size() > 1:
+		if step > STAFF_BOTTOM_LINE_STEP:
+			# Below staff: keep the ledger above the notehead.
+			var above := out[0]
+			for s in out:
+				if s < above:
+					above = s
+			out = [above]
+		else:
+			# Above staff: keep the ledger below the notehead (closer to staff).
+			var below := out[0]
+			for s in out:
+				if s > below:
+					below = s
+			out = [below]
 	return out
 
 
@@ -5096,7 +6463,7 @@ func _show_preview_ledger(step: int, color: Color) -> void:
 		var y := STAFF_TOP_LINE_Y + float(ledger_steps[i]) * STAFF_STEP_Y
 		var pl: ColorRect = _staff_preview_ledgers[i]
 		pl.color = color
-		pl.position = Vector2(_staff_note.position.x - 8.0, y - 1.0)
+		pl.position = Vector2((_staff_note.position.x + (_staff_note.size.x * 0.5)) - (pl.size.x * 0.5), y - 1.0)
 		pl.visible = true
 
 
@@ -5112,7 +6479,7 @@ func _show_target_dotted_oval(step: int, color: Color, center_x_override: float 
 	var center_x := STAFF_NOTE_SNAP_X + (_staff_note.size.x * 0.5)
 	if center_x_override >= 0.0:
 		center_x = center_x_override
-	var center_y := STAFF_TOP_LINE_Y + float(step) * STAFF_STEP_Y
+	var center_y := _staff_center_y_for_step(step)
 	var rx := 16.0
 	var ry := 10.0
 	for i in range(_placement_target_dots.size()):
@@ -5164,7 +6531,7 @@ func _generate_sight_chord_round() -> void:
 	if not found:
 		triad = SIGHT_TRIADS[0]
 		var b := _effective_sight_step_bounds()
-		centers = [STAFF_TOP_LINE_Y + float(b.y) * STAFF_STEP_Y, STAFF_TOP_LINE_Y + float(maxi(b.x, b.y - 2)) * STAFF_STEP_Y, STAFF_TOP_LINE_Y + float(maxi(b.x, b.y - 4)) * STAFF_STEP_Y]
+		centers = [_staff_center_y_for_step(b.y), _staff_center_y_for_step(maxi(b.x, b.y - 2)), _staff_center_y_for_step(maxi(b.x, b.y - 4))]
 
 	_current_sight_chord_name = str(triad.get("name", "C Major"))
 	_position_sight_chord(centers)
@@ -5254,9 +6621,9 @@ func _pick_staff_centers_for_triad(root: String, _quality: String, inversion: in
 					continue
 				if gap_top_mid > 3 or gap_mid_low > 3:
 					continue
-				var c0 := STAFF_TOP_LINE_Y + float(s0) * STAFF_STEP_Y
-				var c1 := STAFF_TOP_LINE_Y + float(s1) * STAFF_STEP_Y
-				var c2 := STAFF_TOP_LINE_Y + float(s2) * STAFF_STEP_Y
+				var c0 := _staff_center_y_for_step(s0)
+				var c1 := _staff_center_y_for_step(s1)
+				var c2 := _staff_center_y_for_step(s2)
 				if s0 < bounds.x or s0 > bounds.y:
 					continue
 				if s1 < bounds.x or s1 > bounds.y:
@@ -5282,9 +6649,9 @@ func _pick_staff_centers_for_triad(root: String, _quality: String, inversion: in
 	var top_bucket: int = mini(3, step_triplets.size()) - 1
 	var picked: Array = step_triplets[_rng.randi_range(0, top_bucket)]
 	return [
-		STAFF_TOP_LINE_Y + float(picked[0]) * STAFF_STEP_Y,
-		STAFF_TOP_LINE_Y + float(picked[1]) * STAFF_STEP_Y,
-		STAFF_TOP_LINE_Y + float(picked[2]) * STAFF_STEP_Y
+		_staff_center_y_for_step(picked[0]),
+		_staff_center_y_for_step(picked[1]),
+		_staff_center_y_for_step(picked[2])
 	]
 
 
@@ -5344,7 +6711,7 @@ func _pick_sight_note_slot() -> Dictionary:
 	var step := _rng.randi_range(_sight_range_min_step, _sight_range_max_step)
 	return {
 		"name": _staff_step_name_for_clef(step, _selected_clef),
-		"center_y": STAFF_TOP_LINE_Y + float(step) * STAFF_STEP_Y
+		"center_y": _staff_center_y_for_step(step)
 	}
 
 
@@ -5359,11 +6726,11 @@ func _add_staff_ledger_line(line_y: float, center_x: float) -> void:
 	if _staff_area == null:
 		return
 	var ledger := ColorRect.new()
-	ledger.color = Color(1.0, 1.0, 1.0, 0.95)
-	ledger.size = Vector2(36, 2)
-	ledger.position = Vector2(center_x - 18.0, line_y - 1.0)
+	ledger.color = Color(1.0, 0.47, 0.73, 1.0)
+	ledger.size = Vector2(64, 2)
+	ledger.position = Vector2(center_x - 32.0, line_y - 1.0)
+	ledger.z_index = 130
 	_staff_area.add_child(ledger)
-	_staff_area.move_child(ledger, _staff_area.get_child_count() - 2)
 	_staff_ledger_lines.append(ledger)
 
 
@@ -5769,6 +7136,10 @@ func _midi_to_freq(midi_note: int) -> float:
 
 func _load_piano_samples() -> void:
 	_piano_samples.clear()
+	_load_sampled_piano_from_folder()
+	if not _piano_samples.is_empty():
+		return
+	# Fallback to legacy sparse sample map.
 	for midi_key in PIANO_SAMPLE_PATHS.keys():
 		var sample_path: String = PIANO_SAMPLE_PATHS[midi_key]
 		if not ResourceLoader.exists(sample_path, "AudioStream"):
@@ -5776,6 +7147,81 @@ func _load_piano_samples() -> void:
 		var stream := ResourceLoader.load(sample_path)
 		if stream is AudioStream:
 			_piano_samples[midi_key] = stream
+
+
+func _load_sampled_piano_from_folder() -> void:
+	var dir := DirAccess.open(PIANO_SAMPLED_DIR)
+	if dir == null:
+		return
+	var files: PackedStringArray = dir.get_files()
+	var lower_names: Dictionary = {}
+	for file_name in files:
+		var f := String(file_name).to_lower()
+		lower_names[f.get_basename()] = true
+	for file_name in files:
+		var f := String(file_name)
+		if not f.to_lower().ends_with(".ogg"):
+			continue
+		var midi := _sampled_filename_to_midi(f, lower_names)
+		if midi < 0:
+			continue
+		var full_path := "%s/%s" % [PIANO_SAMPLED_DIR, f]
+		if not ResourceLoader.exists(full_path, "AudioStream"):
+			continue
+		var stream := ResourceLoader.load(full_path)
+		if stream is AudioStream and not _piano_samples.has(midi):
+			_piano_samples[midi] = stream
+
+
+func _sampled_filename_to_midi(file_name: String, lower_names: Dictionary) -> int:
+	var base := file_name.get_basename().to_lower()
+	var rx := RegEx.new()
+	if rx.compile("^([a-g])(\\d)(?:_(\\d+))?$") != OK:
+		return -1
+	var m := rx.search(base)
+	if m == null:
+		return -1
+	var letter := m.get_string(1)
+	var octave := int(m.get_string(2))
+	var variant_text := m.get_string(3)
+	var variant := int(variant_text) if variant_text != "" else 1
+
+	var natural_semi := _natural_letter_to_semitone(letter)
+	if natural_semi < 0:
+		return -1
+
+	var midi := 12 * (octave + 1) + natural_semi
+	var is_natural_only := letter == "b" or letter == "e"
+	var has_natural_variant := lower_names.has("%s%d_2" % [letter, octave])
+	var use_sharp := false
+	if not is_natural_only and variant != 2 and has_natural_variant:
+		use_sharp = true
+	if use_sharp:
+		midi += 1
+
+	if midi < 0 or midi > 127:
+		return -1
+	return midi
+
+
+func _natural_letter_to_semitone(letter: String) -> int:
+	match letter:
+		"c":
+			return 0
+		"d":
+			return 2
+		"e":
+			return 4
+		"f":
+			return 5
+		"g":
+			return 7
+		"a":
+			return 9
+		"b":
+			return 11
+		_:
+			return -1
 
 
 func _play_note(midi_note: int, duration: float) -> void:
@@ -5807,9 +7253,9 @@ func _nearest_sample_midi(target_midi: int) -> int:
 
 
 func _play_success_sfx() -> void:
-	if _success_sfx != null and _sfx_player != null:
+	if _correct_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
-		_sfx_player.stream = _success_sfx
+		_sfx_player.stream = _correct_sfx
 		_sfx_player.play()
 		await get_tree().create_timer(0.33).timeout
 		return
@@ -5819,10 +7265,11 @@ func _play_success_sfx() -> void:
 
 
 func _play_new_question_cue() -> void:
-	if _sfx_player != null:
-		await _push_sine(880.0, 0.05)
-		await _push_silence(0.015)
-		await _push_sine(988.0, 0.06)
+	if _new_question_sfx != null and _sfx_player != null:
+		_sfx_player.stop()
+		_sfx_player.stream = _new_question_sfx
+		_sfx_player.play()
+		await get_tree().create_timer(0.28).timeout
 		return
 	await _push_sine(880.0, 0.05)
 	await _push_silence(0.015)
@@ -5830,15 +7277,81 @@ func _play_new_question_cue() -> void:
 
 
 func _play_fail_sfx() -> void:
-	if _fail_sfx != null and _sfx_player != null:
+	if _wrong_choice_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
-		_sfx_player.stream = _fail_sfx
+		_sfx_player.stream = _wrong_choice_sfx
 		_sfx_player.play()
 		await get_tree().create_timer(0.34).timeout
 		return
 	await _push_sine(392.0, 0.09)
 	await _push_silence(0.03)
 	await _push_sine(293.7, 0.12)
+
+
+func _play_gameover_fail_sfx() -> void:
+	if _fail_gameover_sfx != null and _sfx_player != null:
+		_sfx_player.stop()
+		_sfx_player.stream = _fail_gameover_sfx
+		_sfx_player.play()
+		await get_tree().create_timer(0.46).timeout
+		return
+	await _push_sine(220.0, 0.2)
+
+
+func _play_win_fanfare_sfx() -> void:
+	if _win_fanfare_sfx != null and _sfx_player != null:
+		_sfx_player.stop()
+		_sfx_player.stream = _win_fanfare_sfx
+		_sfx_player.play()
+		await get_tree().create_timer(0.8).timeout
+
+
+func _play_module_complete_sfx() -> void:
+	if _module_complete_sfx != null and _sfx_player != null:
+		_sfx_player.stop()
+		_sfx_player.stream = _module_complete_sfx
+		_sfx_player.play()
+
+
+func _play_powerup_sfx() -> void:
+	if _powerup_sfx != null and _sfx_player != null:
+		_sfx_player.stop()
+		_sfx_player.stream = _powerup_sfx
+		_sfx_player.play()
+
+
+func _play_transition_whoosh_sfx() -> void:
+	if _transition_whoosh_sfx != null and _ui_sfx_player != null:
+		_ui_sfx_player.stop()
+		_ui_sfx_player.stream = _transition_whoosh_sfx
+		_ui_sfx_player.play()
+
+
+func _play_ui_click_sfx() -> void:
+	if _ui_click_sfx != null and _ui_sfx_player != null:
+		_ui_sfx_player.stop()
+		_ui_sfx_player.stream = _ui_click_sfx
+		_ui_sfx_player.play()
+
+
+func _play_sight_answer_click_sfx() -> void:
+	if _ui_sight_answer_click_sfx != null and _ui_sfx_player != null:
+		_ui_sfx_player.stop()
+		_ui_sfx_player.stream = _ui_sight_answer_click_sfx
+		_ui_sfx_player.play()
+
+
+func _start_note_chase_music() -> void:
+	if _music_player == null or _note_chase_bgm == null:
+		return
+	_music_player.stream = _note_chase_bgm
+	_music_player.pitch_scale = 1.0
+	_music_player.play()
+
+
+func _stop_note_chase_music() -> void:
+	if _music_player != null and _music_player.playing:
+		_music_player.stop()
 
 
 func _push_sine(freq: float, duration: float) -> void:
