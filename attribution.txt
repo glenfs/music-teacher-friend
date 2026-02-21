@@ -24,4 +24,10 @@ Door chimes by IENBA -- https://freesound.org/s/491404/ -- License: Creative Com
 Correct Choice by unadamlar -- https://freesound.org/s/476178/ -- License: Creative Commons 0
 UI undo sound effect by hotpin7 -- https://freesound.org/s/843083/ -- License: Attribution 4.0
 Note Chase BGM uses: Game Menu Achievement by CogFireStudios -- https://freesound.org/s/619833/ -- License: Creative Commons 0
+Achievement Happy Beeps Jingle by CogFireStudios -- https://freesound.org/s/619838/ -- License: Creative Commons 0
+Wristwatch.Tic-Tac.wav by andychristen -- https://freesound.org/s/268185/ -- License: Attribution 4.0
+
+Fonts:
+Inter -- https://fonts.google.com/specimen/Inter -- License: SIL Open Font License 1.1
+Poppins -- https://fonts.google.com/specimen/Poppins -- License: SIL Open Font License 1.1
 

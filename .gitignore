@@ -14,3 +14,9 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+
+# Android signing keys (never commit secrets)
+keys/*.jks
+keys/*.keystore
+keys/*.pem
+keys/*.p12
