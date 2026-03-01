@@ -1,0 +1,81 @@
+[gd_resource type="Theme" load_steps=7 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/Nunito-Regular.ttf" id="1_body_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/Baloo2-SemiBold.ttf" id="4_title_button_font"]
+[ext_resource type="StyleBoxFlat" path="res://ui/styles/setup_card_stylebox.tres" id="2_card"]
+[ext_resource type="StyleBoxFlat" path="res://ui/styles/setup_chip_stylebox.tres" id="3_chip"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip_hover"]
+bg_color = Color(0.13, 0.24, 0.39, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.86, 0.4, 0.4)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip_pressed"]
+bg_color = Color(0.08, 0.16, 0.28, 0.86)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.86, 0.4, 0.44)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.12)
+shadow_size = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_input"]
+bg_color = Color(0.1, 0.19, 0.32, 0.82)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.96, 0.86, 0.4, 0.38)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 2
+
+[resource]
+default_font = ExtResource("1_body_font")
+default_font_size = 16
+Button/fonts/font = ExtResource("4_title_button_font")
+Button/colors/font_color = Color(0.9, 0.96, 1, 0.96)
+Button/colors/font_hover_color = Color(0.96, 0.98, 1, 0.98)
+Button/colors/font_pressed_color = Color(0.96, 0.98, 1, 0.98)
+Button/colors/font_outline_color = Color(0, 0, 0, 0)
+Button/constants/outline_size = 0
+Button/styles/normal = ExtResource("3_chip")
+Button/styles/hover = SubResource("StyleBoxFlat_chip_hover")
+Button/styles/pressed = SubResource("StyleBoxFlat_chip_pressed")
+CheckButton/colors/font_color = Color(0.9, 0.96, 1, 0.96)
+CheckButton/colors/font_hover_color = Color(0.96, 0.98, 1, 0.98)
+CheckButton/colors/font_pressed_color = Color(0.96, 0.98, 1, 0.98)
+CheckButton/fonts/font = ExtResource("4_title_button_font")
+CheckButton/styles/normal = ExtResource("3_chip")
+CheckButton/styles/hover = SubResource("StyleBoxFlat_chip_hover")
+CheckButton/styles/pressed = SubResource("StyleBoxFlat_chip_pressed")
+Label/colors/font_color = Color(0.96, 0.98, 1, 0.98)
+LineEdit/colors/font_color = Color(0.96, 0.98, 1, 0.98)
+LineEdit/colors/font_placeholder_color = Color(0.78, 0.9, 0.98, 0.88)
+LineEdit/styles/normal = SubResource("StyleBoxFlat_input")
+LineEdit/styles/focus = SubResource("StyleBoxFlat_input")
+OptionButton/colors/font_color = Color(0.96, 0.98, 1, 0.98)
+OptionButton/fonts/font = ExtResource("4_title_button_font")
+OptionButton/styles/normal = SubResource("StyleBoxFlat_input")
+OptionButton/styles/hover = SubResource("StyleBoxFlat_chip_hover")
+OptionButton/styles/pressed = SubResource("StyleBoxFlat_chip_pressed")
+PanelContainer/styles/panel = ExtResource("2_card")
+RichTextLabel/colors/default_color = Color(0.96, 0.98, 1, 0.98)
+RichTextLabel/colors/font_color = Color(0.96, 0.98, 1, 0.98)

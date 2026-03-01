@@ -20,3 +20,23 @@ keys/*.jks
 keys/*.keystore
 keys/*.pem
 keys/*.p12
+
+# Local agent/tooling metadata
+.claude/
+.codex/
+
+# Local Godot user data/cache
+.godot_userdata/
+
+# Build/export artifacts
+build/
+android/
+*.apk
+
+# QA/runtime outputs
+qa_screenshots/
+*.log
+
+# Local scratch/backups
+backup/
+tree.txt

@@ -1,0 +1,393 @@
+================================================================================
+  PERFORMANCE REVIEW & IMPROVEMENT SUGGESTIONS
+  Project: musiced (Godot 4)
+  Date: 2026-02-28
+================================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+The entire application lives in a single 21,542-line script (interval_birds.gd)
+with 713 functions, 648 instance variables, and ~540 dynamic node allocations.
+This is the root cause of slowness. The file is so large that Godot's GDScript
+compiler, the editor, and runtime all suffer. Below are concrete, prioritized
+improvements.
+
+
+================================================================================
+PRIORITY 1 — CRITICAL (Biggest impact, do these first)
+================================================================================
+
+1.1  SPLIT THE GOD SCRIPT
+     File: scripts/interval_birds.gd (21,542 lines)
+
+     This single file does EVERYTHING: audio, UI building, theming, gameplay
+     logic, tutorials, note chase, continuous sight, rhythm flow, teacher mode,
+     home menu, settings screens, and QA. Godot's GDScript compiler parses and
+     compiles the entire file on load and every hot-reload. With 21K lines this
+     alone adds significant startup lag and makes every script change trigger
+     a full recompile of a massive file.
+
+     Suggested split:
+       - home_menu.gd          (~2,500 lines) — _build_ui, _on_mode_selected,
+                                  home layout, overview cards, settings screens
+       - audio_manager.gd      (~800 lines) — _setup_audio, piano samples,
+                                  SFX playback, conductor integration
+       - ear_training.gd       (~2,000 lines) — interval/chord/progression/
+                                  scale/cadence gameplay logic
+       - sight_reading.gd      (~2,000 lines) — sight notes/chords/placement,
+                                  _apply_answer_mode for sight
+       - note_chase.gd         (~1,200 lines) — _update_note_chase, spawning,
+                                  shield/fever/boss, note chase staff
+       - continuous_sight.gd   (~1,000 lines) — _update_continuous_sight,
+                                  rhythm flow, continuous spawning
+       - tutorial_manager.gd   (~1,500 lines) — _show_tutorial_step and all
+                                  tutorial conversation/exercise logic
+       - theme_styling.gd      (~1,500 lines) — _theme_button_palette,
+                                  _style_button, _style_controls_recursive,
+                                  _set_home_selection_state, all styling
+       - teacher_mode.gd       (~800 lines) — teacher data, CSV, piece rows
+       - bird_chicken.gd       (~500 lines) — bird sprite, food token, bubble
+       - responsive_layout.gd  (~600 lines) — _apply_responsive_touch_scaling,
+                                  _update_game_card_layout, device profiles
+
+     Impact: Faster startup, faster hot-reload, easier for Godot editor to
+     handle, reduces per-frame method-lookup overhead in GDScript.
+
+
+1.2  _build_ui() IS 2,532 LINES — RUNS SYNCHRONOUSLY ON STARTUP
+     Line 2051. This single function creates the entire UI tree in one blocking
+     call during _ready(). It creates ~300+ nodes, allocates dozens of
+     StyleBoxFlat objects, loads textures, and connects signals. The user sees
+     nothing until this completes.
+
+     Fixes:
+     a) Move UI to .tscn scene files. Godot's scene system is optimized for
+        node tree construction and loads faster than procedural code.
+     b) If keeping procedural UI, split into phases and use call_deferred()
+        between them so the engine can render a loading screen:
+          _build_header_ui()
+          call_deferred("_build_home_menu_ui")
+          call_deferred("_build_game_panel_ui")
+          call_deferred("_build_sight_ui")
+          etc.
+     c) Lazy-build sections that aren't immediately visible. Don't build the
+        tutorial UI, teacher panel, sight settings, ear settings, etc. until
+        the user first navigates to them.
+
+     Impact: Dramatically faster perceived startup. Currently the app appears
+     frozen while _build_ui runs.
+
+
+1.3  _theme_button_palette() ALLOCATES A NEW DICTIONARY EVERY CALL
+     Line 5389. This function returns a brand new Dictionary with ~22 Color
+     entries every time it's called. It's called from _set_home_selection_state
+     (line 6810) which is called for EVERY button on every mode change.
+
+     Fix: Cache the palette. Compute once per theme change, store in a var:
+       var _cached_button_palette: Dictionary = {}
+       var _cached_palette_theme_id: String = ""
+
+       func _theme_button_palette() -> Dictionary:
+           var id := _home_tokens.theme_id() if _home_tokens else _ui_theme_id
+           if id == _cached_palette_theme_id and not _cached_button_palette.is_empty():
+               return _cached_button_palette
+           _cached_palette_theme_id = id
+           _cached_button_palette = _compute_palette(id)
+           return _cached_button_palette
+
+     Impact: Eliminates hundreds of dictionary allocations during menu
+     interactions.
+
+
+================================================================================
+PRIORITY 2 — HIGH (Significant frame-time improvements)
+================================================================================
+
+2.1  _process() RUNS 5-6 FUNCTIONS EVERY FRAME UNCONDITIONALLY
+     Line 1473. Every single frame, these run:
+       - _update_note_chase(delta)           — even when not in note chase
+       - _update_continuous_sight(delta)      — even when not in continuous mode
+       - _update_sight_progress_pulse(delta)  — even when progress bar hidden
+       - _ensure_bird_visible_in_gameplay()   — even on home screen
+       - _update_chicken_bubble_position()    — even when bubble is hidden
+       - _note_chase_realign_staff_frame()    — on every frame in sight/chase
+
+     While these have early-return guards, calling 5-6 virtual function
+     dispatches per frame (with dictionary lookups for instance vars) adds up,
+     especially on mobile.
+
+     Fix: Use a state machine or flags to only run the relevant update:
+       func _process(delta: float) -> void:
+           match _active_game_state:
+               GameState.NOTE_CHASE:
+                   _update_note_chase(delta)
+                   _note_chase_realign_staff_frame()
+               GameState.CONTINUOUS_SIGHT:
+                   _update_continuous_sight(delta)
+                   _note_chase_realign_staff_frame()
+               GameState.SIGHT_NOTES:
+                   _update_sight_progress_pulse(delta)
+                   _note_chase_realign_staff_frame()
+               GameState.HOME:
+                   pass  # Nothing needed per-frame
+           if _bird_sprite != null and _bird_sprite.visible:
+               _ensure_bird_visible_in_gameplay()
+               _update_chicken_bubble_position()
+
+     Or even better: disable _process when on the home screen:
+       set_process(false)  # in _show_home()
+       set_process(true)   # in _start_game()
+
+
+2.2  _apply_responsive_touch_scaling() IS 406 LINES, CALLED ON LAYOUT
+     Line 1618. This monster function recalculates sizes and font sizes for
+     EVERY UI element on every layout change. It does ~100+ theme override
+     calls and iterates over button arrays.
+
+     Fixes:
+     a) Cache the last viewport size. Skip if unchanged:
+          if _last_scaled_viewport == vp:
+              return
+          _last_scaled_viewport = vp
+     b) Split into home-only and game-only sections. Only run the relevant
+        part based on current screen.
+     c) Pre-compute scale factors once and store them, rather than computing
+        clampf(vp.x / 1366.0, ...) dozens of times inline.
+
+
+2.3  _set_home_selection_state() — 264 LINES, CREATES StyleBoxFlat OBJECTS
+     Line 6807. Called for every button on mode/selection change. Each call:
+       - Calls _theme_button_palette() (allocates new dict — see 1.3)
+       - Creates up to 3 new StyleBoxFlat objects (normal/hover/pressed)
+       - Calls .duplicate() on existing styleboxes
+       - Sets ~20+ theme overrides per button
+
+     For N buttons, this is O(N) StyleBoxFlat allocations per selection change.
+
+     Fix: Pre-create a set of shared StyleBoxFlat resources per theme/state
+     combination and reuse them. StyleBoxFlat objects can be shared across
+     buttons if they have the same visual properties. Create them once:
+       _selected_normal_sb: StyleBoxFlat
+       _selected_hover_sb: StyleBoxFlat
+       _unselected_normal_sb: StyleBoxFlat
+       etc.
+
+
+2.4  _note_chase_realign_staff_frame() — RUNS EVERY FRAME
+     Line 14850. This 116-line function runs every frame when in sight or
+     chase mode. It recalculates geometry, duplicates a StyleBoxFlat
+     (line 14923), and iterates over staff lines.
+
+     Fixes:
+     a) The StyleBoxFlat.duplicate() on line 14923 allocates a new object
+        every frame. Cache it and only update border_color:
+          if _cached_frame_sb == null:
+              _cached_frame_sb = (sb_s as StyleBoxFlat).duplicate()
+          _cached_frame_sb.border_color = _sight_staff_frame_border_color
+          _note_chase_staff_frame.add_theme_stylebox_override("panel", _cached_frame_sb)
+     b) Only recalculate when bounds actually change (track last bounds).
+     c) The staff line iteration (line 14927) runs every frame — only needed
+        when the frame geometry changes.
+
+
+2.5  823 THEME OVERRIDE CALLS
+     The codebase contains 823 add_theme_*_override() calls. Each one
+     triggers Godot's internal notification system and can cause layout
+     recalculations.
+
+     Fix: Use Theme resources (.tres files) instead of per-node overrides.
+     Create a few Theme variants and assign them to container nodes. Child
+     nodes inherit the theme automatically. This replaces hundreds of
+     individual override calls with a single theme assignment.
+
+
+================================================================================
+PRIORITY 3 — MEDIUM (Good improvements, less critical)
+================================================================================
+
+3.1  AUDIO SETUP LOADS ALL SAMPLES UPFRONT
+     Line 1014: _setup_audio() loads all piano samples, SFX files, etc.
+     during startup. For modes the user may never use.
+
+     Fix: Lazy-load audio. Load piano samples when ear training starts.
+     Load rhythm SFX when rhythm mode starts. Use ResourceLoader.load()
+     with background loading for large audio files.
+
+
+3.2  540 DYNAMIC NODE ALLOCATIONS IN CODE
+     The entire UI is built programmatically with .new() calls rather than
+     using Godot's scene/resource system. This:
+       - Prevents Godot from batching node creation
+       - Prevents resource sharing through the scene system
+       - Makes the code harder to maintain
+       - Prevents Godot editor visual debugging
+
+     Fix: Gradually migrate to .tscn scenes. Start with the home menu, which
+     is the first thing users see. Even partial migration helps.
+
+
+3.3  _style_controls_recursive() WALKS THE ENTIRE NODE TREE
+     Line 5308. Recursive function that visits every child node to apply
+     font and color overrides. Called during styling passes.
+
+     Fix: Use Godot's Theme system. Set a theme on the root node and all
+     children inherit it automatically. No tree walking needed.
+
+
+3.4  REDUNDANT _on_mode_selected() CALLS IN _ready()
+     Lines 1015 and 1021 both call _on_mode_selected(). This 124-line
+     function recalculates all visibility, section states, and layout.
+     Called twice at startup for no apparent reason.
+
+     Fix: Remove one of the duplicate calls.
+
+
+3.5  str() CONVERSIONS IN HOT PATHS
+     Multiple hot-path functions use str() to convert values for comparison:
+       Line 1515: str(_device_profile.get("id", "")) != str(next_profile.get("id", ""))
+       Line 14445: var kind := str(n.get("kind", "note"))
+
+     Fix: Use typed variables and direct comparison where possible.
+
+
+3.6  DICTIONARY LOOKUPS IN PER-FRAME LOOPS
+     In _update_note_chase() (line 14405), each active note is a Dictionary.
+     Every frame, for each note, multiple .get() calls extract values:
+       n.get("node", null), n.get("kind", "note"), n.get("hit", false),
+       n.get("click_cd", 0.0), n.get("triggered", false), etc.
+
+     Fix: Use a typed class/RefCounted instead of Dictionary for note items:
+       class NoteChaseItem extends RefCounted:
+           var node: Panel
+           var kind: String = "note"
+           var hit: bool = false
+           var click_cd: float = 0.0
+           var target: bool = false
+           var decoy: bool = false
+           var triggered: bool = false
+
+     This gives typed property access instead of hash lookups.
+
+
+3.7  CONTINUOUS SIGHT REMOVES FROM ARRAYS BY INDEX IN REVERSE LOOPS
+     Lines 18817-18838. Uses remove_at(i) in reverse loops on arrays.
+     Array.remove_at() shifts all subsequent elements. For arrays with
+     many active notes, this is O(n^2) in the worst case.
+
+     Fix: Build a new array of survivors (like note chase does with
+     still_active on line 14436), then swap:
+       var survivors: Array = []
+       for item in _continuous_sight_notes:
+           if should_keep(item):
+               survivors.append(item)
+       _continuous_sight_notes = survivors
+
+
+3.8  REPEATED get_viewport_rect().size CALLS
+     14 calls across the codebase. While cheap individually, some functions
+     call it multiple times. _ensure_bird_visible_in_gameplay() calls it
+     twice (lines 20934-20935).
+
+     Fix: Call once at the top of each function and reuse the result.
+     Or cache it per-frame in _process.
+
+
+================================================================================
+PRIORITY 4 — LOW (Nice to have, polish)
+================================================================================
+
+4.1  648 INSTANCE VARIABLES
+     The script has 648 instance vars. GDScript stores these in a dictionary-
+     like structure. This many vars means:
+       - Higher memory per instance
+       - Slower property lookups
+       - GC pressure from the large object
+
+     This naturally resolves when the god script is split (see 1.1).
+
+
+4.2  CONSTANT DATA COULD BE PRELOADED RESOURCES
+     Large constant dictionaries (INTERVAL_HINT_PROFILES, CHORD_HINT_PROFILES,
+     SIGHT_NOTE_PROFILES — lines 164-200) are compiled into the script.
+
+     Fix: Move to .json or .tres resource files and load them. Keeps the
+     script smaller and the data can be edited without recompiling.
+
+
+4.3  MULTIPLE create_tween() CALLS WITHOUT KILLING PREVIOUS
+     Some tween-creating functions don't check for existing tweens before
+     creating new ones. _animate_home_button_selection (line 6787) does
+     check, but others may not.
+
+     Fix: Always kill previous tweens before creating new ones to prevent
+     tween buildup.
+
+
+4.4  _continuous_can_spawn_note() — UNKNOWN COST
+     Called every frame during continuous sight. Without seeing its
+     implementation, it may be doing expensive checks.
+
+     Fix: Audit and ensure it's O(1).
+
+
+4.5  PRINT STATEMENTS IN RUNTIME CODE
+     Line 1518: print("Device profile: %s (%s)" % [...])
+     Print statements in production code cause string formatting overhead
+     and I/O on every call.
+
+     Fix: Gate behind a debug flag or remove for release builds:
+       if OS.is_debug_build():
+           print(...)
+
+
+================================================================================
+QUICK WINS (Can do right now with minimal risk)
+================================================================================
+
+1. Cache _theme_button_palette() result                          [~10 min]
+2. Remove duplicate _on_mode_selected() call in _ready()         [~2 min]
+3. Cache viewport size in _ensure_bird_visible_in_gameplay()     [~5 min]
+4. Add set_process(false) when on home screen                    [~5 min]
+5. Cache the StyleBoxFlat in _note_chase_realign_staff_frame()   [~10 min]
+6. Cache viewport size at top of _apply_responsive_touch_scaling [~5 min]
+7. Gate print() behind debug flag                                [~5 min]
+
+
+================================================================================
+ESTIMATED IMPACT SUMMARY
+================================================================================
+
+  Change                          | Startup | Frame Time | Memory
+  --------------------------------+---------+------------+--------
+  Split god script (1.1)          | +++     | ++         | ++
+  Lazy UI building (1.2)          | +++     | -          | +
+  Cache button palette (1.3)      | -       | ++         | +
+  State-gated _process (2.1)      | -       | +++        | -
+  Cache responsive scaling (2.2)  | -       | ++         | -
+  Shared StyleBoxFlat (2.3)       | +       | ++         | ++
+  Cache staff frame SB (2.4)      | -       | ++         | +
+  Use Theme resources (2.5)       | +       | +          | +
+  Lazy audio loading (3.1)        | ++      | -          | +
+  Migrate to .tscn (3.2)          | ++      | +          | +
+  Typed note chase items (3.6)    | -       | +          | +
+
+  Legend: +++ = major, ++ = significant, + = minor, - = negligible
+
+
+================================================================================
+NOTES
+================================================================================
+
+- All other scripts in the project are reasonably sized (< 900 lines each).
+  The problem is concentrated in interval_birds.gd.
+
+- The scripts/ui/ folder already has good abstractions (HomeMenuState,
+  HomeMenuTokens, HomeMenuUI). The pattern exists — it just needs to be
+  extended to cover the rest of the functionality.
+
+- The project uses preload() correctly for external scripts (line 31-63).
+  This is good practice and should be maintained in the split.
+
+- Testing: The QA bot (qa_bot.gd, 2449 lines) directly calls functions
+  on the main script. After splitting, the QA bot will need updating to
+  reference the new script locations.

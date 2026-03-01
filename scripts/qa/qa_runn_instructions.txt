@@ -1,0 +1,10 @@
+Run the expanded QA now in WINDOWED mode using the project root script:
+..\..\qa_run.ps1 -Windowed
+
+After it finishes:
+1) Read the printed QA_REPORT_ABS / QA_LOG_ABS paths from console output
+2) Open qa_report.md from that absolute path and summarize:
+   - which new coverage sections ran
+   - pass/fail per section
+   - any fixes applied (file + summary)
+3) Confirm the screenshots folder exists and report how many PNGs were produced.

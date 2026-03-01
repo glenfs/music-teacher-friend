@@ -1,0 +1,16 @@
+Fonts used by this project
+
+Title / button font:
+- Baloo 2 (variable weight)
+- Copyright 2010-2021 Ek Type (www.ektype.in)
+- License: SIL Open Font License, Version 1.1
+
+Body / description font:
+- Nunito (variable weight)
+- Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
+- License: SIL Open Font License, Version 1.1
+
+Legacy fonts (no longer primary):
+- Poppins
+- Copyright 2014 The Poppins Project Authors
+- License: SIL Open Font License, Version 1.1
