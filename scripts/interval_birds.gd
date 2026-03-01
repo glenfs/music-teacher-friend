@@ -1515,10 +1515,20 @@ func _update_game_card_layout() -> void:
 	var target_h := clampf(vp.y * (0.80 if is_large else 0.68), 320.0, vp.y - 72.0)
 	_game_card.custom_minimum_size = Vector2(target_w, target_h)
 	if _home_card != null:
-		var footer_h := 72.0
+		var overview_active := _is_main_menu_overview_active()
+		var footer_h := 72.0 if overview_active else 56.0
 		if _home_footer_bar != null:
 			footer_h = maxf(footer_h, _home_footer_bar.custom_minimum_size.y)
-		var home_h := clampf(target_h - (footer_h + 78.0), 220.0, vp.y - (footer_h + 88.0))
+		var home_h := 0.0
+		if overview_active:
+			home_h = clampf(target_h - (footer_h + 78.0), 220.0, vp.y - (footer_h + 88.0))
+		else:
+			var header_h := 84.0
+			if _header_card != null:
+				header_h = maxf(header_h, _header_card.custom_minimum_size.y)
+			var shell_gap := clampf(vp.y * 0.035, 22.0, 46.0)
+			var available_h := vp.y - (header_h + footer_h + shell_gap)
+			home_h = clampf(available_h, 260.0, vp.y - (footer_h + 24.0))
 		_home_card.custom_minimum_size = Vector2(target_w, home_h)
 	_apply_responsive_touch_scaling(vp)
 	_layout_game_top_buttons(vp)
@@ -1668,7 +1678,7 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 		btn_h *= 0.90
 	var btn_w_boost := (1.22 if is_tablet else 1.03) * clampf(vp.x / 1366.0, 0.76, 1.10)
 	var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
-	var hud_height := clampf(vp.y * 0.10, 78.0, 112.0 if is_tablet else 96.0)
+	var hud_height := clampf(vp.y * 0.085, 66.0, 102.0 if is_tablet else 84.0)
 	if _header_card != null:
 		_header_card.custom_minimum_size = Vector2(0, roundf(hud_height))
 	var edge_margin := int(roundf(clampf(vp.x * 0.014, 8.0, 18.0)))
@@ -1734,9 +1744,16 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	if _home_footer_row != null:
 		_home_footer_row.add_theme_constant_override("separation", int(roundf((16 if is_tablet else 12) * viewport_scale)))
 	if _home_footer_bar != null:
-		var footer_h := (70.0 if is_tablet else 44.0) * clampf(viewport_scale, 0.90, 1.08)
-		if (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible):
-			footer_h = (96.0 if is_tablet else 82.0) * clampf(viewport_scale, 0.90, 1.08)
+		var main_overview := _is_main_menu_overview_active()
+		var footer_h := 0.0
+		if main_overview:
+			footer_h = (70.0 if is_tablet else 44.0) * clampf(viewport_scale, 0.90, 1.08)
+			if (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible):
+				footer_h = (96.0 if is_tablet else 82.0) * clampf(viewport_scale, 0.90, 1.08)
+		else:
+			footer_h = (58.0 if is_tablet else 38.0) * clampf(viewport_scale, 0.90, 1.08)
+			if (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible):
+				footer_h = (70.0 if is_tablet else 56.0) * clampf(viewport_scale, 0.90, 1.08)
 		_home_footer_bar.custom_minimum_size = Vector2(0, roundf(footer_h))
 	for b in _home_material_buttons:
 		if b == null:
@@ -2136,8 +2153,8 @@ func _build_ui() -> void:
 	hud_margin.set_anchors_preset(PRESET_FULL_RECT)
 	hud_margin.add_theme_constant_override("margin_left", 16)
 	hud_margin.add_theme_constant_override("margin_right", 16)
-	hud_margin.add_theme_constant_override("margin_top", 10)
-	hud_margin.add_theme_constant_override("margin_bottom", 10)
+	hud_margin.add_theme_constant_override("margin_top", 6)
+	hud_margin.add_theme_constant_override("margin_bottom", 6)
 	_header_card.add_child(hud_margin)
 
 	var header_top_row := HBoxContainer.new()
@@ -2194,9 +2211,15 @@ func _build_ui() -> void:
 	header_center_col.add_theme_constant_override("separation", 0)
 	header_center_wrap.add_child(header_center_col)
 
+	var header_brand_row := HBoxContainer.new()
+	header_brand_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	header_brand_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	header_brand_row.add_theme_constant_override("separation", 10)
+	header_center_col.add_child(header_brand_row)
+
 	# Logo placeholder — swap out for actual app icon when available
 	_home_logo_placeholder = PanelContainer.new()
-	_home_logo_placeholder.custom_minimum_size = Vector2(48, 48)
+	_home_logo_placeholder.custom_minimum_size = Vector2(42, 42)
 	_home_logo_placeholder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_home_logo_placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var _ph_sb := StyleBoxFlat.new()
@@ -2222,17 +2245,18 @@ func _build_ui() -> void:
 	_ph_lbl.add_theme_color_override("font_color", Color(0.20, 0.12, 0.02, 1.0))
 	_ph_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_home_logo_placeholder.add_child(_ph_lbl)
-	header_center_col.add_child(_home_logo_placeholder)
+	header_brand_row.add_child(_home_logo_placeholder)
 
 	_title_label = Label.new()
 	_title_label.text = "Home"
-	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_title_label.set_meta("hud_page_title", true)
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_title_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	_title_label.clip_text = true
 	_title_label.add_theme_font_size_override("font_size", 30)
 	_title_label.visible = true
-	header_center_col.add_child(_title_label)
+	header_brand_row.add_child(_title_label)
 
 	_header_mode_label = Label.new()
 	_header_mode_label.text = ""
@@ -2306,6 +2330,7 @@ func _build_ui() -> void:
 
 	_home_card = PanelContainer.new()
 	_home_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_home_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_home_card.custom_minimum_size = Vector2(0, 280)
 	main_col.add_child(_home_card)
 
@@ -3046,6 +3071,7 @@ func _build_ui() -> void:
 		t.text = n
 		t.custom_minimum_size = Vector2(36, 28)
 		t.set_meta("mini_btn", true)
+		t.set_meta("note_chase_target_note", true)
 		t.button_pressed = _note_chase_selected_notes.has(n)
 		t.pressed.connect(_on_note_chase_note_toggled.bind(n))
 		chase_note_row.add_child(t)
@@ -5321,9 +5347,16 @@ func _style_header_card(card: PanelContainer, color: Color) -> void:
 func _style_controls_recursive(node: Node) -> void:
 	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
 	for child in node.get_children():
+		if child is PanelContainer:
+			_remove_menu_top_gloss(child as Control)
 		if child is Label:
 			var label := child as Label
-			if label.has_meta("home_section_header"):
+			if label.has_meta("hud_page_title"):
+				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
+				label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+				label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
+				label.add_theme_constant_override("outline_size", 0)
+			elif label.has_meta("home_section_header"):
 				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
 				label.add_theme_font_size_override("font_size", 27)
 				label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
@@ -5363,6 +5396,8 @@ func _style_controls_recursive(node: Node) -> void:
 				_style_virtual_piano_key_button(btn)
 				continue
 			if btn.flat and btn.has_meta("mode_card_panel"):
+				if _is_menu_ui_control(btn):
+					_apply_menu_top_gloss(btn, 0.20, 0.24, 10.0, 34.0)
 				var click_call_card := Callable(self, "_on_any_ui_button_pressed")
 				if not btn.pressed.is_connected(click_call_card):
 					btn.pressed.connect(click_call_card)
@@ -5373,6 +5408,8 @@ func _style_controls_recursive(node: Node) -> void:
 			btn.add_theme_color_override("font_hover_color", Color(0.16, 0.10, 0.04))
 			btn.add_theme_color_override("font_pressed_color", Color(0.12, 0.08, 0.03))
 			_style_button(btn)
+			if _is_menu_ui_control(btn):
+				_apply_menu_top_gloss(btn, 0.24, 0.24, 10.0, 32.0)
 			var click_call := Callable(self, "_on_any_ui_button_pressed")
 			if not btn.pressed.is_connected(click_call):
 				btn.pressed.connect(click_call)
@@ -5399,6 +5436,86 @@ func _style_controls_recursive(node: Node) -> void:
 			rich.add_theme_font_override("bold_font", _ui_font)
 			rich.add_theme_font_override("italics_font", _ui_font)
 		_style_controls_recursive(child)
+
+
+func _is_menu_ui_control(ctrl: Control) -> bool:
+	if ctrl == null:
+		return false
+	if _game_panel != null and (_game_panel == ctrl or _game_panel.is_ancestor_of(ctrl)):
+		return false
+	if _header_card != null and (_header_card == ctrl or _header_card.is_ancestor_of(ctrl)):
+		return true
+	if _home_card != null and (_home_card == ctrl or _home_card.is_ancestor_of(ctrl)):
+		return true
+	if _home_footer_bar != null and (_home_footer_bar == ctrl or _home_footer_bar.is_ancestor_of(ctrl)):
+		return true
+	return false
+
+
+func _apply_menu_top_gloss(ctrl: Control, alpha: float = 0.22, height_ratio: float = 0.22, min_h: float = 10.0, max_h: float = 40.0) -> void:
+	if ctrl == null:
+		return
+	var gloss := ctrl.get_node_or_null("MenuTopGloss") as Panel
+	if gloss == null:
+		gloss = Panel.new()
+		gloss.name = "MenuTopGloss"
+		gloss.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		gloss.z_index = 300
+		ctrl.add_child(gloss)
+		ctrl.move_child(gloss, ctrl.get_child_count() - 1)
+		gloss.set_meta("menu_gloss_host", ctrl)
+	if not ctrl.has_meta("menu_gloss_resize_connected"):
+		ctrl.set_meta("menu_gloss_resize_connected", true)
+		ctrl.resized.connect(_on_menu_gloss_host_resized.bind(ctrl))
+	_layout_menu_top_gloss(ctrl, alpha, height_ratio, min_h, max_h)
+
+
+func _remove_menu_top_gloss(ctrl: Control) -> void:
+	if ctrl == null:
+		return
+	var gloss := ctrl.get_node_or_null("MenuTopGloss")
+	if gloss != null:
+		gloss.queue_free()
+	if ctrl.has_meta("menu_gloss_resize_connected"):
+		ctrl.remove_meta("menu_gloss_resize_connected")
+
+
+func _layout_menu_top_gloss(ctrl: Control, alpha: float, height_ratio: float, min_h: float, max_h: float) -> void:
+	if ctrl == null:
+		return
+	var gloss := ctrl.get_node_or_null("MenuTopGloss") as Panel
+	if gloss == null:
+		return
+	var inset_x := clampf(ctrl.size.x * 0.02, 3.0, 10.0)
+	var top_inset := clampf(ctrl.size.y * 0.03, 2.0, 6.0)
+	var gloss_h := clampf(ctrl.size.y * height_ratio, min_h, max_h)
+	gloss.position = Vector2(inset_x, top_inset)
+	gloss.size = Vector2(maxf(0.0, ctrl.size.x - (inset_x * 2.0)), gloss_h)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 1.0, 1.0, clampf(alpha, 0.08, 0.42))
+	var r_top := int(roundf(clampf(gloss_h * 0.45, 5.0, 14.0)))
+	var r_bottom := int(roundf(clampf(gloss_h * 0.40, 4.0, 12.0)))
+	sb.corner_radius_top_left = r_top
+	sb.corner_radius_top_right = r_top
+	sb.corner_radius_bottom_left = r_bottom
+	sb.corner_radius_bottom_right = r_bottom
+	sb.border_width_bottom = 1
+	sb.border_color = Color(1.0, 1.0, 1.0, clampf(alpha * 0.35, 0.05, 0.18))
+	gloss.add_theme_stylebox_override("panel", sb)
+
+
+func _on_menu_gloss_host_resized(host: Control) -> void:
+	if host == null:
+		return
+	var alpha := 0.22
+	var ratio := 0.22
+	var min_h := 10.0
+	var max_h := 40.0
+	if host is Button:
+		alpha = 0.24
+		ratio = 0.24
+		max_h = 32.0
+	_layout_menu_top_gloss(host, alpha, ratio, min_h, max_h)
 
 
 func _invalidate_button_palette_cache() -> void:
@@ -5952,6 +6069,9 @@ func _build_home_flow_card(target_parent: Control, hub_name: String, description
 func _style_material_button(btn: Button) -> void:
 	if btn == null:
 		return
+	# Footer action buttons have dedicated styling and should not be overridden.
+	if btn == _home_start_button or btn == _rhythm_flow_demo_home_button or btn == _home_settings_button:
+		return
 	if btn.flat:
 		return
 	if not btn.has_meta("base_text"):
@@ -6067,9 +6187,15 @@ func _style_home_footer_button(btn: Button, accent: Color, fill_alpha: float = 0
 	pressed.bg_color = Color(0.08, 0.19, 0.30, fill_alpha + 0.10)
 	pressed.shadow_size = 3
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 0.98))
-	btn.add_theme_color_override("font_hover_color", Color(0.97, 1.0, 1.0, 1.0))
-	btn.add_theme_color_override("font_pressed_color", Color(0.88, 0.95, 1.0, 0.98))
+	var is_play_cta := btn == _home_start_button or btn == _rhythm_flow_demo_home_button
+	if is_play_cta:
+		btn.add_theme_color_override("font_color", Color(0.12, 0.18, 0.27, 1.0))
+		btn.add_theme_color_override("font_hover_color", Color(0.10, 0.15, 0.22, 1.0))
+		btn.add_theme_color_override("font_pressed_color", Color(0.09, 0.13, 0.20, 1.0))
+	else:
+		btn.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 0.98))
+		btn.add_theme_color_override("font_hover_color", Color(0.97, 1.0, 1.0, 1.0))
+		btn.add_theme_color_override("font_pressed_color", Color(0.88, 0.95, 1.0, 0.98))
 	btn.add_theme_color_override("font_outline_color", Color(0.00, 0.00, 0.00, 0.20))
 	btn.add_theme_constant_override("outline_size", 1)
 	if not btn.has_meta("_hover_feedback_connected"):
@@ -6122,8 +6248,8 @@ func _style_sight_notes_tab_button(btn: Button, selected: bool) -> void:
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
 	normal.corner_radius_bottom_right = 12
-	normal.bg_color = Color(0.16, 0.29, 0.46, 0.88) if selected else Color(0.10, 0.18, 0.31, 0.74)
-	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.30)
+	normal.bg_color = Color(0.16, 0.29, 0.46, 0.88) if selected else Color(0.15, 0.24, 0.38, 0.82)
+	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.56)
 	normal.border_width_left = 2 if selected else 1
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
@@ -6132,10 +6258,10 @@ func _style_sight_notes_tab_button(btn: Button, selected: bool) -> void:
 	normal.shadow_size = 2
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.19, 0.33, 0.52, 0.92) if selected else Color(0.13, 0.24, 0.39, 0.80)
+	hover.bg_color = Color(0.19, 0.33, 0.52, 0.92) if selected else Color(0.18, 0.29, 0.45, 0.88)
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.08, 0.16, 0.28, 0.86)
+	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.11, 0.20, 0.33, 0.90)
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
 	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6523,7 +6649,7 @@ func _style_practice_setup_tab_button(btn: Button, selected: bool) -> void:
 		return
 	_home_button_clean_base_text(btn)
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.16, 0.29, 0.46, 0.88) if selected else Color(0.10, 0.18, 0.31, 0.74)
+	normal.bg_color = Color(0.16, 0.29, 0.46, 0.88) if selected else Color(0.15, 0.24, 0.38, 0.82)
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
@@ -6532,15 +6658,15 @@ func _style_practice_setup_tab_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 3 if selected else 1
-	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.30)
+	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.56)
 	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
 	normal.shadow_size = 2
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.19, 0.33, 0.52, 0.92) if selected else Color(0.13, 0.24, 0.39, 0.80)
+	hover.bg_color = Color(0.19, 0.33, 0.52, 0.92) if selected else Color(0.18, 0.29, 0.45, 0.88)
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.08, 0.16, 0.28, 0.86)
+	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.11, 0.20, 0.33, 0.90)
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
 	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6558,8 +6684,20 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	_home_button_clean_base_text(btn)
+	var is_note_chase_target := bool(btn.get_meta("note_chase_target_note", false))
+	var selected_bg := Color(0.16, 0.30, 0.47, 0.90)
+	var selected_hover := Color(0.19, 0.34, 0.53, 0.94)
+	var selected_pressed := Color(0.12, 0.24, 0.38, 0.96)
+	var selected_border := SIGHT_NOTES_SETUP_ACCENT
+	var selected_text := SIGHT_NOTES_SETUP_TEXT_PRIMARY
+	if is_note_chase_target:
+		selected_bg = Color(0.9098, 0.6275, 0.1255, 0.98) # #E8A020
+		selected_hover = Color(0.95, 0.70, 0.20, 0.99)
+		selected_pressed = Color(0.82, 0.54, 0.08, 0.99)
+		selected_border = Color(0.97, 0.86, 0.45, 0.98)
+		selected_text = Color(0.12, 0.10, 0.06, 1.0)
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.16, 0.30, 0.47, 0.90) if selected else Color(0.10, 0.19, 0.32, 0.76)
+	normal.bg_color = selected_bg if selected else Color(0.10, 0.19, 0.32, 0.76)
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6568,19 +6706,19 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	normal.border_color = selected_border if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
 	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
 	normal.shadow_size = 2
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.19, 0.34, 0.53, 0.94) if selected else Color(0.13, 0.24, 0.39, 0.82)
+	hover.bg_color = selected_hover if selected else Color(0.13, 0.24, 0.39, 0.82)
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.08, 0.16, 0.28, 0.86)
+	pressed.bg_color = selected_pressed if selected else Color(0.08, 0.16, 0.28, 0.86)
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	btn.add_theme_color_override("font_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	if not btn.has_meta("_hover_feedback_connected"):
@@ -7617,17 +7755,17 @@ func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: T
 		btn.add_theme_constant_override("outline_size", 0)
 		return
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.15, 0.27, 0.52, 0.78)
+	normal.bg_color = Color(0.09, 0.17, 0.29, 0.86)
 	normal.corner_radius_top_left = 23
 	normal.corner_radius_top_right = 23
 	normal.corner_radius_bottom_left = 23
 	normal.corner_radius_bottom_right = 23
-	normal.border_color = Color(0.74, 0.92, 1.0, 0.88)
-	normal.border_width_left = 1
-	normal.border_width_top = 1
-	normal.border_width_right = 1
-	normal.border_width_bottom = 1
-	normal.shadow_color = Color(0.02, 0.07, 0.16, 0.42)
+	normal.border_color = Color(0.92, 0.78, 0.32, 0.92)
+	normal.border_width_left = 2
+	normal.border_width_top = 2
+	normal.border_width_right = 2
+	normal.border_width_bottom = 2
+	normal.shadow_color = Color(0.02, 0.03, 0.06, 0.36)
 	normal.shadow_size = 4
 	normal.content_margin_left = 0
 	normal.content_margin_right = 0
@@ -7635,17 +7773,22 @@ func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: T
 	normal.content_margin_bottom = 0
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
-	hover.bg_color = Color(0.19, 0.33, 0.62, 0.90)
+	hover.bg_color = Color(0.12, 0.23, 0.38, 0.92)
+	hover.border_color = Color(0.98, 0.84, 0.40, 0.98)
 	hover.shadow_size = 6
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.09, 0.17, 0.34, 0.90)
+	pressed.bg_color = Color(0.06, 0.12, 0.21, 0.94)
+	pressed.border_color = Color(0.86, 0.70, 0.26, 0.96)
 	pressed.shadow_size = 2
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
-	btn.add_theme_color_override("font_pressed_color", Color(0.90, 0.95, 1.0, 1.0))
-	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.45))
+	btn.add_theme_color_override("font_color", Color(0.98, 0.94, 0.84, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.98, 0.92, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(0.92, 0.86, 0.74, 1.0))
+	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.38))
+	btn.add_theme_color_override("icon_normal_color", Color(0.98, 0.94, 0.84, 1.0))
+	btn.add_theme_color_override("icon_hover_color", Color(1.0, 0.98, 0.92, 1.0))
+	btn.add_theme_color_override("icon_pressed_color", Color(0.92, 0.86, 0.74, 1.0))
 	btn.add_theme_constant_override("outline_size", 1)
 
 
@@ -9836,7 +9979,7 @@ func _sight_selector_range_for_clef(clef_name: String) -> Dictionary:
 func _sight_default_selected_notes_for_clef(clef_name: String) -> PackedStringArray:
 	if clef_name == "Bass":
 		return PackedStringArray(["F3", "G3", "A3", "B3", "C4", "D4", "E4"])
-	return PackedStringArray(["A3", "B3", "C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "F5", "G5"])
+	return PackedStringArray(["A3", "B3", "C4", "D4", "E4", "F4", "G4"])
 
 
 func _sight_note_set_for_clef(clef_name: String) -> PackedStringArray:

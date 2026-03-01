@@ -56,6 +56,7 @@ func ensure_section_hint(section: VBoxContainer, text: String, high_contrast: bo
 		lbl = Label.new()
 		lbl.set_meta("home_hint", true)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		section.add_child(lbl)
