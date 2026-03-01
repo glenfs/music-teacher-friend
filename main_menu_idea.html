@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clefira — Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sky-top: #5bb8f5;
+  --sky-mid: #87ceeb;
+  --sky-bot: #c8e8f0;
+  --ground: #7ec850;
+  --ground-dark: #5a9e35;
+  --gold: #f5c842;
+  --gold-dark: #e0a800;
+  --coral: #ff7b5e;
+  --coral-dark: #e55c3f;
+  --teal: #3ecfb2;
+  --teal-dark: #28a98f;
+  --purple: #9b7fe8;
+  --card-bg: rgba(255,255,255,0.18);
+  --card-border: rgba(255,255,255,0.45);
+  --shadow: rgba(0,0,0,0.18);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Nunito', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #5bb8f5;
+}
+
+/* ===== SCENE CONTAINER ===== */
+.scene {
+  width: 100%;
+  max-width: 900px;
+  height: 100vh;
+  max-height: 700px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+}
+
+/* ===== SKY BACKGROUND ===== */
+.sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #4aa8e8 0%, #76c0ef 45%, #b8dff5 75%, #d4eefc 100%);
+}
+
+/* Clouds */
+.cloud {
+  position: absolute;
+  background: rgba(255,255,255,0.85);
+  border-radius: 50px;
+  filter: blur(1px);
+  animation: cloudDrift linear infinite;
+}
+.cloud::before, .cloud::after {
+  content: '';
+  position: absolute;
+  background: rgba(255,255,255,0.85);
+  border-radius: 50%;
+}
+.c1 { width: 120px; height: 35px; top: 8%; left: 5%; animation-duration: 40s; }
+.c1::before { width: 55px; height: 55px; top: -25px; left: 20px; }
+.c1::after { width: 40px; height: 40px; top: -18px; left: 55px; }
+
+.c2 { width: 90px; height: 28px; top: 14%; left: 55%; animation-duration: 55s; animation-delay: -20s; }
+.c2::before { width: 40px; height: 40px; top: -20px; left: 15px; }
+.c2::after { width: 30px; height: 30px; top: -12px; left: 45px; }
+
+.c3 { width: 70px; height: 22px; top: 5%; left: 75%; animation-duration: 48s; animation-delay: -10s; }
+.c3::before { width: 32px; height: 32px; top: -16px; left: 10px; }
+.c3::after { width: 25px; height: 25px; top: -10px; left: 35px; }
+
+@keyframes cloudDrift {
+  from { transform: translateX(-200px); }
+  to { transform: translateX(110vw); }
+}
+
+/* Sun */
+.sun {
+  position: absolute;
+  top: 4%;
+  right: 8%;
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle at 40% 40%, #ffe066, #f5c842, #e09800);
+  border-radius: 50%;
+  box-shadow: 0 0 0 12px rgba(245,200,66,0.2), 0 0 0 24px rgba(245,200,66,0.1), 0 0 40px rgba(245,200,66,0.4);
+  animation: sunPulse 4s ease-in-out infinite;
+}
+@keyframes sunPulse {
+  0%, 100% { box-shadow: 0 0 0 12px rgba(245,200,66,0.2), 0 0 0 24px rgba(245,200,66,0.1), 0 0 40px rgba(245,200,66,0.4); }
+  50% { box-shadow: 0 0 0 16px rgba(245,200,66,0.25), 0 0 0 32px rgba(245,200,66,0.12), 0 0 60px rgba(245,200,66,0.5); }
+}
+
+/* ===== HILLS ===== */
+.hills {
+  position: absolute;
+  bottom: 28%;
+  left: 0; right: 0;
+  height: 160px;
+}
+.hill {
+  position: absolute;
+  border-radius: 50%;
+}
+.hill1 { width: 500px; height: 200px; background: #6bbf42; bottom: 0; left: -80px; }
+.hill2 { width: 380px; height: 160px; background: #7ec850; bottom: 0; left: 250px; }
+.hill3 { width: 300px; height: 140px; background: #5aaa35; bottom: 0; right: -50px; }
+
+/* Ground strip */
+.ground {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 29%;
+  background: linear-gradient(180deg, #7ec850 0%, #68b03d 30%, #4e8f2a 100%);
+}
+.ground::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 12px;
+  background: linear-gradient(180deg, #8fd45a, #7ec850);
+  border-radius: 0;
+}
+
+/* ===== BARN ===== */
+.barn {
+  position: absolute;
+  bottom: 26%;
+  right: 6%;
+  width: 130px;
+  opacity: 0.88;
+  animation: floatIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.6s both;
+}
+@keyframes floatIn {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 0.88; }
+}
+.barn-body { width: 100%; height: 75px; background: #c0392b; border-radius: 4px 4px 0 0; position: relative; }
+.barn-roof { width: 0; height: 0; border-left: 55px solid transparent; border-right: 55px solid transparent; border-bottom: 45px solid #8e1a0e; margin: 0 auto; position: relative; top: -1px; }
+.barn-door { width: 28px; height: 40px; background: #6b2e0a; border-radius: 3px 3px 0 0; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); }
+.barn-window { width: 20px; height: 20px; background: rgba(255,220,100,0.4); border: 2px solid #6b2e0a; border-radius: 3px; position: absolute; top: 12px; }
+.barn-window.left { left: 12px; }
+.barn-window.right { right: 12px; }
+
+/* ===== ANIMALS ===== */
+.cow {
+  position: absolute;
+  bottom: 27%;
+  left: 7%;
+  font-size: 52px;
+  animation: cowBob 3s ease-in-out infinite, floatIn 0.8s cubic-bezier(0.34,1.56,0.64,1) 0.9s both;
+  cursor: pointer;
+  filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));
+  transform-origin: bottom center;
+}
+@keyframes cowBob {
+  0%, 100% { transform: rotate(-2deg) translateY(0); }
+  50% { transform: rotate(2deg) translateY(-4px); }
+}
+.cow:hover { animation: cowJump 0.4s ease-in-out; }
+@keyframes cowJump { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
+
+.bird {
+  position: absolute;
+  font-size: 22px;
+  animation: birdFly 8s linear infinite;
+  top: 18%;
+}
+.bird1 { animation-delay: 0s; }
+.bird2 { animation-delay: 3s; font-size: 16px; top: 12%; }
+@keyframes birdFly {
+  0% { left: -5%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 105%; opacity: 0; }
+}
+
+/* Flowers */
+.flowers {
+  position: absolute;
+  bottom: 27.5%;
+  display: flex;
+  gap: 6px;
+}
+.flowers.left { left: 20%; }
+.flowers.right { right: 20%; }
+.flower { font-size: 18px; animation: flowerSway 2.5s ease-in-out infinite; }
+.flower:nth-child(2) { animation-delay: 0.4s; }
+.flower:nth-child(3) { animation-delay: 0.8s; }
+@keyframes flowerSway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* ===== MUSICAL NOTES FLOATING ===== */
+.music-note {
+  position: absolute;
+  font-size: 24px;
+  opacity: 0;
+  pointer-events: none;
+  animation: noteFloat 4s ease-in-out infinite;
+}
+.n1 { left: 12%; top: 25%; animation-delay: 0s; }
+.n2 { left: 28%; top: 32%; animation-delay: 1.2s; }
+.n3 { right: 18%; top: 22%; animation-delay: 2.4s; }
+.n4 { right: 30%; top: 35%; animation-delay: 0.6s; }
+@keyframes noteFloat {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg) scale(0.8); }
+  30% { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(-60px) rotate(15deg) scale(1.2); }
+}
+
+/* ===== MAIN UI CARD ===== */
+.main-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(88%, 520px);
+  animation: cardReveal 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;
+}
+@keyframes cardReveal {
+  from { transform: translate(-50%, -42%) scale(0.92); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* Logo section */
+.logo-section {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.logo-icon {
+  font-size: 52px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.25));
+  display: block;
+  animation: logoSpin 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.4s both;
+  margin-bottom: 4px;
+}
+@keyframes logoSpin {
+  from { transform: scale(0) rotate(-180deg); opacity: 0; }
+  to { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.logo-name {
+  font-family: 'Baloo 2', cursive;
+  font-weight: 800;
+  font-size: 46px;
+  color: #fff;
+  line-height: 1;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.12), 0 6px 20px rgba(0,0,0,0.15);
+  letter-spacing: -1px;
+}
+.logo-name span {
+  background: linear-gradient(135deg, #ffe066, #f5c842);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.logo-tagline {
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* Streak banner */
+.streak-banner {
+  background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.12));
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 16px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.streak-banner:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.15); }
+.streak-fire { font-size: 26px; animation: fireShake 0.8s ease-in-out infinite alternate; }
+@keyframes fireShake {
+  from { transform: rotate(-6deg) scale(1); }
+  to { transform: rotate(6deg) scale(1.1); }
+}
+.streak-text { font-family: 'Baloo 2', cursive; font-weight: 700; font-size: 15px; color: #fff; }
+.streak-text strong { color: #ffe066; font-size: 18px; }
+.streak-cta { font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+
+/* Mode cards grid */
+.modes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mode-card {
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255,255,255,0.45);
+  border-radius: 20px;
+  padding: 16px 14px 14px;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s, background 0.2s, border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  animation: cardFadeIn 0.5s ease both;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 1px 0 rgba(255,255,255,0.3) inset;
+}
+.mode-card:nth-child(1) { animation-delay: 0.3s; }
+.mode-card:nth-child(2) { animation-delay: 0.4s; }
+.mode-card:nth-child(3) { animation-delay: 0.5s; }
+.mode-card:nth-child(4) { animation-delay: 0.6s; }
+
+@keyframes cardFadeIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.mode-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 20px 20px 0 0;
+  transition: height 0.2s;
+}
+.mode-card.practice::before { background: linear-gradient(90deg, #3ecfb2, #28bfa0); }
+.mode-card.learn::before    { background: linear-gradient(90deg, #f5c842, #e0a800); }
+.mode-card.ear::before      { background: linear-gradient(90deg, #ff7b5e, #e55c3f); }
+.mode-card.sight::before    { background: linear-gradient(90deg, #9b7fe8, #7c5ce4); }
+
+.mode-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.35) inset;
+  background: rgba(255,255,255,0.26);
+  border-color: rgba(255,255,255,0.65);
+}
+.mode-card:hover::before { height: 4px; }
+
+.mode-card.active {
+  background: rgba(255,255,255,0.28);
+  border-color: rgba(255,255,255,0.7);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 0 0 2px rgba(255,255,255,0.3), 0 1px 0 rgba(255,255,255,0.35) inset;
+}
+.mode-card.active .mode-check { opacity: 1; transform: scale(1); }
+
+.mode-check {
+  position: absolute;
+  top: 10px; right: 12px;
+  width: 20px; height: 20px;
+  background: #3ecfb2;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  font-weight: 700;
+}
+.mode-card.learn.active .mode-check { background: #f5c842; }
+.mode-card.ear.active .mode-check { background: #ff7b5e; }
+.mode-card.sight.active .mode-check { background: #9b7fe8; }
+
+.mode-icon { font-size: 30px; margin-bottom: 7px; display: block; }
+.mode-name {
+  font-family: 'Baloo 2', cursive;
+  font-weight: 700;
+  font-size: 17px;
+  color: #fff;
+  display: block;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  margin-bottom: 3px;
+}
+.mode-desc {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.72);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Bottom buttons row */
+.bottom-row {
+  display: flex;
+  gap: 10px;
+  animation: cardFadeIn 0.5s ease 0.7s both;
+}
+
+.btn-play {
+  flex: 1;
+  padding: 15px 20px;
+  font-family: 'Baloo 2', cursive;
+  font-weight: 800;
+  font-size: 17px;
+  color: #fff;
+  background: linear-gradient(135deg, #3ecfb2, #28bfa0);
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 6px 0 #1a9a82, 0 8px 20px rgba(62,207,178,0.35);
+  transition: all 0.15s;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  letter-spacing: 0.3px;
+}
+.btn-play:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #1a9a82, 0 12px 28px rgba(62,207,178,0.4); }
+.btn-play:active { transform: translateY(3px); box-shadow: 0 3px 0 #1a9a82, 0 4px 12px rgba(62,207,178,0.3); }
+
+.btn-settings {
+  width: 52px;
+  height: 52px;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255,255,255,0.4);
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  flex-shrink: 0;
+}
+.btn-settings:hover { transform: rotate(30deg) scale(1.1); background: rgba(255,255,255,0.25); }
+
+/* Branding footer */
+.brand-footer {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 1px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ===== TOAST notification ===== */
+.toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-80px);
+  background: rgba(30,30,30,0.85);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  z-index: 100;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="scene">
+
+  <!-- SKY -->
+  <div class="sky"></div>
+  <div class="sun"></div>
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+
+  <!-- BIRDS -->
+  <span class="bird bird1">🐦</span>
+  <span class="bird bird2">🐦</span>
+
+  <!-- FLOATING MUSIC NOTES -->
+  <span class="music-note n1">♩</span>
+  <span class="music-note n2">♪</span>
+  <span class="music-note n3">♫</span>
+  <span class="music-note n4">♬</span>
+
+  <!-- HILLS -->
+  <div class="hills">
+    <div class="hill hill1"></div>
+    <div class="hill hill2"></div>
+    <div class="hill hill3"></div>
+  </div>
+
+  <!-- GROUND -->
+  <div class="ground"></div>
+
+  <!-- FLOWERS -->
+  <div class="flowers left">
+    <span class="flower">🌻</span>
+    <span class="flower">🌸</span>
+    <span class="flower">🌼</span>
+  </div>
+  <div class="flowers right">
+    <span class="flower">🌸</span>
+    <span class="flower">🌼</span>
+    <span class="flower">🌻</span>
+  </div>
+
+  <!-- BARN -->
+  <div class="barn">
+    <div class="barn-body">
+      <div class="barn-window left"></div>
+      <div class="barn-window right"></div>
+      <div class="barn-door"></div>
+    </div>
+    <div class="barn-roof"></div>
+  </div>
+
+  <!-- COW -->
+  <span class="cow" onclick="showToast('🐄 Moo!')">🐄</span>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">🐄 Moo!</div>
+
+  <!-- MAIN CARD -->
+  <div class="main-card">
+
+    <!-- Logo -->
+    <div class="logo-section">
+      <span class="logo-icon">𝄞</span>
+      <div class="logo-name">Clef<span>ira</span></div>
+      <div class="logo-tagline">Music learning that actually sticks</div>
+    </div>
+
+    <!-- Streak Banner -->
+    <div class="streak-banner" onclick="showToast('🔥 Keep your streak alive!')">
+      <span class="streak-fire">🔥</span>
+      <div>
+        <div class="streak-text">Day <strong>3</strong> Streak — Keep it going!</div>
+        <div class="streak-cta">Tap to see your progress →</div>
+      </div>
+    </div>
+
+    <!-- Mode Cards -->
+    <div class="modes-grid">
+      <div class="mode-card practice active" onclick="selectMode(this)">
+        <div class="mode-check">✓</div>
+        <span class="mode-icon">🎯</span>
+        <span class="mode-name">Practice</span>
+        <span class="mode-desc">Sharpen skills you already know</span>
+      </div>
+      <div class="mode-card learn" onclick="selectMode(this)">
+        <div class="mode-check">✓</div>
+        <span class="mode-icon">📖</span>
+        <span class="mode-name">Learn</span>
+        <span class="mode-desc">Master new concepts step by step</span>
+      </div>
+      <div class="mode-card ear" onclick="selectMode(this)">
+        <div class="mode-check">✓</div>
+        <span class="mode-icon">👂</span>
+        <span class="mode-name">Ear Training</span>
+        <span class="mode-desc">Train your musical ear</span>
+      </div>
+      <div class="mode-card sight" onclick="selectMode(this)">
+        <div class="mode-check">✓</div>
+        <span class="mode-icon">🎼</span>
+        <span class="mode-name">Sight Reading</span>
+        <span class="mode-desc">Read notes at a glance</span>
+      </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="bottom-row">
+      <button class="btn-play" onclick="showToast('🎵 Starting game...')">
+        <span>▶</span> Let's Play!
+      </button>
+      <button class="btn-settings" onclick="showToast('⚙️ Settings')">⚙️</button>
+    </div>
+
+  </div>
+
+  <div class="brand-footer">© Adagio Labs · v1.0.2</div>
+
+</div>
+
+<script>
+  function selectMode(card) {
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    const name = card.querySelector('.mode-name').textContent;
+    showToast('Mode selected: ' + name + ' ✓');
+  }
+
+  let toastTimeout;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+</script>
+</body>
+</html>

@@ -5,12 +5,12 @@ const THEMES := {
 	"golden_harvest": {
 		"label": "Golden Harvest",
 		"colors": {
-			"panel_bg": Color(0.10, 0.14, 0.11, 0.74),
+			"panel_bg": Color(0.10, 0.14, 0.11, 0.20),
 			"panel_border": Color(0.92, 0.84, 0.58, 0.45),
 			"text_primary": Color(0.98, 0.96, 0.88, 1.0),
 			"text_muted": Color(0.92, 0.90, 0.82, 0.86),
 			"text_error": Color(1.0, 0.83, 0.70, 1.0),
-			"focus_border": Color(0.26, 0.93, 0.98, 0.96),
+			"focus_border": Color(0.95, 0.76, 0.31, 0.96),
 			"hint": Color(0.83, 0.95, 0.98, 0.95),
 			"disabled_overlay": Color(0.55, 0.55, 0.55, 0.38)
 		}
@@ -18,7 +18,7 @@ const THEMES := {
 	"azure_cascade": {
 		"label": "Azure Cascade",
 		"colors": {
-			"panel_bg": Color(0.07, 0.13, 0.21, 0.76),
+			"panel_bg": Color(0.07, 0.13, 0.21, 0.20),
 			"panel_border": Color(0.42, 0.72, 0.95, 0.52),
 			"text_primary": Color(0.92, 0.97, 1.0, 1.0),
 			"text_muted": Color(0.82, 0.90, 0.97, 0.90),
@@ -31,7 +31,7 @@ const THEMES := {
 	"slate_foundry": {
 		"label": "Slate Foundry",
 		"colors": {
-			"panel_bg": Color(0.12, 0.13, 0.16, 0.78),
+			"panel_bg": Color(0.12, 0.13, 0.16, 0.22),
 			"panel_border": Color(0.62, 0.66, 0.72, 0.52),
 			"text_primary": Color(0.94, 0.95, 0.97, 1.0),
 			"text_muted": Color(0.82, 0.84, 0.88, 0.90),
@@ -44,7 +44,7 @@ const THEMES := {
 	"crimson_nocturne": {
 		"label": "Crimson Nocturne",
 		"colors": {
-			"panel_bg": Color(0.20, 0.08, 0.10, 0.78),
+			"panel_bg": Color(0.20, 0.08, 0.10, 0.22),
 			"panel_border": Color(0.94, 0.46, 0.40, 0.52),
 			"text_primary": Color(1.0, 0.94, 0.90, 1.0),
 			"text_muted": Color(0.95, 0.84, 0.82, 0.90),
@@ -57,7 +57,7 @@ const THEMES := {
 	"rose_velvet": {
 		"label": "Rose Velvet",
 		"colors": {
-			"panel_bg": Color(0.22, 0.11, 0.18, 0.76),
+			"panel_bg": Color(0.22, 0.11, 0.18, 0.20),
 			"panel_border": Color(0.95, 0.60, 0.77, 0.54),
 			"text_primary": Color(1.0, 0.94, 0.98, 1.0),
 			"text_muted": Color(0.96, 0.84, 0.92, 0.90),

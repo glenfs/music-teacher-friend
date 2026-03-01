@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/rhythm/rhythm_glyph.gd" id="1"]
+
+[node name="RhythmGlyph" type="Panel"]
+mouse_filter = 2
+z_index = 246
+script = ExtResource("1")
+

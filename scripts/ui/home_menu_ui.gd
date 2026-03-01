@@ -17,20 +17,24 @@ func _cache_styles(high_contrast: bool) -> void:
 		return
 
 	var section_active := StyleBoxFlat.new()
-	section_active.bg_color = Color(0.16, 0.14, 0.09, 0.62) if not high_contrast else Color(0.10, 0.10, 0.10, 0.98)
-	section_active.border_color = colors["focus_border"]
-	section_active.border_width_left = 2
-	section_active.border_width_top = 2
-	section_active.border_width_right = 2
-	section_active.border_width_bottom = 2
-	section_active.corner_radius_top_left = 14
-	section_active.corner_radius_top_right = 14
-	section_active.corner_radius_bottom_left = 14
-	section_active.corner_radius_bottom_right = 14
+	section_active.bg_color = Color(0.86, 0.93, 0.97, 0.92) if not high_contrast else Color(0.10, 0.10, 0.10, 0.98)
+	section_active.border_color = Color(0.2471, 0.6549, 0.6275, 0.42) if not high_contrast else colors["focus_border"]
+	section_active.border_width_left = 1
+	section_active.border_width_top = 1
+	section_active.border_width_right = 1
+	section_active.border_width_bottom = 1
+	section_active.corner_radius_top_left = 18
+	section_active.corner_radius_top_right = 18
+	section_active.corner_radius_bottom_left = 18
+	section_active.corner_radius_bottom_right = 18
+	section_active.shadow_color = Color(0.0, 0.0, 0.0, 0.08)
+	section_active.shadow_size = 8
 
 	var section_idle := section_active.duplicate()
-	section_idle.bg_color = Color(0.12, 0.11, 0.08, 0.38) if not high_contrast else Color(0.06, 0.06, 0.06, 0.90)
-	section_idle.border_color = _tokens.colors(high_contrast)["panel_border"]
+	section_idle.bg_color = Color(0.82, 0.90, 0.96, 0.86) if not high_contrast else Color(0.06, 0.06, 0.06, 0.90)
+	section_idle.border_color = Color(0.20, 0.36, 0.50, 0.14) if not high_contrast else _tokens.colors(high_contrast)["panel_border"]
+	section_idle.shadow_color = Color(0.0, 0.0, 0.0, 0.04)
+	section_idle.shadow_size = 6
 
 	_styles[key] = {
 		"section_active": section_active,
@@ -51,6 +55,7 @@ func ensure_section_hint(section: VBoxContainer, text: String, high_contrast: bo
 	if lbl == null:
 		lbl = Label.new()
 		lbl.set_meta("home_hint", true)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		section.add_child(lbl)

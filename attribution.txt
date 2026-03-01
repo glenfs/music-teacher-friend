@@ -30,4 +30,5 @@ Wristwatch.Tic-Tac.wav by andychristen -- https://freesound.org/s/268185/ -- Lic
 Fonts:
 Inter -- https://fonts.google.com/specimen/Inter -- License: SIL Open Font License 1.1
 Poppins -- https://fonts.google.com/specimen/Poppins -- License: SIL Open Font License 1.1
-
+snare.wav by Hanbaal -- https://freesound.org/s/178668/ -- License: Creative Commons 0
+bass2.wav by Matias.Reccius -- https://freesound.org/s/50982/ -- License: Creative Commons 0

@@ -1,0 +1,28 @@
+Fix QA so that running Godot with --qa ALWAYS produces artifacts and cannot silently no-op.
+
+1) Ensure QA runner is attached on startup:
+- In the main scene script (likely interval_birds.gd or the root controller script), in _ready(), detect OS.get_cmdline_args().
+- If "--qa" is present, instantiate and add scripts/qa/qa_runner.gd (or its scene) as a Node and start it.
+
+2) Ensure artifacts are written to user:// (NOT project root, NOT res://):
+- Write:
+  - user://qa_report.md
+  - user://qa_run_log.json
+  - user://qa_screenshots/*.png
+- Create the screenshots directory if missing.
+
+3) Print absolute artifact paths:
+- Use ProjectSettings.globalize_path("user://qa_report.md") etc, and print them.
+
+4) Make no-op impossible:
+- If "--qa" is present and runner didn’t start, quit with exit code 2.
+- If QA runs and any test fails, quit with exit code 1.
+- Only quit 0 when QA ran and passed.
+
+5) Add console proof:
+- Print "QA START", each step name, and "QA DONE PASS/FAIL".
+
+6) Re-run visible QA (NOT headless) using:
+"C:\ProgrammingLanguages\gadot\Godot_v4.6-stable_win64.exe\Godot_v4.6-stable_win64.exe" --path . -- --qa
+
+After run, use PowerShell to read artifacts from the user:// globalized path that QA prints.
