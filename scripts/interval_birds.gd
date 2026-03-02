@@ -5003,36 +5003,37 @@ func _load_menu_setup_style_resources() -> void:
 
 
 func _setup_card_stylebox(compact: bool = false) -> StyleBoxFlat:
+	var contract := _menu_style_contract()
 	var base: StyleBoxFlat = null
 	if _menu_setup_card_stylebox != null:
 		base = _menu_setup_card_stylebox.duplicate() as StyleBoxFlat
 	if base == null:
 		base = StyleBoxFlat.new()
-		base.bg_color = MENU_SETUP_CARD_FILL
 		base.corner_radius_top_left = 18
 		base.corner_radius_top_right = 18
 		base.corner_radius_bottom_left = 18
 		base.corner_radius_bottom_right = 18
-		base.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.46)
 		base.border_width_left = 1
 		base.border_width_top = 1
 		base.border_width_right = 1
 		base.border_width_bottom = 1
-		base.shadow_color = Color(0.0, 0.0, 0.0, 0.14)
-		base.shadow_size = 6
+	base.bg_color = Color(contract.get("panel_bg", MENU_SETUP_CARD_FILL))
+	base.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.46)))
+	base.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+	base.shadow_size = int(contract.get("shadow_panel_size", 6))
 	if compact:
-		base.bg_color = MENU_SETUP_CARD_FILL_COOL
+		base.bg_color = Color(contract.get("panel_bg_compact", MENU_SETUP_CARD_FILL_COOL))
 		base.shadow_size = maxi(5, base.shadow_size - 1)
 	return base
 
 
 func _setup_chip_stylebox(selected: bool) -> StyleBoxFlat:
+	var contract := _menu_style_contract()
 	var base: StyleBoxFlat = null
 	if _menu_setup_chip_stylebox != null:
 		base = _menu_setup_chip_stylebox.duplicate() as StyleBoxFlat
 	if base == null:
 		base = StyleBoxFlat.new()
-		base.bg_color = MENU_SETUP_CARD_FILL_COOL
 		base.corner_radius_top_left = 14
 		base.corner_radius_top_right = 14
 		base.corner_radius_bottom_left = 14
@@ -5041,19 +5042,20 @@ func _setup_chip_stylebox(selected: bool) -> StyleBoxFlat:
 		base.border_width_top = 1
 		base.border_width_right = 1
 		base.border_width_bottom = 1
-		base.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.32)
-		base.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-		base.shadow_size = 2
+	base.bg_color = Color(contract.get("btn_inactive_bg", MENU_SETUP_CARD_FILL_COOL))
+	base.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.32)))
+	base.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	base.shadow_size = int(contract.get("shadow_chip_size", 2))
 	if selected:
-		base.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26) # #E8A020 tint
-		base.border_color = MENU_SETUP_HIGHLIGHT
+		base.bg_color = Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+		base.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
 		base.border_width_left = 2
 		base.border_width_top = 2
 		base.border_width_right = 2
 		base.border_width_bottom = 2
 	else:
-		base.bg_color = MENU_SETUP_CARD_FILL_COOL
-		base.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+		base.bg_color = Color(contract.get("btn_inactive_bg", MENU_SETUP_CARD_FILL_COOL))
+		base.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 		base.border_width_left = 1
 		base.border_width_top = 1
 		base.border_width_right = 1
@@ -5273,7 +5275,7 @@ func _apply_pro_style() -> void:
 func _style_card(card: PanelContainer, color: Color) -> void:
 	if card == null:
 		return
-	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
+	var contract := _menu_style_contract()
 	var sb := StyleBoxFlat.new()
 	var is_home_shell := card == _home_card
 	if is_home_shell:
@@ -5281,7 +5283,7 @@ func _style_card(card: PanelContainer, color: Color) -> void:
 		if (not home_menu_visible) or _is_main_menu_overview_active():
 			card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 			return
-		sb.bg_color = Color(0.0588, 0.1529, 0.2510, 0.70)
+		sb.bg_color = Color(contract.get("panel_bg", Color(0.0588, 0.1529, 0.2510, 0.70)))
 		sb.corner_radius_top_left = 20
 		sb.corner_radius_top_right = 20
 		sb.corner_radius_bottom_left = 20
@@ -5290,9 +5292,9 @@ func _style_card(card: PanelContainer, color: Color) -> void:
 		sb.border_width_top = 2
 		sb.border_width_right = 2
 		sb.border_width_bottom = 2
-		sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-		sb.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
-		sb.shadow_size = 6
+		sb.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+		sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 		sb.content_margin_left = 0
 		sb.content_margin_top = 0
 		sb.content_margin_right = 0
@@ -5304,13 +5306,13 @@ func _style_card(card: PanelContainer, color: Color) -> void:
 	sb.corner_radius_top_right = _home_tokens.RADIUS["card"] if _home_tokens != null else 18
 	sb.corner_radius_bottom_left = _home_tokens.RADIUS["card"] if _home_tokens != null else 18
 	sb.corner_radius_bottom_right = _home_tokens.RADIUS["card"] if _home_tokens != null else 18
-	sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	sb.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 	sb.border_width_left = 2
 	sb.border_width_top = 2
 	sb.border_width_right = 2
 	sb.border_width_bottom = 2
-	sb.shadow_color = Color(0, 0, 0, 0.45)
-	sb.shadow_size = _home_tokens.SHADOW["card_size"] if _home_tokens != null else 8
+	sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+	sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 	sb.content_margin_left = 16
 	sb.content_margin_top = 16
 	sb.content_margin_right = 16
@@ -5323,22 +5325,24 @@ func _style_home_option_group_card(card: PanelContainer) -> void:
 		return
 	var setup_active := _is_hud_derived_setup_screen_active()
 	var compact := bool(card.get_meta("compact_group", false))
+	var contract := _menu_style_contract()
 	var sb := StyleBoxFlat.new()
 	if setup_active:
 		sb = _setup_card_stylebox(compact)
 	else:
-		sb.bg_color = Color(0.0902, 0.2235, 0.3608, 0.65 if compact else 0.72)
+		sb.bg_color = Color(contract.get("panel_bg_compact", Color(0.0902, 0.2235, 0.3608, 0.72)))
+		sb.bg_color.a = 0.65 if compact else 0.72
 		sb.corner_radius_top_left = 18
 		sb.corner_radius_top_right = 18
 		sb.corner_radius_bottom_left = 18
 		sb.corner_radius_bottom_right = 18
-		sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+		sb.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 		sb.border_width_left = 1
 		sb.border_width_top = 1
 		sb.border_width_right = 1
 		sb.border_width_bottom = 1
-		sb.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-		sb.shadow_size = 4 if compact else 6
+		sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		sb.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - (1 if compact else 0))
 	card.add_theme_stylebox_override("panel", sb)
 
 
@@ -5400,6 +5404,10 @@ func _style_controls_recursive(node: Node) -> void:
 				label.add_theme_font_override("font", _ui_font)
 				label.add_theme_font_size_override("font_size", 14)
 				label.add_theme_color_override("font_color", colors.get("text_muted", Color(0.92, 0.90, 0.82, 0.86)))
+			elif label.has_meta("mode_card_title_label"):
+				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
+				label.add_theme_font_size_override("font_size", 18)
+				label.add_theme_color_override("font_color", Color(0.16, 0.22, 0.31, 1.0))
 			else:
 				label.add_theme_font_override("font", _ui_font)
 				label.add_theme_color_override("font_color", colors.get("text_primary", Color(0.98, 0.96, 0.88)))
@@ -5422,7 +5430,10 @@ func _style_controls_recursive(node: Node) -> void:
 				continue
 			if btn.flat and btn.has_meta("mode_card_panel"):
 				if _is_menu_ui_control(btn):
-					_apply_menu_top_gloss(btn, 0.20, 0.24, 10.0, 34.0)
+					if btn.has_meta("main_menu_mode_key"):
+						_remove_menu_top_gloss(btn)
+					else:
+						_apply_menu_top_gloss(btn, 0.20, 0.24, 10.0, 34.0)
 				var click_call_card := Callable(self, "_on_any_ui_button_pressed")
 				if not btn.pressed.is_connected(click_call_card):
 					btn.pressed.connect(click_call_card)
@@ -5480,6 +5491,11 @@ func _is_menu_ui_control(ctrl: Control) -> bool:
 func _apply_menu_top_gloss(ctrl: Control, alpha: float = 0.22, height_ratio: float = 0.22, min_h: float = 10.0, max_h: float = 40.0) -> void:
 	if ctrl == null:
 		return
+	var contract := _menu_style_contract()
+	alpha = float(contract.get("gloss_alpha", alpha))
+	height_ratio = float(contract.get("gloss_height_ratio", height_ratio))
+	min_h = float(contract.get("gloss_min_h", min_h))
+	max_h = float(contract.get("gloss_max_h", max_h))
 	var gloss := ctrl.get_node_or_null("MenuTopGloss") as Panel
 	if gloss == null:
 		gloss = Panel.new()
@@ -5522,8 +5538,7 @@ func _layout_menu_top_gloss(ctrl: Control, alpha: float, height_ratio: float, mi
 		is_main_menu_mode_card = btn.has_meta("mode_card_panel") and btn.has_meta("main_menu_mode_key")
 	var sb := StyleBoxFlat.new()
 	if is_main_menu_mode_card:
-		# Keep card gloss subtle so the gold body remains visible.
-		sb.bg_color = Color(1.0, 0.98, 0.92, 0.26)
+		sb.bg_color = Color(1.0, 0.98, 0.92, 0.22)
 	else:
 		sb.bg_color = Color(1.0, 1.0, 1.0, clampf(alpha, 0.08, 0.42))
 	var r_top := int(roundf(clampf(gloss_h * 0.45, 5.0, 14.0)))
@@ -5543,14 +5558,11 @@ func _layout_menu_top_gloss(ctrl: Control, alpha: float, height_ratio: float, mi
 func _on_menu_gloss_host_resized(host: Control) -> void:
 	if host == null:
 		return
-	var alpha := 0.22
-	var ratio := 0.22
-	var min_h := 10.0
-	var max_h := 40.0
-	if host is Button:
-		alpha = 0.24
-		ratio = 0.24
-		max_h = 32.0
+	var contract := _menu_style_contract()
+	var alpha := float(contract.get("gloss_alpha", 0.24))
+	var ratio := float(contract.get("gloss_height_ratio", 0.24))
+	var min_h := float(contract.get("gloss_min_h", 10.0))
+	var max_h := float(contract.get("gloss_max_h", 32.0))
 	_layout_menu_top_gloss(host, alpha, ratio, min_h, max_h)
 
 
@@ -5558,155 +5570,85 @@ func _invalidate_button_palette_cache() -> void:
 	_cached_button_palette = {}
 	_cached_palette_theme_id = ""
 
+func _menu_style_contract() -> Dictionary:
+	var fallback := {
+		"panel_bg": MENU_SETUP_CARD_FILL,
+		"panel_bg_compact": MENU_SETUP_CARD_FILL_COOL,
+		"panel_border": Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.46),
+		"panel_border_strong": MENU_SETUP_HIGHLIGHT,
+		"btn_inactive_bg": Color(0.10, 0.19, 0.32, 0.82),
+		"btn_inactive_hover": Color(0.13, 0.24, 0.39, 0.88),
+		"btn_inactive_pressed": Color(0.08, 0.16, 0.28, 0.90),
+		"btn_inactive_border": Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44),
+		"btn_inactive_text": SIGHT_NOTES_SETUP_TEXT_BODY,
+		"btn_selected_bg": Color(0.9098, 0.6275, 0.1255, 0.26),
+		"btn_selected_hover": Color(0.9098, 0.6275, 0.1255, 0.34),
+		"btn_selected_pressed": Color(0.9098, 0.6275, 0.1255, 0.22),
+		"btn_selected_border": MENU_SETUP_HIGHLIGHT,
+		"btn_selected_text": SIGHT_NOTES_SETUP_TEXT_PRIMARY,
+		"btn_selected_text_dark": Color(0.12, 0.18, 0.27, 1.0),
+		"cta_bg": Color(0.9098, 0.6275, 0.1255, 0.98),
+		"cta_hover": Color(0.95, 0.70, 0.20, 0.99),
+		"cta_pressed": Color(0.82, 0.54, 0.08, 0.99),
+		"cta_border": Color(0.97, 0.86, 0.40, 0.94),
+		"cta_text": Color(0.12, 0.18, 0.27, 1.0),
+		"gloss_alpha": 0.24,
+		"gloss_height_ratio": 0.24,
+		"gloss_min_h": 10.0,
+		"gloss_max_h": 32.0,
+		"shadow_panel_alpha": 0.14,
+		"shadow_panel_size": 6,
+		"shadow_chip_alpha": 0.10,
+		"shadow_chip_size": 2,
+		"shadow_button_alpha": 0.28,
+		"shadow_button_size": 4,
+		"shadow_nav_alpha": 0.0,
+		"shadow_nav_size": 0,
+		"shadow_nav_hover_size": 0,
+		"shadow_nav_pressed_size": 0
+	}
+	if _home_tokens == null or not _home_tokens.has_method("menu_style_contract"):
+		return fallback
+	var contract_v: Variant = _home_tokens.menu_style_contract()
+	if not (contract_v is Dictionary):
+		return fallback
+	var merged := fallback.duplicate(true)
+	merged.merge(contract_v as Dictionary, true)
+	return merged
+
 func _theme_button_palette() -> Dictionary:
-	var id := _ui_theme_id
-	if _home_tokens != null:
-		id = _home_tokens.theme_id()
+	var id := "menu_contract"
 	if id == _cached_palette_theme_id and not _cached_button_palette.is_empty():
 		return _cached_button_palette
 	_cached_palette_theme_id = id
-	var result: Dictionary
-	match id:
-		"azure_cascade":
-			result = {
-				"base_bg": Color(0.44, 0.67, 0.88, 0.96),
-				"base_hover": Color(0.54, 0.76, 0.95, 1.0),
-				"base_pressed": Color(0.32, 0.56, 0.78, 1.0),
-				"base_border": Color(0.14, 0.32, 0.50, 0.72),
-				"base_text": Color(0.08, 0.16, 0.26, 1.0),
-				"selected_bg": Color(0.12, 0.34, 0.56, 0.98),
-				"selected_hover": Color(0.16, 0.40, 0.64, 0.99),
-				"selected_pressed": Color(0.08, 0.26, 0.44, 1.0),
-				"selected_text": Color(0.92, 0.98, 1.0, 1.0),
-				"settings_bg": Color(0.20, 0.56, 0.78, 0.98),
-				"settings_hover": Color(0.28, 0.64, 0.86, 1.0),
-				"settings_pressed": Color(0.14, 0.46, 0.66, 1.0),
-				"settings_border": Color(0.10, 0.30, 0.44, 0.98),
-				"settings_text": Color(0.92, 0.98, 1.0, 1.0),
-				"start_bg": Color(0.30, 0.70, 0.92, 0.98),
-				"start_hover": Color(0.40, 0.80, 1.0, 1.0),
-				"start_pressed": Color(0.24, 0.58, 0.80, 1.0),
-				"start_border": Color(0.10, 0.34, 0.52, 0.95),
-				"start_text": Color(0.05, 0.14, 0.24, 1.0),
-				"toggle_on_bg": Color(0.13, 0.36, 0.58, 0.98),
-				"toggle_on_border": Color(0.44, 0.90, 1.0, 1.0),
-				"toggle_off_bg": Color(0.44, 0.67, 0.88, 0.96),
-				"toggle_off_border": Color(0.14, 0.32, 0.50, 0.70),
-				"toggle_on_text": Color(0.93, 0.99, 1.0, 1.0),
-				"toggle_off_text": Color(0.08, 0.16, 0.26, 1.0)
-			}
-		"slate_foundry":
-			result = {
-				"base_bg": Color(0.62, 0.66, 0.72, 0.96),
-				"base_hover": Color(0.71, 0.75, 0.80, 1.0),
-				"base_pressed": Color(0.48, 0.52, 0.58, 1.0),
-				"base_border": Color(0.20, 0.22, 0.26, 0.75),
-				"base_text": Color(0.12, 0.13, 0.16, 1.0),
-				"selected_bg": Color(0.24, 0.27, 0.33, 0.98),
-				"selected_hover": Color(0.30, 0.34, 0.40, 0.99),
-				"selected_pressed": Color(0.18, 0.21, 0.26, 1.0),
-				"selected_text": Color(0.95, 0.96, 0.98, 1.0),
-				"settings_bg": Color(0.40, 0.48, 0.58, 0.98),
-				"settings_hover": Color(0.48, 0.56, 0.66, 1.0),
-				"settings_pressed": Color(0.30, 0.38, 0.48, 1.0),
-				"settings_border": Color(0.16, 0.20, 0.26, 0.98),
-				"settings_text": Color(0.94, 0.96, 1.0, 1.0),
-				"start_bg": Color(0.52, 0.58, 0.64, 0.98),
-				"start_hover": Color(0.62, 0.68, 0.74, 1.0),
-				"start_pressed": Color(0.42, 0.48, 0.54, 1.0),
-				"start_border": Color(0.18, 0.22, 0.28, 0.95),
-				"start_text": Color(0.10, 0.11, 0.14, 1.0),
-				"toggle_on_bg": Color(0.28, 0.32, 0.38, 0.98),
-				"toggle_on_border": Color(0.68, 0.84, 0.95, 1.0),
-				"toggle_off_bg": Color(0.62, 0.66, 0.72, 0.96),
-				"toggle_off_border": Color(0.20, 0.22, 0.26, 0.70),
-				"toggle_on_text": Color(0.95, 0.96, 0.98, 1.0),
-				"toggle_off_text": Color(0.12, 0.13, 0.16, 1.0)
-			}
-		"crimson_nocturne":
-			result = {
-				"base_bg": Color(0.86, 0.44, 0.38, 0.96),
-				"base_hover": Color(0.94, 0.52, 0.46, 1.0),
-				"base_pressed": Color(0.70, 0.30, 0.28, 1.0),
-				"base_border": Color(0.42, 0.14, 0.14, 0.76),
-				"base_text": Color(0.26, 0.06, 0.07, 1.0),
-				"selected_bg": Color(0.45, 0.12, 0.14, 0.98),
-				"selected_hover": Color(0.54, 0.16, 0.18, 0.99),
-				"selected_pressed": Color(0.34, 0.08, 0.10, 1.0),
-				"selected_text": Color(1.0, 0.93, 0.90, 1.0),
-				"settings_bg": Color(0.76, 0.24, 0.24, 0.98),
-				"settings_hover": Color(0.86, 0.30, 0.30, 1.0),
-				"settings_pressed": Color(0.62, 0.18, 0.18, 1.0),
-				"settings_border": Color(0.38, 0.10, 0.10, 0.98),
-				"settings_text": Color(1.0, 0.92, 0.90, 1.0),
-				"start_bg": Color(0.90, 0.34, 0.26, 0.98),
-				"start_hover": Color(1.0, 0.42, 0.32, 1.0),
-				"start_pressed": Color(0.76, 0.24, 0.20, 1.0),
-				"start_border": Color(0.44, 0.12, 0.10, 0.95),
-				"start_text": Color(0.24, 0.05, 0.05, 1.0),
-				"toggle_on_bg": Color(0.52, 0.14, 0.16, 0.98),
-				"toggle_on_border": Color(1.0, 0.58, 0.45, 1.0),
-				"toggle_off_bg": Color(0.86, 0.44, 0.38, 0.96),
-				"toggle_off_border": Color(0.42, 0.14, 0.14, 0.70),
-				"toggle_on_text": Color(1.0, 0.93, 0.90, 1.0),
-				"toggle_off_text": Color(0.26, 0.06, 0.07, 1.0)
-			}
-		"rose_velvet":
-			result = {
-				"base_bg": Color(0.90, 0.60, 0.76, 0.96),
-				"base_hover": Color(0.96, 0.68, 0.83, 1.0),
-				"base_pressed": Color(0.76, 0.46, 0.62, 1.0),
-				"base_border": Color(0.44, 0.20, 0.34, 0.74),
-				"base_text": Color(0.24, 0.08, 0.18, 1.0),
-				"selected_bg": Color(0.50, 0.20, 0.38, 0.98),
-				"selected_hover": Color(0.60, 0.26, 0.46, 0.99),
-				"selected_pressed": Color(0.40, 0.14, 0.30, 1.0),
-				"selected_text": Color(1.0, 0.94, 0.98, 1.0),
-				"settings_bg": Color(0.78, 0.36, 0.60, 0.98),
-				"settings_hover": Color(0.86, 0.44, 0.68, 1.0),
-				"settings_pressed": Color(0.64, 0.26, 0.50, 1.0),
-				"settings_border": Color(0.38, 0.14, 0.30, 0.98),
-				"settings_text": Color(1.0, 0.94, 0.98, 1.0),
-				"start_bg": Color(0.94, 0.52, 0.74, 0.98),
-				"start_hover": Color(1.0, 0.62, 0.82, 1.0),
-				"start_pressed": Color(0.80, 0.40, 0.62, 1.0),
-				"start_border": Color(0.44, 0.16, 0.34, 0.95),
-				"start_text": Color(0.24, 0.08, 0.18, 1.0),
-				"toggle_on_bg": Color(0.56, 0.22, 0.42, 0.98),
-				"toggle_on_border": Color(1.0, 0.66, 0.86, 1.0),
-				"toggle_off_bg": Color(0.90, 0.60, 0.76, 0.96),
-				"toggle_off_border": Color(0.44, 0.20, 0.34, 0.70),
-				"toggle_on_text": Color(1.0, 0.94, 0.98, 1.0),
-				"toggle_off_text": Color(0.24, 0.08, 0.18, 1.0)
-			}
-		_:
-			result = {
-				"base_bg": Color(0.84, 0.74, 0.42, 0.96),
-				"base_hover": Color(0.93, 0.82, 0.46, 1.0),
-				"base_pressed": Color(0.73, 0.61, 0.33, 1.0),
-				"base_border": Color(0.30, 0.23, 0.10, 0.68),
-				"base_text": Color(0.20, 0.14, 0.06, 1.0),
-				"selected_bg": Color(0.35, 0.27, 0.09, 0.98),
-				"selected_hover": Color(0.43, 0.33, 0.11, 0.99),
-				"selected_pressed": Color(0.27, 0.20, 0.07, 1.0),
-				"selected_text": Color(1.0, 0.97, 0.86, 1.0),
-				"settings_bg": Color(0.18, 0.46, 0.62, 0.98),
-				"settings_hover": Color(0.23, 0.54, 0.72, 1.0),
-				"settings_pressed": Color(0.14, 0.36, 0.50, 1.0),
-				"settings_border": Color(0.08, 0.24, 0.34, 0.98),
-				"settings_text": Color(0.93, 0.98, 1.0, 1.0),
-				"start_bg": Color(0.92, 0.67, 0.20, 0.98),
-				"start_hover": Color(0.98, 0.74, 0.27, 1.0),
-				"start_pressed": Color(0.82, 0.58, 0.15, 1.0),
-				"start_border": Color(0.46, 0.30, 0.06, 0.95),
-				"start_text": Color(0.18, 0.11, 0.03, 1.0),
-				"toggle_on_bg": Color(0.35, 0.27, 0.09, 0.98),
-				"toggle_on_border": Color(0.95, 0.76, 0.31, 1.0),
-				"toggle_off_bg": Color(0.84, 0.74, 0.42, 0.96),
-				"toggle_off_border": Color(0.30, 0.23, 0.10, 0.68),
-				"toggle_on_text": Color(1.0, 0.97, 0.86, 1.0),
-				"toggle_off_text": Color(0.20, 0.14, 0.06, 1.0)
-			}
+	var c := _menu_style_contract()
+	var result := {
+		"base_bg": c.get("btn_inactive_bg", Color(0.10, 0.19, 0.32, 0.82)),
+		"base_hover": c.get("btn_inactive_hover", Color(0.13, 0.24, 0.39, 0.88)),
+		"base_pressed": c.get("btn_inactive_pressed", Color(0.08, 0.16, 0.28, 0.90)),
+		"base_border": c.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)),
+		"base_text": c.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY),
+		"selected_bg": c.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)),
+		"selected_hover": c.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)),
+		"selected_pressed": c.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)),
+		"selected_text": c.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY),
+		"settings_bg": c.get("btn_inactive_bg", Color(0.10, 0.19, 0.32, 0.82)),
+		"settings_hover": c.get("btn_inactive_hover", Color(0.13, 0.24, 0.39, 0.88)),
+		"settings_pressed": c.get("btn_inactive_pressed", Color(0.08, 0.16, 0.28, 0.90)),
+		"settings_border": c.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)),
+		"settings_text": c.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY),
+		"start_bg": c.get("cta_bg", Color(0.9098, 0.6275, 0.1255, 0.98)),
+		"start_hover": c.get("cta_hover", Color(0.95, 0.70, 0.20, 0.99)),
+		"start_pressed": c.get("cta_pressed", Color(0.82, 0.54, 0.08, 0.99)),
+		"start_border": c.get("cta_border", Color(0.97, 0.86, 0.40, 0.94)),
+		"start_text": c.get("cta_text", Color(0.12, 0.18, 0.27, 1.0)),
+		"toggle_on_bg": c.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)),
+		"toggle_on_border": c.get("btn_selected_border", MENU_SETUP_HIGHLIGHT),
+		"toggle_off_bg": c.get("btn_inactive_bg", Color(0.10, 0.19, 0.32, 0.82)),
+		"toggle_off_border": c.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)),
+		"toggle_on_text": c.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY),
+		"toggle_off_text": c.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY)
+	}
 	_cached_button_palette = result
 	return result
 
@@ -5721,6 +5663,7 @@ func _pick_readable_text_color(bg: Color) -> Color:
 
 func _style_button(btn: Button) -> void:
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var base_text: Color = _pick_readable_text_color(pal["base_bg"])
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = pal["base_bg"]
@@ -5733,18 +5676,18 @@ func _style_button(btn: Button) -> void:
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
-	normal.shadow_size = 4
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 
 	var hover := normal.duplicate()
 	hover.bg_color = pal["base_hover"]
-	hover.shadow_size = 6
+	hover.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("hover", hover)
 
 	var pressed := normal.duplicate()
 	pressed.bg_color = pal["base_pressed"]
-	pressed.shadow_size = 2
+	pressed.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", base_text)
 	btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(pal["base_hover"]))
@@ -5760,6 +5703,7 @@ func _style_settings_button(btn: Button) -> void:
 	if btn == null:
 		return
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var settings_text := _pick_readable_text_color(pal["settings_bg"])
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = pal["settings_bg"]
@@ -5772,8 +5716,8 @@ func _style_settings_button(btn: Button) -> void:
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.02, 0.08, 0.12, 0.36)
-	normal.shadow_size = 5
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
 	hover.bg_color = pal["settings_hover"]
@@ -5793,6 +5737,7 @@ func _style_settings_button(btn: Button) -> void:
 func _style_interval_option_toggle(btn: Button, enabled: bool, on_text: String, off_text: String, is_disabled: bool = false) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
 	var normal := StyleBoxFlat.new()
 	normal.corner_radius_top_left = 22
 	normal.corner_radius_top_right = 22
@@ -5803,14 +5748,14 @@ func _style_interval_option_toggle(btn: Button, enabled: bool, on_text: String, 
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
 	if is_disabled:
-		normal.bg_color = Color(0.25, 0.25, 0.25, 0.58)
-		normal.border_color = Color(0.12, 0.12, 0.12, 0.55)
+		normal.bg_color = Color(0.16, 0.20, 0.27, 0.58)
+		normal.border_color = Color(0.55, 0.60, 0.67, 0.45)
 	elif enabled:
-		normal.bg_color = Color(0.52, 0.84, 0.62, 0.98)
-		normal.border_color = Color(0.16, 0.40, 0.22, 0.90)
+		normal.bg_color = pal["toggle_on_bg"]
+		normal.border_color = pal["toggle_on_border"]
 	else:
-		normal.bg_color = Color(0.30, 0.30, 0.30, 0.92)
-		normal.border_color = Color(0.12, 0.12, 0.12, 0.85)
+		normal.bg_color = pal["toggle_off_bg"]
+		normal.border_color = pal["toggle_off_border"]
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
 	hover.bg_color = normal.bg_color.lightened(0.08)
@@ -5818,8 +5763,8 @@ func _style_interval_option_toggle(btn: Button, enabled: bool, on_text: String, 
 	var pressed := normal.duplicate()
 	pressed.bg_color = normal.bg_color.darkened(0.08)
 	btn.add_theme_stylebox_override("pressed", pressed)
-	var on_color := Color(0.08, 0.20, 0.12, 1.0)
-	var off_color := Color(0.98, 0.98, 0.98, 1.0)
+	var on_color := Color(pal["toggle_on_text"])
+	var off_color := Color(pal["toggle_off_text"])
 	var text_color := off_color if (is_disabled or not enabled) else on_color
 	btn.add_theme_color_override("font_color", text_color)
 	btn.add_theme_color_override("font_hover_color", text_color)
@@ -5849,6 +5794,7 @@ func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) ->
 	if toggle == null:
 		return
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
 	normal.corner_radius_top_left = 16
 	normal.corner_radius_top_right = 16
@@ -5858,8 +5804,8 @@ func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) ->
 	normal.border_width_top = 3
 	normal.border_width_right = 3
 	normal.border_width_bottom = 3
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.34)
-	normal.shadow_size = 5
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	if is_disabled:
 		normal.bg_color = Color(0.30, 0.30, 0.30, 0.70)
 		normal.border_color = Color(0.52, 0.52, 0.52, 0.75)
@@ -5876,8 +5822,8 @@ func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) ->
 	var pressed := normal.duplicate()
 	pressed.bg_color = normal.bg_color.darkened(0.08)
 	toggle.add_theme_stylebox_override("pressed", pressed)
-	var on_text: Color = _pick_readable_text_color(pal["toggle_on_bg"])
-	var off_text: Color = _pick_readable_text_color(pal["toggle_off_bg"])
+	var on_text := Color(pal["toggle_on_text"])
+	var off_text := Color(pal["toggle_off_text"])
 	var disabled_text := Color(0.84, 0.84, 0.84, 0.78)
 	var font_color := disabled_text if is_disabled else (on_text if enabled else off_text)
 	toggle.add_theme_color_override("font_color", font_color)
@@ -5991,8 +5937,8 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	card_sb.border_width_top = 1
 	card_sb.border_width_right = 1
 	card_sb.border_width_bottom = 1
-	card_sb.shadow_color = MENU_CARD_SHADOW
-	card_sb.shadow_size = 4
+	card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0)
+	card_sb.shadow_size = 0
 	card.add_theme_stylebox_override("panel", card_sb)
 	target_parent.add_child(card)
 
@@ -6037,8 +5983,11 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	var name_lbl := Label.new()
 	name_lbl.text = label
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_title_font != null:
+		name_lbl.add_theme_font_override("font", _ui_title_font)
 	name_lbl.add_theme_font_size_override("font_size", 18)
 	name_lbl.add_theme_color_override("font_color", Color(0.16, 0.22, 0.31, 1.0))
+	name_lbl.set_meta("mode_card_title_label", true)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(name_lbl)
 
@@ -6113,14 +6062,15 @@ func _style_material_button(btn: Button) -> void:
 	if not btn.has_meta("base_text"):
 		btn.set_meta("base_text", btn.text)
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = pal["base_bg"]
 	normal.corner_radius_top_left = 18
 	normal.corner_radius_top_right = 18
 	normal.corner_radius_bottom_left = 18
 	normal.corner_radius_bottom_right = 18
-	normal.shadow_color = Color(0, 0, 0, 0.35)
-	normal.shadow_size = 5
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	normal.border_color = pal["base_border"]
 	normal.border_width_left = 2
 	normal.border_width_top = 2
@@ -6134,12 +6084,12 @@ func _style_material_button(btn: Button) -> void:
 
 	var hover := normal.duplicate()
 	hover.bg_color = pal["base_hover"]
-	hover.shadow_size = 7
+	hover.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("hover", hover)
 
 	var pressed := normal.duplicate()
 	pressed.bg_color = pal["base_pressed"]
-	pressed.shadow_size = 3
+	pressed.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("pressed", pressed)
 
 	var base_text: Color = _pick_readable_text_color(pal["base_bg"])
@@ -6201,37 +6151,46 @@ func _style_home_footer_bar() -> void:
 func _style_home_footer_button(btn: Button, accent: Color, fill_alpha: float = 0.22) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var is_play_cta := btn == _home_start_button or btn == _rhythm_flow_demo_home_button
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.98) if is_play_cta else Color(0.10, 0.22, 0.34, fill_alpha)
+	normal.bg_color = Color(pal["start_bg"]) if is_play_cta else Color(pal["base_bg"])
+	if not is_play_cta:
+		normal.bg_color.a = fill_alpha
 	normal.corner_radius_top_left = 16
 	normal.corner_radius_top_right = 16
 	normal.corner_radius_bottom_left = 16
 	normal.corner_radius_bottom_right = 16
-	normal.border_color = Color(0.97, 0.86, 0.40, 0.94) if is_play_cta else Color(accent.r, accent.g, accent.b, 0.62)
+	normal.border_color = Color(pal["start_border"]) if is_play_cta else Color(contract.get("btn_inactive_border", Color(accent.r, accent.g, accent.b, 0.62)))
 	normal.border_width_left = 2
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.02, 0.06, 0.10, 0.28)
-	normal.shadow_size = 5
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
-	hover.bg_color = Color(0.95, 0.70, 0.20, 0.99) if is_play_cta else Color(0.12, 0.26, 0.40, fill_alpha + 0.08)
-	hover.shadow_size = 7
+	hover.bg_color = Color(pal["start_hover"]) if is_play_cta else Color(pal["base_hover"])
+	if not is_play_cta:
+		hover.bg_color.a = fill_alpha + 0.08
+	hover.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.82, 0.54, 0.08, 0.99) if is_play_cta else Color(0.08, 0.19, 0.30, fill_alpha + 0.10)
-	pressed.shadow_size = 3
+	pressed.bg_color = Color(pal["start_pressed"]) if is_play_cta else Color(pal["base_pressed"])
+	if not is_play_cta:
+		pressed.bg_color.a = fill_alpha + 0.10
+	pressed.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("pressed", pressed)
 	if is_play_cta:
-		btn.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12, 1.0))
-		btn.add_theme_color_override("font_hover_color", Color(0.08, 0.08, 0.10, 1.0))
-		btn.add_theme_color_override("font_pressed_color", Color(0.06, 0.06, 0.08, 1.0))
+		btn.add_theme_color_override("font_color", Color(pal["start_text"]))
+		btn.add_theme_color_override("font_hover_color", Color(pal["start_text"]))
+		btn.add_theme_color_override("font_pressed_color", Color(pal["start_text"]))
 	else:
-		btn.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 0.98))
-		btn.add_theme_color_override("font_hover_color", Color(0.97, 1.0, 1.0, 1.0))
-		btn.add_theme_color_override("font_pressed_color", Color(0.88, 0.95, 1.0, 0.98))
+		var base_text: Color = _pick_readable_text_color(Color(pal["base_bg"]))
+		btn.add_theme_color_override("font_color", base_text)
+		btn.add_theme_color_override("font_hover_color", base_text)
+		btn.add_theme_color_override("font_pressed_color", base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.00, 0.00, 0.00, 0.20))
 	btn.add_theme_constant_override("outline_size", 1)
 	if not btn.has_meta("_hover_feedback_connected"):
@@ -6279,29 +6238,33 @@ func _ensure_sight_notes_local_overlay() -> void:
 func _style_sight_notes_tab_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
 	normal.corner_radius_bottom_right = 12
-	normal.bg_color = Color(0.16, 0.29, 0.46, 0.88) if selected else Color(0.15, 0.24, 0.38, 0.82)
-	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.56)
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
+	normal.border_color = Color(contract.get("btn_selected_border", SIGHT_NOTES_SETUP_ACCENT)) if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.56)
 	normal.border_width_left = 2 if selected else 1
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 3 if selected else 1
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.19, 0.33, 0.52, 0.92) if selected else Color(0.18, 0.29, 0.45, 0.88)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.11, 0.20, 0.33, 0.90)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 15)
@@ -6315,8 +6278,10 @@ func _style_sight_notes_tab_button(btn: Button, selected: bool) -> void:
 func _style_sight_notes_segment_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26) if selected else MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6325,19 +6290,21 @@ func _style_sight_notes_segment_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = MENU_SETUP_HIGHLIGHT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT)) if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.9098, 0.6275, 0.1255, 0.34) if selected else Color(0.12, 0.25, 0.40, 0.84)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.9098, 0.6275, 0.1255, 0.22) if selected else Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 15)
@@ -6350,8 +6317,10 @@ func _style_sight_notes_segment_button(btn: Button, selected: bool) -> void:
 func _style_sight_notes_key_chip_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26) if selected else MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
@@ -6360,19 +6329,21 @@ func _style_sight_notes_key_chip_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = MENU_SETUP_HIGHLIGHT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-	normal.shadow_size = 1
+	normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT)) if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.9098, 0.6275, 0.1255, 0.34) if selected else Color(0.12, 0.25, 0.40, 0.84)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.9098, 0.6275, 0.1255, 0.22) if selected else Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 14)
@@ -6385,8 +6356,10 @@ func _style_sight_notes_key_chip_button(btn: Button, selected: bool) -> void:
 func _style_sight_notes_range_nudge_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.12, 0.22, 0.38, 0.84)
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 10
 	normal.corner_radius_top_right = 10
 	normal.corner_radius_bottom_left = 10
@@ -6395,15 +6368,15 @@ func _style_sight_notes_range_nudge_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
-	normal.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-	normal.shadow_size = 1
+	normal.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.16, 0.29, 0.46, 0.90)
+	hover.bg_color = Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.09, 0.17, 0.30, 0.92)
+	pressed.bg_color = Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6420,8 +6393,10 @@ func _style_sight_notes_range_nudge_button(btn: Button) -> void:
 func _style_sight_notes_primary_cta_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.98)
+	normal.bg_color = Color(pal["start_bg"])
 	normal.corner_radius_top_left = 20
 	normal.corner_radius_top_right = 20
 	normal.corner_radius_bottom_left = 20
@@ -6430,19 +6405,19 @@ func _style_sight_notes_primary_cta_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 2
-	normal.border_color = Color(0.97, 0.86, 0.40, 0.94)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
-	normal.shadow_size = 6
+	normal.border_color = Color(pal["start_border"])
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.95, 0.70, 0.20, 0.99)
+	hover.bg_color = Color(pal["start_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.82, 0.54, 0.08, 0.99)
+	pressed.bg_color = Color(pal["start_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", Color(0.12, 0.18, 0.27, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color(0.10, 0.15, 0.22, 1.0))
-	btn.add_theme_color_override("font_pressed_color", Color(0.09, 0.13, 0.20, 1.0))
+	btn.add_theme_color_override("font_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_hover_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_pressed_color", Color(pal["start_text"]))
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 18)
@@ -6491,10 +6466,11 @@ func _set_sight_notes_setup_card_style(card: PanelContainer, active: bool, compa
 func _refresh_sight_notes_setup_menu_style() -> void:
 	_apply_menu_setup_theme_to_home()
 	var active := _is_sight_notes_setup_screen_active()
+	var contract := _menu_style_contract()
 	_ensure_sight_notes_local_overlay()
 	if _sight_notes_section_style_cached == null:
 		_sight_notes_section_style_cached = StyleBoxFlat.new()
-		_sight_notes_section_style_cached.bg_color = Color(0.0588, 0.1529, 0.2510, 0.70)
+		_sight_notes_section_style_cached.bg_color = Color(contract.get("panel_bg", Color(0.0588, 0.1529, 0.2510, 0.70)))
 		_sight_notes_section_style_cached.corner_radius_top_left = 20
 		_sight_notes_section_style_cached.corner_radius_top_right = 20
 		_sight_notes_section_style_cached.corner_radius_bottom_left = 20
@@ -6503,12 +6479,13 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_section_style_cached.border_width_top = 2
 		_sight_notes_section_style_cached.border_width_right = 2
 		_sight_notes_section_style_cached.border_width_bottom = 2
-		_sight_notes_section_style_cached.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-		_sight_notes_section_style_cached.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
-		_sight_notes_section_style_cached.shadow_size = 6
+		_sight_notes_section_style_cached.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+		_sight_notes_section_style_cached.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		_sight_notes_section_style_cached.shadow_size = int(contract.get("shadow_panel_size", 6))
 	if _sight_notes_tab_shell_style_cached == null:
 		_sight_notes_tab_shell_style_cached = StyleBoxFlat.new()
-		_sight_notes_tab_shell_style_cached.bg_color = Color(0.08, 0.16, 0.29, 0.44)
+		_sight_notes_tab_shell_style_cached.bg_color = Color(contract.get("panel_bg_compact", Color(0.08, 0.16, 0.29, 0.44)))
+		_sight_notes_tab_shell_style_cached.bg_color.a = 0.44
 		_sight_notes_tab_shell_style_cached.corner_radius_top_left = 16
 		_sight_notes_tab_shell_style_cached.corner_radius_top_right = 16
 		_sight_notes_tab_shell_style_cached.corner_radius_bottom_left = 16
@@ -6517,9 +6494,9 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_tab_shell_style_cached.border_width_top = 2
 		_sight_notes_tab_shell_style_cached.border_width_right = 2
 		_sight_notes_tab_shell_style_cached.border_width_bottom = 2
-		_sight_notes_tab_shell_style_cached.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.52)
-		_sight_notes_tab_shell_style_cached.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-		_sight_notes_tab_shell_style_cached.shadow_size = 5
+		_sight_notes_tab_shell_style_cached.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.52)))
+		_sight_notes_tab_shell_style_cached.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		_sight_notes_tab_shell_style_cached.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
 	if _sight_notes_tab_shell_empty_cached == null:
 		_sight_notes_tab_shell_empty_cached = StyleBoxEmpty.new()
 	var section_card_v: Variant = _home_section_cards.get(_sight_options_box, null)
@@ -6543,7 +6520,9 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 			_set_home_section_card_state(_sight_options_box, _selected_mode == MODE_SIGHT)
 	if _sight_notes_local_overlay != null and is_instance_valid(_sight_notes_local_overlay):
 		_sight_notes_local_overlay.visible = active
-		_sight_notes_local_overlay.color = Color(MENU_SETUP_TINT.r, MENU_SETUP_TINT.g, MENU_SETUP_TINT.b, 0.18)
+		var panel_bg := Color(contract.get("panel_bg", MENU_SETUP_TINT))
+		panel_bg.a = 0.18
+		_sight_notes_local_overlay.color = panel_bg
 	if _sight_options_box != null:
 		_sight_options_box.add_theme_constant_override("separation", 22 if active else 18)
 	if _sight_notes_tabs_shell != null:
@@ -6688,8 +6667,10 @@ func _style_practice_setup_tab_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	_home_button_clean_base_text(btn)
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.15, 0.24, 0.38, 0.90) if selected else Color(0.10, 0.19, 0.32, 0.82)
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
@@ -6698,19 +6679,21 @@ func _style_practice_setup_tab_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 3 if selected else 1
-	normal.border_color = MENU_SETUP_HIGHLIGHT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT)) if selected else Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.18, 0.29, 0.45, 0.92) if selected else Color(0.13, 0.24, 0.39, 0.88)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.10, 0.20, 0.33, 0.96) if selected else Color(0.08, 0.16, 0.28, 0.90)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 15)
@@ -6724,13 +6707,15 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	_home_button_clean_base_text(btn)
-	var selected_bg := Color(0.9098, 0.6275, 0.1255, 0.26) # #E8A020 tint
-	var selected_hover := Color(0.9098, 0.6275, 0.1255, 0.34)
-	var selected_pressed := Color(0.9098, 0.6275, 0.1255, 0.22)
-	var selected_border := MENU_SETUP_HIGHLIGHT
-	var selected_text := SIGHT_NOTES_SETUP_TEXT_PRIMARY
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
+	var selected_bg := Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+	var selected_hover := Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
+	var selected_pressed := Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
+	var selected_border := Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = selected_bg if selected else MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = selected_bg if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6739,19 +6724,20 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = selected_border if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.border_color = selected_border if selected else Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = selected_hover if selected else Color(0.13, 0.24, 0.39, 0.84)
+	hover.bg_color = selected_hover if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = selected_pressed if selected else Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = selected_pressed if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	if not btn.has_meta("_hover_feedback_connected"):
@@ -6762,8 +6748,10 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_disabled: bool = false) -> void:
 	if toggle == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6772,12 +6760,12 @@ func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_d
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
-	normal.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-	normal.shadow_size = 2
+	normal.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	if enabled:
-		normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26)
-		normal.border_color = MENU_SETUP_HIGHLIGHT
+		normal.bg_color = Color(pal["selected_bg"])
+		normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
 		normal.border_width_left = 2
 		normal.border_width_top = 2
 		normal.border_width_right = 2
@@ -6795,7 +6783,7 @@ func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_d
 	toggle.add_theme_stylebox_override("pressed", pressed)
 	var text_col := SIGHT_NOTES_SETUP_TEXT_BODY
 	if enabled:
-		text_col = SIGHT_NOTES_SETUP_TEXT_PRIMARY
+		text_col = Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
 	if is_disabled:
 		text_col = Color(0.62, 0.66, 0.73, 0.88)
 	toggle.add_theme_color_override("font_color", text_col)
@@ -6811,8 +6799,10 @@ func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_d
 func _style_practice_setup_secondary_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.10, 0.19, 0.32, 0.78)
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 18
 	normal.corner_radius_top_right = 18
 	normal.corner_radius_bottom_left = 18
@@ -6821,15 +6811,15 @@ func _style_practice_setup_secondary_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
-	normal.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 4
+	normal.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.13, 0.24, 0.39, 0.84)
+	hover.bg_color = Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6845,8 +6835,10 @@ func _style_practice_setup_secondary_button(btn: Button) -> void:
 func _style_practice_setup_input_control(ctrl: Control) -> void:
 	if ctrl == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.10, 0.19, 0.32, 0.82)
+	sb.bg_color = Color(pal["base_bg"])
 	sb.corner_radius_top_left = 12
 	sb.corner_radius_top_right = 12
 	sb.corner_radius_bottom_left = 12
@@ -6855,12 +6847,12 @@ func _style_practice_setup_input_control(ctrl: Control) -> void:
 	sb.border_width_top = 1
 	sb.border_width_right = 1
 	sb.border_width_bottom = 1
-	sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.38)
+	sb.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.38)))
 	if ctrl is OptionButton:
 		var opt := ctrl as OptionButton
 		opt.add_theme_stylebox_override("normal", sb)
 		var hover := sb.duplicate() as StyleBoxFlat
-		hover.bg_color = Color(0.13, 0.24, 0.39, 0.86)
+		hover.bg_color = Color(pal["base_hover"])
 		opt.add_theme_stylebox_override("hover", hover)
 		opt.add_theme_stylebox_override("pressed", hover)
 		opt.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6880,8 +6872,10 @@ func _style_practice_setup_input_control(ctrl: Control) -> void:
 func _style_practice_setup_primary_cta_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.98)
+	normal.bg_color = Color(pal["start_bg"])
 	normal.corner_radius_top_left = 20
 	normal.corner_radius_top_right = 20
 	normal.corner_radius_bottom_left = 20
@@ -6890,19 +6884,19 @@ func _style_practice_setup_primary_cta_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 2
-	normal.border_color = Color(0.97, 0.86, 0.40, 0.94)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
-	normal.shadow_size = 6
+	normal.border_color = Color(pal["start_border"])
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.95, 0.70, 0.20, 0.99)
+	hover.bg_color = Color(pal["start_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.82, 0.54, 0.08, 0.99)
+	pressed.bg_color = Color(pal["start_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", Color(0.12, 0.18, 0.27, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color(0.10, 0.15, 0.22, 1.0))
-	btn.add_theme_color_override("font_pressed_color", Color(0.09, 0.13, 0.20, 1.0))
+	btn.add_theme_color_override("font_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_hover_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_pressed_color", Color(pal["start_text"]))
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.custom_minimum_size = Vector2(maxf(240.0, btn.custom_minimum_size.x), maxf(56.0, btn.custom_minimum_size.y))
@@ -7080,7 +7074,7 @@ func _refresh_practice_setup_theme() -> void:
 	_style_practice_setup_secondary_button(_rhythm_flow_save_button_menu)
 	_style_practice_setup_secondary_button(_rhythm_flow_next_button)
 	_style_practice_setup_primary_cta_button(_home_start_button)
-	_style_practice_setup_secondary_button(_rhythm_flow_demo_home_button)
+	_style_practice_setup_primary_cta_button(_rhythm_flow_demo_home_button)
 
 
 func _home_button_base_text(btn: Button) -> String:
@@ -7137,6 +7131,7 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	_set_home_button_label_state(btn, selected)
 	_animate_home_button_selection(btn, selected)
 	var token_colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
@@ -7166,13 +7161,19 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if mode_card_flat:
 		# Use a true glass look: low-opacity white fill, panel-driven visuals.
 		if main_menu_card:
-			# Main menu overview cards should use the same warm gold family as primary CTA.
-			selected_btn_bg = Color(0.9098, 0.6275, 0.1255, 0.78)
-			selected_btn_hover_bg = Color(0.945, 0.700, 0.220, 0.82)
-			selected_btn_pressed_bg = Color(0.860, 0.575, 0.105, 0.74)
-			base_btn_bg = Color(0.9098, 0.6275, 0.1255, 0.66)
-			base_btn_hover_bg = Color(0.930, 0.670, 0.185, 0.72)
-			base_btn_pressed_bg = Color(0.835, 0.545, 0.095, 0.64)
+			# Main menu overview cards use the contract CTA family.
+			selected_btn_bg = Color(contract.get("cta_bg", Color(0.9098, 0.6275, 0.1255, 0.98)))
+			selected_btn_bg.a = 0.78
+			selected_btn_hover_bg = Color(contract.get("cta_hover", Color(0.95, 0.70, 0.20, 0.99)))
+			selected_btn_hover_bg.a = 0.82
+			selected_btn_pressed_bg = Color(contract.get("cta_pressed", Color(0.82, 0.54, 0.08, 0.99)))
+			selected_btn_pressed_bg.a = 0.74
+			base_btn_bg = Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+			base_btn_bg.a = 0.66
+			base_btn_hover_bg = Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
+			base_btn_hover_bg.a = 0.72
+			base_btn_pressed_bg = Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
+			base_btn_pressed_bg.a = 0.64
 		else:
 			selected_btn_bg = Color(1.0, 1.0, 1.0, 0.06)
 			selected_btn_hover_bg = Color(1.0, 1.0, 1.0, 0.07)
@@ -7209,8 +7210,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			sb.border_width_top = 4
 			sb.border_width_right = 4
 			sb.border_width_bottom = 4
-			sb.shadow_color = Color(0.20, 0.14, 0.04, 0.92)
-			sb.shadow_size = 9
+			sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			sb.shadow_size = int(contract.get("shadow_button_size", 4))
 		else:
 			sb.bg_color = base_btn_bg
 			sb.border_color = pal["base_border"]
@@ -7218,8 +7219,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			sb.border_width_top = 2
 			sb.border_width_right = 2
 			sb.border_width_bottom = 2
-			sb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-			sb.shadow_size = 5
+			sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			sb.shadow_size = int(contract.get("shadow_button_size", 4))
 	var hover := btn.get_theme_stylebox("hover")
 	if hover is StyleBoxFlat:
 		var hb := hover as StyleBoxFlat
@@ -7232,8 +7233,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			hb.border_width_top = 4
 			hb.border_width_right = 4
 			hb.border_width_bottom = 4
-			hb.shadow_color = Color(0.20, 0.14, 0.04, 0.92)
-			hb.shadow_size = 10
+			hb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			hb.shadow_size = int(contract.get("shadow_button_size", 4))
 		else:
 			hb.bg_color = base_btn_hover_bg
 			hb.border_color = pal["base_border"]
@@ -7241,8 +7242,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			hb.border_width_top = 2
 			hb.border_width_right = 2
 			hb.border_width_bottom = 2
-			hb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-			hb.shadow_size = 7
+			hb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			hb.shadow_size = int(contract.get("shadow_button_size", 4))
 	var pressed := btn.get_theme_stylebox("pressed")
 	if pressed is StyleBoxFlat:
 		var pb := pressed as StyleBoxFlat
@@ -7255,8 +7256,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			pb.border_width_top = 4
 			pb.border_width_right = 4
 			pb.border_width_bottom = 4
-			pb.shadow_color = Color(0.20, 0.14, 0.04, 0.92)
-			pb.shadow_size = 6
+			pb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			pb.shadow_size = int(contract.get("shadow_button_size", 4))
 		else:
 			pb.bg_color = base_btn_pressed_bg
 			pb.border_color = pal["base_border"]
@@ -7264,12 +7265,13 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			pb.border_width_top = 2
 			pb.border_width_right = 2
 			pb.border_width_bottom = 2
-			pb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-			pb.shadow_size = 3
+			pb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			pb.shadow_size = int(contract.get("shadow_button_size", 4))
 	if selected:
-		btn.add_theme_color_override("font_color", _pick_readable_text_color(selected_btn_bg))
-		btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(selected_btn_hover_bg))
-		btn.add_theme_color_override("font_pressed_color", _pick_readable_text_color(selected_btn_pressed_bg))
+		var selected_text := Color(pal["selected_text"])
+		btn.add_theme_color_override("font_color", selected_text)
+		btn.add_theme_color_override("font_hover_color", selected_text)
+		btn.add_theme_color_override("font_pressed_color", selected_text)
 		btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.16) if mode_card_flat else Color(0.0, 0.0, 0.0, 0.55))
 		btn.add_theme_constant_override("outline_size", 1 if mode_card_flat else 2)
 	else:
@@ -7299,22 +7301,22 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			if mode_card_flat:
 				if selected:
 					sb.bg_color = selected_btn_bg
-					sb.border_color = Color(0.98, 0.86, 0.45, 0.96) if main_menu_card else Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
+					sb.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.86, 0.45, 0.96))) if main_menu_card else Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
 					sb.border_width_left = 1
 					sb.border_width_top = 1
 					sb.border_width_right = 1
 					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.18, 0.12, 0.03, 0.24) if main_menu_card else MENU_CARD_SHADOW
-					sb.shadow_size = 8 if main_menu_card else 6
+					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					sb.shadow_size = 0 if main_menu_card else int(contract.get("shadow_panel_size", 6))
 				else:
 					sb.bg_color = base_btn_bg
-					sb.border_color = Color(0.96, 0.82, 0.36, 0.74) if main_menu_card else Color(1.0, 1.0, 1.0, 0.06)
+					sb.border_color = Color(contract.get("panel_border", Color(0.96, 0.82, 0.36, 0.74))) if main_menu_card else Color(1.0, 1.0, 1.0, 0.06)
 					sb.border_width_left = 1
 					sb.border_width_top = 1
 					sb.border_width_right = 1
 					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.16, 0.10, 0.03, 0.20) if main_menu_card else MENU_CARD_SHADOW
-					sb.shadow_size = 8 if main_menu_card else 5
+					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					sb.shadow_size = 0 if main_menu_card else maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
 				card_panel.add_theme_stylebox_override("panel", sb)
 			else:
 				if selected:
@@ -7325,8 +7327,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 					sb.border_width_top = 3
 					sb.border_width_right = 3
 					sb.border_width_bottom = 3
-					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
-					sb.shadow_size = 10
+					sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 				else:
 					sb.bg_color = Color(base_btn_bg.r, base_btn_bg.g, base_btn_bg.b, 0.55)
 					sb.border_color = pal["base_border"]
@@ -7334,8 +7336,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 					sb.border_width_top = 1
 					sb.border_width_right = 1
 					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
-					sb.shadow_size = 5
+					sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					sb.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
 				card_panel.add_theme_stylebox_override("panel", sb)
 		if btn.has_meta("mode_card_accent_bar"):
 			var accent := btn.get_meta("mode_card_accent_bar") as ColorRect
@@ -7752,6 +7754,7 @@ func _apply_top_hud_nav_button_skin() -> void:
 func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: Texture2D = null) -> void:
 	if btn == null:
 		return
+	var contract := _menu_style_contract()
 	btn.text = icon_text
 	btn.icon = icon_tex
 	btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -7769,32 +7772,32 @@ func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: T
 	btn.add_theme_font_size_override("font_size", 24 if icon_tex == null else 18)
 	btn.add_theme_constant_override("icon_max_width", 28)
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.09, 0.17, 0.29, 0.86)
+	normal.bg_color = Color(contract.get("btn_inactive_bg", Color(0.09, 0.17, 0.29, 0.86)))
 	normal.corner_radius_top_left = 23
 	normal.corner_radius_top_right = 23
 	normal.corner_radius_bottom_left = 23
 	normal.corner_radius_bottom_right = 23
-	normal.border_color = Color(0.92, 0.78, 0.32, 0.92)
+	normal.border_color = Color(contract.get("btn_selected_border", Color(0.92, 0.78, 0.32, 0.92)))
 	normal.border_width_left = 2
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.02, 0.03, 0.06, 0.36)
-	normal.shadow_size = 4
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_nav_alpha", 0.0)))
+	normal.shadow_size = int(contract.get("shadow_nav_size", 0))
 	normal.content_margin_left = 0
 	normal.content_margin_right = 0
 	normal.content_margin_top = 0
 	normal.content_margin_bottom = 0
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
-	hover.bg_color = Color(0.12, 0.23, 0.38, 0.92)
-	hover.border_color = Color(0.98, 0.84, 0.40, 0.98)
-	hover.shadow_size = 6
+	hover.bg_color = Color(contract.get("btn_inactive_hover", Color(0.12, 0.23, 0.38, 0.92)))
+	hover.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.84, 0.40, 0.98)))
+	hover.shadow_size = int(contract.get("shadow_nav_hover_size", 0))
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.06, 0.12, 0.21, 0.94)
-	pressed.border_color = Color(0.86, 0.70, 0.26, 0.96)
-	pressed.shadow_size = 2
+	pressed.bg_color = Color(contract.get("btn_inactive_pressed", Color(0.06, 0.12, 0.21, 0.94)))
+	pressed.border_color = Color(contract.get("btn_selected_border", Color(0.86, 0.70, 0.26, 0.96)))
+	pressed.shadow_size = int(contract.get("shadow_nav_pressed_size", 0))
 	btn.add_theme_stylebox_override("pressed", pressed)
 	var is_settings_button: bool = btn == _sight_settings_button
 	var base_icon_color: Color = Color(1.0, 1.0, 1.0, 1.0) if is_settings_button else Color(0.98, 0.94, 0.84, 1.0)
@@ -10137,15 +10140,20 @@ func _apply_sight_note_selector_for_current_clef() -> void:
 	var start_note := str(range_cfg.get("start_note", "A3"))
 	var end_note := str(range_cfg.get("end_note", "C6"))
 	var needs_reconfigure := _sight_selector_last_clef != _selected_clef or _sight_selector_last_start_note != start_note or _sight_selector_last_end_note != end_note
+	var selector_config := {
+		"start_note": start_note,
+		"end_note": end_note,
+		"selectable_white_only": true,
+		"default_selected_set": selected,
+		"min_selected_count": 3,
+		"selected_color": Color(0.98, 0.82, 0.40, 1.0)
+	}
 	if needs_reconfigure:
-		_sight_note_selector.configure({
-			"start_note": start_note,
-			"end_note": end_note,
-			"selectable_white_only": true,
-			"default_selected_set": selected,
-			"min_selected_count": 3,
-			"selected_color": Color(0.98, 0.82, 0.40, 1.0)
-		})
+		var animate_clef_switch := _sight_selector_last_clef != "" and _sight_selector_last_clef != _selected_clef
+		if animate_clef_switch:
+			_sight_note_selector.transition_to_config(selector_config, selected)
+		else:
+			_sight_note_selector.configure(selector_config)
 		_sight_selector_last_clef = _selected_clef
 		_sight_selector_last_start_note = start_note
 		_sight_selector_last_end_note = end_note

@@ -12,13 +12,15 @@ func _cache_styles(high_contrast: bool) -> void:
 	if _tokens == null:
 		return
 	var colors: Dictionary = _tokens.colors(high_contrast)
+	var contract: Dictionary = _tokens.menu_style_contract() if _tokens.has_method("menu_style_contract") else {}
 	var key: String = "hc" if high_contrast else "normal"
 	if _styles.has(key):
 		return
 
 	var section_active := StyleBoxFlat.new()
-	section_active.bg_color = Color(0.86, 0.93, 0.97, 0.92) if not high_contrast else Color(0.10, 0.10, 0.10, 0.98)
-	section_active.border_color = Color(0.2471, 0.6549, 0.6275, 0.42) if not high_contrast else colors["focus_border"]
+	section_active.bg_color = Color(contract.get("panel_bg", Color(0.86, 0.93, 0.97, 0.92))) if not high_contrast else Color(0.10, 0.10, 0.10, 0.98)
+	section_active.bg_color.a = 0.92 if not high_contrast else section_active.bg_color.a
+	section_active.border_color = Color(contract.get("panel_border", colors["focus_border"])) if not high_contrast else colors["focus_border"]
 	section_active.border_width_left = 1
 	section_active.border_width_top = 1
 	section_active.border_width_right = 1
@@ -27,14 +29,15 @@ func _cache_styles(high_contrast: bool) -> void:
 	section_active.corner_radius_top_right = 18
 	section_active.corner_radius_bottom_left = 18
 	section_active.corner_radius_bottom_right = 18
-	section_active.shadow_color = Color(0.0, 0.0, 0.0, 0.08)
-	section_active.shadow_size = 8
+	section_active.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+	section_active.shadow_size = int(contract.get("shadow_panel_size", 6))
 
 	var section_idle := section_active.duplicate()
-	section_idle.bg_color = Color(0.82, 0.90, 0.96, 0.86) if not high_contrast else Color(0.06, 0.06, 0.06, 0.90)
-	section_idle.border_color = Color(0.20, 0.36, 0.50, 0.14) if not high_contrast else _tokens.colors(high_contrast)["panel_border"]
-	section_idle.shadow_color = Color(0.0, 0.0, 0.0, 0.04)
-	section_idle.shadow_size = 6
+	section_idle.bg_color = Color(contract.get("panel_bg_compact", Color(0.82, 0.90, 0.96, 0.86))) if not high_contrast else Color(0.06, 0.06, 0.06, 0.90)
+	section_idle.bg_color.a = 0.86 if not high_contrast else section_idle.bg_color.a
+	section_idle.border_color = Color(contract.get("panel_border", _tokens.colors(high_contrast)["panel_border"])) if not high_contrast else _tokens.colors(high_contrast)["panel_border"]
+	section_idle.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+	section_idle.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
 
 	_styles[key] = {
 		"section_active": section_active,
