@@ -31,6 +31,13 @@ var _white_buttons: Dictionary = {}
 var _white_x_by_midi: Dictionary = {}
 var _white_w_by_midi: Dictionary = {}
 var _last_rebuild_width := -1.0
+var _cached_sb_normal_sel: StyleBoxFlat = null
+var _cached_sb_hover_sel: StyleBoxFlat = null
+var _cached_sb_pressed_sel: StyleBoxFlat = null
+var _cached_sb_normal_unsel: StyleBoxFlat = null
+var _cached_sb_hover_unsel: StyleBoxFlat = null
+var _cached_sb_pressed_unsel: StyleBoxFlat = null
+var _cached_style_color := Color(0.0, 0.0, 0.0, 0.0)
 
 @onready var _scroll: ScrollContainer = $Scroll
 @onready var _keyboard: Control = $Scroll/Keyboard
@@ -156,6 +163,7 @@ func _rebuild_keyboard() -> void:
 		key_btn.pressed.connect(_on_white_key_pressed.bind(int(midi_note)))
 		_white_layer.add_child(key_btn)
 		_white_buttons[int(midi_note)] = key_btn
+		_apply_white_key_finish(key_btn)
 		_add_octave_label_if_needed(int(midi_note), x, key_w)
 		idx += 1
 
@@ -232,34 +240,57 @@ func _apply_selection_visuals() -> void:
 		_apply_white_key_style(btn, selected)
 
 
+func _ensure_key_style_cache() -> void:
+	if _cached_sb_normal_sel != null and _cached_style_color == selected_color:
+		return
+	_cached_style_color = selected_color
+	var sel := selected_color
+	var unsel := Color(0.98, 0.99, 1.0, 1.0)
+	_cached_sb_normal_sel = StyleBoxFlat.new()
+	_cached_sb_normal_sel.bg_color = sel
+	_cached_sb_normal_sel.corner_radius_top_left = 6
+	_cached_sb_normal_sel.corner_radius_top_right = 6
+	_cached_sb_normal_sel.corner_radius_bottom_left = 8
+	_cached_sb_normal_sel.corner_radius_bottom_right = 8
+	_cached_sb_normal_sel.border_width_left = 2
+	_cached_sb_normal_sel.border_width_top = 2
+	_cached_sb_normal_sel.border_width_right = 2
+	_cached_sb_normal_sel.border_width_bottom = 3
+	_cached_sb_normal_sel.border_color = Color(0.13, 0.13, 0.11, 0.92)
+	_cached_sb_normal_sel.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
+	_cached_sb_normal_sel.shadow_size = 2
+	_cached_sb_hover_sel = _cached_sb_normal_sel.duplicate() as StyleBoxFlat
+	_cached_sb_hover_sel.bg_color = sel.lightened(0.06)
+	_cached_sb_hover_sel.shadow_size = 3
+	_cached_sb_pressed_sel = _cached_sb_normal_sel.duplicate() as StyleBoxFlat
+	_cached_sb_pressed_sel.bg_color = sel.darkened(0.08)
+	_cached_sb_pressed_sel.shadow_size = 1
+	_cached_sb_normal_unsel = _cached_sb_normal_sel.duplicate() as StyleBoxFlat
+	_cached_sb_normal_unsel.bg_color = unsel
+	_cached_sb_normal_unsel.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
+	_cached_sb_hover_unsel = _cached_sb_normal_unsel.duplicate() as StyleBoxFlat
+	_cached_sb_hover_unsel.bg_color = Color(1.0, 1.0, 1.0, 1.0)
+	_cached_sb_hover_unsel.shadow_size = 3
+	_cached_sb_pressed_unsel = _cached_sb_normal_unsel.duplicate() as StyleBoxFlat
+	_cached_sb_pressed_unsel.bg_color = Color(0.95, 0.97, 1.0, 1.0)
+	_cached_sb_pressed_unsel.shadow_size = 1
+
+
 func _apply_white_key_style(btn: Button, selected: bool) -> void:
-	var base_color := selected_color if selected else Color(0.98, 0.99, 1.0, 1.0)
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = base_color
-	normal.corner_radius_top_left = 6
-	normal.corner_radius_top_right = 6
-	normal.corner_radius_bottom_left = 8
-	normal.corner_radius_bottom_right = 8
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 3
-	normal.border_color = Color(0.13, 0.13, 0.11, 0.92)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.22 if selected else 0.16)
-	normal.shadow_size = 2
-	btn.add_theme_stylebox_override("normal", normal)
-
-	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = base_color.lightened(0.06) if selected else Color(1.0, 1.0, 1.0, 1.0)
-	hover.shadow_size = 3
-	btn.add_theme_stylebox_override("hover", hover)
-
-	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = base_color.darkened(0.08) if selected else Color(0.95, 0.97, 1.0, 1.0)
-	pressed.shadow_size = 1
-	btn.add_theme_stylebox_override("pressed", pressed)
+	var prev_sel: int = int(btn.get_meta("_key_sel", -1))
+	if prev_sel == (1 if selected else 0):
+		return
+	btn.set_meta("_key_sel", 1 if selected else 0)
+	_ensure_key_style_cache()
+	if selected:
+		btn.add_theme_stylebox_override("normal", _cached_sb_normal_sel)
+		btn.add_theme_stylebox_override("hover", _cached_sb_hover_sel)
+		btn.add_theme_stylebox_override("pressed", _cached_sb_pressed_sel)
+	else:
+		btn.add_theme_stylebox_override("normal", _cached_sb_normal_unsel)
+		btn.add_theme_stylebox_override("hover", _cached_sb_hover_unsel)
+		btn.add_theme_stylebox_override("pressed", _cached_sb_pressed_unsel)
 	btn.material = null
-	_apply_white_key_finish(btn)
 
 
 func _add_octave_label_if_needed(midi_note: int, x: float, white_key_w: float) -> void:

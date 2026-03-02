@@ -70,31 +70,17 @@ func animate_section_visibility(section: VBoxContainer, card: Control, visible: 
 	if section == null:
 		return
 	var target := card if card != null else section
+	var current_visible := section.visible and target.visible and target.modulate.a >= 0.99
+	if current_visible == visible:
+		return
 	if target.has_meta("home_section_tween"):
-		var old_tween_v: Variant = target.get_meta("home_section_tween")
-		if old_tween_v is Tween:
-			var old_tween := old_tween_v as Tween
-			if old_tween != null and old_tween.is_running():
-				old_tween.kill()
-	if visible:
-		target.visible = true
-		section.visible = true
-		target.position = Vector2.ZERO
-		target.modulate = Color(1, 1, 1, 0.0)
-		var tween := section.create_tween()
-		tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tween.tween_property(target, "modulate", Color(1, 1, 1, 1), 0.14)
-		target.set_meta("home_section_tween", tween)
-	else:
-		var tween_out := section.create_tween()
-		tween_out.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
-		tween_out.tween_property(target, "modulate", Color(1, 1, 1, 0.0), 0.10)
-		tween_out.finished.connect(func() -> void:
-			section.visible = false
-			if card != null:
-				card.visible = false
-		)
-		target.set_meta("home_section_tween", tween_out)
+		target.remove_meta("home_section_tween")
+	target.modulate = Color(1, 1, 1, 1)
+	target.position = Vector2.ZERO
+	target.visible = visible
+	section.visible = visible
+	if card != null:
+		card.visible = visible
 
 func apply_focus_chain(controls: Array[Control], default_focus: Control) -> void:
 	var valid: Array[Control] = []
