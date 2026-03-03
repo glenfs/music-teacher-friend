@@ -521,6 +521,7 @@ var _home_hint_labels: Dictionary = {}
 var _home_disabled_reason_label: Label
 var _home_sight_mode_row: Control
 var _sight_clef_row: Control
+var _sight_clef_label: Label
 var _home_interval_degree_row: Control
 var _home_chase_note_row: Control
 var _home_chase_clef_row: Control
@@ -787,6 +788,7 @@ var _chord_buttons: Dictionary = {}
 var _sight_key_buttons: Dictionary = {}
 var _sight_chord_choice_buttons: Array[Button] = []
 var _sight_notes_chords_skin_active := false
+var _continuous_sight_skin_active := false
 var _sight_progress_ratio_target := 0.0
 var _sight_progress_ratio_display := 0.0
 var _sight_progress_tween: Tween
@@ -995,12 +997,25 @@ var _qa_exposed_tempos: Array[int] = [60, 90, 140]
 # --- Performance caches ---
 var _cached_button_palette: Dictionary = {}
 var _cached_palette_theme_id: String = ""
+var _button_style_cache: Dictionary = {}
+var _button_style_cache_theme_id: String = ""
 var _last_responsive_vp: Vector2 = Vector2.ZERO
 var _cached_staff_frame_sb: StyleBoxFlat = null
 var _cached_staff_frame_border: Color = Color()
 var _cached_glass_btn_sb: StyleBoxFlat = null
 var _last_setup_theme_active := false
 var _setup_theme_dirty := true
+# B1: streak flash tween kill-guards
+var _sight_streak_flash_tween_1: Tween = null
+var _sight_streak_flash_tween_2: Tween = null
+# B2: bird reaction tween kill-guard
+var _bird_action_tween: Tween = null
+# C6: shared game-card stylebox (identical in both sight skins)
+var _sight_game_card_style_cache: StyleBoxFlat = null
+# D3: HUD label dirty-tracking (avoids str() + Label relayout every frame)
+var _hud_combo_displayed: int = -1
+var _hud_level_displayed: int = -1
+var _hud_acc_displayed: int = -1
 
 
 func _ready() -> void:
@@ -1032,6 +1047,7 @@ func _ready() -> void:
 	_sync_home_state_from_runtime()
 	_load_ear_settings()
 	_load_menu_setup_style_resources()
+	_cache_button_styles()
 	_build_ui()
 	_setup_audio()
 	_show_home()
@@ -2354,7 +2370,7 @@ func _build_ui() -> void:
 	_home_scroll = ScrollContainer.new()
 	_home_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_home_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_home_scroll.follow_focus = true
+	_home_scroll.follow_focus = false
 	_home_card.add_child(_home_scroll)
 
 	_home_panel = VBoxContainer.new()
@@ -2922,6 +2938,13 @@ func _build_ui() -> void:
 	sight_setup_header_row.add_child(_sight_notes_setup_title_label)
 	sight_setup_header_row.add_child(clef_row)
 	_sight_clef_row = clef_row
+
+	var clef_label := Label.new()
+	clef_label.text = "Clef:"
+	clef_label.set_meta("settings_small_label", true)
+	clef_label.visible = false
+	clef_row.add_child(clef_label)
+	_sight_clef_label = clef_label
 
 	var treble_btn := Button.new()
 	treble_btn.text = "Treble"
@@ -4740,10 +4763,12 @@ func _refresh_background_scene_emphasis() -> void:
 	if _background_vignette_bottom != null:
 		_background_vignette_bottom.modulate = Color(1.0, 1.0, 1.0, 0.10 if home_visible else 0.28)
 	if _home_menu_overlay != null:
-		_home_menu_overlay.visible = home_visible
+		if _home_menu_overlay.visible != home_visible:
+			_home_menu_overlay.visible = home_visible
 	for lbl in _music_note_labels:
 		if lbl != null and is_instance_valid(lbl):
-			lbl.visible = home_visible
+			if lbl.visible != home_visible:
+				lbl.visible = home_visible
 	for tw in _music_note_tweens:
 		if tw != null and is_instance_valid(tw):
 			if home_visible:
@@ -5566,9 +5591,69 @@ func _on_menu_gloss_host_resized(host: Control) -> void:
 	_layout_menu_top_gloss(host, alpha, ratio, min_h, max_h)
 
 
+func _build_cached_stylebox(bg: Color, border: Color, corner_radius: int, border_width: int, shadow_alpha: float = 0.0, shadow_size: int = 0) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.corner_radius_top_left = corner_radius
+	sb.corner_radius_top_right = corner_radius
+	sb.corner_radius_bottom_left = corner_radius
+	sb.corner_radius_bottom_right = corner_radius
+	sb.border_color = border
+	sb.border_width_left = border_width
+	sb.border_width_top = border_width
+	sb.border_width_right = border_width
+	sb.border_width_bottom = border_width
+	sb.shadow_color = Color(0.0, 0.0, 0.0, shadow_alpha)
+	sb.shadow_size = shadow_size
+	return sb
+
+
+func _cache_button_styles() -> void:
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
+	var shadow_alpha := float(contract.get("shadow_button_alpha", 0.28))
+	var shadow_size := int(contract.get("shadow_button_size", 4))
+	_button_style_cache = {
+		"button_normal": _build_cached_stylebox(Color(pal["base_bg"]), Color(pal["base_border"]), 12, 2, shadow_alpha, shadow_size),
+		"button_hover": _build_cached_stylebox(Color(pal["base_hover"]), Color(pal["base_border"]), 12, 2, shadow_alpha, shadow_size),
+		"button_pressed": _build_cached_stylebox(Color(pal["base_pressed"]), Color(pal["base_border"]), 12, 2, shadow_alpha, shadow_size),
+		"settings_normal": _build_cached_stylebox(Color(pal["settings_bg"]), Color(pal["settings_border"]), 12, 2, shadow_alpha, shadow_size),
+		"settings_hover": _build_cached_stylebox(Color(pal["settings_hover"]), Color(pal["settings_border"]), 12, 2, shadow_alpha, shadow_size),
+		"settings_pressed": _build_cached_stylebox(Color(pal["settings_pressed"]), Color(pal["settings_border"]), 12, 2, shadow_alpha, shadow_size),
+		"interval_on_normal": _build_cached_stylebox(Color(pal["toggle_on_bg"]), Color(pal["toggle_on_border"]), 22, 2, 0.0, 0),
+		"interval_on_hover": _build_cached_stylebox(Color(pal["toggle_on_bg"]).lightened(0.08), Color(pal["toggle_on_border"]), 22, 2, 0.0, 0),
+		"interval_on_pressed": _build_cached_stylebox(Color(pal["toggle_on_bg"]).darkened(0.08), Color(pal["toggle_on_border"]), 22, 2, 0.0, 0),
+		"interval_off_normal": _build_cached_stylebox(Color(pal["toggle_off_bg"]), Color(pal["toggle_off_border"]), 22, 2, 0.0, 0),
+		"interval_off_hover": _build_cached_stylebox(Color(pal["toggle_off_bg"]).lightened(0.08), Color(pal["toggle_off_border"]), 22, 2, 0.0, 0),
+		"interval_off_pressed": _build_cached_stylebox(Color(pal["toggle_off_bg"]).darkened(0.08), Color(pal["toggle_off_border"]), 22, 2, 0.0, 0),
+		"interval_disabled_normal": _build_cached_stylebox(Color(0.16, 0.20, 0.27, 0.58), Color(0.55, 0.60, 0.67, 0.45), 22, 2, 0.0, 0),
+		"interval_disabled_hover": _build_cached_stylebox(Color(0.16, 0.20, 0.27, 0.58).lightened(0.08), Color(0.55, 0.60, 0.67, 0.45), 22, 2, 0.0, 0),
+		"interval_disabled_pressed": _build_cached_stylebox(Color(0.16, 0.20, 0.27, 0.58).darkened(0.08), Color(0.55, 0.60, 0.67, 0.45), 22, 2, 0.0, 0),
+		"menu_on_normal": _build_cached_stylebox(Color(pal["toggle_on_bg"]), Color(pal["toggle_on_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_on_hover": _build_cached_stylebox(Color(pal["toggle_on_bg"]).lightened(0.08), Color(pal["toggle_on_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_on_pressed": _build_cached_stylebox(Color(pal["toggle_on_bg"]).darkened(0.08), Color(pal["toggle_on_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_off_normal": _build_cached_stylebox(Color(pal["toggle_off_bg"]), Color(pal["toggle_off_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_off_hover": _build_cached_stylebox(Color(pal["toggle_off_bg"]).lightened(0.08), Color(pal["toggle_off_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_off_pressed": _build_cached_stylebox(Color(pal["toggle_off_bg"]).darkened(0.08), Color(pal["toggle_off_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_disabled_normal": _build_cached_stylebox(Color(0.30, 0.30, 0.30, 0.70), Color(0.52, 0.52, 0.52, 0.75), 16, 3, shadow_alpha, shadow_size),
+		"menu_disabled_hover": _build_cached_stylebox(Color(0.30, 0.30, 0.30, 0.70).lightened(0.08), Color(0.52, 0.52, 0.52, 0.75), 16, 3, shadow_alpha, shadow_size),
+		"menu_disabled_pressed": _build_cached_stylebox(Color(0.30, 0.30, 0.30, 0.70).darkened(0.08), Color(0.52, 0.52, 0.52, 0.75), 16, 3, shadow_alpha, shadow_size)
+	}
+	_button_style_cache_theme_id = _cached_palette_theme_id if _cached_palette_theme_id != "" else "menu_contract"
+
+
+func _ensure_button_style_cache() -> void:
+	_theme_button_palette()
+	var palette_id := _cached_palette_theme_id if _cached_palette_theme_id != "" else "menu_contract"
+	if _button_style_cache.is_empty() or _button_style_cache_theme_id != palette_id:
+		_cache_button_styles()
+
+
 func _invalidate_button_palette_cache() -> void:
 	_cached_button_palette = {}
 	_cached_palette_theme_id = ""
+	_button_style_cache = {}
+	_button_style_cache_theme_id = ""
 
 func _menu_style_contract() -> Dictionary:
 	var fallback := {
@@ -5661,34 +5746,49 @@ func _pick_readable_text_color(bg: Color) -> Color:
 	return light if light_delta >= dark_delta else dark
 
 
+func _is_cached_button_stylebox(sb: StyleBoxFlat) -> bool:
+	if sb == null:
+		return false
+	for cached_v in _button_style_cache.values():
+		if cached_v is StyleBoxFlat and cached_v == sb:
+			return true
+	return false
+
+
+func _get_mutable_button_stylebox(btn: Button, state_name: String) -> StyleBoxFlat:
+	if btn == null:
+		return null
+	var sb_v: Variant = btn.get_theme_stylebox(state_name)
+	if not (sb_v is StyleBoxFlat):
+		return null
+	var sb := sb_v as StyleBoxFlat
+	if _is_cached_button_stylebox(sb):
+		var mutable_sb := sb.duplicate() as StyleBoxFlat
+		btn.add_theme_stylebox_override(state_name, mutable_sb)
+		return mutable_sb
+	return sb
+
+
+func _cached_button_style(key: String) -> StyleBoxFlat:
+	var sb_v: Variant = _button_style_cache.get(key, null)
+	if sb_v is StyleBoxFlat:
+		return sb_v as StyleBoxFlat
+	return null
+
+
 func _style_button(btn: Button) -> void:
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
-	var contract := _menu_style_contract()
 	var base_text: Color = _pick_readable_text_color(pal["base_bg"])
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = pal["base_bg"]
-	normal.corner_radius_top_left = 12
-	normal.corner_radius_top_right = 12
-	normal.corner_radius_bottom_left = 12
-	normal.corner_radius_bottom_right = 12
-	normal.border_color = pal["base_border"]
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
-	normal.shadow_size = int(contract.get("shadow_button_size", 4))
-	btn.add_theme_stylebox_override("normal", normal)
-
-	var hover := normal.duplicate()
-	hover.bg_color = pal["base_hover"]
-	hover.shadow_size = normal.shadow_size
-	btn.add_theme_stylebox_override("hover", hover)
-
-	var pressed := normal.duplicate()
-	pressed.bg_color = pal["base_pressed"]
-	pressed.shadow_size = normal.shadow_size
-	btn.add_theme_stylebox_override("pressed", pressed)
+	var normal := _cached_button_style("button_normal")
+	var hover := _cached_button_style("button_hover")
+	var pressed := _cached_button_style("button_pressed")
+	if normal != null:
+		btn.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		btn.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", base_text)
 	btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(pal["base_hover"]))
 	btn.add_theme_color_override("font_pressed_color", _pick_readable_text_color(pal["base_pressed"]))
@@ -5702,29 +5802,18 @@ func _style_button(btn: Button) -> void:
 func _style_settings_button(btn: Button) -> void:
 	if btn == null:
 		return
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
-	var contract := _menu_style_contract()
 	var settings_text := _pick_readable_text_color(pal["settings_bg"])
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = pal["settings_bg"]
-	normal.corner_radius_top_left = 12
-	normal.corner_radius_top_right = 12
-	normal.corner_radius_bottom_left = 12
-	normal.corner_radius_bottom_right = 12
-	normal.border_color = pal["settings_border"]
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
-	normal.shadow_size = int(contract.get("shadow_button_size", 4))
-	btn.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate()
-	hover.bg_color = pal["settings_hover"]
-	btn.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate()
-	pressed.bg_color = pal["settings_pressed"]
-	btn.add_theme_stylebox_override("pressed", pressed)
+	var normal := _cached_button_style("settings_normal")
+	var hover := _cached_button_style("settings_hover")
+	var pressed := _cached_button_style("settings_pressed")
+	if normal != null:
+		btn.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		btn.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", settings_text)
 	btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(pal["settings_hover"]))
 	btn.add_theme_color_override("font_pressed_color", _pick_readable_text_color(pal["settings_pressed"]))
@@ -5737,32 +5826,22 @@ func _style_settings_button(btn: Button) -> void:
 func _style_interval_option_toggle(btn: Button, enabled: bool, on_text: String, off_text: String, is_disabled: bool = false) -> void:
 	if btn == null:
 		return
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
-	var normal := StyleBoxFlat.new()
-	normal.corner_radius_top_left = 22
-	normal.corner_radius_top_right = 22
-	normal.corner_radius_bottom_left = 22
-	normal.corner_radius_bottom_right = 22
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
+	var state_prefix := "interval_off"
 	if is_disabled:
-		normal.bg_color = Color(0.16, 0.20, 0.27, 0.58)
-		normal.border_color = Color(0.55, 0.60, 0.67, 0.45)
+		state_prefix = "interval_disabled"
 	elif enabled:
-		normal.bg_color = pal["toggle_on_bg"]
-		normal.border_color = pal["toggle_on_border"]
-	else:
-		normal.bg_color = pal["toggle_off_bg"]
-		normal.border_color = pal["toggle_off_border"]
-	btn.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate()
-	hover.bg_color = normal.bg_color.lightened(0.08)
-	btn.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate()
-	pressed.bg_color = normal.bg_color.darkened(0.08)
-	btn.add_theme_stylebox_override("pressed", pressed)
+		state_prefix = "interval_on"
+	var normal := _cached_button_style(state_prefix + "_normal")
+	var hover := _cached_button_style(state_prefix + "_hover")
+	var pressed := _cached_button_style(state_prefix + "_pressed")
+	if normal != null:
+		btn.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		btn.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		btn.add_theme_stylebox_override("pressed", pressed)
 	var on_color := Color(pal["toggle_on_text"])
 	var off_color := Color(pal["toggle_off_text"])
 	var text_color := off_color if (is_disabled or not enabled) else on_color
@@ -5793,35 +5872,22 @@ func _style_harmonic_intervals_toggle(enabled: bool) -> void:
 func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) -> void:
 	if toggle == null:
 		return
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
-	var contract := _menu_style_contract()
-	var normal := StyleBoxFlat.new()
-	normal.corner_radius_top_left = 16
-	normal.corner_radius_top_right = 16
-	normal.corner_radius_bottom_left = 16
-	normal.corner_radius_bottom_right = 16
-	normal.border_width_left = 3
-	normal.border_width_top = 3
-	normal.border_width_right = 3
-	normal.border_width_bottom = 3
-	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
-	normal.shadow_size = int(contract.get("shadow_button_size", 4))
+	var state_prefix := "menu_off"
 	if is_disabled:
-		normal.bg_color = Color(0.30, 0.30, 0.30, 0.70)
-		normal.border_color = Color(0.52, 0.52, 0.52, 0.75)
+		state_prefix = "menu_disabled"
 	elif enabled:
-		normal.bg_color = pal["toggle_on_bg"]
-		normal.border_color = pal["toggle_on_border"]
-	else:
-		normal.bg_color = pal["toggle_off_bg"]
-		normal.border_color = pal["toggle_off_border"]
-	toggle.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate()
-	hover.bg_color = normal.bg_color.lightened(0.08)
-	toggle.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate()
-	pressed.bg_color = normal.bg_color.darkened(0.08)
-	toggle.add_theme_stylebox_override("pressed", pressed)
+		state_prefix = "menu_on"
+	var normal := _cached_button_style(state_prefix + "_normal")
+	var hover := _cached_button_style(state_prefix + "_hover")
+	var pressed := _cached_button_style(state_prefix + "_pressed")
+	if normal != null:
+		toggle.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		toggle.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		toggle.add_theme_stylebox_override("pressed", pressed)
 	var on_text := Color(pal["toggle_on_text"])
 	var off_text := Color(pal["toggle_off_text"])
 	var disabled_text := Color(0.84, 0.84, 0.84, 0.78)
@@ -5844,32 +5910,57 @@ func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) ->
 		_connect_button_hover_feedback(toggle as Button)
 
 
+func _run_control_scale_tween(ctrl: Control, target_scale: Vector2, duration: float, trans: int = Tween.TRANS_QUAD, ease: int = Tween.EASE_OUT) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	if ctrl.scale.is_equal_approx(target_scale):
+		return
+	var prev_v: Variant = ctrl.get_meta("_scale_tween", null)
+	if prev_v is Tween:
+		var prev_tw := prev_v as Tween
+		if is_instance_valid(prev_tw):
+			prev_tw.kill()
+	var tw := ctrl.create_tween()
+	tw.set_trans(trans)
+	tw.set_ease(ease)
+	tw.tween_property(ctrl, "scale", target_scale, duration)
+	ctrl.set_meta("_scale_tween", tw)
+
+
 func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 	if card == null or btn == null:
 		return
+	if card.has_meta("_card_hover_feedback_connected"):
+		return
+	card.set_meta("_card_hover_feedback_connected", true)
 	card.pivot_offset = card.size * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 	var hover_enter := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
 		card.pivot_offset = card.size * 0.5
-		var tw := card.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(card, "scale", Vector2(1.025, 1.025), 0.12)
+		_run_control_scale_tween(card, Vector2(1.025, 1.025), 0.12, Tween.TRANS_QUAD, Tween.EASE_OUT)
 		var sb: Variant = card.get_theme_stylebox("panel") if card is PanelContainer else null
 		if sb is StyleBoxFlat:
-			var hover_sb := (sb as StyleBoxFlat).duplicate()
-			hover_sb.shadow_size = mini(hover_sb.shadow_size + 4, 16)
-			hover_sb.shadow_color = Color(hover_sb.shadow_color.r, hover_sb.shadow_color.g, hover_sb.shadow_color.b, minf(hover_sb.shadow_color.a + 0.06, 0.5))
+			var base_sb := sb as StyleBoxFlat
+			var cached_base_v: Variant = card.get_meta("_hover_base_sb", null)
+			var cached_hover_v: Variant = card.get_meta("_hover_hover_sb", null)
+			var hover_sb: StyleBoxFlat = null
+			if cached_base_v is StyleBoxFlat and cached_hover_v is StyleBoxFlat and cached_base_v == base_sb:
+				hover_sb = cached_hover_v as StyleBoxFlat
+			else:
+				hover_sb = base_sb.duplicate()
+				hover_sb.shadow_size = mini(hover_sb.shadow_size + 4, 16)
+				hover_sb.shadow_color = Color(hover_sb.shadow_color.r, hover_sb.shadow_color.g, hover_sb.shadow_color.b, minf(hover_sb.shadow_color.a + 0.06, 0.5))
+				card.set_meta("_hover_base_sb", base_sb)
+				card.set_meta("_hover_hover_sb", hover_sb)
 			card.add_theme_stylebox_override("panel", hover_sb)
-			card.set_meta("_pre_hover_sb", sb)
+			card.set_meta("_pre_hover_sb", base_sb)
 	var hover_exit := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
 		card.pivot_offset = card.size * 0.5
-		var tw := card.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(card, "scale", Vector2.ONE, 0.15)
+		_run_control_scale_tween(card, Vector2.ONE, 0.15, Tween.TRANS_QUAD, Tween.EASE_OUT)
 		if card.has_meta("_pre_hover_sb"):
 			var old_sb: Variant = card.get_meta("_pre_hover_sb")
 			if old_sb is StyleBoxFlat:
@@ -5879,10 +5970,7 @@ func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 		if card == null or not is_instance_valid(card):
 			return
 		card.pivot_offset = card.size * 0.5
-		var tw := card.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		tw.tween_property(card, "scale", Vector2(0.97, 0.97), 0.06)
-		tw.tween_property(card, "scale", Vector2(1.025, 1.025), 0.14)
+		_run_control_scale_tween(card, Vector2(0.97, 0.97), 0.06, Tween.TRANS_BACK, Tween.EASE_OUT)
 	card.mouse_entered.connect(hover_enter)
 	card.mouse_exited.connect(hover_exit)
 	btn.button_down.connect(press_down)
@@ -5891,29 +5979,25 @@ func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 func _connect_button_hover_feedback(btn: Button) -> void:
 	if btn == null:
 		return
+	if btn.has_meta("_button_hover_feedback_connected"):
+		return
+	btn.set_meta("_button_hover_feedback_connected", true)
 	btn.pivot_offset = btn.size * 0.5
 	var hover_enter := func() -> void:
 		if btn == null or not is_instance_valid(btn):
 			return
 		btn.pivot_offset = btn.size * 0.5
-		var tw := btn.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(btn, "scale", Vector2(1.03, 1.03), 0.10)
+		_run_control_scale_tween(btn, Vector2(1.03, 1.03), 0.10, Tween.TRANS_QUAD, Tween.EASE_OUT)
 	var hover_exit := func() -> void:
 		if btn == null or not is_instance_valid(btn):
 			return
 		btn.pivot_offset = btn.size * 0.5
-		var tw := btn.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(btn, "scale", Vector2.ONE, 0.12)
+		_run_control_scale_tween(btn, Vector2.ONE, 0.12, Tween.TRANS_QUAD, Tween.EASE_OUT)
 	var press_down := func() -> void:
 		if btn == null or not is_instance_valid(btn):
 			return
 		btn.pivot_offset = btn.size * 0.5
-		var tw := btn.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		tw.tween_property(btn, "scale", Vector2(0.96, 0.96), 0.05)
-		tw.tween_property(btn, "scale", Vector2.ONE, 0.12)
+		_run_control_scale_tween(btn, Vector2(0.96, 0.96), 0.05, Tween.TRANS_BACK, Tween.EASE_OUT)
 	btn.mouse_entered.connect(hover_enter)
 	btn.mouse_exited.connect(hover_exit)
 	btn.button_down.connect(press_down)
@@ -6575,6 +6659,14 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 			var clef_grid := _sight_clef_row as GridContainer
 			clef_grid.add_theme_constant_override("h_separation", 10 if active else 12)
 			clef_grid.add_theme_constant_override("v_separation", 8 if active else 10)
+	if _sight_clef_label != null:
+		var show_clef_label := _selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Note Flow")
+		_sight_clef_label.visible = show_clef_label
+		_sight_clef_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_sight_clef_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if active else SIGHT_NOTES_SETUP_TEXT_BODY)
+		_sight_clef_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
+		_sight_clef_label.add_theme_constant_override("outline_size", 0)
+		_sight_clef_label.add_theme_font_size_override("font_size", 15 if active else 14)
 	if _sight_key_sig_row != null:
 		_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_BEGIN if active else BoxContainer.ALIGNMENT_CENTER
 		_sight_key_sig_row.add_theme_constant_override("separation", 6 if active else 12)
@@ -7198,9 +7290,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		btn.add_theme_stylebox_override("normal", _cached_glass_btn_sb)
 		btn.add_theme_stylebox_override("hover", _cached_glass_btn_sb)
 		btn.add_theme_stylebox_override("pressed", _cached_glass_btn_sb)
-	var normal := btn.get_theme_stylebox("normal")
-	if normal is StyleBoxFlat:
-		var sb := normal as StyleBoxFlat
+	var sb := _get_mutable_button_stylebox(btn, "normal")
+	if sb != null:
 		if mode_card_flat:
 			pass  # Glass SB already applied with correct values
 		elif selected:
@@ -7221,9 +7312,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			sb.border_width_bottom = 2
 			sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
 			sb.shadow_size = int(contract.get("shadow_button_size", 4))
-	var hover := btn.get_theme_stylebox("hover")
-	if hover is StyleBoxFlat:
-		var hb := hover as StyleBoxFlat
+	var hb := _get_mutable_button_stylebox(btn, "hover")
+	if hb != null:
 		if mode_card_flat:
 			pass  # Glass SB already applied
 		elif selected:
@@ -7244,9 +7334,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			hb.border_width_bottom = 2
 			hb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
 			hb.shadow_size = int(contract.get("shadow_button_size", 4))
-	var pressed := btn.get_theme_stylebox("pressed")
-	if pressed is StyleBoxFlat:
-		var pb := pressed as StyleBoxFlat
+	var pb := _get_mutable_button_stylebox(btn, "pressed")
+	if pb != null:
 		if mode_card_flat:
 			pass  # Glass SB already applied
 		elif selected:
@@ -7293,52 +7382,52 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if btn.has_meta("mode_card_panel"):
 		var card_panel: PanelContainer = btn.get_meta("mode_card_panel")
 		if card_panel != null and is_instance_valid(card_panel):
-			var sb := StyleBoxFlat.new()
-			sb.corner_radius_top_left = 18
-			sb.corner_radius_top_right = 18
-			sb.corner_radius_bottom_left = 18
-			sb.corner_radius_bottom_right = 18
+			var card_sb := StyleBoxFlat.new()
+			card_sb.corner_radius_top_left = 18
+			card_sb.corner_radius_top_right = 18
+			card_sb.corner_radius_bottom_left = 18
+			card_sb.corner_radius_bottom_right = 18
 			if mode_card_flat:
 				if selected:
-					sb.bg_color = selected_btn_bg
-					sb.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.86, 0.45, 0.96))) if main_menu_card else Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
-					sb.border_width_left = 1
-					sb.border_width_top = 1
-					sb.border_width_right = 1
-					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
-					sb.shadow_size = 0 if main_menu_card else int(contract.get("shadow_panel_size", 6))
+					card_sb.bg_color = selected_btn_bg
+					card_sb.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.86, 0.45, 0.96))) if main_menu_card else Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
+					card_sb.border_width_left = 1
+					card_sb.border_width_top = 1
+					card_sb.border_width_right = 1
+					card_sb.border_width_bottom = 1
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = 0 if main_menu_card else int(contract.get("shadow_panel_size", 6))
 				else:
-					sb.bg_color = base_btn_bg
-					sb.border_color = Color(contract.get("panel_border", Color(0.96, 0.82, 0.36, 0.74))) if main_menu_card else Color(1.0, 1.0, 1.0, 0.06)
-					sb.border_width_left = 1
-					sb.border_width_top = 1
-					sb.border_width_right = 1
-					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
-					sb.shadow_size = 0 if main_menu_card else maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
-				card_panel.add_theme_stylebox_override("panel", sb)
+					card_sb.bg_color = base_btn_bg
+					card_sb.border_color = Color(contract.get("panel_border", Color(0.96, 0.82, 0.36, 0.74))) if main_menu_card else Color(1.0, 1.0, 1.0, 0.06)
+					card_sb.border_width_left = 1
+					card_sb.border_width_top = 1
+					card_sb.border_width_right = 1
+					card_sb.border_width_bottom = 1
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = 0 if main_menu_card else maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
+				card_panel.add_theme_stylebox_override("panel", card_sb)
 			else:
 				if selected:
 					var selected_card_bg := Color(selected_btn_bg.r, selected_btn_bg.g, selected_btn_bg.b, selected_btn_bg.a)
-					sb.bg_color = selected_card_bg
-					sb.border_color = token_colors.get("focus_border", Color(0.95, 0.76, 0.31))
-					sb.border_width_left = 3
-					sb.border_width_top = 3
-					sb.border_width_right = 3
-					sb.border_width_bottom = 3
-					sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
-					sb.shadow_size = int(contract.get("shadow_panel_size", 6))
+					card_sb.bg_color = selected_card_bg
+					card_sb.border_color = token_colors.get("focus_border", Color(0.95, 0.76, 0.31))
+					card_sb.border_width_left = 3
+					card_sb.border_width_top = 3
+					card_sb.border_width_right = 3
+					card_sb.border_width_bottom = 3
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 				else:
-					sb.bg_color = Color(base_btn_bg.r, base_btn_bg.g, base_btn_bg.b, 0.55)
-					sb.border_color = pal["base_border"]
-					sb.border_width_left = 1
-					sb.border_width_top = 1
-					sb.border_width_right = 1
-					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
-					sb.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
-				card_panel.add_theme_stylebox_override("panel", sb)
+					card_sb.bg_color = Color(base_btn_bg.r, base_btn_bg.g, base_btn_bg.b, 0.55)
+					card_sb.border_color = pal["base_border"]
+					card_sb.border_width_left = 1
+					card_sb.border_width_top = 1
+					card_sb.border_width_right = 1
+					card_sb.border_width_bottom = 1
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
+				card_panel.add_theme_stylebox_override("panel", card_sb)
 		if btn.has_meta("mode_card_accent_bar"):
 			var accent := btn.get_meta("mode_card_accent_bar") as ColorRect
 			if accent != null and is_instance_valid(accent):
@@ -7532,6 +7621,10 @@ func _is_sight_notes_chords_mode() -> bool:
 	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
 
 
+func _is_sight_notes_style_mode() -> bool:
+	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow")
+
+
 func _sight_skin_is_desktop_hybrid_profile() -> bool:
 	var touch_primary := bool(_device_profile.get("is_touch_primary", false)) or OS.has_feature("mobile") or OS.has_feature("android")
 	return not touch_primary
@@ -7721,17 +7814,21 @@ func _animate_sight_streak_score_feedback(prev_streak: int, prev_score: int, now
 	_sight_streak_anim_tween.tween_method(Callable(self, "_set_sight_streak_display_score"), float(prev_score), float(now_score), 0.26)
 	var flash := Color(1.0, 0.86, 0.38, 1.0) if is_positive else Color(1.0, 0.52, 0.52, 1.0)
 	if _sight_streak_value_label != null:
-		var t1 := create_tween()
-		t1.set_trans(Tween.TRANS_SINE)
-		t1.set_ease(Tween.EASE_OUT)
-		t1.tween_property(_sight_streak_value_label, "modulate", flash, 0.08)
-		t1.tween_property(_sight_streak_value_label, "modulate", Color(1, 1, 1, 1), 0.22)
+		if _sight_streak_flash_tween_1 != null and is_instance_valid(_sight_streak_flash_tween_1):
+			_sight_streak_flash_tween_1.kill()
+		_sight_streak_flash_tween_1 = create_tween()
+		_sight_streak_flash_tween_1.set_trans(Tween.TRANS_SINE)
+		_sight_streak_flash_tween_1.set_ease(Tween.EASE_OUT)
+		_sight_streak_flash_tween_1.tween_property(_sight_streak_value_label, "modulate", flash, 0.08)
+		_sight_streak_flash_tween_1.tween_property(_sight_streak_value_label, "modulate", Color(1, 1, 1, 1), 0.22)
 	if _sight_streak_score_label != null:
-		var t2 := create_tween()
-		t2.set_trans(Tween.TRANS_SINE)
-		t2.set_ease(Tween.EASE_OUT)
-		t2.tween_property(_sight_streak_score_label, "modulate", flash, 0.08)
-		t2.tween_property(_sight_streak_score_label, "modulate", Color(1, 1, 1, 1), 0.22)
+		if _sight_streak_flash_tween_2 != null and is_instance_valid(_sight_streak_flash_tween_2):
+			_sight_streak_flash_tween_2.kill()
+		_sight_streak_flash_tween_2 = create_tween()
+		_sight_streak_flash_tween_2.set_trans(Tween.TRANS_SINE)
+		_sight_streak_flash_tween_2.set_ease(Tween.EASE_OUT)
+		_sight_streak_flash_tween_2.tween_property(_sight_streak_score_label, "modulate", flash, 0.08)
+		_sight_streak_flash_tween_2.tween_property(_sight_streak_score_label, "modulate", Color(1, 1, 1, 1), 0.22)
 	if delta_score != 0:
 		var score_text := "%s%d" % ["+" if delta_score > 0 else "", delta_score]
 		_spawn_sight_stat_pop_text(score_text, flash, _sight_staff_note_anchor_global_position())
@@ -7874,14 +7971,31 @@ func _build_sight_hearts_text(lives: int, max_hearts: int = 3) -> String:
 func _refresh_sight_lives_feed_shield_ui() -> void:
 	if _sight_lives_panel == null:
 		return
-	var in_notes_chords := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
-	_sight_lives_panel.visible = in_notes_chords and _game_panel != null and _game_panel.visible
+	var in_notes_style := _is_sight_notes_style_mode()
+	_sight_lives_panel.visible = in_notes_style and _game_panel != null and _game_panel.visible
 	if not _sight_lives_panel.visible:
+		return
+	if _sight_mode == "Rhythm Flow":
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.text = "COMBO"
+		if _sight_lives_hearts_label != null:
+			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = false
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = false
 		return
 	if _sight_lives_title_label != null:
 		_sight_lives_title_label.text = "LIVES"
 	if _sight_lives_hearts_label != null:
-		_sight_lives_hearts_label.text = _build_sight_hearts_text(_lives, 3)
+		if _sight_mode == "Continuous":
+			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+		else:
+			_sight_lives_hearts_label.text = _build_sight_hearts_text(_lives, 3)
+	if _sight_feed_chip != null:
+		_sight_feed_chip.visible = _sight_mode != "Rhythm Flow"
+	if _sight_shield_chip != null:
+		_sight_shield_chip.visible = _sight_mode != "Rhythm Flow"
 	if _sight_feed_chip_label != null:
 		_sight_feed_chip_label.text = "Feed %d/%d" % [_chicken_combo_charge, CHICKEN_COMBO_TARGET]
 	if _sight_shield_chip_label != null:
@@ -7894,13 +8008,28 @@ func _refresh_sight_lives_feed_shield_ui() -> void:
 func _refresh_sight_streak_panel_ui() -> void:
 	if _sight_streak_panel == null:
 		return
-	var in_notes_chords := _is_sight_notes_chords_game_mode()
-	_sight_streak_panel.visible = in_notes_chords and _game_panel != null and _game_panel.visible
+	var in_notes_style := _is_sight_notes_style_mode()
+	_sight_streak_panel.visible = in_notes_style and _game_panel != null and _game_panel.visible
 	if not _sight_streak_panel.visible:
 		_sight_streak_animating = false
 		return
+	if _sight_mode == "Rhythm Flow":
+		if _sight_streak_title_label != null:
+			_sight_streak_title_label.text = "BPM"
+		if _sight_streak_value_label != null:
+			_sight_streak_value_label.text = str(_rhythm_flow_bpm)
+		if _sight_streak_score_label != null:
+			var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
+			_sight_streak_score_label.text = "ACC %d%%" % acc
+		return
 	if _sight_streak_title_label != null:
 		_sight_streak_title_label.text = "STREAK"
+	if _sight_mode == "Continuous":
+		if _sight_streak_value_label != null:
+			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_combo]
+		if _sight_streak_score_label != null:
+			_sight_streak_score_label.text = "Score: %d" % _score
+		return
 	if _sight_streak_animating:
 		_set_sight_streak_display_values(_sight_streak_display_value, _sight_score_display_value)
 		return
@@ -7942,24 +8071,25 @@ func _style_sight_answer_button_neon(btn: Button) -> void:
 func _apply_sight_notes_chords_skin() -> void:
 	_sight_notes_chords_skin_active = true
 	if _game_card != null:
-		var game_card_sb := StyleBoxFlat.new()
-		game_card_sb.bg_color = Color(0.03, 0.12, 0.23, 0.62)
-		game_card_sb.corner_radius_top_left = 18
-		game_card_sb.corner_radius_top_right = 18
-		game_card_sb.corner_radius_bottom_left = 18
-		game_card_sb.corner_radius_bottom_right = 18
-		game_card_sb.border_color = Color(0.26, 0.80, 0.98, 0.34)
-		game_card_sb.border_width_left = 2
-		game_card_sb.border_width_top = 2
-		game_card_sb.border_width_right = 2
-		game_card_sb.border_width_bottom = 2
-		game_card_sb.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
-		game_card_sb.shadow_size = 10
-		game_card_sb.content_margin_left = 20
-		game_card_sb.content_margin_top = 16
-		game_card_sb.content_margin_right = 20
-		game_card_sb.content_margin_bottom = 16
-		_game_card.add_theme_stylebox_override("panel", game_card_sb)
+		if _sight_game_card_style_cache == null:
+			_sight_game_card_style_cache = StyleBoxFlat.new()
+			_sight_game_card_style_cache.bg_color = Color(0.03, 0.12, 0.23, 0.62)
+			_sight_game_card_style_cache.corner_radius_top_left = 18
+			_sight_game_card_style_cache.corner_radius_top_right = 18
+			_sight_game_card_style_cache.corner_radius_bottom_left = 18
+			_sight_game_card_style_cache.corner_radius_bottom_right = 18
+			_sight_game_card_style_cache.border_color = Color(0.26, 0.80, 0.98, 0.34)
+			_sight_game_card_style_cache.border_width_left = 2
+			_sight_game_card_style_cache.border_width_top = 2
+			_sight_game_card_style_cache.border_width_right = 2
+			_sight_game_card_style_cache.border_width_bottom = 2
+			_sight_game_card_style_cache.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
+			_sight_game_card_style_cache.shadow_size = 10
+			_sight_game_card_style_cache.content_margin_left = 20
+			_sight_game_card_style_cache.content_margin_top = 16
+			_sight_game_card_style_cache.content_margin_right = 20
+			_sight_game_card_style_cache.content_margin_bottom = 16
+		_game_card.add_theme_stylebox_override("panel", _sight_game_card_style_cache)
 	if _header_card != null:
 		_style_header_card(_header_card, Color(0.02, 0.08, 0.18, 0.30))
 	if _header_accent_line != null:
@@ -8142,6 +8272,202 @@ func _refresh_sight_notes_chords_skin() -> void:
 	elif _sight_settings_button != null:
 		var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
 		_sight_settings_button.visible = home_visible
+	var in_continuous_game := _is_continuous_flow_sight_mode() and _game_panel != null and _game_panel.visible
+	if in_continuous_game:
+		_apply_continuous_sight_skin()
+	elif _continuous_sight_skin_active:
+		_restore_continuous_sight_skin()
+
+
+func _apply_continuous_sight_skin() -> void:
+	_continuous_sight_skin_active = true
+	if _game_card != null:
+		if _sight_game_card_style_cache == null:
+			_sight_game_card_style_cache = StyleBoxFlat.new()
+			_sight_game_card_style_cache.bg_color = Color(0.03, 0.12, 0.23, 0.62)
+			_sight_game_card_style_cache.corner_radius_top_left = 18
+			_sight_game_card_style_cache.corner_radius_top_right = 18
+			_sight_game_card_style_cache.corner_radius_bottom_left = 18
+			_sight_game_card_style_cache.corner_radius_bottom_right = 18
+			_sight_game_card_style_cache.border_color = Color(0.26, 0.80, 0.98, 0.34)
+			_sight_game_card_style_cache.border_width_left = 2
+			_sight_game_card_style_cache.border_width_top = 2
+			_sight_game_card_style_cache.border_width_right = 2
+			_sight_game_card_style_cache.border_width_bottom = 2
+			_sight_game_card_style_cache.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
+			_sight_game_card_style_cache.shadow_size = 10
+			_sight_game_card_style_cache.content_margin_left = 20
+			_sight_game_card_style_cache.content_margin_top = 16
+			_sight_game_card_style_cache.content_margin_right = 20
+			_sight_game_card_style_cache.content_margin_bottom = 16
+		_game_card.add_theme_stylebox_override("panel", _sight_game_card_style_cache)
+	if _header_card != null:
+		_style_header_card(_header_card, Color(0.02, 0.08, 0.18, 0.30))
+	if _header_accent_line != null:
+		_header_accent_line.visible = false
+	if _title_label != null:
+		_title_label.text = "Sight Reading - %s" % _sight_mode
+		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_title_label.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
+		_title_label.remove_theme_color_override("font_outline_color")
+		_title_label.remove_theme_constant_override("outline_size")
+		_title_label.add_theme_color_override("font_shadow_color", Color(0.02, 0.07, 0.14, 0.38))
+		_title_label.add_theme_constant_override("shadow_offset_x", 0)
+		_title_label.add_theme_constant_override("shadow_offset_y", 1)
+	if _header_mode_label != null:
+		_header_mode_label.visible = false
+	if _header_tagline_label != null:
+		var tagline := "Tap the glyphs in time" if _sight_mode == "Rhythm Flow" else "Read the staff — answer before the note passes"
+		_header_tagline_label.text = tagline
+		_header_tagline_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.98, 0.90))
+	_apply_top_hud_nav_button_skin()
+	if _home_mode_back_button != null:
+		_home_mode_back_button.visible = true
+	if _home_mode_home_button != null:
+		_home_mode_home_button.visible = true
+	if _sight_settings_button != null:
+		_sight_settings_button.visible = true
+	# Neon HUD boxes — same palette as Notes/Chords
+	var desktop_hybrid := _sight_skin_is_desktop_hybrid_profile()
+	var icon_glow_alpha := 0.72 if desktop_hybrid else 0.42
+	_style_sight_hud_box_neon(_hud_left_box, Color(0.34, 0.88, 1.0, 0.96))
+	_style_sight_hud_box_neon(_hud_center_box, Color(0.95, 0.78, 0.35, 0.96))
+	_style_sight_hud_box_neon(_hud_right_box, Color(0.95, 0.82, 0.50, 0.90))
+	var is_rhythm := _sight_mode == "Rhythm Flow"
+	# Left panel: Note Flow uses Notes-style lives panel, Rhythm Flow keeps combo-focused panel.
+	if _sight_lives_panel != null:
+		_sight_lives_panel.visible = true
+	if _sight_lives_title_label != null:
+		_sight_lives_title_label.text = "COMBO" if is_rhythm else "LIVES"
+		_sight_lives_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
+	if _sight_lives_hearts_label != null:
+		if is_rhythm:
+			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+			_sight_lives_hearts_label.add_theme_color_override("font_color", Color(0.44, 0.96, 1.0, 1.0))
+			_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.04, 0.14, 0.22, 0.76))
+			_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(0.20, 0.86, 1.0, icon_glow_alpha))
+		else:
+			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+			_sight_lives_hearts_label.add_theme_color_override("font_color", Color(1.0, 0.36, 0.38, 1.0))
+			_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.17, 0.05, 0.08, 0.76))
+			_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.34, 0.26, icon_glow_alpha))
+		_sight_lives_hearts_label.add_theme_constant_override("outline_size", 1)
+		_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_x", 0)
+		_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_y", 0)
+	# Keep Feed/Shield chips visible in Note Flow for parity with Notes HUD.
+	if _sight_feed_chip != null:
+		_sight_feed_chip.visible = not is_rhythm
+	if _sight_shield_chip != null:
+		_sight_shield_chip.visible = not is_rhythm
+	_style_sight_stat_chip(_sight_feed_chip, Color(0.98, 0.82, 0.34, 0.94))
+	_style_sight_stat_chip(_sight_shield_chip, Color(0.55, 0.62, 0.72, 0.84))
+	if _sight_feed_chip_label != null:
+		_sight_feed_chip_label.add_theme_color_override("font_color", Color(0.98, 0.90, 0.54, 1.0))
+	if _sight_feed_chip_icon != null:
+		_sight_feed_chip_icon.modulate = Color(0.96, 0.78, 0.20, 1.0)
+		_sight_feed_chip_icon.visible = _sight_wheat_icon != null
+	if _sight_shield_chip_label != null:
+		_sight_shield_chip_label.add_theme_color_override("font_color", Color(0.70, 0.75, 0.82, 0.94))
+	# Right panel: Note Flow uses streak/score like Notes, Rhythm Flow keeps BPM.
+	if _sight_streak_panel != null:
+		_sight_streak_panel.visible = true
+	if _sight_streak_title_label != null:
+		_sight_streak_title_label.text = "BPM" if is_rhythm else "STREAK"
+		_sight_streak_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
+	if _sight_streak_value_label != null:
+		_sight_streak_value_label.text = str(_rhythm_flow_bpm) if is_rhythm else ("%s %d" % [char(0x1F525), _continuous_sight_combo])
+		_sight_streak_value_label.add_theme_color_override("font_color", Color(1.0, 0.76, 0.30, 0.99))
+		_sight_streak_value_label.add_theme_color_override("font_outline_color", Color(0.18, 0.10, 0.02, 0.80))
+		_sight_streak_value_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.66, 0.20, icon_glow_alpha))
+		_sight_streak_value_label.add_theme_constant_override("outline_size", 1)
+		_sight_streak_value_label.add_theme_constant_override("shadow_offset_x", 0)
+		_sight_streak_value_label.add_theme_constant_override("shadow_offset_y", 0)
+	if _sight_streak_score_label != null:
+		_sight_streak_score_label.text = "ACC %d%%" % int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0)) if is_rhythm else ("Score: %d" % _score)
+		_sight_streak_score_label.add_theme_color_override("font_color", Color(0.98, 0.86, 0.54, 0.98))
+	# Center box labels
+	if _lives_label != null:
+		_lives_label.visible = false
+	if _streak_label != null:
+		_streak_label.visible = false
+	if _xp_label != null:
+		_xp_label.visible = false
+	if _score_label != null:
+		_score_label.add_theme_color_override("font_color", Color(1.0, 0.93, 0.68, 1.0))
+	if _progress_label != null:
+		_progress_label.add_theme_color_override("font_color", Color(0.86, 0.95, 1.0, 0.98))
+	if _status_label != null:
+		_status_label.add_theme_color_override("font_color", Color(0.86, 0.96, 1.0, 0.98))
+	if not is_rhythm:
+		_refresh_sight_lives_feed_shield_ui()
+		_refresh_sight_streak_panel_ui()
+	if _staff_area != null:
+		_note_chase_realign_staff_frame()
+
+
+func _restore_continuous_sight_skin() -> void:
+	if _header_tagline_label != null:
+		_header_tagline_label.text = APP_TAGLINE_LABEL
+		_header_tagline_label.add_theme_color_override("font_color", Color(0.84, 0.92, 0.98, 0.70))
+	if _header_mode_label != null:
+		_header_mode_label.visible = false
+	if _header_accent_line != null:
+		_header_accent_line.visible = false
+	if _home_tokens != null:
+		var colors: Dictionary = _home_tokens.colors(false)
+		var panel_bg: Color = colors.get("panel_bg", Color(0.10, 0.14, 0.11, 0.74))
+		var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+		var header_bg := Color(
+			clampf(panel_bg.r + 0.06, 0.0, 1.0),
+			clampf(panel_bg.g + 0.10, 0.0, 1.0),
+			clampf(panel_bg.b + 0.16, 0.0, 1.0),
+			0.24 if home_visible else 0.34
+		)
+		_style_header_card(_header_card, header_bg)
+		_style_card(_game_card, Color(panel_bg.r, panel_bg.g, panel_bg.b, 0.70))
+	else:
+		var fallback_home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+		_style_header_card(_header_card, Color(0.16, 0.24, 0.30, 0.24 if fallback_home_visible else 0.34))
+		_style_card(_game_card, Color(0.10, 0.14, 0.11, 0.70))
+	if _title_label != null:
+		var title_color := Color(0.98, 0.96, 0.88, 1.0)
+		if _home_tokens != null:
+			var title_colors: Dictionary = _home_tokens.colors(false)
+			title_color = Color(title_colors.get("text_primary", title_color))
+		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_title_label.add_theme_color_override("font_color", title_color)
+		_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.24))
+		_title_label.add_theme_constant_override("shadow_offset_x", 0)
+		_title_label.add_theme_constant_override("shadow_offset_y", 1)
+		_title_label.remove_theme_color_override("font_outline_color")
+		_title_label.remove_theme_constant_override("outline_size")
+	_apply_top_hud_nav_button_skin()
+	if _sight_lives_panel != null:
+		_sight_lives_panel.visible = false
+	if _sight_streak_panel != null:
+		_sight_streak_panel.visible = false
+	# Restore chip visibility for when Notes mode later shows the panel
+	if _sight_feed_chip != null:
+		_sight_feed_chip.visible = true
+	if _sight_shield_chip != null:
+		_sight_shield_chip.visible = true
+	if _lives_label != null:
+		_lives_label.visible = true
+	if _streak_label != null:
+		_streak_label.visible = true
+	if _xp_label != null:
+		_xp_label.visible = true
+	_style_hud_box(_hud_left_box)
+	_style_hud_box(_hud_center_box)
+	_style_hud_box(_hud_right_box)
+	if _score_label != null:
+		_score_label.remove_theme_color_override("font_color")
+	if _progress_label != null:
+		_progress_label.remove_theme_color_override("font_color")
+	if _status_label != null:
+		_status_label.remove_theme_color_override("font_color")
+	_refresh_game_title()
+	_continuous_sight_skin_active = false
 
 
 func _style_note_chase_metric_box(box: PanelContainer) -> void:
@@ -11799,13 +12125,19 @@ func _current_post_answer_delay() -> float:
 
 func _refresh_meta_ui() -> void:
 	if _selected_mode == MODE_NOTE_CHASE:
-		_set_note_chase_top_text_only(true)
+		_set_note_chase_top_text_only(false)
+		_style_sight_hud_box_neon(_hud_left_box, Color(0.34, 0.88, 1.0, 0.96))
+		_style_sight_hud_box_neon(_hud_center_box, Color(0.95, 0.78, 0.35, 0.96))
+		_style_sight_hud_box_neon(_hud_right_box, Color(0.95, 0.82, 0.50, 0.90))
 		if _sight_lives_panel != null:
 			_sight_lives_panel.visible = false
 		if _sight_streak_panel != null:
 			_sight_streak_panel.visible = false
 		if _lives_label != null:
-			_lives_label.text = "Focus Hearts: %d / 5" % _lives
+			_lives_label.text = _build_sight_hearts_text(_lives, 5)
+			_lives_label.visible = true
+		if _score_label != null:
+			_score_label.visible = true
 		var target_text := "Targets: %s" % ", ".join(_note_chase_selected_notes)
 		var speed_text := "Speed: %.1fx" % _note_chase_speed_multiplier()
 		var combo_text := "Combo: x%d" % maxi(1, _note_chase_combo_mult)
@@ -11832,6 +12164,7 @@ func _refresh_meta_ui() -> void:
 		_set_note_chase_bottom_metric(_note_chase_bottom_shield_label, "🛡", shield_text)
 		if _note_chase_level_label != null:
 			_note_chase_level_label.text = "Level %d" % (_note_chase_speed_stage + 1)
+			_note_chase_level_label.visible = true
 		if _streak_label != null:
 			_streak_label.visible = false
 		if _xp_label != null:
@@ -11854,26 +12187,18 @@ func _refresh_meta_ui() -> void:
 		_refresh_sight_question_progress_ui(false)
 		return
 	_set_note_chase_top_text_only(false)
-	var sight_card_mode := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+	var sight_card_mode := _is_sight_notes_style_mode()
 	if _lives_label != null:
-		if _is_rhythm_flow_mode():
-			_lives_label.text = ""
+		if sight_card_mode:
 			_lives_label.visible = false
+			_refresh_sight_lives_feed_shield_ui()
+			_refresh_sight_streak_panel_ui()
+		else:
+			var shield_readout := "Shield Ready" if _chicken_combo_shields > 0 else "Shield --"
+			_lives_label.text = "Lives: %d | Feed: %d/%d | %s" % [_lives, _chicken_combo_charge, CHICKEN_COMBO_TARGET, shield_readout]
+			_lives_label.visible = true
 			if _sight_lives_panel != null:
 				_sight_lives_panel.visible = false
-			if _sight_streak_panel != null:
-				_sight_streak_panel.visible = false
-		else:
-			if sight_card_mode:
-				_lives_label.visible = false
-				_refresh_sight_lives_feed_shield_ui()
-				_refresh_sight_streak_panel_ui()
-			else:
-				var shield_readout := "Shield Ready" if _chicken_combo_shields > 0 else "Shield --"
-				_lives_label.text = "Lives: %d | Feed: %d/%d | %s" % [_lives, _chicken_combo_charge, CHICKEN_COMBO_TARGET, shield_readout]
-				_lives_label.visible = true
-				if _sight_lives_panel != null:
-					_sight_lives_panel.visible = false
 	if sight_card_mode:
 		if _streak_label != null:
 			_streak_label.visible = false
@@ -13091,41 +13416,56 @@ func _show_home() -> void:
 	_chicken_combo_shields = 0
 	_current_ear_text_answer = ""
 	_current_theory_item_id = ""
-	_home_card.visible = true
-	_home_panel.visible = true
-	_game_card.visible = false
-	_game_panel.visible = false
+	if not _home_card.visible:
+		_home_card.visible = true
+	if not _home_panel.visible:
+		_home_panel.visible = true
+	if _game_card.visible:
+		_game_card.visible = false
+	if _game_panel.visible:
+		_game_panel.visible = false
 	_refresh_background_scene_emphasis()
 	if _sight_answer_overlay != null:
-		_sight_answer_overlay.visible = false
-	_end_button.visible = false
-	_restart_button.visible = false
+		if _sight_answer_overlay.visible:
+			_sight_answer_overlay.visible = false
+	if _end_button.visible:
+		_end_button.visible = false
+	if _restart_button.visible:
+		_restart_button.visible = false
 	if _game_home_button != null:
-		_game_home_button.visible = false
+		if _game_home_button.visible:
+			_game_home_button.visible = false
 	_refresh_gameplay_nav_overlay()
-	_hud_left_box.visible = false
-	_hud_right_box.visible = false
-	_hud_center_box.visible = false
-	if _tutorial_panel != null:
+	if _hud_left_box.visible:
+		_hud_left_box.visible = false
+	if _hud_right_box.visible:
+		_hud_right_box.visible = false
+	if _hud_center_box.visible:
+		_hud_center_box.visible = false
+	if _tutorial_panel != null and _tutorial_panel.visible:
 		_tutorial_panel.visible = false
 	if _tutorial_bubble != null:
-		_tutorial_bubble.visible = false
+		if _tutorial_bubble.visible:
+			_tutorial_bubble.visible = false
 	if _tutorial_bubble_tail != null:
-		_tutorial_bubble_tail.visible = false
-	if _tutorial_panel != null:
-		_tutorial_panel.visible = false
+		if _tutorial_bubble_tail.visible:
+			_tutorial_bubble_tail.visible = false
 	if _tutorial_button_row != null:
-		_tutorial_button_row.visible = false
+		if _tutorial_button_row.visible:
+			_tutorial_button_row.visible = false
 	if _tutorial_end_button_col != null:
-		_tutorial_end_button_col.visible = false
+		if _tutorial_end_button_col.visible:
+			_tutorial_end_button_col.visible = false
 	if _tutorial_chicken != null:
-		_tutorial_chicken.visible = false
+		if _tutorial_chicken.visible:
+			_tutorial_chicken.visible = false
 	if _bird_sprite != null:
 		# Re-anchor on every home return so the bird cannot stay off-screen
 		# after gameplay/tweens or viewport/layout changes.
 		_bird_home_global_position = _compute_bird_home_global_position()
 		_bird_home_ready = true
-		_bird_sprite.visible = true
+		if not _bird_sprite.visible:
+			_bird_sprite.visible = true
 		_reset_bird_position()
 		_start_bird_idle_anim()
 	_result_box_hide()
@@ -13133,23 +13473,31 @@ func _show_home() -> void:
 	if _title_label != null:
 		_title_label.text = "Home"
 		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_title_label.visible = true
+		if not _title_label.visible:
+			_title_label.visible = true
 	if _home_wordmark_row != null:
-		_home_wordmark_row.visible = true
+		if not _home_wordmark_row.visible:
+			_home_wordmark_row.visible = true
 	if _header_mode_label != null:
-		_header_mode_label.visible = false
+		if _header_mode_label.visible:
+			_header_mode_label.visible = false
 	if _header_accent_line != null:
-		_header_accent_line.visible = false
+		if _header_accent_line.visible:
+			_header_accent_line.visible = false
 	if _header_version_label != null:
-		_header_version_label.visible = false
+		if _header_version_label.visible:
+			_header_version_label.visible = false
 	if _home_footer_bar != null:
-		_home_footer_bar.visible = true
+		if not _home_footer_bar.visible:
+			_home_footer_bar.visible = true
 	if _home_title_label != null:
-		_home_title_label.visible = true
+		if not _home_title_label.visible:
+			_home_title_label.visible = true
 		if _home_title_label.has_meta("home_title_separator"):
 			var sep := _home_title_label.get_meta("home_title_separator") as ColorRect
 			if sep != null and is_instance_valid(sep):
-				sep.visible = true
+				if not sep.visible:
+					sep.visible = true
 	_refresh_home_subtitle()
 	_refresh_meta_ui()
 	_refresh_game_title()
@@ -13171,62 +13519,87 @@ func _show_game() -> void:
 		_refresh_bird_perch_from_layout(true)
 		call_deferred("_refresh_bird_perch_from_layout", true)
 	_result_box_hide()
-	_home_card.visible = false
-	_home_panel.visible = false
-	_game_card.visible = true
-	_game_panel.visible = true
+	if _home_card.visible:
+		_home_card.visible = false
+	if _home_panel.visible:
+		_home_panel.visible = false
+	if not _game_card.visible:
+		_game_card.visible = true
+	if not _game_panel.visible:
+		_game_panel.visible = true
 	_refresh_background_scene_emphasis()
 	if _sight_answer_overlay != null:
-		_sight_answer_overlay.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+		var show_sight_overlay := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+		if _sight_answer_overlay.visible != show_sight_overlay:
+			_sight_answer_overlay.visible = show_sight_overlay
 	if _home_title_label != null:
-		_home_title_label.visible = false
+		if _home_title_label.visible:
+			_home_title_label.visible = false
 		if _home_title_label.has_meta("home_title_separator"):
 			var sep2 := _home_title_label.get_meta("home_title_separator") as ColorRect
 			if sep2 != null and is_instance_valid(sep2):
-				sep2.visible = false
+				if sep2.visible:
+					sep2.visible = false
 	if _home_wordmark_row != null:
-		_home_wordmark_row.visible = true
+		if not _home_wordmark_row.visible:
+			_home_wordmark_row.visible = true
 	if _title_label != null:
-		_title_label.visible = true
+		if not _title_label.visible:
+			_title_label.visible = true
 	if _header_version_label != null:
-		_header_version_label.visible = false
+		if _header_version_label.visible:
+			_header_version_label.visible = false
 	if _home_footer_bar != null:
-		_home_footer_bar.visible = false
+		if _home_footer_bar.visible:
+			_home_footer_bar.visible = false
 	if _home_mode_back_button != null:
-		_home_mode_back_button.visible = true
+		if not _home_mode_back_button.visible:
+			_home_mode_back_button.visible = true
 		_home_mode_back_button.disabled = false
 	if _home_mode_home_button != null:
-		_home_mode_home_button.visible = true
+		if not _home_mode_home_button.visible:
+			_home_mode_home_button.visible = true
 		_home_mode_home_button.disabled = false
 	_apply_top_hud_nav_button_skin()
-	_end_button.visible = true
-	_restart_button.visible = true
+	if not _end_button.visible:
+		_end_button.visible = true
+	if not _restart_button.visible:
+		_restart_button.visible = true
 	if _game_home_button != null:
-		_game_home_button.visible = (_selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
-	_hud_left_box.visible = true
-	_hud_right_box.visible = true
-	_hud_center_box.visible = true
+		var show_game_home := _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE
+		if _game_home_button.visible != show_game_home:
+			_game_home_button.visible = show_game_home
+	if not _hud_left_box.visible:
+		_hud_left_box.visible = true
+	if not _hud_right_box.visible:
+		_hud_right_box.visible = true
+	if not _hud_center_box.visible:
+		_hud_center_box.visible = true
 	# Clear any stale note/chord visuals from the previous mode before the next round starts.
 	# Also clear any lingering Note Flow / Rhythm Flow spawned glyph panels if switching modes mid-session.
 	_clear_continuous_sight_notes()
 	_hide_continuous_visual_aids()
 	_set_continuous_rest_symbol_visible(false)
 	if _staff_note != null:
-		_staff_note.visible = false
+		if _staff_note.visible:
+			_staff_note.visible = false
 		_staff_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_staff_note.modulate = Color(1, 1, 1, 1)
 	for n in _staff_chord_notes:
 		if n != null:
-			n.visible = false
+			if n.visible:
+				n.visible = false
 			n.modulate = Color(1, 1, 1, 1)
 	for lbl in _staff_chord_accidental_labels:
 		if lbl != null:
-			lbl.visible = false
+			if lbl.visible:
+				lbl.visible = false
 	_hide_preview_ledger()
 	_clear_staff_ledger_lines()
 	for pl in _staff_preview_ledgers:
 		if pl != null:
-			pl.visible = false
+			if pl.visible:
+				pl.visible = false
 	for line in _continuous_empty_bar_lines:
 		if line != null and is_instance_valid(line):
 			line.queue_free()
@@ -13247,42 +13620,52 @@ func _show_game() -> void:
 		_hud_center_box.custom_minimum_size = Vector2(360, 74)
 	_set_sight_result_background_hidden(false)
 	if _selected_mode == MODE_READ:
-		_hud_left_box.visible = false
-		_hud_right_box.visible = false
-		_hud_center_box.visible = false
-	elif _is_rhythm_flow_mode():
-		# In Rhythm Flow, remove the left HUD box from layout so Score/Streak shift left.
-		if _hud_left_box != null:
+		if _hud_left_box.visible:
 			_hud_left_box.visible = false
+		if _hud_right_box.visible:
+			_hud_right_box.visible = false
+		if _hud_center_box.visible:
+			_hud_center_box.visible = false
+	elif _is_rhythm_flow_mode():
+		# Keep full three-card HUD in Rhythm Flow for consistency with other gameplay screens.
+		if _hud_left_box != null:
+			_hud_left_box.visible = true
 			_hud_left_box.modulate = Color(1, 1, 1, 1.0)
-			_hud_left_box.custom_minimum_size = Vector2(0, 0)
+			_hud_left_box.custom_minimum_size = Vector2(230, 60)
 			for child in _hud_left_box.get_children():
 				if child is CanvasItem:
-					(child as CanvasItem).visible = false
+					(child as CanvasItem).visible = true
 		if _hud_center_box != null:
-			_hud_center_box.custom_minimum_size = Vector2(430, 74)
+			_hud_center_box.custom_minimum_size = Vector2(360, 74)
 	if _tutorial_button_row != null:
-		_tutorial_button_row.visible = _selected_mode == MODE_READ
+		var show_tutorial_btn_row := _selected_mode == MODE_READ
+		if _tutorial_button_row.visible != show_tutorial_btn_row:
+			_tutorial_button_row.visible = show_tutorial_btn_row
 		if _selected_mode == MODE_READ:
 			call_deferred("_position_tutorial_button_row")
 	if _tutorial_end_button_col != null:
-		_tutorial_end_button_col.visible = false
+		if _tutorial_end_button_col.visible:
+			_tutorial_end_button_col.visible = false
 	if _tutorial_panel != null and _selected_mode == MODE_READ:
 		call_deferred("_position_tutorial_title")
 		call_deferred("_position_tutorial_end_buttons")
 	_end_button.move_to_front()
 	_restart_button.move_to_front()
 	if _game_home_button != null:
-		_game_home_button.visible = (_selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
+		var show_game_home_final := _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE
+		if _game_home_button.visible != show_game_home_final:
+			_game_home_button.visible = show_game_home_final
 	_refresh_gameplay_nav_overlay()
 	_refresh_game_title()
 	_refresh_sight_notes_chords_skin()
 	_refresh_sight_key_label()
 	if _bird_sprite != null and (_selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))):
-		_bird_sprite.visible = false
+		if _bird_sprite.visible:
+			_bird_sprite.visible = false
 		_hide_chicken_bubble()
 	if _is_rhythm_flow_mode() and _tutorial_chicken != null:
-		_tutorial_chicken.visible = false
+		if _tutorial_chicken.visible:
+			_tutorial_chicken.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -14420,8 +14803,8 @@ func _note_chase_capture_targets_with_rainbow(skip_node: Panel) -> int:
 func _note_chase_apply_theme() -> void:
 	if _sky_area != null:
 		if _selected_mode == MODE_NOTE_CHASE:
-			var tint: Color = NOTE_CHASE_THEME_TINTS[_note_chase_speed_stage % NOTE_CHASE_THEME_TINTS.size()]
-			_sky_area.modulate = tint
+			# Keep Note Chase background consistent with other gameplay screens (no stage tint hue shift).
+			_sky_area.modulate = Color(1, 1, 1, 1)
 		else:
 			_sky_area.modulate = Color(1, 1, 1, 1)
 
@@ -16845,7 +17228,7 @@ func _update_continuous_visual_aids() -> void:
 		_hide_continuous_visual_aids()
 		return
 	var beginner_aids_active := _continuous_sight_level <= 2 or _continuous_assist_level > 0
-	if not _continuous_sight_active or _continuous_sight_waiting_start or _continuous_rest_bar_active or not _continuous_note_flow_aids_enabled or not beginner_aids_active:
+	if not _continuous_sight_active or _continuous_sight_waiting_start or not _continuous_note_flow_aids_enabled or not beginner_aids_active:
 		_hide_continuous_visual_aids()
 		return
 	_ensure_continuous_aid_nodes()
@@ -17068,17 +17451,18 @@ func _spawn_continuous_empty_bar_visual() -> void:
 
 
 func _start_continuous_rest_bar() -> void:
-	_continuous_rest_bar_active = true
-	_continuous_rest_bar_timer = (60.0 / float(maxi(1, _continuous_sight_bpm))) * 4.0
-	# Phrase rest: stop spawning for one bar, but keep current notes flowing out.
+	# Rest-bar insertion was removed from Note Flow; keep this as a safety no-op.
+	_continuous_rest_bar_active = false
+	_continuous_rest_bar_timer = 0.0
 	_set_continuous_rest_symbol_visible(false)
-	_spawn_continuous_empty_bar_visual()
-	_status_label.text = "Empty bar"
-	_apply_answer_mode()
+	_clear_continuous_empty_bar_visual()
 
 
-func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: float = NAN, count_toward_rest: bool = true) -> void:
+func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: float = NAN, _count_toward_rest: bool = true) -> void:
 	if _staff_area == null:
+		return
+	# Runtime Note Flow spawning must respect gap constraints to avoid occasional overlap/double-note artifacts.
+	if is_nan(center_x_override) and not _continuous_can_spawn_note():
 		return
 	var bounds := _continuous_sight_level_bounds if _continuous_sight_active else _effective_sight_step_bounds()
 	var note_spec := _continuous_take_next_note_spec(bounds)
@@ -17149,11 +17533,6 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 		"ledgers": ledgers
 	})
 	_continuous_spawn_seq += 1
-	if count_toward_rest and _continuous_sight_active and not _continuous_rest_bar_active:
-		_continuous_notes_until_rest -= 1
-		if _continuous_notes_until_rest <= 0:
-			_continuous_notes_until_rest = 16
-			_start_continuous_rest_bar()
 
 
 func _seed_continuous_stream_near_line(seed_count: int = 17) -> void:
@@ -17331,9 +17710,7 @@ func _continuous_next_note_index() -> int:
 	return best_idx
 
 
-func _continuous_can_spawn_note() -> bool:
-	if _continuous_sight_notes.is_empty():
-		return true
+func _continuous_rightmost_note_center_x() -> float:
 	var rightmost_center_x := -INF
 	for n in _continuous_sight_notes:
 		var p_v: Variant = n.get("panel", null)
@@ -17346,12 +17723,24 @@ func _continuous_can_spawn_note() -> bool:
 		if not is_finite(center_x):
 			continue
 		rightmost_center_x = maxf(rightmost_center_x, center_x)
+	return rightmost_center_x
+
+
+func _continuous_can_spawn_note() -> bool:
+	if _continuous_sight_notes.is_empty():
+		return true
+	var rightmost_center_x := _continuous_rightmost_note_center_x()
 	if rightmost_center_x == -INF:
 		return true
-	if (_continuous_spawn_x() - rightmost_center_x) >= _continuous_sight_min_gap:
+	var spawn_x := _continuous_spawn_x()
+	var gap := spawn_x - rightmost_center_x
+	if gap >= _continuous_sight_min_gap:
 		return true
-	# Safety fallback for low-FPS/mobile edge cases where spacing gate can stall.
-	return (_continuous_sight_elapsed - _continuous_last_spawn_elapsed) >= 1.6
+	# Fallback for low-FPS edge cases, but never when the newest note is still at/after spawn X.
+	# This avoids accidental near-overlap/double-note stacks when the game hitches.
+	if rightmost_center_x > (spawn_x + 2.0):
+		return false
+	return gap >= 24.0 and (_continuous_sight_elapsed - _continuous_last_spawn_elapsed) >= 1.6
 
 
 func _rhythm_flow_pattern_library() -> Array[Array]:
@@ -19328,10 +19717,24 @@ func _update_rhythm_flow(delta: float) -> void:
 		return
 	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
 	if _rhythm_flow_session_mode == RHYTHM_FLOW_SESSION_DEMO:
-		_progress_label.text = "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_bpm]
+		var demo_text := "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_bpm]
+		if _progress_label.text != demo_text:
+			_progress_label.text = demo_text
 	else:
-		_progress_label.text = "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+		var rhythm_text := "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+		if _progress_label.text != rhythm_text:
+			_progress_label.text = rhythm_text
 	_score_label.text = "Score: %d" % _score
+	if _continuous_sight_skin_active:
+		if _sight_lives_hearts_label != null and _hud_combo_displayed != _continuous_sight_combo:
+			_hud_combo_displayed = _continuous_sight_combo
+			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+		if _sight_streak_value_label != null and _hud_level_displayed != _rhythm_flow_bpm:
+			_hud_level_displayed = _rhythm_flow_bpm
+			_sight_streak_value_label.text = str(_rhythm_flow_bpm)
+		if _sight_streak_score_label != null and _hud_acc_displayed != acc:
+			_hud_acc_displayed = acc
+			_sight_streak_score_label.text = "ACC %d%%" % acc
 
 
 func _update_continuous_sight(delta: float) -> void:
@@ -19350,54 +19753,17 @@ func _update_continuous_sight(delta: float) -> void:
 		_update_rhythm_flow(0.0 if rhythm_paused else delta)
 		return
 	_update_continuous_visual_aids()
-	if _continuous_rest_bar_active:
-		_continuous_rest_bar_timer = maxf(0.0, _continuous_rest_bar_timer - delta)
-		if _continuous_rest_bar_timer <= 0.0:
-			_continuous_rest_bar_active = false
-			_set_continuous_rest_symbol_visible(false)
-			_continuous_last_spawn_elapsed = _continuous_sight_elapsed
-			_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
-			_status_label.text = "Level %d" % _continuous_sight_level
-			_apply_answer_mode()
-	# During a rest bar, existing notes keep moving but no new notes spawn.
-	if _continuous_rest_bar_active:
-		pass
-	else:
-		_continuous_sight_spawn_timer -= delta
-		if _continuous_sight_spawn_timer <= 0.0 and _continuous_can_spawn_note():
-			_spawn_continuous_sight_note()
-			_continuous_last_spawn_elapsed = _continuous_sight_elapsed
-			_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
+	_continuous_sight_spawn_timer -= delta
+	if _continuous_sight_spawn_timer <= 0.0 and _continuous_can_spawn_note():
+		_spawn_continuous_sight_note()
+		_continuous_last_spawn_elapsed = _continuous_sight_elapsed
+		_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
 	var line_x := _continuous_play_line_x()
 	var remove_x := -40.0
 	var zone_bounds := _continuous_zone_bounds()
 	var focus_idx := _continuous_next_note_index()
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
 		remove_x = _note_chase_staff_frame.position.x - 40.0
-	var _surviving_bar_lines: Array[ColorRect] = []
-	for line in _continuous_empty_bar_lines:
-		if line == null or not is_instance_valid(line):
-			continue
-		line.position.x -= _continuous_sight_speed * delta
-		if line.position.x < line_x - 6.0:
-			line.modulate = Color(1, 1, 1, clampf(line.modulate.a - (delta * 1.8), 0.0, 1.0))
-		if line.position.x < remove_x or line.modulate.a <= 0.02:
-			line.queue_free()
-		else:
-			_surviving_bar_lines.append(line)
-	_continuous_empty_bar_lines = _surviving_bar_lines
-	var _surviving_bar_rests: Array[Label] = []
-	for rest_lbl in _continuous_empty_bar_rests:
-		if rest_lbl == null or not is_instance_valid(rest_lbl):
-			continue
-		rest_lbl.position.x -= _continuous_sight_speed * delta
-		if rest_lbl.position.x < line_x - 12.0:
-			rest_lbl.modulate = Color(1, 1, 1, clampf(rest_lbl.modulate.a - (delta * 1.8), 0.0, 1.0))
-		if rest_lbl.position.x < remove_x or rest_lbl.modulate.a <= 0.02:
-			rest_lbl.queue_free()
-		else:
-			_surviving_bar_rests.append(rest_lbl)
-	_continuous_empty_bar_rests = _surviving_bar_rests
 	var _surviving_notes: Array[Dictionary] = []
 	for i in range(_continuous_sight_notes.size()):
 		var n := _continuous_sight_notes[i]
@@ -19478,8 +19844,20 @@ func _update_continuous_sight(delta: float) -> void:
 					if not _continuous_sight_active:
 						return
 	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
-	_progress_label.text = "LV:%d  ACC:%d%%  P:%d G:%d M:%d  COMBO:%d" % [_continuous_sight_level, acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+	var new_progress_text := "LV:%d  ACC:%d%%  P:%d G:%d M:%d  COMBO:%d" % [_continuous_sight_level, acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+	if _progress_label.text != new_progress_text:
+		_progress_label.text = new_progress_text
 	_score_label.text = "Score: %d" % _score
+	if _continuous_sight_skin_active:
+		if _sight_lives_hearts_label != null and _hud_combo_displayed != _lives:
+			_hud_combo_displayed = _lives
+			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+		if _sight_streak_value_label != null and _hud_level_displayed != _continuous_sight_combo:
+			_hud_level_displayed = _continuous_sight_combo
+			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_combo]
+		if _sight_streak_score_label != null and _hud_acc_displayed != _score:
+			_hud_acc_displayed = _score
+			_sight_streak_score_label.text = "Score: %d" % _score
 
 
 func _on_sight_chord_choice_index(choice_idx: int) -> void:
@@ -19798,7 +20176,14 @@ func _active_staff_top_y() -> float:
 
 func _active_staff_line_gap_y() -> float:
 	if _selected_mode == MODE_NOTE_CHASE and _staff_area != null:
-		return clampf(_staff_area.size.y * 0.13, 50.0, 70.0)
+		var chase_h: float = _staff_area.size.y
+		var base_gap: float = clampf(chase_h * 0.11, 44.0, 62.0)
+		var top_y: float = _active_staff_top_y()
+		var bottom_note_margin: float = 30.0
+		# Keep the Note Chase staff top anchor intact while opening more room below
+		# so lower notes (e.g. D4/A3 in treble, low bass notes) stay fully visible.
+		var max_fit_gap: float = ((chase_h - bottom_note_margin - top_y + 2.0) / 12.0) * 2.0
+		return clampf(minf(base_gap, max_fit_gap), 36.0, 62.0)
 	if _selected_mode == MODE_SIGHT and _staff_area != null:
 		var sight_h := _staff_area.size.y
 		var min_gap := 40.0
@@ -19856,16 +20241,17 @@ func _staff_center_y_for_step(step: int) -> float:
 		y -= 2.0
 	elif step < STAFF_TOP_LINE_STEP:
 		y += 1.0
-	# In Note Catcher, bring top ledger notes slightly closer to the top line.
+	# Note Chase only: Treble G5 should sit a touch higher.
 	if _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble" and step == -1:
-		y += 6.0
+		y -= 1.0
 	# Treble D4 (space below first line): raise it so top edge sits close to first line.
 	if _selected_clef == "Treble" and step == 9:
 		y -= 8.0
 		if _selected_mode == MODE_SIGHT:
 			y += 8.0
 	if _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble" and step == 9:
-		y -= 4.0
+		# Note Chase only: Treble D4 should sit slightly lower.
+		y += 9.0
 	# Treble below-staff ledger notes (B3, A3) should sit closer to ledger line.
 	if _selected_clef == "Treble" and step >= 10:
 		y -= 4.0
@@ -21658,13 +22044,15 @@ func _play_completion_reaction(score_pct: float) -> void:
 
 func _play_reaction_roll() -> void:
 	var y0 := _bird_sprite.position.y
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bird_sprite, "rotation_degrees", 360.0, 0.85)
-	tween.parallel().tween_property(_bird_sprite, "position:y", y0 - 28.0, 0.4)
-	tween.tween_property(_bird_sprite, "position:y", y0, 0.45)
-	tween.finished.connect(func() -> void:
+	if _bird_action_tween != null and is_instance_valid(_bird_action_tween):
+		_bird_action_tween.kill()
+	_bird_action_tween = create_tween()
+	_bird_action_tween.set_trans(Tween.TRANS_SINE)
+	_bird_action_tween.set_ease(Tween.EASE_IN_OUT)
+	_bird_action_tween.tween_property(_bird_sprite, "rotation_degrees", 360.0, 0.85)
+	_bird_action_tween.parallel().tween_property(_bird_sprite, "position:y", y0 - 28.0, 0.4)
+	_bird_action_tween.tween_property(_bird_sprite, "position:y", y0, 0.45)
+	_bird_action_tween.finished.connect(func() -> void:
 		if _bird_sprite != null:
 			_bird_sprite.rotation_degrees = 0.0
 		_start_bird_idle_anim()
@@ -21673,25 +22061,29 @@ func _play_reaction_roll() -> void:
 
 func _play_reaction_jump() -> void:
 	var y0 := _bird_sprite.position.y
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bird_sprite, "position:y", y0 - 34.0, 0.23)
-	tween.tween_property(_bird_sprite, "position:y", y0, 0.28)
-	tween.finished.connect(func() -> void:
+	if _bird_action_tween != null and is_instance_valid(_bird_action_tween):
+		_bird_action_tween.kill()
+	_bird_action_tween = create_tween()
+	_bird_action_tween.set_trans(Tween.TRANS_SINE)
+	_bird_action_tween.set_ease(Tween.EASE_IN_OUT)
+	_bird_action_tween.tween_property(_bird_sprite, "position:y", y0 - 34.0, 0.23)
+	_bird_action_tween.tween_property(_bird_sprite, "position:y", y0, 0.28)
+	_bird_action_tween.finished.connect(func() -> void:
 		_start_bird_idle_anim()
 	)
 
 
 func _play_reaction_walk() -> void:
 	var x0 := _bird_sprite.global_position.x
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bird_sprite, "global_position:x", x0 - 70.0, 0.35)
-	tween.tween_property(_bird_sprite, "global_position:x", x0 + 70.0, 0.35)
-	tween.tween_property(_bird_sprite, "global_position:x", x0, 0.35)
-	tween.finished.connect(func() -> void:
+	if _bird_action_tween != null and is_instance_valid(_bird_action_tween):
+		_bird_action_tween.kill()
+	_bird_action_tween = create_tween()
+	_bird_action_tween.set_trans(Tween.TRANS_SINE)
+	_bird_action_tween.set_ease(Tween.EASE_IN_OUT)
+	_bird_action_tween.tween_property(_bird_sprite, "global_position:x", x0 - 70.0, 0.35)
+	_bird_action_tween.tween_property(_bird_sprite, "global_position:x", x0 + 70.0, 0.35)
+	_bird_action_tween.tween_property(_bird_sprite, "global_position:x", x0, 0.35)
+	_bird_action_tween.finished.connect(func() -> void:
 		_start_bird_idle_anim()
 	)
 
