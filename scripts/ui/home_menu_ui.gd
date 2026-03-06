@@ -135,6 +135,7 @@ func ensure_grid_layout(row: Control, columns: int, h_gap: int, v_gap: int) -> C
 	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	grid.add_theme_constant_override("h_separation", h_gap)
 	grid.add_theme_constant_override("v_separation", v_gap)
+	grid.visible = row.visible
 	parent.add_child(grid)
 	parent.move_child(grid, index)
 	parent.remove_child(row)

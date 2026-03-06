@@ -1,6 +1,8 @@
 class_name HomeMenuTokens
 extends RefCounted
 
+const FIXED_THEME_ID := "azure_cascade"
+
 const THEMES := {
 	"golden_harvest": {
 		"label": "Golden Harvest",
@@ -80,7 +82,7 @@ const COLORS_HIGH_CONTRAST := {
 	"disabled_overlay": Color(0.42, 0.42, 0.42, 0.62)
 }
 
-var _theme_id := "golden_harvest"
+var _theme_id := FIXED_THEME_ID
 
 const SPACING := {
 	"section_gap": 12,
@@ -166,28 +168,24 @@ func profile_for_viewport(vp: Vector2) -> Dictionary:
 	return LAYOUTS["large_phone"]
 
 func theme_ids() -> Array[String]:
-	return ["golden_harvest", "azure_cascade", "slate_foundry", "crimson_nocturne", "rose_velvet"]
+	return [FIXED_THEME_ID]
 
-func set_theme(theme_id: String) -> void:
-	if THEMES.has(theme_id):
-		_theme_id = theme_id
-	else:
-		_theme_id = "golden_harvest"
+func set_theme(_theme_id: String) -> void:
+	# Keep a single stable palette across menu/config screens.
+	_theme_id = FIXED_THEME_ID
 
 func theme_id() -> String:
 	return _theme_id
 
-func theme_label(theme_id: String) -> String:
-	if THEMES.has(theme_id):
-		var d: Dictionary = THEMES[theme_id]
-		return str(d.get("label", theme_id))
-	return "Golden Harvest"
+func theme_label(_theme_id: String) -> String:
+	var d: Dictionary = THEMES.get(FIXED_THEME_ID, THEMES["azure_cascade"])
+	return str(d.get("label", FIXED_THEME_ID))
 
 func colors(high_contrast: bool) -> Dictionary:
 	if high_contrast:
 		return COLORS_HIGH_CONTRAST
-	var d: Dictionary = THEMES.get(_theme_id, THEMES["golden_harvest"])
-	return d.get("colors", THEMES["golden_harvest"]["colors"])
+	var d: Dictionary = THEMES.get(FIXED_THEME_ID, THEMES["azure_cascade"])
+	return d.get("colors", THEMES["azure_cascade"]["colors"])
 
 func menu_style_contract() -> Dictionary:
 	return MENU_STYLE_CONTRACT.duplicate(true)

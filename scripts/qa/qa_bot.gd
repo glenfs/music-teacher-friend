@@ -1201,15 +1201,12 @@ func _sight_notes_coverage() -> void:
 
 
 func _sight_chords_coverage() -> void:
-	for clef in ["Treble", "Bass"]:
-		await _goto_practice_sight_mode("Chords")
-		if not await _set_clef(clef):
-			na_step("Sight Chords clef `%s` not supported" % clef)
-			continue
-		await _set_sight_key_sig("C")
-		await _run_sight_session("sight_chords_%s_c" % clef.to_lower(), "Chords", 5)
-		if await _set_sight_key_sig("2b"):
-			await _run_sight_session("sight_chords_%s_2b" % clef.to_lower(), "Chords", 5)
+	# Chords mode now always uses grand staff (no clef toggle)
+	await _goto_practice_sight_mode("Chords")
+	await _set_sight_key_sig("C")
+	await _run_sight_session("sight_chords_grand_c", "Chords", 5)
+	if await _set_sight_key_sig("2b"):
+		await _run_sight_session("sight_chords_grand_2b", "Chords", 5)
 
 
 func _sight_placement_coverage() -> void:
