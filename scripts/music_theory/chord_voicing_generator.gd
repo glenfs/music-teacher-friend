@@ -104,6 +104,19 @@ const BASS_STEP_NOTES := {
 ## Generate a grand-staff voicing for the given chord.
 ## Returns: { treble_notes: Array[Dict], bass_notes: Array[Dict], all_notes: Array[Dict] }
 ## Each note dict: { letter: String, octave: int, accidental: int, midi: int, staff: String, step: int }
+##
+## Piano voicing rules (comfortable playing):
+##   Left hand (bass staff): 1-2 notes. Usually bass tone + optional guide/5th.
+##   Right hand (treble staff): 2-4 notes in close position.
+##   Avoid dense low-register clusters below C3 (MIDI 48).
+##   Keep per-hand spans reachable for average players.
+const MAX_HAND_SPAN := 10             # 2-note hand stretch: minor 7th
+const MAX_THREE_NOTE_SPAN := 10       # 3+ notes in one hand: keep within major 6th/minor 7th
+const MAX_ADJACENT_GAP := 7           # practical adjacent-note spacing cap in one hand
+const MAX_JAZZ_POP_GLOBAL_SPAN := 26  # two-hand spread cap for grand-staff sight chords
+const MAX_JAZZ_POP_LH_NOTES := 2
+const MAX_JAZZ_POP_RH_NOTES := 4
+
 static func generate(root_letter: String, root_acc: int, quality: String, inversion: int, sig_map: Dictionary, rng: RandomNumberGenerator, spread: bool = true, seventh_style_layout: bool = false) -> Dictionary:
 	var intervals: Array = CHORD_INTERVALS.get(quality, [0, 4, 7])
 	var degrees: Array = CHORD_DEGREES.get(quality, [0, 2, 4])
@@ -119,131 +132,254 @@ static func generate(root_letter: String, root_acc: int, quality: String, invers
 		tone_intervals.append(iv)
 		tone_degrees.append(int(degrees[i_tone]) if i_tone < degrees.size() else 0)
 
-	# Apply inversion: rotate tones
 	var num_tones := tone_pcs.size()
 	var effective_inversion := clampi(inversion, 0, num_tones - 1)
 
-	# Grand-staff sight-chords can request 7th-style layout behavior:
-	# keep original chord tones without triad/power root-doubling so notehead
-	# placement matches the 7th-tier profile across families.
-	var should_double_root := (not seventh_style_layout) and (num_tones == 3 or num_tones == 2)
-
-	# Pick a bass root octave
-	var bass_root_octave := 3
+	# --- Pick bass octave ---
+	var bass_octave := 3
 	if spread:
-		bass_root_octave = rng.randi_range(2, 3)
+		bass_octave = rng.randi_range(2, 3)
 
-	# Build concrete pitches with octave assignments
-	var concrete_notes: Array[Dictionary] = []
-
-	# Assign the bass note (lowest note based on inversion)
+	# --- Determine left-hand (bass staff) voicing ---
+	# The bass note is the inversion bass tone placed in the low register.
 	var bass_tone_idx := effective_inversion
-	var bass_pc := tone_pcs[bass_tone_idx]
 	var bass_iv := tone_intervals[bass_tone_idx]
-	var bass_midi := _find_nearest_midi_for_pc(bass_pc, _letter_to_midi(root_letter, root_acc, bass_root_octave) + bass_iv - (12 if bass_iv > 0 and effective_inversion > 0 else 0))
-	# Clamp bass to reasonable range
+	var bass_midi := _find_nearest_midi_for_pc(tone_pcs[bass_tone_idx],
+		_letter_to_midi(root_letter, root_acc, bass_octave) + bass_iv - (12 if bass_iv > 0 and effective_inversion > 0 else 0))
 	while bass_midi < BASS_RANGE_LOW:
 		bass_midi += 12
 	while bass_midi > MIDDLE_C_MIDI:
 		bass_midi -= 12
-	if bass_midi < BASS_RANGE_LOW:
-		bass_midi = BASS_RANGE_LOW
+	bass_midi = clampi(bass_midi, BASS_RANGE_LOW, MIDDLE_C_MIDI - 1)
 
-	var bass_degree := tone_degrees[bass_tone_idx]
-	var bass_letter_info := _midi_to_letter_in_key(bass_midi, root_letter, root_acc, bass_degree, sig_map)
-	concrete_notes.append({
-		"midi": bass_midi,
-		"letter": bass_letter_info.letter,
-		"octave": bass_letter_info.octave,
-		"accidental": bass_letter_info.accidental,
-		"tone_index": bass_tone_idx,
-	})
+	# LH profile:
+	#   - dyads/triads: bass + optional companion
+	#   - 7th/6th/9th families: bass + optional guide tone
+	#   - in grand-staff sight mode: cap LH to two notes
+	var lh_tone_indices: Array[int] = [bass_tone_idx]
+	var lh_extra_candidates: Array[int] = []
+	for ti in range(num_tones):
+		if ti != bass_tone_idx:
+			lh_extra_candidates.append(ti)
 
-	# Build remaining tones above the bass
-	var remaining_indices: Array[int] = []
-	for i in range(num_tones):
-		if i != bass_tone_idx:
-			remaining_indices.append(i)
+	if num_tones == 2:
+		if not lh_extra_candidates.is_empty():
+			var dyad_idx := _pick_lh_companion_index(bass_tone_idx, tone_intervals, quality, lh_extra_candidates, false)
+			if dyad_idx >= 0:
+				lh_tone_indices.append(dyad_idx)
+	elif num_tones == 3:
+		var triad_add_prob := 0.70 if seventh_style_layout else 0.55
+		if rng.randf() < triad_add_prob and not lh_extra_candidates.is_empty():
+			var triad_idx := _pick_lh_companion_index(bass_tone_idx, tone_intervals, quality, lh_extra_candidates, false)
+			if triad_idx >= 0:
+				lh_tone_indices.append(triad_idx)
+	else:
+		# 7ths, 6ths, extensions (4+ tones)
+		var dense_add_prob := 0.75 if seventh_style_layout else 0.45
+		if rng.randf() < dense_add_prob and not lh_extra_candidates.is_empty():
+			var guide_idx := _pick_lh_companion_index(bass_tone_idx, tone_intervals, quality, lh_extra_candidates, true)
+			if guide_idx >= 0:
+				lh_tone_indices.append(guide_idx)
 
-	# Sort remaining by interval to keep voicing ordered
-	remaining_indices.sort_custom(func(a: int, b: int) -> bool:
-		return tone_intervals[a] < tone_intervals[b]
-	)
+	if seventh_style_layout and lh_tone_indices.size() > MAX_JAZZ_POP_LH_NOTES:
+		lh_tone_indices.resize(MAX_JAZZ_POP_LH_NOTES)
 
-	# Place remaining tones in the treble register (above middle C) for piano-like spread.
-	# Target: upper voices in octave 4-5 so they land on the treble staff.
-	var treble_root_midi := _letter_to_midi(root_letter, root_acc, 4)  # root in octave 4
-	for idx in remaining_indices:
-		var iv_offset := tone_intervals[idx] - tone_intervals[bass_tone_idx]
-		if iv_offset <= 0:
-			iv_offset += 12
-		# Start from root in octave 4, offset by the interval
-		var note_midi := treble_root_midi + (tone_intervals[idx] - tone_intervals[0])
-		# Ensure it's above middle C for treble staff placement
-		while note_midi < MIDDLE_C_MIDI:
-			note_midi += 12
-		# If not spread, keep notes within one octave of each other
-		if not spread and note_midi > MIDDLE_C_MIDI + 16:
-			note_midi -= 12
-			if note_midi < MIDDLE_C_MIDI:
+	# --- Build LH concrete notes ---
+	var concrete_notes: Array[Dictionary] = []
+	# Sort LH tones by interval for ascending pitch order
+	lh_tone_indices.sort_custom(func(a: int, b: int) -> bool:
+		return tone_intervals[a] < tone_intervals[b])
+
+	# Determine max span based on how many LH notes we're placing
+	var lh_span_limit: int = MAX_HAND_SPAN if lh_tone_indices.size() <= 2 else MAX_THREE_NOTE_SPAN
+	if seventh_style_layout:
+		lh_span_limit = MAX_HAND_SPAN
+
+	for li in range(lh_tone_indices.size()):
+		var ti: int = lh_tone_indices[li]
+		var note_midi: int
+		if li == 0:
+			note_midi = bass_midi
+		else:
+			# Place above the bass note, within LH reach
+			note_midi = _find_nearest_midi_for_pc(tone_pcs[ti], bass_midi + (tone_intervals[ti] - tone_intervals[bass_tone_idx]))
+			if note_midi <= bass_midi:
 				note_midi += 12
-		# Clamp to playable range
-		note_midi = clampi(note_midi, BASS_RANGE_LOW, TREBLE_RANGE_HIGH)
-		var letter_info := _midi_to_letter_in_key(note_midi, root_letter, root_acc, tone_degrees[idx], sig_map)
+			# Ensure within LH span limit
+			while note_midi - bass_midi > lh_span_limit:
+				note_midi -= 12
+			# Keep in bass staff range
+			while note_midi < BASS_RANGE_LOW:
+				note_midi += 12
+			# If still exceeds span after range correction, skip this note
+			if note_midi - bass_midi > lh_span_limit:
+				continue
+			note_midi = clampi(note_midi, BASS_RANGE_LOW, BASS_RANGE_HIGH)
+		var deg: int = tone_degrees[ti] if ti < tone_degrees.size() else 0
+		var info := _midi_to_letter_in_key(note_midi, root_letter, root_acc, deg, sig_map)
 		concrete_notes.append({
 			"midi": note_midi,
-			"letter": letter_info.letter,
-			"octave": letter_info.octave,
-			"accidental": letter_info.accidental,
-			"tone_index": idx,
+			"letter": info.letter,
+			"octave": info.octave,
+			"accidental": info.accidental,
+			"tone_index": ti,
 		})
 
-	# Optionally double the root — place it one octave above the bass note (still in bass/low treble)
-	if should_double_root and num_tones >= 2:
-		# Always double the actual root pitch class, not the bass inversion note
-		# Place near one octave above the bass note for good spacing
-		var double_midi := _find_nearest_midi_for_pc(tone_pcs[0], int(concrete_notes[0].midi) + 12)
-		# Make sure it's distinct from existing notes
-		var dominated := false
-		for cn in concrete_notes:
-			if int(cn.midi) == double_midi:
-				dominated = true
+	# Final LH validation: check adjacent gaps and drop offending notes
+	if concrete_notes.size() >= 3:
+		concrete_notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.midi) < int(b.midi))
+		# Check from top down — drop any note that creates too wide a gap
+		var validated: Array[Dictionary] = [concrete_notes[0]]
+		for vi in range(1, concrete_notes.size()):
+			var gap: int = int(concrete_notes[vi].midi) - int(validated[validated.size() - 1].midi)
+			if gap <= MAX_ADJACENT_GAP:
+				validated.append(concrete_notes[vi])
+			# else: skip this note — gap too wide for adjacent fingers
+		concrete_notes = validated
+
+	# --- Build RH concrete notes (close voicing within one octave) ---
+	# Pack all chord tones into a single octave above middle C.
+	# Max 4 RH notes to keep it playable.
+	var rh_base_midi := _letter_to_midi(root_letter, root_acc, 4)
+	while rh_base_midi < MIDDLE_C_MIDI:
+		rh_base_midi += 12
+	# For variety, sometimes start an octave higher (keeps things in mid-treble)
+	var rh_octave_jump_prob := 0.22 if seventh_style_layout else 0.35
+	if rh_base_midi < 65 and rng.randf() < rh_octave_jump_prob:
+		rh_base_midi += 12
+
+	var rh_source_indices: Array[int] = []
+	for ti in range(num_tones):
+		rh_source_indices.append(ti)
+	if seventh_style_layout:
+		rh_source_indices.sort_custom(func(a: int, b: int) -> bool:
+			var ia := _tone_importance_for_quality(int(tone_intervals[a]), quality)
+			var ib := _tone_importance_for_quality(int(tone_intervals[b]), quality)
+			if ia == ib:
+				return int(tone_intervals[a]) < int(tone_intervals[b])
+			return ia > ib
+		)
+		var has_root_lh := false
+		for lti in lh_tone_indices:
+			if posmod(int(tone_intervals[lti]), 12) == 0:
+				has_root_lh = true
 				break
-		if not dominated and double_midi >= BASS_RANGE_LOW and double_midi <= TREBLE_RANGE_HIGH:
-			var span := maxi(double_midi, _max_midi(concrete_notes)) - mini(double_midi, _min_midi(concrete_notes))
-			if span <= MAX_VOICING_SPAN:
-				var dbl_info := _midi_to_letter_in_key(double_midi, root_letter, root_acc, 0, sig_map)
-				concrete_notes.append({
-					"midi": double_midi,
-					"letter": dbl_info.letter,
-					"octave": dbl_info.octave,
-					"accidental": dbl_info.accidental,
-					"tone_index": 0,
-				})
+		var selected: Array[int] = []
+		for src_idx in rh_source_indices:
+			if selected.size() >= MAX_JAZZ_POP_RH_NOTES:
+				break
+			if src_idx == bass_tone_idx and has_root_lh and num_tones >= 4 and selected.size() > 0:
+				continue
+			selected.append(src_idx)
+		if selected.is_empty():
+			selected.append(0)
+		if not has_root_lh:
+			var has_root_selected := false
+			for sti in selected:
+				if posmod(int(tone_intervals[sti]), 12) == 0:
+					has_root_selected = true
+					break
+			if not has_root_selected:
+				for ti2 in range(num_tones):
+					if posmod(int(tone_intervals[ti2]), 12) == 0:
+						if selected.size() < MAX_JAZZ_POP_RH_NOTES:
+							selected.append(ti2)
+						elif selected.size() > 0:
+							selected[selected.size() - 1] = ti2
+						break
+		rh_source_indices = selected
+
+	var rh_built: Array[int] = []
+	var rh_midi_to_tone_index: Dictionary = {}
+	for ti in rh_source_indices:
+		var target_midi: int = rh_base_midi + tone_intervals[ti]
+		# Wrap into the octave starting at rh_base_midi (close voicing)
+		while target_midi >= rh_base_midi + 12:
+			target_midi -= 12
+		while target_midi < rh_base_midi:
+			target_midi += 12
+		# Dedup within RH
+		if target_midi not in rh_built:
+			rh_built.append(target_midi)
+			rh_midi_to_tone_index[str(target_midi)] = ti
+	rh_built.sort()
+
+	# Cap RH note count
+	var rh_note_cap := MAX_JAZZ_POP_RH_NOTES if seventh_style_layout else 4
+	while rh_built.size() > rh_note_cap:
+		rh_built.pop_back()
+
+	# Final span check — use tighter limit for 3+ notes
+	if rh_built.size() >= 2:
+		var rh_span_limit: int = MAX_HAND_SPAN if rh_built.size() <= 2 else MAX_THREE_NOTE_SPAN
+		while rh_built.size() > 2 and rh_built[rh_built.size() - 1] - rh_built[0] > rh_span_limit:
+			rh_built.pop_back()
+		# 2-note fallback check
+		if rh_built.size() == 2 and rh_built[1] - rh_built[0] > MAX_HAND_SPAN:
+			rh_built.pop_back()
+
+	# Clamp to treble range
+	for ri in range(rh_built.size()):
+		rh_built[ri] = clampi(rh_built[ri], MIDDLE_C_MIDI, TREBLE_RANGE_HIGH)
+
+	# Add RH notes to concrete_notes.
+	# In playable profile, if a RH pitch collides with LH, try shifting RH up an octave.
+	for midi in rh_built:
+		var midi_val: int = int(midi)
+		var is_dup := false
+		for cn in concrete_notes:
+			if int(cn.midi) == midi_val:
+				is_dup = true
+				break
+		if is_dup and seventh_style_layout:
+			var shifted := midi_val + 12
+			while shifted <= TREBLE_RANGE_HIGH:
+				var collides := false
+				for cn2 in concrete_notes:
+					if int(cn2.midi) == shifted:
+						collides = true
+						break
+				if not collides:
+					midi_val = shifted
+					is_dup = false
+					break
+				shifted += 12
+		if is_dup:
+			continue
+		# Find matching tone index for correct letter naming
+		var pc := posmod(midi_val, 12)
+		var best_ti := int(rh_midi_to_tone_index.get(str(midi), -1))
+		if best_ti < 0:
+			for ti in range(num_tones):
+				if tone_pcs[ti] == pc:
+					best_ti = ti
+					break
+		if best_ti < 0:
+			best_ti = 0
+		var deg: int = tone_degrees[best_ti] if best_ti < tone_degrees.size() else 0
+		var info := _midi_to_letter_in_key(midi_val, root_letter, root_acc, deg, sig_map)
+		concrete_notes.append({
+			"midi": midi_val,
+			"letter": info.letter,
+			"octave": info.octave,
+			"accidental": info.accidental,
+			"tone_index": best_ti,
+		})
+
+	# Enforce adjacent-gap constraint within each hand
+	_fix_adjacent_gaps(concrete_notes, MIDDLE_C_MIDI, root_letter, root_acc, sig_map)
 
 	# Sort by MIDI pitch (low to high)
 	concrete_notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return int(a.midi) < int(b.midi)
 	)
+	if seventh_style_layout:
+		_compress_voicing_span_for_playability(concrete_notes, MAX_JAZZ_POP_GLOBAL_SPAN, root_letter, root_acc, tone_degrees, sig_map)
 
-	# Validate span
-	if concrete_notes.size() >= 2:
-		var span: int = int(concrete_notes[concrete_notes.size() - 1].midi) - int(concrete_notes[0].midi)
-		if span > MAX_VOICING_SPAN:
-			# Compress: bring highest note down an octave
-			concrete_notes[concrete_notes.size() - 1].midi = int(concrete_notes[concrete_notes.size() - 1].midi) - 12
-			var fix_tone_idx: int = int(concrete_notes[concrete_notes.size() - 1].tone_index)
-			var fix_degree: int = tone_degrees[fix_tone_idx] if fix_tone_idx < tone_degrees.size() else 0
-			var fixed := _midi_to_letter_in_key(int(concrete_notes[concrete_notes.size() - 1].midi), root_letter, root_acc, fix_degree, sig_map)
-			concrete_notes[concrete_notes.size() - 1].letter = fixed.letter
-			concrete_notes[concrete_notes.size() - 1].octave = fixed.octave
-			concrete_notes[concrete_notes.size() - 1].accidental = fixed.accidental
-			concrete_notes.sort_custom(func(a2: Dictionary, b2: Dictionary) -> bool:
-				return int(a2.midi) < int(b2.midi)
-			)
-
-	# Validate muddy bass: ensure no two bass notes below C3 (MIDI 48) are closer than MIN_LOW_BASS_INTERVAL
+	# Validate muddy bass
 	_fix_muddy_bass(concrete_notes)
+	_sanitize_to_chord_tones(concrete_notes, tone_pcs, tone_degrees, root_letter, root_acc, sig_map)
 
 	# Split across staves
 	var treble_notes: Array[Dictionary] = []
@@ -251,7 +387,6 @@ static func generate(root_letter: String, root_acc: int, quality: String, invers
 	for note in concrete_notes:
 		var midi: int = int(note.midi)
 		var staff := "bass" if midi < MIDDLE_C_MIDI else "treble"
-		# Middle C (60) goes to treble by default, but if it's the only note above bass it can go to bass
 		if midi == MIDDLE_C_MIDI:
 			staff = "treble"
 		note["staff"] = staff
@@ -261,7 +396,7 @@ static func generate(root_letter: String, root_acc: int, quality: String, invers
 		else:
 			bass_notes.append(note)
 
-	# Ensure at least one note per staff — if all on one staff, move the extreme note
+	# Ensure at least one note per staff
 	if treble_notes.is_empty() and bass_notes.size() >= 2:
 		var moved: Dictionary = bass_notes.pop_back()
 		moved["staff"] = "treble"
@@ -284,6 +419,143 @@ static func generate(root_letter: String, root_acc: int, quality: String, invers
 	}
 
 
+static func _pick_lh_companion_index(bass_tone_idx: int, tone_intervals: Array[int], quality: String, candidates: Array[int], prefer_guides: bool) -> int:
+	var q := quality.to_lower()
+	var best_idx := -1
+	var best_score := -9999.0
+	var bass_iv := int(tone_intervals[bass_tone_idx])
+	for ci in candidates:
+		var iv_raw := int(tone_intervals[ci])
+		var iv := posmod(iv_raw, 12)
+		var score := float(_tone_importance_for_quality(iv_raw, quality))
+		if prefer_guides:
+			if iv == 3 or iv == 4 or iv == 10 or iv == 11:
+				score += 24.0
+			elif iv == 2 or iv == 5 or iv == 9:
+				score += 14.0
+			elif iv == 7:
+				score += 6.0
+		else:
+			if iv == 7 or iv == 6 or iv == 8:
+				score += 44.0
+			elif iv == 3 or iv == 4:
+				score += 6.0
+		if q.find("sus") >= 0 and (iv == 2 or iv == 5):
+			score += 16.0
+		if (q.find("dim") >= 0 or q.find("aug") >= 0) and (iv == 6 or iv == 8):
+			score += 12.0
+		score -= absf(float(iv_raw - bass_iv)) * 0.45
+		if score > best_score:
+			best_score = score
+			best_idx = int(ci)
+	return best_idx
+
+
+static func _tone_importance_for_quality(interval_semitones: int, quality: String) -> int:
+	var iv := posmod(interval_semitones, 12)
+	var q := quality.to_lower()
+	match iv:
+		0:
+			return 88
+		3, 4:
+			return 100
+		10, 11:
+			return 98
+		2, 9:
+			return 92
+		5:
+			return 98 if q.find("sus") >= 0 else 74
+		6, 8:
+			if q.find("dim") >= 0 or q.find("aug") >= 0:
+				return 96
+			return 76
+		7:
+			if q.find("power") >= 0:
+				return 100
+			return 72
+		_:
+			return 70
+
+
+static func _compress_voicing_span_for_playability(notes: Array[Dictionary], max_span: int, root_letter: String, root_acc: int, tone_degrees: Array[int], sig_map: Dictionary) -> void:
+	if notes.size() < 2:
+		return
+	for _attempt in range(10):
+		notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.midi) < int(b.midi))
+		var lo := int(notes[0].midi)
+		var hi := int(notes[notes.size() - 1].midi)
+		if hi - lo <= max_span:
+			break
+		var moved := false
+		if hi - 12 >= MIDDLE_C_MIDI:
+			var top := notes[notes.size() - 1]
+			top.midi = hi - 12
+			var top_ti := int(top.get("tone_index", 0))
+			var top_deg := int(tone_degrees[top_ti]) if top_ti >= 0 and top_ti < tone_degrees.size() else 0
+			var top_info := _midi_to_letter_in_key(int(top.midi), root_letter, root_acc, top_deg, sig_map)
+			top.letter = top_info.letter
+			top.octave = top_info.octave
+			top.accidental = top_info.accidental
+			notes[notes.size() - 1] = top
+			moved = true
+		elif lo + 12 < MIDDLE_C_MIDI:
+			var bottom := notes[0]
+			bottom.midi = lo + 12
+			var b_ti := int(bottom.get("tone_index", 0))
+			var b_deg := int(tone_degrees[b_ti]) if b_ti >= 0 and b_ti < tone_degrees.size() else 0
+			var b_info := _midi_to_letter_in_key(int(bottom.midi), root_letter, root_acc, b_deg, sig_map)
+			bottom.letter = b_info.letter
+			bottom.octave = b_info.octave
+			bottom.accidental = b_info.accidental
+			notes[0] = bottom
+			moved = true
+		if not moved:
+			break
+
+
+static func _sanitize_to_chord_tones(notes: Array[Dictionary], tone_pcs: Array[int], tone_degrees: Array[int], root_letter: String, root_acc: int, sig_map: Dictionary) -> void:
+	if notes.is_empty() or tone_pcs.is_empty():
+		return
+	for i in range(notes.size()):
+		var n := notes[i]
+		var midi := int(n.get("midi", 60))
+		var pc := posmod(midi, 12)
+		var has_pc := false
+		for tpc in tone_pcs:
+			if int(tpc) == pc:
+				has_pc = true
+				break
+		if has_pc:
+			continue
+		var best_ti := 0
+		var best_shift := 0
+		var best_dist := 99
+		for ti in range(tone_pcs.size()):
+			var target_pc := int(tone_pcs[ti])
+			var up: int = posmod(target_pc - pc, 12)
+			var down: int = up - 12
+			var shift: int = down if absi(down) <= absi(up) else up
+			var dist: int = absi(shift)
+			if dist < best_dist:
+				best_dist = dist
+				best_ti = ti
+				best_shift = shift
+		var corrected := midi + best_shift
+		while corrected < BASS_RANGE_LOW:
+			corrected += 12
+		while corrected > TREBLE_RANGE_HIGH:
+			corrected -= 12
+		var degree := int(tone_degrees[best_ti]) if best_ti >= 0 and best_ti < tone_degrees.size() else 0
+		var info := _midi_to_letter_in_key(corrected, root_letter, root_acc, degree, sig_map)
+		n["midi"] = corrected
+		n["letter"] = info.letter
+		n["octave"] = info.octave
+		n["accidental"] = info.accidental
+		n["tone_index"] = best_ti
+		notes[i] = n
+
+
 ## Run 500 random voicings and validate constraints. Returns array of error strings (empty = pass).
 static func self_test_500(rng: RandomNumberGenerator) -> Array[String]:
 	var errors: Array[String] = []
@@ -296,10 +568,15 @@ static func self_test_500(rng: RandomNumberGenerator) -> Array[String]:
 		var max_inv: int = CHORD_INTERVALS[quality].size() - 1
 		var inv := rng.randi_range(0, max_inv)
 		var spread := rng.randf() > 0.3
-		var result := generate(root, 0, quality, inv, sig_map, rng, spread)
+		var use_playable_profile := rng.randf() > 0.5
+		var result := generate(root, 0, quality, inv, sig_map, rng, spread, use_playable_profile)
 		var treble: Array = result.get("treble_notes", [])
 		var bass: Array = result.get("bass_notes", [])
 		var all: Array = result.get("all_notes", [])
+		var root_pc := posmod(_letter_to_midi(root, 0, 4), 12)
+		var required_pcs: Dictionary = {}
+		for iv in CHORD_INTERVALS[quality]:
+			required_pcs[str(posmod(root_pc + int(iv), 12))] = true
 		if all.size() < 2:
 			errors.append("Test %d: %s %s inv %d — fewer than 2 notes" % [_i, root, quality, inv])
 			continue
@@ -308,6 +585,9 @@ static func self_test_500(rng: RandomNumberGenerator) -> Array[String]:
 			var midi: int = int(n.midi)
 			if midi < BASS_RANGE_LOW or midi > TREBLE_RANGE_HIGH:
 				errors.append("Test %d: %s %s — MIDI %d out of range" % [_i, root, quality, midi])
+			var pc := posmod(midi, 12)
+			if not required_pcs.has(str(pc)):
+				errors.append("Test %d: %s %s — non-chord tone MIDI %d (pc %d)" % [_i, root, quality, midi, pc])
 		# Check staff assignment
 		for n in treble:
 			if int(n.midi) < TREBLE_RANGE_LOW - 3:
@@ -319,9 +599,32 @@ static func self_test_500(rng: RandomNumberGenerator) -> Array[String]:
 		var span: int = int(all[all.size() - 1].midi) - int(all[0].midi)
 		if span > MAX_VOICING_SPAN + 2:
 			errors.append("Test %d: span %d exceeds max %d" % [_i, span, MAX_VOICING_SPAN])
+		if use_playable_profile and span > MAX_JAZZ_POP_GLOBAL_SPAN + 2:
+			errors.append("Test %d: playable profile span %d exceeds target %d" % [_i, span, MAX_JAZZ_POP_GLOBAL_SPAN])
 		# Check at least one note per staff
 		if treble.is_empty() or bass.is_empty():
 			errors.append("Test %d: %s %s — missing staff (%d treble, %d bass)" % [_i, root, quality, treble.size(), bass.size()])
+		# Check per-hand span and adjacent gaps
+		for hand_label in ["bass", "treble"]:
+			var hand_notes: Array[int] = []
+			for n in all:
+				if str(n.staff) == hand_label:
+					hand_notes.append(int(n.midi))
+			if use_playable_profile:
+				if hand_label == "bass" and hand_notes.size() > MAX_JAZZ_POP_LH_NOTES:
+					errors.append("Test %d: playable profile has %d LH notes (> %d)" % [_i, hand_notes.size(), MAX_JAZZ_POP_LH_NOTES])
+				if hand_label == "treble" and hand_notes.size() > MAX_JAZZ_POP_RH_NOTES:
+					errors.append("Test %d: playable profile has %d RH notes (> %d)" % [_i, hand_notes.size(), MAX_JAZZ_POP_RH_NOTES])
+			if hand_notes.size() >= 2:
+				hand_notes.sort()
+				var h_span: int = hand_notes[hand_notes.size() - 1] - hand_notes[0]
+				var span_limit: int = MAX_HAND_SPAN if hand_notes.size() <= 2 else MAX_THREE_NOTE_SPAN
+				if h_span > span_limit + 1:
+					errors.append("Test %d: %s %s — %s hand span %d > %d (%d notes)" % [_i, root, quality, hand_label, h_span, span_limit, hand_notes.size()])
+				for hi in range(hand_notes.size() - 1):
+					var adj_gap: int = hand_notes[hi + 1] - hand_notes[hi]
+					if adj_gap > MAX_ADJACENT_GAP + 1:
+						errors.append("Test %d: %s %s — %s adjacent gap %d > %d" % [_i, root, quality, hand_label, adj_gap, MAX_ADJACENT_GAP])
 	return errors
 
 
@@ -333,7 +636,10 @@ static func _letter_to_midi(letter: String, accidental: int, octave: int) -> int
 
 
 static func _find_nearest_midi_for_pc(pc: int, target_midi: int) -> int:
-	var base := (target_midi / 12) * 12 + posmod(pc, 12)
+	# Snap to the nearest MIDI with the requested pitch class.
+	# Use octave base via modulo instead of float division to avoid semitone drift.
+	var octave_base := target_midi - posmod(target_midi, 12)
+	var base := octave_base + posmod(pc, 12)
 	if base > target_midi + 6:
 		base -= 12
 	elif base < target_midi - 6:
@@ -374,28 +680,34 @@ static func _midi_to_letter_in_key(midi: int, _root_letter: String, _root_acc: i
 
 
 static func _simplify_enharmonic(letter: String, octave: int, acc: int, midi: int) -> Dictionary:
-	# Try adjacent letter names to find a simpler spelling (|acc| <= 1)
-	var letter_idx := NOTE_LETTERS.find(letter)
-	var best_letter := letter
-	var best_octave := octave
-	var best_acc := acc
-	for offset in [1, -1]:
-		var try_idx := posmod(letter_idx + offset, 7)
-		var try_letter: String = NOTE_LETTERS[try_idx]
+	# Search all letter spellings and choose the simplest accidental spelling.
+	# This avoids misleading names like A# when the pitch is really B natural.
+	var preferred_idx := NOTE_LETTERS.find(letter)
+	if preferred_idx < 0:
+		preferred_idx = 0
+	var best_letter: String = letter
+	var best_octave: int = octave
+	var best_acc: int = acc
+	var best_cost: int = 9999
+	for li in range(NOTE_LETTERS.size()):
+		var try_letter: String = NOTE_LETTERS[li]
 		var try_pc: int = int(LETTER_PC.get(try_letter, 0))
 		var try_acc: int = posmod(midi, 12) - try_pc
 		if try_acc > 6:
 			try_acc -= 12
 		elif try_acc < -6:
 			try_acc += 12
-		if absi(try_acc) < absi(best_acc):
-			var try_octave: int = (midi / 12) - 1
-			var recheck: int = (try_octave + 1) * 12 + try_pc + try_acc
-			if recheck != midi:
-				if recheck > midi:
-					try_octave -= 1
-				else:
-					try_octave += 1
+		var try_octave: int = int((midi - try_pc - try_acc) / 12) - 1
+		var recheck: int = (try_octave + 1) * 12 + try_pc + try_acc
+		if recheck != midi:
+			continue
+		var cost: int = (absi(try_acc) * 20) + absi(li - preferred_idx)
+		if try_acc == 0:
+			cost -= 6
+		elif absi(try_acc) == 1:
+			cost -= 2
+		if cost < best_cost:
+			best_cost = cost
 			best_letter = try_letter
 			best_octave = try_octave
 			best_acc = try_acc
@@ -473,6 +785,31 @@ static func _min_midi(notes: Array[Dictionary]) -> int:
 	return m
 
 
+static func _fix_adjacent_gaps(notes: Array[Dictionary], split_midi: int, _root_letter: String, _root_acc: int, _sig_map: Dictionary) -> void:
+	# For each hand (LH < split_midi, RH >= split_midi), ensure no two
+	# consecutive notes exceed MAX_ADJACENT_GAP semitones.
+	for is_rh in [false, true]:
+		var hand: Array[Dictionary] = []
+		for n in notes:
+			var in_rh := int(n.midi) >= split_midi
+			if in_rh == is_rh:
+				hand.append(n)
+		if hand.size() < 2:
+			continue
+		hand.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.midi) < int(b.midi))
+		for i in range(hand.size() - 1):
+			var gap: int = int(hand[i + 1].midi) - int(hand[i].midi)
+			if gap > MAX_ADJACENT_GAP:
+				var new_midi: int = int(hand[i + 1].midi) - 12
+				var prev_midi: int = int(hand[i].midi)
+				var floor_midi: int = split_midi if is_rh else BASS_RANGE_LOW
+				if new_midi > prev_midi and new_midi >= floor_midi:
+					hand[i + 1].midi = new_midi
+					# Octave shift preserves note spelling; update octave for display correctness.
+					hand[i + 1].octave = int(new_midi / 12) - 1
+
+
 static func _fix_muddy_bass(notes: Array[Dictionary]) -> void:
 	# Ensure bass notes below C3 (MIDI 48) have enough spacing
 	for i in range(notes.size() - 1):
@@ -484,3 +821,5 @@ static func _fix_muddy_bass(notes: Array[Dictionary]) -> void:
 				notes[i + 1].midi = midi_b + 12
 				if int(notes[i + 1].midi) > TREBLE_RANGE_HIGH:
 					notes[i + 1].midi = midi_b  # revert if out of range
+				else:
+					notes[i + 1].octave = int(int(notes[i + 1].midi) / 12) - 1

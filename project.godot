@@ -15,9 +15,9 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="MusicEd - Interval Birds"
-run/main_scene="res://scenes/IntervalBirds.tscn"
+run/main_scene="res://scenes/ui/SplashScreen.tscn"
 config/features=PackedStringArray("4.6")
-boot_splash/image="uid://5k460d2ns8et"
+boot_splash/show_image=false
 config/icon="res://icon.svg"
 
 [display]

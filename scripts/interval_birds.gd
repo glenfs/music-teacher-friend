@@ -93,7 +93,7 @@ const GRAND_STAFF_CLEF_RIGHT_NUDGE := 18.0
 const GRAND_STAFF_CLEF_DOWN_SPACES := 1.0
 const GRAND_STAFF_TREBLE_CLEF_EXTRA_RIGHT := 3.0
 const GRAND_STAFF_BASS_CLEF_EXTRA_RAISE_SPACES := 1.15
-const GRAND_STAFF_LEDGER_RIGHT_NUDGE := 4.0
+const GRAND_STAFF_LEDGER_RIGHT_NUDGE := 0.0
 const SIGHT_CLEF_ANCHOR_FACTOR_TREBLE := 1.02
 const SIGHT_CLEF_ANCHOR_FACTOR_BASS := 1.62
 const SIGHT_CLEF_EXTRA_RAISE_TREBLE := 17.0
@@ -391,7 +391,19 @@ const SIGHT_NOTE_COLORS := [
 	Color(0.94, 0.54, 0.88, 0.98),
 	Color(0.42, 0.84, 0.76, 0.98)
 ]
+const PIANO_NUMBERED_DIR := "res://assets/audio/piano/piano"
+const PIANO_NUMBERED_FIRST_INDEX := 1
+const PIANO_NUMBERED_LAST_INDEX := 88
+const PIANO_NUMBERED_BASE_MIDI := 21 # 1 => A0 (MIDI 21)
 const PIANO_SAMPLED_DIR := "res://assets/audio/piano/sampled"
+const PIANO_SAMPLED_MIDI_OVERRIDES := {
+	# Legacy sampled-bank override (fallback-only when numbered MP3 bank is missing):
+	# Verified anomaly in this sample set (main-menu playback + pitch check):
+	# - a1.ogg   is A#1
+	# - a1_2.ogg is A1 natural
+	"a1": 34,    # A#1
+	"a1_2": 33,  # A1
+}
 const TEACHER_DATA_PATH := "user://teacher_data.json"
 const EAR_SETTINGS_PATH := "user://ear_settings.json"
 const PROGRESS_DATA_PATH := "user://progress_data.json"
@@ -521,6 +533,7 @@ var _ear_settings_button: Button
 var _ear_settings_screen: VBoxContainer
 var _ear_settings_back_button: Button
 var _ear_settings_more_panel: VBoxContainer
+var _settings_exit_button: Button
 var _ear_choice_count_select: OptionButton
 var _ear_theme_select: OptionButton
 var _ear_settings_header_label: Label
@@ -2010,6 +2023,10 @@ func _stop_prompt_audio_playback() -> void:
 	for p in _chord_players:
 		if p != null:
 			p.stop()
+	if _rhythm_metronome_player != null:
+		_rhythm_metronome_player.stop()
+	if _shield_sfx_player != null:
+		_shield_sfx_player.stop()
 	# Do not stop the generator player here. Prompt fallback audio writes into the
 	# generator ring buffer and stopping the player can leave later replays silent
 	# (or waiting indefinitely for free frames on some devices).
@@ -2513,6 +2530,17 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 		if sig_btn == null:
 			continue
 		sig_btn.add_theme_font_size_override("font_size", int(roundf((18 if is_tablet else 13) * large_scale)))
+	for b in _sight_chord_tier_buttons.values():
+		var tier_btn := b as Button
+		if tier_btn == null:
+			continue
+		var tier_size := Vector2(188, 58) if is_tablet else Vector2(148, 46)
+		if compact_height_ui:
+			tier_size.y = minf(tier_size.y, 54.0 if is_tablet else 42.0)
+		if very_compact_height_ui:
+			tier_size.y = minf(tier_size.y, 50.0 if is_tablet else 40.0)
+		tier_btn.custom_minimum_size = tier_size
+		tier_btn.add_theme_font_size_override("font_size", int(roundf((20 if is_tablet else 15) * large_scale)))
 	for b in _note_chase_note_toggles.values():
 		var note_btn := b as Button
 		if note_btn == null:
@@ -3201,6 +3229,14 @@ func _build_ui() -> void:
 	settings_section_spacer.custom_minimum_size = Vector2(0, 16)
 	_ear_settings_screen.add_child(settings_section_spacer)
 
+	_settings_exit_button = Button.new()
+	_settings_exit_button.text = "Exit Settings"
+	_settings_exit_button.custom_minimum_size = Vector2(190, 48)
+	_settings_exit_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_settings_exit_button.pressed.connect(_on_settings_exit_pressed)
+	_ear_settings_screen.add_child(_settings_exit_button)
+	_home_material_buttons.append(_settings_exit_button)
+
 	_refresh_ear_settings_ui()
 
 	_interval_options_box = VBoxContainer.new()
@@ -3739,7 +3775,7 @@ func _build_ui() -> void:
 	for tier in range(1, SIGHT_CHORD_MAX_TIER + 1):
 		var tier_btn := Button.new()
 		tier_btn.text = str(SIGHT_CHORD_TIER_NAMES.get(tier, "Tier %d" % tier))
-		tier_btn.custom_minimum_size = Vector2(80, 34)
+		tier_btn.custom_minimum_size = Vector2(128, 42)
 		tier_btn.set_meta("compact_btn", true)
 		tier_btn.pressed.connect(_on_sight_chord_tier_button_pressed.bind(tier))
 		sight_tier_row.add_child(tier_btn)
@@ -7051,11 +7087,19 @@ func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 	card.set_meta("_card_hover_feedback_connected", true)
 	card.pivot_offset = card.size * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	var is_main_menu_mode_card: bool = btn.has_meta("main_menu_mode_key")
+	var hover_scale: Vector2 = Vector2(1.055, 1.055) if is_main_menu_mode_card else Vector2(1.035, 1.035)
+	var press_scale: Vector2 = Vector2(0.975, 0.975) if is_main_menu_mode_card else Vector2(0.97, 0.97)
 	var hover_enter := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
+		var hover_active_v: Variant = card.get_meta("_card_hover_active", false)
+		var hover_active: bool = hover_active_v if hover_active_v is bool else false
+		if hover_active:
+			return
+		card.set_meta("_card_hover_active", true)
 		card.pivot_offset = card.size * 0.5
-		_run_control_scale_tween(card, Vector2(1.025, 1.025), 0.12, Tween.TRANS_QUAD, Tween.EASE_OUT)
+		_run_control_scale_tween(card, hover_scale, 0.12, Tween.TRANS_BACK, Tween.EASE_OUT)
 		var sb: Variant = card.get_theme_stylebox("panel") if card is PanelContainer else null
 		if sb is StyleBoxFlat:
 			var base_sb := sb as StyleBoxFlat
@@ -7066,15 +7110,38 @@ func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 				hover_sb = cached_hover_v as StyleBoxFlat
 			else:
 				hover_sb = base_sb.duplicate()
-				hover_sb.shadow_size = mini(hover_sb.shadow_size + 4, 16)
-				hover_sb.shadow_color = Color(hover_sb.shadow_color.r, hover_sb.shadow_color.g, hover_sb.shadow_color.b, minf(hover_sb.shadow_color.a + 0.06, 0.5))
+				if is_main_menu_mode_card:
+					hover_sb.shadow_size = maxi(12, mini(hover_sb.shadow_size + 10, 20))
+					hover_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.34)
+					hover_sb.border_width_left = maxi(2, hover_sb.border_width_left)
+					hover_sb.border_width_top = maxi(2, hover_sb.border_width_top)
+					hover_sb.border_width_right = maxi(2, hover_sb.border_width_right)
+					hover_sb.border_width_bottom = maxi(2, hover_sb.border_width_bottom)
+					hover_sb.border_color = Color(1.0, 0.92, 0.62, 0.96)
+				else:
+					hover_sb.shadow_size = mini(hover_sb.shadow_size + 6, 16)
+					hover_sb.shadow_color = Color(hover_sb.shadow_color.r, hover_sb.shadow_color.g, hover_sb.shadow_color.b, minf(hover_sb.shadow_color.a + 0.16, 0.52))
 				card.set_meta("_hover_base_sb", base_sb)
 				card.set_meta("_hover_hover_sb", hover_sb)
 			card.add_theme_stylebox_override("panel", hover_sb)
 			card.set_meta("_pre_hover_sb", base_sb)
+		if btn.has_meta("mode_card_accent_bar"):
+			var accent_node: Variant = btn.get_meta("mode_card_accent_bar")
+			if accent_node is ColorRect:
+				var accent := accent_node as ColorRect
+				if accent != null and is_instance_valid(accent):
+					card.set_meta("_pre_hover_accent_color", accent.color)
+					card.set_meta("_pre_hover_accent_right", accent.offset_right)
+					accent.color = Color(accent.color.r, accent.color.g, accent.color.b, minf(accent.color.a + (0.26 if is_main_menu_mode_card else 0.16), 1.0))
+					accent.offset_right = 10 if is_main_menu_mode_card else 7
 	var hover_exit := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
+		var hover_active_v: Variant = card.get_meta("_card_hover_active", false)
+		var hover_active: bool = hover_active_v if hover_active_v is bool else false
+		if not hover_active:
+			return
+		card.set_meta("_card_hover_active", false)
 		card.pivot_offset = card.size * 0.5
 		_run_control_scale_tween(card, Vector2.ONE, 0.15, Tween.TRANS_QUAD, Tween.EASE_OUT)
 		if card.has_meta("_pre_hover_sb"):
@@ -7082,13 +7149,31 @@ func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 			if old_sb is StyleBoxFlat:
 				card.add_theme_stylebox_override("panel", old_sb as StyleBoxFlat)
 			card.remove_meta("_pre_hover_sb")
+		if btn.has_meta("mode_card_accent_bar"):
+			var accent_node: Variant = btn.get_meta("mode_card_accent_bar")
+			if accent_node is ColorRect:
+				var accent := accent_node as ColorRect
+				if accent != null and is_instance_valid(accent):
+					var pre_color_v: Variant = card.get_meta("_pre_hover_accent_color", accent.color)
+					if pre_color_v is Color:
+						accent.color = pre_color_v as Color
+					var pre_right_v: Variant = card.get_meta("_pre_hover_accent_right", accent.offset_right)
+					if pre_right_v is float or pre_right_v is int:
+						accent.offset_right = float(pre_right_v)
+		if card.has_meta("_pre_hover_accent_color"):
+			card.remove_meta("_pre_hover_accent_color")
+		if card.has_meta("_pre_hover_accent_right"):
+			card.remove_meta("_pre_hover_accent_right")
 	var press_down := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
 		card.pivot_offset = card.size * 0.5
-		_run_control_scale_tween(card, Vector2(0.97, 0.97), 0.06, Tween.TRANS_BACK, Tween.EASE_OUT)
+		_run_control_scale_tween(card, press_scale, 0.06, Tween.TRANS_BACK, Tween.EASE_OUT)
+	# Hover can be eaten by a full-rect child button, so bind both emitters.
 	card.mouse_entered.connect(hover_enter)
 	card.mouse_exited.connect(hover_exit)
+	btn.mouse_entered.connect(hover_enter)
+	btn.mouse_exited.connect(hover_exit)
 	btn.button_down.connect(press_down)
 
 
@@ -7204,6 +7289,7 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	btn.flat = true
 	btn.set_anchors_preset(PRESET_FULL_RECT)
 	btn.focus_mode = Control.FOCUS_ALL
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.set_meta("mode_card_panel", card)
 	btn.set_meta("mode_card_icon", icon)
 	btn.set_meta("mode_card_name_label", name_lbl)
@@ -7759,7 +7845,8 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_range_container.add_theme_constant_override("separation", 12 if active else 4)
 	var sight_notes_mode := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
 	if _sight_notes_setup_title_label != null:
-		_sight_notes_setup_title_label.visible = active and not sight_notes_mode
+		var show_setup_title := active and not sight_notes_mode and not (_selected_mode == MODE_SIGHT and _sight_mode == "Chords")
+		_sight_notes_setup_title_label.visible = show_setup_title
 		_sight_notes_setup_title_label.text = "Clef & Key Signature"
 		_sight_notes_setup_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_sight_notes_setup_title_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -7767,7 +7854,8 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_setup_title_label.add_theme_constant_override("outline_size", 0)
 		_sight_notes_setup_title_label.add_theme_font_size_override("font_size", 18)
 	if _sight_key_sig_label != null:
-		_sight_key_sig_label.visible = true
+		var show_key_sig_label := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		_sight_key_sig_label.visible = show_key_sig_label
 		_sight_key_sig_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if active else HORIZONTAL_ALIGNMENT_CENTER
 		_sight_key_sig_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if active else Color(0.92, 0.90, 0.82, 0.92))
 		_sight_key_sig_label.add_theme_font_size_override("font_size", 15 if active else 16)
@@ -9167,7 +9255,8 @@ func _refresh_sight_lives_feed_shield_ui() -> void:
 		return
 	var in_notes_style := _is_sight_notes_style_mode()
 	var in_ear := _is_ear_training_mode()
-	var show_panel := (in_notes_style or in_ear) and _game_panel != null and _game_panel.visible
+	var hide_sight_practice_panel := in_notes_style and not in_ear and _practice_mode_enabled
+	var show_panel := (in_notes_style or in_ear) and _game_panel != null and _game_panel.visible and not hide_sight_practice_panel
 	_sight_lives_panel.visible = show_panel
 	if not show_panel:
 		return
@@ -9578,31 +9667,38 @@ func _apply_continuous_sight_skin() -> void:
 	_style_sight_hud_box_neon(_hud_center_box, Color(0.95, 0.78, 0.35, 0.96))
 	_style_sight_hud_box_neon(_hud_right_box, Color(0.95, 0.82, 0.50, 0.90))
 	var is_rhythm := _sight_mode == "Rhythm Flow"
+	var hide_sight_practice_panel := _practice_mode_enabled
 	# Left panel: Note Flow uses Notes-style lives panel, Rhythm Flow keeps combo-focused panel.
 	if _sight_lives_panel != null:
-		_sight_lives_panel.visible = true
-	if _sight_lives_title_label != null:
-		_sight_lives_title_label.text = "COMBO" if is_rhythm else "LIVES"
-		_sight_lives_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
-	if _sight_lives_hearts_label != null:
-		if is_rhythm:
-			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
-			_sight_lives_hearts_label.add_theme_color_override("font_color", Color(0.44, 0.96, 1.0, 1.0))
-			_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.04, 0.14, 0.22, 0.76))
-			_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(0.20, 0.86, 1.0, icon_glow_alpha))
-		else:
-			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
-			_sight_lives_hearts_label.add_theme_color_override("font_color", Color(1.0, 0.36, 0.38, 1.0))
-			_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.17, 0.05, 0.08, 0.76))
-			_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.34, 0.26, icon_glow_alpha))
-		_sight_lives_hearts_label.add_theme_constant_override("outline_size", 1)
-		_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_x", 0)
-		_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_y", 0)
-	# Keep Feed/Shield chips visible in Note Flow for parity with Notes HUD.
-	if _sight_feed_chip != null:
-		_sight_feed_chip.visible = not is_rhythm
-	if _sight_shield_chip != null:
-		_sight_shield_chip.visible = not is_rhythm
+		_sight_lives_panel.visible = not hide_sight_practice_panel
+	if not hide_sight_practice_panel:
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.text = "COMBO" if is_rhythm else "LIVES"
+			_sight_lives_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
+		if _sight_lives_hearts_label != null:
+			if is_rhythm:
+				_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+				_sight_lives_hearts_label.add_theme_color_override("font_color", Color(0.44, 0.96, 1.0, 1.0))
+				_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.04, 0.14, 0.22, 0.76))
+				_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(0.20, 0.86, 1.0, icon_glow_alpha))
+			else:
+				_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+				_sight_lives_hearts_label.add_theme_color_override("font_color", Color(1.0, 0.36, 0.38, 1.0))
+				_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.17, 0.05, 0.08, 0.76))
+				_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.34, 0.26, icon_glow_alpha))
+			_sight_lives_hearts_label.add_theme_constant_override("outline_size", 1)
+			_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_x", 0)
+			_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_y", 0)
+		# Keep Feed/Shield chips visible in Note Flow for parity with Notes HUD.
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = not is_rhythm
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = not is_rhythm
+	else:
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = false
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = false
 	_style_sight_stat_chip(_sight_feed_chip, Color(0.98, 0.82, 0.34, 0.94))
 	_style_sight_stat_chip(_sight_shield_chip, Color(0.55, 0.62, 0.72, 0.84))
 	if _sight_feed_chip_label != null:
@@ -11114,7 +11210,7 @@ func _load_texture(path: String) -> Texture2D:
 func _setup_audio_players() -> void:
 	_piano_player = AudioStreamPlayer.new()
 	add_child(_piano_player)
-	for i in 5:
+	for i in 8:
 		var chord_player := AudioStreamPlayer.new()
 		add_child(chord_player)
 		_chord_players.append(chord_player)
@@ -12504,6 +12600,13 @@ func _on_sight_settings_back_pressed() -> void:
 	_sight_settings_screen_active = false
 	_refresh_sight_settings_subscreen()
 	_on_mode_selected()
+
+
+func _on_settings_exit_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
+	_play_ui_click_sfx()
+	_on_home_back_pressed()
 
 
 func _on_home_mode_back_pressed() -> void:
@@ -14671,6 +14774,7 @@ func _on_restart_quiz_pressed() -> void:
 	if _is_prompt_playing:
 		return
 	_clear_gameplay_transient_visuals()
+	_set_sight_result_background_hidden(false)
 	_bump_quiz_run_token()
 	_invalidate_audio_sequence_schedule()
 	if _selected_mode == MODE_READ:
@@ -15075,8 +15179,29 @@ func _is_sight_chords_grand_staff_mode() -> bool:
 
 func _current_sight_grand_staff_chord_midis() -> Array[int]:
 	var out: Array[int] = []
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
+		return out
+	# Prefer the MIDI values bound to currently visible noteheads.
+	# This guarantees playback matches what the player sees.
+	var note_panels: Array[Panel] = []
+	if _staff_note != null:
+		note_panels.append(_staff_note)
+	note_panels.append_array(_staff_chord_notes)
+	for p in note_panels:
+		if p == null or not p.visible:
+			continue
+		if not p.has_meta("sight_note_midi"):
+			continue
+		var midi_v := int(p.get_meta("sight_note_midi", -1))
+		if midi_v >= 0:
+			out.append(midi_v)
+	if not out.is_empty():
+		return out
+
 	if not _is_sight_chords_grand_staff_mode():
 		return out
+
+	# Fallback to generated voicing data when panels are not yet populated.
 	var voicing_v: Variant = _current_sight_chord_def.get("grand_staff_voicing", {})
 	if not (voicing_v is Dictionary):
 		return out
@@ -15090,10 +15215,46 @@ func _current_sight_grand_staff_chord_midis() -> Array[int]:
 	return out
 
 
+func _sight_step_to_midi(step: int, clef_name: String, accidental: int = 0) -> int:
+	var anchor_letter := "A" if clef_name == "Bass" else "F"
+	var anchor_octave := 3 if clef_name == "Bass" else 5
+	var seq_len: int = NOTE_NAME_ORDER.size()
+	var anchor_idx: int = NOTE_NAME_ORDER.find(anchor_letter)
+	if anchor_idx < 0 or seq_len <= 0:
+		return -1
+	var anchor_diatonic: int = (anchor_octave * seq_len) + anchor_idx
+	var note_diatonic: int = anchor_diatonic - step
+	var octave: int = int(floor(float(note_diatonic) / float(seq_len)))
+	var letter_idx: int = posmod(note_diatonic, seq_len)
+	var letter := str(NOTE_NAME_ORDER[letter_idx])
+	var midi: int = ((octave + 1) * 12) + _note_letter_pitch_class(letter, accidental)
+	if midi < 0 or midi > 127:
+		return -1
+	return midi
+
+
+func _current_sight_note_prompt_midi() -> int:
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
+		return -1
+	var step: int = _current_sight_display_step
+	var base_letter := _staff_step_name_for_clef(step, _selected_clef)
+	if base_letter.is_empty():
+		return -1
+	var accidental := 0
+	if _current_sight_note_explicit_accidental == char(0x266E):
+		accidental = 0
+	else:
+		accidental = int(_key_signature_accidental_map().get(base_letter, 0))
+	return _sight_step_to_midi(step, _selected_clef, accidental)
+
+
 func _apply_answer_mode() -> void:
 	var gate_choices_for_round_start := _awaiting_round_start and (_is_ear_training_mode() or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
 	var is_ear_mode := _is_ear_training_mode()
 	var vp := get_viewport_rect().size
+	var ear_chord_raise_pct := 0.40
+	var ear_chord_bottom_lift_px := clampf(vp.y * 0.04, 20.0, 56.0) if _selected_mode == MODE_CHORD else 0.0
+	var ear_chord_sky_h := clampf(140.0 * (1.0 - ear_chord_raise_pct), 72.0, 132.0)
 	var compact_height_layout := vp.y < 930.0
 	var very_compact_height_layout := vp.y < 860.0
 	var ultra_compact_height_layout := vp.y < 780.0
@@ -15193,6 +15354,7 @@ func _apply_answer_mode() -> void:
 		_interval_center_top_spacer.visible = is_ear_mode
 	if _interval_center_bottom_spacer != null:
 		_interval_center_bottom_spacer.visible = is_ear_mode
+		_interval_center_bottom_spacer.custom_minimum_size = Vector2(0, ear_chord_bottom_lift_px if _selected_mode == MODE_CHORD else 0)
 	if _interval_prompt_top_spacer != null:
 		_interval_prompt_top_spacer.visible = is_ear_mode
 	if _interval_choices_top_spacer != null:
@@ -15408,6 +15570,9 @@ func _apply_answer_mode() -> void:
 	if _sky_block != null:
 		if _selected_mode == MODE_READ:
 			_sky_block.custom_minimum_size = Vector2(0, 118)
+		elif _selected_mode == MODE_CHORD:
+			# Ear Chord quiz: keep options higher on screen by reducing top spacer.
+			_sky_block.custom_minimum_size = Vector2(0, ear_chord_sky_h)
 		elif _selected_mode == MODE_SIGHT:
 			var sight_sky_h := 16.0
 			if compact_height_layout:
@@ -15428,7 +15593,7 @@ func _apply_answer_mode() -> void:
 			_sky_block.custom_minimum_size = Vector2(0, chase_sky_h)
 		else:
 			_sky_block.custom_minimum_size = Vector2(0, 140)
-		var compact_bottom_sky := (_selected_mode == MODE_NOTE_CHASE) or (_selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))
+		var compact_bottom_sky := (_selected_mode == MODE_CHORD) or (_selected_mode == MODE_NOTE_CHASE) or (_selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))
 		_sky_block.size_flags_vertical = Control.SIZE_SHRINK_END if compact_bottom_sky else Control.SIZE_EXPAND_FILL
 	if _staff_area != null:
 		var is_large := vp.y >= 720.0 or vp.x >= 1100.0
@@ -18588,10 +18753,17 @@ func _play_current_prompt() -> void:
 		await _play_chord_sequence(cadence_chords, _cadence_tempo, "broken" if _cadence_broken else "block")
 		return
 	if _selected_mode == MODE_SIGHT:
-		if _is_sight_chords_grand_staff_mode():
-			var notes := _current_sight_grand_staff_chord_midis()
-			if not notes.is_empty():
-				await _play_chord_block_with_fade(notes, SIGHT_GRAND_STAFF_REPLAY_DURATION, SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS)
+		if _sight_mode == "Chords":
+			var chord_notes := _current_sight_grand_staff_chord_midis()
+			if not chord_notes.is_empty():
+				await _play_chord_block_with_fade(chord_notes, SIGHT_GRAND_STAFF_REPLAY_DURATION, SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS)
+				return
+		elif _sight_mode == "Notes":
+			var sight_note_midi := _current_sight_note_prompt_midi()
+			if sight_note_midi >= 0:
+				var sight_note_len := clampf(_current_note_duration(), 0.18, 0.55)
+				await _play_note(sight_note_midi, sight_note_len)
+				await _push_silence(0.05)
 				return
 		await get_tree().create_timer(0.05).timeout
 		return
@@ -18810,6 +18982,10 @@ func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_second
 		await _push_silence(0.10)
 		return
 	var used_players: Array[AudioStreamPlayer] = []
+	# Piano-like dynamics: bass notes slightly louder, upper voices softer.
+	# Slight roll (stagger) between notes for a natural feel.
+	var base_vol_db := -6.0  # softer baseline than raw 0 dB
+	var roll_gap := 0.025  # 25ms stagger between notes for gentle rolled feel
 	for i in notes.size():
 		var midi_note := notes[i]
 		var nearest := _nearest_sample_cached(midi_note, sample_map)
@@ -18818,9 +18994,13 @@ func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_second
 		player.stop()
 		player.stream = stream
 		player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
-		player.volume_db = 0.0
+		# Dynamic curve: bass (low MIDI) slightly louder, treble notes softer
+		var voice_ratio := float(i) / maxf(1.0, float(notes.size() - 1))
+		player.volume_db = base_vol_db - (voice_ratio * 3.5)  # top voice ~3.5 dB quieter
 		player.play()
 		used_players.append(player)
+		if i < notes.size() - 1:
+			await get_tree().create_timer(roll_gap).timeout
 	var fade := clampf(fade_seconds, 0.06, maxf(0.06, duration - 0.02))
 	var hold := maxf(0.02, duration - fade)
 	await get_tree().create_timer(hold).timeout
@@ -23829,7 +24009,9 @@ func _generate_sight_chord_round_grand_staff(candidates: Array[Dictionary]) -> v
 	if ChordVoicingGeneratorScript.CHORD_INTERVALS.has(voicing_quality):
 		num_tones = (ChordVoicingGeneratorScript.CHORD_INTERVALS[voicing_quality] as Array).size()
 	var max_inv := num_tones - 1
-	var inversion := _rng.randi_range(0, max_inv)
+	var chord_tier := int(chord_def.get("tier", _sight_selected_chord_tier))
+	var force_root_position := chord_tier <= 2
+	var inversion := 0 if force_root_position else _rng.randi_range(0, max_inv)
 
 	var voicing := ChordVoicingGeneratorScript.generate(root_letter, root_acc, voicing_quality, inversion, sig_map, _rng, true, true)
 	var all_notes: Array = voicing.get("all_notes", [])
@@ -24030,7 +24212,16 @@ func _position_sight_chord_grand_staff(voicing: Dictionary, chord_def: Dictionar
 			lbl.visible = false
 	_clear_staff_ledger_lines()
 
-	# Position each note on the correct staff
+	# Position each note on the correct staff using direct geometry.
+	# Staff lines are drawn at: staff_top + line_index * gap  (line_index 0..4)
+	# Steps map to lines/spaces: step 0 = line 0 (top), step 1 = space, step 2 = line 1, etc.
+	# So the exact Y for any step is: staff_top + step * (gap / 2.0)
+	# This must use the SAME top_y and gap values that draw the staff lines.
+	var gap := _active_staff_line_gap_y()
+	var treble_top := _active_staff_top_y()
+	var bass_top := _grand_staff_bass_top_y(treble_top, gap)
+	var half_gap := gap * 0.5
+
 	var display_note_centers: Array[float] = []
 	var note_staffs: Array[String] = []
 	var note_steps: Array[int] = []
@@ -24040,13 +24231,11 @@ func _position_sight_chord_grand_staff(voicing: Dictionary, chord_def: Dictionar
 		var staff: String = str(note.get("staff", "treble"))
 		var step: int = int(note.get("step", 4))
 		var display_step := step
-		var center_y: float
 		if staff == "bass":
 			display_step = _grand_staff_bass_display_step(step)
-			center_y = _grand_staff_bass_center_y_for_step(display_step)
-		else:
-			center_y = _staff_center_y_for_step(step)
-		center_y += _grand_staff_note_vertical_nudge_pixels(note, chord_def)
+		# Pure math: staff_top + display_step * half_gap — no nudges, no mode checks
+		var staff_top_y: float = treble_top if staff == "treble" else bass_top
+		var center_y: float = staff_top_y + float(display_step) * half_gap
 		display_note_centers.append(center_y)
 		note_staffs.append(staff)
 		note_steps.append(display_step)
@@ -24097,7 +24286,7 @@ func _position_sight_chord_grand_staff(voicing: Dictionary, chord_def: Dictionar
 	for ni in range(all_notes.size()):
 		if ni < note_panels.size():
 			var p := note_panels[ni]
-			var center_y := display_note_centers[ni]
+			var target_y := display_note_centers[ni]
 			var display_note: Dictionary = all_notes[ni]
 			var note_name := _sight_note_name_with_accidental(
 				str(display_note.get("letter", "C")),
@@ -24107,13 +24296,18 @@ func _position_sight_chord_grand_staff(voicing: Dictionary, chord_def: Dictionar
 			p.set_meta("sight_note_name", note_name)
 			p.set_meta("sight_note_midi", int(display_note.get("midi", -1)))
 			p.visible = true
-			p.scale = _note_scale_for_y(center_y)
-			# Keep in-staff notes with the visual nudge, but ledger notes canonical
-			# so ledger-line counts/placement remain musically correct.
-			var gs_nudge := _active_staff_step_y() * 0.5
-			if note_steps[ni] < STAFF_TOP_LINE_STEP or note_steps[ni] > STAFF_BOTTOM_LINE_STEP:
-				gs_nudge = 0.0
-			p.position = Vector2(x + note_x_offsets[ni], center_y - (p.size.y * p.scale.y * 0.5) + gs_nudge)
+			p.scale = _note_scale_for_y(target_y)
+			# Place the notehead so its visual center lands exactly on target_y.
+			# The panel is rotated around its top-left corner (no pivot_offset set).
+			# For a panel of (w, h) scaled by (sx, sy) and rotated by θ:
+			#   visual_center = position + rotate(Vector2(w*sx/2, h*sy/2), θ)
+			# We want visual_center.y == target_y, so:
+			#   position.y = target_y - rotated_half.y
+			var sw := p.size.x * p.scale.x
+			var sh := p.size.y * p.scale.y
+			var theta := deg_to_rad(p.rotation_degrees)
+			var rotated_half_y := sin(theta) * (sw * 0.5) + cos(theta) * (sh * 0.5)
+			p.position = Vector2(x + note_x_offsets[ni], target_y - rotated_half_y)
 
 	# Ledger lines for both staves
 	_update_grand_staff_ledger_lines(all_notes, note_panels)
@@ -24149,11 +24343,12 @@ func _position_sight_chord_grand_staff(voicing: Dictionary, chord_def: Dictionar
 			acc_lbl.text = flat_sym
 		acc_lbl.visible = true
 		acc_visible[i] = true
-		var center_y := p.position.y + (p.size.y * p.scale.y * 0.5)
+		# Use the exact target_y (staff line/space center) for accidental vertical alignment
+		var target_y: float = display_note_centers[i]
 		var note_left := p.position.x
 		var acc_offset_x := maxf(GRAND_STAFF_ACCIDENTAL_X_OFFSET, p.size.x * p.scale.x * 0.40)
 		var y_adjust := (-8.0 if acc_val < 0 else -1.0) - SIGHT_ACCIDENTAL_RAISE_Y
-		acc_lbl.position = Vector2(note_left - acc_offset_x, center_y - (acc_lbl.size.y * 0.5) + y_adjust)
+		acc_lbl.position = Vector2(note_left - acc_offset_x, target_y - (acc_lbl.size.y * 0.5) + y_adjust)
 
 	# Second pass: stagger accidentals for notes a 2nd apart that both have accidentals.
 	# Standard rule: when two adjacent-second notes both show accidentals, stagger them
@@ -24197,7 +24392,11 @@ func _update_grand_staff_ledger_lines(all_notes: Array, note_panels: Array[Panel
 		if staff == "bass":
 			step = _grand_staff_bass_display_step(step)
 		var staff_top_y: float = treble_top if staff == "treble" else bass_top
-		var center_x := p.position.x + (p.size.x * p.scale.x * 0.5)
+		# Compute true visual center X accounting for rotation
+		var sw := p.size.x * p.scale.x
+		var sh := p.size.y * p.scale.y
+		var theta := deg_to_rad(p.rotation_degrees)
+		var center_x := p.position.x + cos(theta) * (sw * 0.5) - sin(theta) * (sh * 0.5)
 		# Ledger lines below staff (step > 8) or above staff (step < 0)
 		if step >= STAFF_BOTTOM_LINE_STEP + 2:
 			# For notes in spaces below the staff, stop at the closest ledger line
@@ -24223,40 +24422,6 @@ func _update_grand_staff_ledger_lines(all_notes: Array, note_panels: Array[Panel
 					_add_staff_ledger_line(y, center_x)
 				s -= 2
 
-
-func _grand_staff_note_vertical_nudge_pixels(note: Dictionary, _chord_def: Dictionary = {}) -> float:
-	# Grand-staff chords only: one unified placement profile across all tiers/families.
-	if not _is_sight_chords_grand_staff_mode():
-		return 0.0
-	var midi := int(note.get("midi", -1))
-	if midi < 0:
-		return 0.0
-	var step_y := _active_staff_step_y()
-	var small := clampf(step_y * 0.24, 2.0, 4.8)
-	var medium := clampf(step_y * 0.32, 2.4, 5.8)
-	var strong := clampf(step_y * 0.46, 3.2, 7.6)
-	var slight := clampf(step_y * 0.08, 0.8, 1.6)
-	match midi:
-		# Treble
-		60: # C4 slightly lower
-			return medium + slight
-		79: # G5 lower
-			return strong + slight
-		81, 83, 72: # A5, B5, C5 slightly lower
-			return medium
-		62: # D4 slightly lower
-			return small + slight
-		59, 57:
-			return small
-		71: # B4 neutral
-			return 0.0
-		# Bass
-		36: # C2 lower
-			return strong
-		38, 40, 41: # D2, E2, F2 slightly lower
-			return strong + slight
-		_:
-			return 0.0
 
 
 func _generate_sight_placement_round() -> void:
@@ -24399,9 +24564,12 @@ func _position_sight_chord(note_centers: Array[float], chord_def: Dictionary = {
 	if note_centers.size() < 3:
 		return
 	var display_note_centers: Array[float] = []
+	var note_steps: Array[int] = []
 	display_note_centers.resize(note_centers.size())
 	for i in range(note_centers.size()):
-		display_note_centers[i] = float(note_centers[i]) + SIGHT_CHORD_NOTE_CENTER_OFFSET_Y
+		var center_y_raw := float(note_centers[i])
+		note_steps.append(_nearest_staff_step_from_center_y(center_y_raw))
+		display_note_centers[i] = center_y_raw + SIGHT_CHORD_NOTE_CENTER_OFFSET_Y
 
 	var x := _sight_note_snap_x()
 	var first_top := display_note_centers[0] - (_staff_note.size.y * 0.5)
@@ -24439,6 +24607,9 @@ func _position_sight_chord(note_centers: Array[float], chord_def: Dictionary = {
 			var letter_name := str(tone_letters[i])
 			var accidental_name := int(tone_accidentals[i]) if i < tone_accidentals.size() else 0
 			panel.set_meta("sight_note_name", _sight_note_name_with_accidental(letter_name, accidental_name))
+			if i < note_steps.size():
+				var step_i := int(note_steps[i])
+				panel.set_meta("sight_note_midi", _sight_step_to_midi(step_i, _selected_clef, accidental_name))
 	for i in range(_staff_chord_accidental_labels.size()):
 		var acc_lbl := _staff_chord_accidental_labels[i]
 		if acc_lbl == null:
@@ -25616,26 +25787,54 @@ func _midi_to_freq(midi_note: int) -> float:
 func _load_piano_samples() -> void:
 	_piano_samples.clear()
 	_piano_interval_anchor_samples.clear()
+	_load_numbered_piano_from_folder()
+	if not _piano_samples.is_empty():
+		# Keep ear training and sight/chords on the same sample set.
+		_piano_interval_anchor_samples = _piano_samples.duplicate()
+		return
 	_load_sampled_piano_from_folder()
 	if not _piano_samples.is_empty():
 		# Also load trusted fixed anchors for interval mode playback.
 		for midi_key in PIANO_SAMPLE_PATHS.keys():
 			var sample_path_a: String = PIANO_SAMPLE_PATHS[midi_key]
-			if not ResourceLoader.exists(sample_path_a, "AudioStream"):
-				continue
-			var stream_a := ResourceLoader.load(sample_path_a)
-			if stream_a is AudioStream:
+			var stream_a := _load_audio_stream_from_path(sample_path_a)
+			if stream_a != null:
 				_piano_interval_anchor_samples[midi_key] = stream_a
 		return
 	# Fallback to legacy sparse sample map.
 	for midi_key in PIANO_SAMPLE_PATHS.keys():
 		var sample_path: String = PIANO_SAMPLE_PATHS[midi_key]
-		if not ResourceLoader.exists(sample_path, "AudioStream"):
-			continue
-		var stream := ResourceLoader.load(sample_path)
-		if stream is AudioStream:
+		var stream := _load_audio_stream_from_path(sample_path)
+		if stream != null:
 			_piano_samples[midi_key] = stream
 			_piano_interval_anchor_samples[midi_key] = stream
+
+
+func _load_numbered_piano_from_folder() -> void:
+	var dir := DirAccess.open(PIANO_NUMBERED_DIR)
+	if dir == null:
+		return
+	for sample_index in range(PIANO_NUMBERED_FIRST_INDEX, PIANO_NUMBERED_LAST_INDEX + 1):
+		var full_path := "%s/%d.mp3" % [PIANO_NUMBERED_DIR, sample_index]
+		var stream := _load_audio_stream_from_path(full_path)
+		if stream != null:
+			var midi := PIANO_NUMBERED_BASE_MIDI + (sample_index - PIANO_NUMBERED_FIRST_INDEX)
+			if not _piano_samples.has(midi):
+				_piano_samples[midi] = stream
+
+
+func _load_audio_stream_from_path(path: String) -> AudioStream:
+	if ResourceLoader.exists(path, "AudioStream"):
+		var loaded_res: Resource = ResourceLoader.load(path)
+		if loaded_res is AudioStream:
+			return loaded_res as AudioStream
+	if path.to_lower().ends_with(".mp3"):
+		var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+		if not bytes.is_empty():
+			var mp3_stream := AudioStreamMP3.new()
+			mp3_stream.data = bytes
+			return mp3_stream
+	return null
 
 
 func _load_sampled_piano_from_folder() -> void:
@@ -25655,15 +25854,15 @@ func _load_sampled_piano_from_folder() -> void:
 		if midi < 0:
 			continue
 		var full_path := "%s/%s" % [PIANO_SAMPLED_DIR, f]
-		if not ResourceLoader.exists(full_path, "AudioStream"):
-			continue
-		var stream := ResourceLoader.load(full_path)
-		if stream is AudioStream and not _piano_samples.has(midi):
+		var stream := _load_audio_stream_from_path(full_path)
+		if stream != null and not _piano_samples.has(midi):
 			_piano_samples[midi] = stream
 
 
 func _sampled_filename_to_midi(file_name: String, lower_names: Dictionary) -> int:
 	var base := file_name.get_basename().to_lower()
+	if PIANO_SAMPLED_MIDI_OVERRIDES.has(base):
+		return int(PIANO_SAMPLED_MIDI_OVERRIDES[base])
 	var rx := RegEx.new()
 	if rx.compile("^([a-g])(\\d)(?:_(\\d+))?$") != OK:
 		return -1

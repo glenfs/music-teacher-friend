@@ -1,0 +1,65 @@
+  Interval
+                                                                                                                                                                                                                                               1. Chord buttons don't reflect the active pool
+  The interval choices are random distractors from whatever you've enabled in settings. If you've only unlocked P4/P5/P8 (beginner), you might still see "TT" or "m2" as choices that are never going to be the answer. Every wrong button
+  should be a plausible answer — only show choices from the active pool.
+
+  2. No spaced repetition
+  Cadence mode uses ReviewQueue so missed cadences come back more often. Interval and Chord modes don't — they're just random. A player who consistently misses m6 will never get more m6 questions. This is the single biggest learning gap.
+
+  3. Root note range is too narrow and fixed
+  Root MIDI is always 52–64 (roughly E3–E4). Real ear training requires hearing intervals from multiple starting pitches. A P5 from C sounds different from a P5 from F# to beginners. Easy sessions should keep a narrow range; harder
+  sessions should widen it (e.g. 45–72).
+
+  4. Label abbreviations are cryptic for beginners
+  m2, TT, M7 mean nothing to someone just starting. Buttons should show the full name: Minor 2nd, Tritone, Major 7th. The abbreviation can be secondary.
+
+  5. No difficulty progression within a session
+  Q1 gets an easy interval (P5), but Q2–Q10 are all equally random. The session should ramp: first 3 questions stay in a comfort zone, then gradually add harder intervals from the enabled pool. Sight Reading does this with levels —
+  interval should too.
+
+  6. No "compare" after a wrong answer
+  After a wrong answer you replay the original. But what the learner really needs is: "You heard this — now hear what you said — can you hear the difference?" A brief A/B button ("Hear your answer") after wrong would be the single most
+  educational addition.
+
+  ---
+  Chords
+
+  1. All 10 chord buttons always visible regardless of active group
+  This is the biggest UX problem. When Group 1 (Major/Minor) is selected, all 10 buttons show — but 8 of them can never be correct. This makes the layout feel overwhelming and teaches the player to eliminate answers by exclusion rather
+  than listening. Only show buttons for chords in the active group.
+
+  2. Inversion feedback is invisible
+  When inversions are enabled the player hears a 1st or 2nd inversion chord, answers correctly, and gets no information about what they actually heard. The feedback should say: "Correct! C Major — 1st Inversion." Over time this builds
+  real recognition of voicings.
+
+  3. Adaptive group progression punishes a single mistake too hard
+  The adaptive mode (Group 4) uses raw streak to decide which chords appear. One wrong answer resets streak to 0, sending you back to Group 1 territory. This is frustrating. Use a rolling accuracy window (last 5 questions) instead of
+  streak count for adaptive difficulty.
+
+  4. No per-chord accuracy summary after the session
+  The result screen shows total score. It should also show a breakdown: "Major: 4/4 ✓  Minor: 3/4  Dom7: 1/3 ✗" — this tells the player exactly what needs more work and makes the session feel meaningful.
+
+  5. Chord group names mean nothing to a beginner
+  "Group 2: Aug/Dim" — why is that harder? Why does it come after Group 1? A short descriptor on the group button would help: "Aug/Dim — unstable sounds", "7th chords — jazz flavour".
+
+  ---
+  Cadence
+
+  1. Key is always C — answer becomes predictable fast
+  _cadence_key exists in the code but is never randomized or user-configurable in the UI. After a few sessions the player starts recognizing the specific chord sounds in C rather than the cadence pattern. Even rotating through 3–4 keys
+  (C, G, F, D) would break this. The setting just needs to be exposed or auto-rotated.
+
+  2. Only 4 cadence types makes sessions feel thin
+  With just 4 options, even a 10-question session becomes repetitive fast. Two quick additions that are musically important: Imperfect Authentic (V → I, but not in root position) and the Interrupted/Deceptive variant (V → IV). This would
+   give 6 types and much more variety.
+
+  3. No onboarding / context for what a "cadence" even is
+  Interval and Chord modes at least have obvious labels. "Cadence" is a technical term — a new player has no idea what a "Perfect (V–I)" means. This mode needs a first-run intro overlay (same pattern as the ear training intro overlay
+  already in the code) that plays each cadence type with its label before the quiz starts.
+
+  4. No visual of the cadence structure
+  When the two chords play, there's nothing on screen that shows "you're hearing chord I, then chord V". Even a simple Roman numeral display during playback (I → V → ?) that fills in the blanks when the answer is revealed would help
+  learners build theory understanding alongside ear training.
+
+  5. Broken chords toggle is buried
+  This is genuinely one of the most effective ways to train — hearing chords as arpeggios instead of blocks is a completely different skill. It should be a prominent two-state button in the main session UI, not hidden in settings.
