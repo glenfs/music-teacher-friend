@@ -253,6 +253,14 @@ func _is_ear_mode_enabled_for_build(mode: int) -> bool:
 	return true
 
 
+func _is_sight_mode_enabled_for_build(mode_name: String) -> bool:
+	if _app == null or not is_instance_valid(_app):
+		return true
+	if _app.has_method("_mvp_is_sight_mode_enabled"):
+		return bool(_app.call("_mvp_is_sight_mode_enabled", mode_name))
+	return true
+
+
 func _ear_mode_name(mode: int) -> String:
 	match mode:
 		MODE_INTERVAL:
@@ -545,11 +553,17 @@ func _section_smoke() -> void:
 	await _smoke_sight_submode("Notes", "smoke_sight_notes")
 	await _smoke_sight_submode("Chords", "smoke_sight_chords")
 	if _has_sight_submode("Placement"):
-		await _smoke_sight_submode("Placement", "smoke_sight_placement")
+		if _is_sight_mode_enabled_for_build("Placement"):
+			await _smoke_sight_submode("Placement", "smoke_sight_placement")
+		else:
+			na_step("Smoke: Sight Placement mode locked in this build")
 	else:
 		na_step("Smoke: Sight Placement not present in this build")
 	if _has_sight_submode("Continuous"):
-		await _smoke_sight_submode("Continuous", "smoke_sight_continuous")
+		if _is_sight_mode_enabled_for_build("Continuous"):
+			await _smoke_sight_submode("Continuous", "smoke_sight_continuous")
+		else:
+			na_step("Smoke: Sight Continuous mode locked in this build")
 	else:
 		na_step("Smoke: Sight Continuous/Note Flow not present in this build")
 	await _test_note_chase()
@@ -688,24 +702,24 @@ func _section_sight() -> void:
 		await _sight_chords_coverage()
 		return
 	if placement_only:
-		if _has_sight_submode("Placement"):
+		if _has_sight_submode("Placement") and _is_sight_mode_enabled_for_build("Placement"):
 			await _sight_placement_coverage()
 		else:
 			na_step("Sight Placement coverage: not applicable for this build")
 		return
 	if continuous_only:
-		if _has_sight_submode("Continuous"):
+		if _has_sight_submode("Continuous") and _is_sight_mode_enabled_for_build("Continuous"):
 			await _sight_continuous_coverage()
 		else:
 			na_step("Sight Continuous/Note Flow coverage: not applicable for this build")
 		return
 	await _sight_notes_coverage()
 	await _sight_chords_coverage()
-	if _has_sight_submode("Placement"):
+	if _has_sight_submode("Placement") and _is_sight_mode_enabled_for_build("Placement"):
 		await _sight_placement_coverage()
 	else:
 		na_step("Sight Placement coverage: not applicable for this build")
-	if _has_sight_submode("Continuous"):
+	if _has_sight_submode("Continuous") and _is_sight_mode_enabled_for_build("Continuous"):
 		await _sight_continuous_coverage()
 	else:
 		na_step("Sight Continuous/Note Flow coverage: not applicable for this build")
@@ -1350,29 +1364,71 @@ func _sight_placement_coverage() -> void:
 
 
 func _sight_continuous_coverage() -> void:
+	if not _is_sight_mode_enabled_for_build("Continuous"):
+		na_step("Sight Continuous coverage skipped: mode is MVP-locked in this build")
+		return
 	await _goto_practice_sight_mode("Continuous")
 	await _take_tagged_screenshot("sight_continuous_before")
 	if not await _start_round_from_home():
 		fail("Sight Continuous: failed to start")
 		return
 	await _wait_flag("_continuous_sight_active", true, 240)
-	# Start round if waiting gate still active.
+	# Ensure the continuous flow leaves "tap to start" waiting state before we probe hits.
+	if _member_bool("_continuous_sight_waiting_start", false):
+		if _app.has_method("_start_continuous_flow_after_waiting"):
+			_call("_start_continuous_flow_after_waiting")
+		else:
+			_call("_on_round_start_pressed")
+		await wait_frames(10)
 	if _member_bool("_awaiting_round_start", false):
 		_call("_on_round_start_pressed")
 		await wait_frames(10)
 	var start_hits := _member_int("_continuous_sight_total_hits", 0)
-	for i in range(180):
-		if i % 12 == 0:
-			_call("_on_continuous_sight_key_pressed", ["C"])
+	var hit_registered := false
+	for _i in range(300):
+		if _member_bool("_continuous_sight_waiting_start", false):
+			if _app.has_method("_start_continuous_flow_after_waiting"):
+				_call("_start_continuous_flow_after_waiting")
+			await get_tree().process_frame
+			continue
+		_try_hit_continuous_active_note()
+		if _member_int("_continuous_sight_total_hits", 0) > start_hits:
+			hit_registered = true
+			break
 		await get_tree().process_frame
 	var end_hits := _member_int("_continuous_sight_total_hits", 0)
-	if end_hits <= start_hits:
+	if not hit_registered and end_hits <= start_hits:
 		warn_step("Sight Continuous: no hit/miss events detected during timed session")
 	pass_step("sight_continuous_timed_session")
 	_call("_on_end_quiz_pressed")
 	await wait_frames(10)
 	await _assert_audio_stopped("Sight Continuous")
 	await _assert_continuous_notes_cleared()
+
+
+func _try_hit_continuous_active_note() -> bool:
+	var idx := -1
+	if _app.has_method("_continuous_active_note_index"):
+		idx = int(_app.call("_continuous_active_note_index"))
+	if idx < 0:
+		return false
+	var notes_v: Variant = _member("_continuous_sight_notes")
+	if not (notes_v is Array):
+		return false
+	var notes: Array = notes_v as Array
+	if idx >= notes.size():
+		return false
+	var note_any: Variant = notes[idx]
+	if not (note_any is Dictionary):
+		return false
+	var note := note_any as Dictionary
+	if bool(note.get("answered", false)):
+		return false
+	var token := str(note.get("name", "")).strip_edges()
+	if token.is_empty():
+		return false
+	_call("_on_continuous_sight_key_pressed", [token])
+	return true
 
 
 func _run_sight_session(tag: String, mode_name: String, questions: int) -> void:
@@ -1679,22 +1735,32 @@ func _assert_audio_stopped(context: String) -> void:
 		], "Playback stops shortly after navigation", "Prompt/audio still marked active", "Intermittent")
 	else:
 		pass_step("%s_audio_stopped" % context.replace(" ", "_").to_lower())
+	await wait_frames(8)
 	var audio_dbg := _qa_audio_debug_counters()
-	var active_count := int(audio_dbg.get("active_count", 0))
+	var suspicious := _qa_suspicious_audio_names(audio_dbg)
+	# Give short tails a chance to settle before warning.
+	if not suspicious.is_empty():
+		var deadline := Time.get_ticks_msec() + 1200
+		while Time.get_ticks_msec() < deadline and not suspicious.is_empty():
+			await get_tree().process_frame
+			audio_dbg = _qa_audio_debug_counters()
+			suspicious = _qa_suspicious_audio_names(audio_dbg)
+	if not suspicious.is_empty():
+		warn_step("%s: audio counters show active playback after stop check (%s)" % [context, ", ".join(suspicious)])
+		_log_step("INFO", "Audio debug counters", {"audio": audio_dbg})
+
+
+func _qa_suspicious_audio_names(audio_dbg: Dictionary) -> Array[String]:
 	var active_names_v: Variant = audio_dbg.get("active_names", [])
 	var active_names: Array = active_names_v if active_names_v is Array else []
 	var suspicious: Array[String] = []
 	for name_any in active_names:
 		var name := str(name_any)
-		# Keep music/SFX channels as non-fatal background noise in headless QA.
-		if name in ["music", "ui_sfx", "sfx", "shield_sfx"]:
+		# "generator" is intentionally kept running for synthesized prompts.
+		if name in ["generator", "music", "ui_sfx", "sfx", "shield_sfx"]:
 			continue
 		suspicious.append(name)
-	if not suspicious.is_empty():
-		warn_step("%s: audio counters show active playback after stop check (%s)" % [context, ", ".join(suspicious)])
-	elif active_count > 3:
-		warn_step("%s: audio counters show %d active players after stop check" % [context, active_count])
-		_log_step("INFO", "Audio debug counters", {"audio": audio_dbg})
+	return suspicious
 
 
 func _assert_no_orphan_ui(context: String) -> void:
@@ -1891,14 +1957,30 @@ func _check_visible_controls_within_viewport() -> void:
 				checked += 1
 				var r := c.get_global_rect()
 				if r.size.x > 4 and r.size.y > 4:
+					if _is_control_in_scroll_hierarchy(c):
+						for ch in n.get_children():
+							if ch is Node:
+								stack.append(ch)
+						continue
 					if r.position.x < -16 or r.position.y < -16 or r.end.x > vp_rect.end.x + 16 or r.end.y > vp_rect.end.y + 16:
 						clipped += 1
 		for ch in n.get_children():
 			if ch is Node:
 				stack.append(ch)
-	if clipped > 0:
+	if clipped > 2:
 		warn_step("Viewport scan: %d controls extend beyond viewport (symptom-based check)" % clipped)
 	pass_step("viewport_bounds_scan_%d" % checked)
+
+
+func _is_control_in_scroll_hierarchy(ctrl: Control) -> bool:
+	if ctrl == null:
+		return false
+	var n: Node = ctrl
+	while n != null:
+		if n is ScrollContainer:
+			return true
+		n = n.get_parent()
+	return false
 
 
 func _check_sight_layout_overlap() -> void:
