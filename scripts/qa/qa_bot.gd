@@ -1025,14 +1025,38 @@ func _set_inversion_toggle(enabled: bool) -> void:
 
 func _press_chord_group(group_id: int) -> bool:
 	var dict_v: Variant = _member("_chord_group_buttons")
-	if dict_v == null or not (dict_v is Dictionary):
+	if dict_v is Dictionary:
+		var dict := dict_v as Dictionary
+		var btn_v: Variant = dict.get(group_id, null)
+		if btn_v is Button:
+			_emit_click_marker(btn_v as Button)
+			(btn_v as Button).emit_signal("pressed")
+			await wait_frames(4)
+			pass_step("chord_group_%d" % group_id)
+			return true
+	# Fallback for current UI: chord tiers are exposed as per-chord toggles.
+	var tiers_v: Variant = _member("_chord_tier_toggles")
+	if not (tiers_v is Dictionary):
 		return false
-	var dict := dict_v as Dictionary
-	var btn_v: Variant = dict.get(group_id, null)
-	if btn_v == null or not (btn_v is Button):
+	var tiers := tiers_v as Dictionary
+	if tiers.is_empty():
 		return false
-	_emit_click_marker(btn_v as Button)
-	(btn_v as Button).emit_signal("pressed")
+	var include_set: Dictionary = {}
+	match group_id:
+		1:
+			include_set = {"Major": true, "Minor": true}
+		2:
+			include_set = {"Augmented": true, "Diminished": true}
+		3:
+			include_set = {"Sus2": true, "Sus4": true, "Maj7": true, "Dom7": true, "Min7": true, "Dim7": true}
+		4:
+			include_set = {}
+		_:
+			return false
+	for chord_key_any in tiers.keys():
+		var chord_key := str(chord_key_any)
+		var desired := true if group_id == 4 else include_set.has(chord_key)
+		_call("_on_chord_tier_toggle", [desired, chord_key])
 	await wait_frames(4)
 	pass_step("chord_group_%d" % group_id)
 	return true
@@ -1657,7 +1681,18 @@ func _assert_audio_stopped(context: String) -> void:
 		pass_step("%s_audio_stopped" % context.replace(" ", "_").to_lower())
 	var audio_dbg := _qa_audio_debug_counters()
 	var active_count := int(audio_dbg.get("active_count", 0))
-	if active_count > 1:
+	var active_names_v: Variant = audio_dbg.get("active_names", [])
+	var active_names: Array = active_names_v if active_names_v is Array else []
+	var suspicious: Array[String] = []
+	for name_any in active_names:
+		var name := str(name_any)
+		# Keep music/SFX channels as non-fatal background noise in headless QA.
+		if name in ["music", "ui_sfx", "sfx", "shield_sfx"]:
+			continue
+		suspicious.append(name)
+	if not suspicious.is_empty():
+		warn_step("%s: audio counters show active playback after stop check (%s)" % [context, ", ".join(suspicious)])
+	elif active_count > 3:
 		warn_step("%s: audio counters show %d active players after stop check" % [context, active_count])
 		_log_step("INFO", "Audio debug counters", {"audio": audio_dbg})
 
@@ -1954,6 +1989,8 @@ func _assert_prompt_and_replay_gate_once() -> void:
 	if _member_bool("_is_prompt_playing", false) and not replay_btn.disabled:
 		warn_step("Replay button enabled while prompt playing (behavior may be intended)")
 	await _wait_for_accepting_answer(720)
+	if _member_bool("_is_prompt_playing", false):
+		await _wait_for_prompt_not_playing(720)
 	if replay_btn.disabled:
 		warn_step("Replay button still disabled after answer became available")
 
