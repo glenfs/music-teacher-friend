@@ -51,8 +51,14 @@ func run_suite() -> Dictionary:
 	await _run_scoped_test("Smoke", "smoke", _section_smoke)
 	await _run_scoped_test("Ear Interval Matrix", "ear.intervals", _section_interval_matrix)
 	await _run_scoped_test("Ear Chord Matrix", "ear.chords", _section_chord_matrix)
-	await _run_scoped_test("Progression Coverage", "ear.progression", _section_progression)
-	await _run_scoped_test("Scale/Mode Coverage", "ear.scale_mode", _section_scale_mode)
+	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION):
+		await _run_scoped_test("Progression Coverage", "ear.progression", _section_progression)
+	else:
+		_record_feature_skip("Progression Coverage", "Ear mode `Progression` is MVP-locked for this build.")
+	if _is_ear_mode_enabled_for_build(MODE_SCALE_MODE):
+		await _run_scoped_test("Scale/Mode Coverage", "ear.scale_mode", _section_scale_mode)
+	else:
+		_record_feature_skip("Scale/Mode Coverage", "Ear mode `Scale/Mode` is MVP-locked for this build.")
 	await _run_scoped_test("Cadence Coverage", "ear.cadence", _section_cadence)
 	await _run_scoped_test("Sight Reading Coverage", "sight", _section_sight)
 	await _run_scoped_test("Note Chase Coverage", "note_chase", _section_note_chase)
@@ -239,9 +245,59 @@ func _scope_allows(prefix: String) -> bool:
 	return s == "all" or s == p or s.begins_with(p + ".")
 
 
+func _is_ear_mode_enabled_for_build(mode: int) -> bool:
+	if _app == null or not is_instance_valid(_app):
+		return true
+	if _app.has_method("_mvp_is_ear_mode_enabled"):
+		return bool(_app.call("_mvp_is_ear_mode_enabled", mode))
+	return true
+
+
+func _ear_mode_name(mode: int) -> String:
+	match mode:
+		MODE_INTERVAL:
+			return "Interval"
+		MODE_CHORD:
+			return "Chord"
+		MODE_PROGRESSION:
+			return "Progression"
+		MODE_SCALE_MODE:
+			return "Scale/Mode"
+		MODE_CADENCE:
+			return "Cadence"
+		_:
+			return "Mode %d" % mode
+
+
 func _record_scope_skip(name: String, prefix: String) -> void:
 	var status := "SKIPPED (scope)"
 	var msg := "Skipped by qa_scope=`%s` (section prefix `%s`)" % [qa_scope, prefix]
+	print("QA STEP: %s" % name)
+	print("QA SKIP: %s" % msg)
+	_sections.append({
+		"name": name,
+		"ok": true,
+		"status": status,
+		"failures": [],
+		"warnings": [],
+		"steps": [{"status":"SKIP","detail":msg,"section":name,"time_unix":Time.get_unix_time_from_system()}]
+	})
+	_tests.append({"name": name, "ok": true, "skipped": true, "failures": []})
+	_qa_log.append({
+		"type": "section",
+		"name": name,
+		"status": status,
+		"failures": [],
+		"warnings": [],
+		"steps": [{"status":"SKIP","detail":msg,"section":name,"time_unix":Time.get_unix_time_from_system()}]
+	})
+
+
+func _record_feature_skip(name: String, reason: String) -> void:
+	var status := "SKIPPED (build)"
+	var msg := reason.strip_edges()
+	if msg.is_empty():
+		msg = "Skipped: feature not enabled in this build."
 	print("QA STEP: %s" % name)
 	print("QA SKIP: %s" % msg)
 	_sections.append({
@@ -272,10 +328,16 @@ func _test_ear_chord() -> void:
 
 
 func _test_ear_progression() -> void:
+	if not _is_ear_mode_enabled_for_build(MODE_PROGRESSION):
+		na_step("Ear Progression test skipped: mode is MVP-locked in this build")
+		return
 	await _test_ear_mode(MODE_PROGRESSION, "progression")
 
 
 func _test_ear_scale_mode() -> void:
+	if not _is_ear_mode_enabled_for_build(MODE_SCALE_MODE):
+		na_step("Ear Scale/Mode test skipped: mode is MVP-locked in this build")
+		return
 	await _test_ear_mode(MODE_SCALE_MODE, "scale_mode")
 
 
@@ -381,8 +443,13 @@ func _test_note_chase() -> void:
 		fail("Note Chase: failed to start")
 		return
 	if not await _wait_for_note_chase_running(180):
-		fail("Note Chase: round never started")
-		return
+		# Headless QA can burn frames faster than Note Chase's real-time countdown.
+		if _member_bool("_awaiting_round_start", false):
+			_call("_on_round_start_pressed")
+			await wait_frames(8)
+		if not await _wait_for_note_chase_running(360):
+			fail("Note Chase: round never started")
+			return
 	if not await _wait_for_note_chase_note(240):
 		fail("Note Chase: no active notes spawned")
 	else:
@@ -466,8 +533,14 @@ func _section_smoke() -> void:
 	await _test_practice()
 	await _smoke_ear_mode("Interval", MODE_INTERVAL, "smoke_interval")
 	await _smoke_ear_mode("Chord", MODE_CHORD, "smoke_chord")
-	await _smoke_ear_mode("Progression", MODE_PROGRESSION, "smoke_progression")
-	await _smoke_ear_mode("Scale/Mode", MODE_SCALE_MODE, "smoke_scale_mode")
+	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION):
+		await _smoke_ear_mode("Progression", MODE_PROGRESSION, "smoke_progression")
+	else:
+		na_step("Smoke: Progression mode locked in this build")
+	if _is_ear_mode_enabled_for_build(MODE_SCALE_MODE):
+		await _smoke_ear_mode("Scale/Mode", MODE_SCALE_MODE, "smoke_scale_mode")
+	else:
+		na_step("Smoke: Scale/Mode mode locked in this build")
 	await _smoke_ear_mode("Cadence", MODE_CADENCE, "smoke_cadence")
 	await _smoke_sight_submode("Notes", "smoke_sight_notes")
 	await _smoke_sight_submode("Chords", "smoke_sight_chords")
@@ -667,7 +740,7 @@ func _section_navigation_stress() -> void:
 		await _nav_back_assert("Navigation", "sight_notes_to_practice_%d_before" % i, "sight_notes_to_practice_%d_after" % i)
 		await _goto_note_chase()
 		await _nav_back_assert("Navigation", "note_chase_to_practice_%d_before" % i, "note_chase_to_practice_%d_after" % i)
-	if await _goto_practice_ear_mode_start_quiz(MODE_PROGRESSION, "nav_rapid_back_during_playback"):
+	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION) and await _goto_practice_ear_mode_start_quiz(MODE_PROGRESSION, "nav_rapid_back_during_playback"):
 		_call("_on_end_quiz_pressed")
 		await wait_frames(2)
 		_call("_on_home_back_pressed")
@@ -680,10 +753,16 @@ func _section_negative_paths() -> void:
 	var items := [
 		{"label":"interval", "mode":MODE_INTERVAL},
 		{"label":"chord", "mode":MODE_CHORD},
-		{"label":"progression", "mode":MODE_PROGRESSION},
-		{"label":"scale_mode", "mode":MODE_SCALE_MODE},
 		{"label":"cadence", "mode":MODE_CADENCE}
 	]
+	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION):
+		items.append({"label":"progression", "mode":MODE_PROGRESSION})
+	else:
+		na_step("Negative paths: Progression mode locked in this build")
+	if _is_ear_mode_enabled_for_build(MODE_SCALE_MODE):
+		items.append({"label":"scale_mode", "mode":MODE_SCALE_MODE})
+	else:
+		na_step("Negative paths: Scale/Mode mode locked in this build")
 	for item in items:
 		if int(item["mode"]) == MODE_CADENCE:
 			await _set_cadence_types(["Perfect", "Plagal", "Half", "Deceptive"])
@@ -703,18 +782,24 @@ func _section_audio_robustness() -> void:
 		_call("_on_home_back_pressed")
 		await _assert_audio_stopped("Audio back stop")
 		pass_step("audio_stop_back")
-	await _set_progression_patterns(["IVviIV", "iiVI"])
-	if await _goto_practice_ear_mode_start_quiz(MODE_PROGRESSION, "audio_replay_abuse"):
-		await _replay_abuse("progression_replay_abuse", 6)
-		_call("_on_end_quiz_pressed")
-		await wait_frames(10)
-	await _set_scale_modes(["Major", "Natural Minor"])
-	if await _goto_practice_ear_mode_start_quiz(MODE_SCALE_MODE, "audio_restart"):
-		_call("_on_restart_quiz_pressed")
-		await wait_frames(8)
-		await _assert_audio_stopped("Audio restart stop")
-		_call("_on_end_quiz_pressed")
-		await wait_frames(8)
+	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION):
+		await _set_progression_patterns(["IVviIV", "iiVI"])
+		if await _goto_practice_ear_mode_start_quiz(MODE_PROGRESSION, "audio_replay_abuse"):
+			await _replay_abuse("progression_replay_abuse", 6)
+			_call("_on_end_quiz_pressed")
+			await wait_frames(10)
+	else:
+		na_step("Audio robustness: Progression mode locked in this build")
+	if _is_ear_mode_enabled_for_build(MODE_SCALE_MODE):
+		await _set_scale_modes(["Major", "Natural Minor"])
+		if await _goto_practice_ear_mode_start_quiz(MODE_SCALE_MODE, "audio_restart"):
+			_call("_on_restart_quiz_pressed")
+			await wait_frames(8)
+			await _assert_audio_stopped("Audio restart stop")
+			_call("_on_end_quiz_pressed")
+			await wait_frames(8)
+	else:
+		na_step("Audio robustness: Scale/Mode mode locked in this build")
 	var miss_info := _qa_missing_resource_sim_info()
 	if bool(miss_info.get("enabled", false)):
 		pass_step("missing_resource_simulation_flag_present")
@@ -748,7 +833,10 @@ func _section_technical_assertions() -> void:
 
 func _section_long_run_stability() -> void:
 	await _long_ear_session(MODE_INTERVAL, "long_interval", 20)
-	await _long_ear_session(MODE_PROGRESSION, "long_progression", 12)
+	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION):
+		await _long_ear_session(MODE_PROGRESSION, "long_progression", 12)
+	else:
+		na_step("Long-run: Progression mode locked in this build")
 	for i in range(20):
 		await _goto_practice_ear_mode(MODE_INTERVAL if i % 2 == 0 else MODE_CHORD)
 		_call("_on_home_back_pressed")
@@ -769,6 +857,9 @@ func _has_sight_submode(mode_name: String) -> bool:
 
 
 func _smoke_ear_mode(label: String, mode: int, tag: String) -> void:
+	if not _is_ear_mode_enabled_for_build(mode):
+		na_step("%s smoke skipped: mode is MVP-locked in this build" % label)
+		return
 	await _goto_practice_ear_mode(mode)
 	await _take_tagged_screenshot("%s_before" % tag)
 	if not _assert_core_controls_on_detail(label):
@@ -1440,6 +1531,9 @@ func _nav_back_assert(area: String, before_tag: String, after_tag: String) -> vo
 
 
 func _goto_practice_ear_mode_start_quiz(mode: int, tag: String) -> bool:
+	if not _is_ear_mode_enabled_for_build(mode):
+		na_step("%s: mode `%s` is locked in this build" % [tag, _ear_mode_name(mode)])
+		return false
 	await _goto_practice_ear_mode(mode)
 	await _normalize_mode_options_for_start(mode)
 	await _take_tagged_screenshot("%s_before" % tag)
@@ -1451,6 +1545,9 @@ func _goto_practice_ear_mode_start_quiz(mode: int, tag: String) -> bool:
 
 
 func _negative_path_ear(mode: int, tag: String) -> void:
+	if not _is_ear_mode_enabled_for_build(mode):
+		na_step("%s negative path skipped: mode `%s` is locked in this build" % [tag, _ear_mode_name(mode)])
+		return
 	await _goto_practice_ear_mode(mode)
 	await _normalize_mode_options_for_start(mode)
 	if not await _start_round_from_home():
@@ -1903,6 +2000,9 @@ func _assert_answer_enable_behavior() -> void:
 
 
 func _long_ear_session(mode: int, tag: String, questions: int) -> void:
+	if not _is_ear_mode_enabled_for_build(mode):
+		na_step("%s skipped: mode `%s` is locked in this build" % [tag, _ear_mode_name(mode)])
+		return
 	await _goto_practice_ear_mode(mode)
 	var q_spin: Variant = _member("_question_spin")
 	if q_spin is SpinBox:
@@ -2051,7 +2151,9 @@ func _wait_for_accepting_answer(max_frames: int) -> bool:
 
 
 func _wait_for_note_chase_running(max_frames: int) -> bool:
-	for _i in range(max_frames):
+	var timeout_seconds := maxf(3.2, float(max_frames) / 60.0)
+	var deadline := Time.get_ticks_msec() + int(round(timeout_seconds * 1000.0))
+	while Time.get_ticks_msec() <= deadline:
 		if bool(_app.get("_note_chase_running")):
 			return true
 		await get_tree().process_frame
@@ -2059,7 +2161,9 @@ func _wait_for_note_chase_running(max_frames: int) -> bool:
 
 
 func _wait_for_note_chase_note(max_frames: int) -> bool:
-	for _i in range(max_frames):
+	var timeout_seconds := maxf(2.8, float(max_frames) / 60.0)
+	var deadline := Time.get_ticks_msec() + int(round(timeout_seconds * 1000.0))
+	while Time.get_ticks_msec() <= deadline:
 		var items: Array = _app.get("_note_chase_active_notes")
 		for item_any in items:
 			var item: Dictionary = item_any
