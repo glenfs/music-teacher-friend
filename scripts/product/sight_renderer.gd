@@ -1031,10 +1031,33 @@ func position_sight_chord(host, note_centers: Array, chord_def: Dictionary = {},
 		return
 	var display_note_centers: Array[float] = []
 	var note_steps: Array[int] = []
+	var note_x_offsets: Array[float] = []
 	for center_any in note_centers:
 		var center_y_raw := float(center_any)
 		note_steps.append(host._nearest_staff_step_from_center_y(center_y_raw))
 		display_note_centers.append(center_y_raw + sight_chord_note_center_offset_y)
+		note_x_offsets.append(0.0)
+	var sample_center_y: float = host._active_staff_top_y() + (host._active_staff_line_gap_y() * 2.0)
+	var note_scale: Vector2 = host._note_scale_for_y(sample_center_y)
+	var note_w: float = host._staff_note.size.x * note_scale.x
+	var second_interval_shift_ratio: float = float(config.get("sight_chord_second_interval_shift_ratio", 0.62))
+	var ci := 0
+	while ci < note_steps.size():
+		var run: Array[int] = [ci]
+		var ri := ci + 1
+		while ri < note_steps.size():
+			if absi(note_steps[ri] - note_steps[ri - 1]) != 1:
+				break
+			run.append(ri)
+			ri += 1
+		if run.size() >= 2:
+			run.sort_custom(func(a: int, b: int) -> bool: return note_steps[a] > note_steps[b])
+			for pos in range(run.size()):
+				if pos % 2 == 1:
+					note_x_offsets[run[pos]] = note_w * second_interval_shift_ratio
+			ci = ri
+		else:
+			ci += 1
 	var x := sight_note_snap_x(
 		host._staff_area,
 		host._selected_mode,
@@ -1047,18 +1070,22 @@ func position_sight_chord(host, note_centers: Array, chord_def: Dictionary = {},
 	var first_top: float = float(display_note_centers[0]) - (host._staff_note.size.y * 0.5)
 	host._staff_note.visible = true
 	host._staff_note.scale = host._note_scale_for_y(float(display_note_centers[0]))
-	host._staff_note.position = Vector2(x, first_top)
+	host._staff_note.position = Vector2(x + note_x_offsets[0], first_top)
+	var ledger_note_centers: Array[float] = [float(display_note_centers[0])]
+	var ledger_note_center_xs: Array[float] = [host._staff_note.position.x + (host._staff_note.size.x * host._staff_note.scale.x * 0.5)]
 	var extra_note_count := mini(host._staff_chord_notes.size(), maxi(0, display_note_centers.size() - 1))
 	for i in range(extra_note_count):
 		var note_panel = host._staff_chord_notes[i]
 		var center_y := float(display_note_centers[i + 1])
 		note_panel.visible = true
 		note_panel.scale = host._note_scale_for_y(center_y)
-		note_panel.position = Vector2(x, center_y - (note_panel.size.y * 0.5))
+		note_panel.position = Vector2(x + note_x_offsets[i + 1], center_y - (note_panel.size.y * 0.5))
+		ledger_note_centers.append(center_y)
+		ledger_note_center_xs.append(note_panel.position.x + (note_panel.size.x * note_panel.scale.x * 0.5))
 	for i in range(extra_note_count, host._staff_chord_notes.size()):
 		var hidden_note = host._staff_chord_notes[i]
 		hidden_note.visible = false
-	host._update_staff_ledger_lines_for_notes(display_note_centers, x + (host._staff_note.size.x * 0.5))
+	host._update_staff_ledger_lines_for_note_positions(ledger_note_centers, ledger_note_center_xs)
 	var tone_accidentals: Array = chord_def.get("display_accidentals", chord_def.get("tone_accidentals", [0, 0, 0]))
 	var tone_letters: Array = chord_def.get("display_letters", chord_def.get("tone_letters", ["C", "E", "G"]))
 	var sig_map: Dictionary = host._key_signature_accidental_map()

@@ -94,6 +94,7 @@ const SIGHT_CHORD_NOTE_CENTER_OFFSET_Y := 5.0
 const GRAND_STAFF_NOTEHEAD_HEIGHT_RATIO := 0.88
 const GRAND_STAFF_NOTEHEAD_WIDTH_RATIO := 1.14
 const GRAND_STAFF_SECOND_INTERVAL_SHIFT_RATIO := 0.70
+const SIGHT_CHORD_SECOND_INTERVAL_SHIFT_RATIO := 0.66
 const GRAND_STAFF_BASS_LEDGER_STEP_EXTRA_DOWN := 0
 const GRAND_STAFF_CLEF_RIGHT_NUDGE := 18.0
 const GRAND_STAFF_CLEF_DOWN_SPACES := 1.0
@@ -1976,6 +1977,7 @@ func _sight_renderer_config() -> Dictionary:
 		"sight_accidental_x_offset": SIGHT_ACCIDENTAL_X_OFFSET,
 		"sight_accidental_raise_y": SIGHT_ACCIDENTAL_RAISE_Y,
 		"grand_staff_second_interval_shift_ratio": GRAND_STAFF_SECOND_INTERVAL_SHIFT_RATIO,
+		"sight_chord_second_interval_shift_ratio": SIGHT_CHORD_SECOND_INTERVAL_SHIFT_RATIO,
 		"grand_staff_accidental_x_offset": GRAND_STAFF_ACCIDENTAL_X_OFFSET,
 		"grand_staff_clef_right_nudge": GRAND_STAFF_CLEF_RIGHT_NUDGE,
 		"grand_staff_clef_down_spaces": GRAND_STAFF_CLEF_DOWN_SPACES,
@@ -23216,18 +23218,40 @@ func _nearest_ledger_step_from_visual_note_center_y(note_center_y: float) -> int
 
 
 func _update_staff_ledger_lines_for_notes(note_centers: Array[float], note_center_x: float) -> void:
+	var note_center_xs: Array[float] = []
+	for _i in range(note_centers.size()):
+		note_center_xs.append(note_center_x)
+	_update_staff_ledger_lines_for_note_positions(note_centers, note_center_xs)
+
+
+func _update_staff_ledger_lines_for_note_positions(note_centers: Array[float], note_center_xs: Array[float]) -> void:
 	_clear_staff_ledger_lines()
-	var needed: Array[float] = []
-	for note_center_y in note_centers:
+	var needed: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	for i in range(note_centers.size()):
+		var note_center_y := float(note_centers[i])
+		var note_center_x := float(note_center_xs[i]) if i < note_center_xs.size() else (_sight_note_snap_x() + (_staff_note.size.x * 0.5))
 		var step := _nearest_ledger_step_from_visual_note_center_y(note_center_y)
 		var ledger_steps := _ledger_steps_for_note_step(step)
 		for s in ledger_steps:
 			var y := _active_staff_top_y() + float(s) * _active_staff_step_y()
-			if not needed.has(y):
-				needed.append(y)
-	needed.sort()
-	for yv in needed:
-		_add_staff_ledger_line(float(yv), note_center_x)
+			var key := "%0.2f|%0.2f" % [y, note_center_x]
+			if seen.has(key):
+				continue
+			seen[key] = true
+			needed.append({"y": y, "x": note_center_x})
+	needed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ay := float(a.get("y", 0.0))
+		var by := float(b.get("y", 0.0))
+		if is_equal_approx(ay, by):
+			return float(a.get("x", 0.0)) < float(b.get("x", 0.0))
+		return ay < by
+	)
+	for item_any in needed:
+		if typeof(item_any) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_any as Dictionary
+		_add_staff_ledger_line(float(item.get("y", 0.0)), float(item.get("x", 0.0)))
 
 
 func _pick_sight_note_slot() -> Dictionary:
