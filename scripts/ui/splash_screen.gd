@@ -2,12 +2,13 @@ extends Control
 
 const MAIN_MENU_SCENE: String = "res://scenes/IntervalBirds.tscn"
 const MAIN_MENU_PACKED: PackedScene = preload("res://scenes/IntervalBirds.tscn")
+const AudioEngineScript = preload("res://scripts/product/audio_engine.gd")
 const LOGO_FONT_PATH: String = "res://assets/fonts/Baloo2-SemiBold.ttf"
 const TAGLINE_FONT_PATH: String = "res://assets/fonts/Nunito-Regular.ttf"
 const ONE_SEMITONE_UP: float = 1.059463
 const CHORD_STREAM_PATHS := [
-	"res://assets/audio/piano/sampled/c5.ogg",
-	"res://assets/audio/piano/sampled/g5.ogg",
+	"res://assets/audio/piano/piano/52.mp3",
+	"res://assets/audio/piano/piano/59.mp3",
 ]
 
 @onready var _background: ColorRect = $Background
@@ -32,6 +33,7 @@ var _sequence_tween: Tween = null
 var _arpeggio_tween: Tween = null
 var _staff_glow_tween: Tween = null
 var _transitioned: bool = false
+var _audio_engine: AudioEngine = AudioEngineScript.new()
 
 
 func _ready() -> void:
@@ -106,10 +108,7 @@ func _configure_audio() -> void:
 			continue
 		if player.stream == null and index < CHORD_STREAM_PATHS.size():
 			var path: String = CHORD_STREAM_PATHS[index]
-			if ResourceLoader.exists(path):
-				var stream_res: Resource = load(path)
-				if stream_res is AudioStream:
-					player.stream = stream_res as AudioStream
+			player.stream = _audio_engine.load_audio_stream_from_path(path)
 		player.pitch_scale = ONE_SEMITONE_UP if index == 1 else 1.0
 		player.volume_db = -27.0 if index == 0 else -28.0
 

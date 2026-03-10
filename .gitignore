@@ -37,6 +37,17 @@ android/
 qa_screenshots/
 *.log
 
-# Local scratch/backups
+# Web export artifacts
+web/
+
+# Temp/scratch files
+*.txt
+*.bat
+*.sql
 backup/
-tree.txt
+!assets/fonts/FONT_CREDITS.txt
+!attribution.txt
+!assets/LICENSES.md
+
+# Godot editor temp files
+scenes/*.tmp

@@ -1945,6 +1945,7 @@ func _check_visible_controls_within_viewport() -> void:
 	var vp_rect := get_viewport().get_visible_rect()
 	var checked := 0
 	var clipped := 0
+	var clipped_ancestors: Array[Control] = []
 	var stack: Array[Node] = [_app]
 	while not stack.is_empty():
 		var n_any: Variant = stack.pop_back()
@@ -1962,8 +1963,23 @@ func _check_visible_controls_within_viewport() -> void:
 							if ch is Node:
 								stack.append(ch)
 						continue
+					# Skip background textures that intentionally cover the viewport
+					if c is TextureRect and (c as TextureRect).stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_COVERED:
+						for ch in n.get_children():
+							if ch is Node:
+								stack.append(ch)
+						continue
 					if r.position.x < -16 or r.position.y < -16 or r.end.x > vp_rect.end.x + 16 or r.end.y > vp_rect.end.y + 16:
-						clipped += 1
+						# Only count topmost clipped ancestor — skip children that
+						# inherit the same overflow from a parent already counted.
+						var is_child_of_clipped := false
+						for ancestor in clipped_ancestors:
+							if ancestor.is_ancestor_of(c):
+								is_child_of_clipped = true
+								break
+						if not is_child_of_clipped:
+							clipped += 1
+							clipped_ancestors.append(c)
 		for ch in n.get_children():
 			if ch is Node:
 				stack.append(ch)

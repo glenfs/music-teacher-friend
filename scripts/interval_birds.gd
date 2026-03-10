@@ -10478,7 +10478,7 @@ func _chord_hint_meta(quality_name: String) -> Dictionary:
 		"7sus4": [0, 5, 7, 10],
 		"maj6": [0, 4, 7, 9], "min6": [0, 3, 7, 9], "69": [0, 4, 7, 9, 14],
 		"dom9": [0, 4, 7, 10, 14], "maj9": [0, 4, 7, 11, 14], "min9": [0, 3, 7, 10, 14],
-		"add9": [0, 2, 4, 7],
+		"add9": [0, 4, 7, 14],
 	}
 	return {"intervals": _hint_intervals.get(family, [0, 4, 7]), "family": family}
 
@@ -17858,7 +17858,7 @@ func _generate_round() -> void:
 			_chord_ask_pool = _current_available_chord_types
 		# First question: start with the most recognisable chord for an easy opening win
 		if _question_index == 1 and _focus_missed_ids.is_empty():
-			var easy_chord_order := ["Major", "Minor", "Dom7", "Maj7", "min7", "Diminished"]
+			var easy_chord_order := ["Major", "Minor", "Dom7", "Maj7", "Min7", "Dim"]
 			for easy_chord in easy_chord_order:
 				if easy_chord in _chord_ask_pool:
 					_current_chord_quality = easy_chord
@@ -22643,8 +22643,6 @@ func _triad_quality_from_intervals(i3: int, i5: int) -> String:
 	if i3 == 3 and i5 == 7:
 		return "Minor"
 	if i3 == 3 and i5 == 6:
-		return "Diminished"
-	if i3 == 4 and i5 == 6:
 		return "Diminished"
 	if i3 == 4 and i5 == 8:
 		return "Augmented"

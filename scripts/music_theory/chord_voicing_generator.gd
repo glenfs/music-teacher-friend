@@ -376,10 +376,17 @@ static func generate(root_letter: String, root_acc: int, quality: String, invers
 	)
 	if seventh_style_layout:
 		_compress_voicing_span_for_playability(concrete_notes, MAX_JAZZ_POP_GLOBAL_SPAN, root_letter, root_acc, tone_degrees, sig_map)
+	else:
+		_compress_voicing_span_for_playability(concrete_notes, MAX_VOICING_SPAN, root_letter, root_acc, tone_degrees, sig_map)
 
 	# Validate muddy bass
 	_fix_muddy_bass(concrete_notes)
 	_sanitize_to_chord_tones(concrete_notes, tone_pcs, tone_degrees, root_letter, root_acc, sig_map)
+
+	# Final safety net: enforce per-hand span and adjacent-gap constraints.
+	# Post-processing steps above can introduce new violations, so we re-check
+	# and drop offending notes as a last resort (preserving at least 2 total).
+	_enforce_hand_constraints(concrete_notes, MIDDLE_C_MIDI)
 
 	# Split across staves
 	var treble_notes: Array[Dictionary] = []
@@ -783,6 +790,48 @@ static func _min_midi(notes: Array[Dictionary]) -> int:
 		if int(n.midi) < m:
 			m = int(n.midi)
 	return m
+
+
+static func _enforce_hand_constraints(notes: Array[Dictionary], split_midi: int) -> void:
+	## Final safety net: for each hand, enforce MAX_HAND_SPAN / MAX_THREE_NOTE_SPAN
+	## and MAX_ADJACENT_GAP by dropping offending notes. Never drops below 2 total notes.
+	if notes.size() <= 2:
+		return
+	notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.midi) < int(b.midi))
+	for is_rh in [false, true]:
+		var hand: Array[Dictionary] = []
+		var other: Array[Dictionary] = []
+		for n in notes:
+			if (int(n.midi) >= split_midi) == is_rh:
+				hand.append(n)
+			else:
+				other.append(n)
+		if hand.size() < 2:
+			continue
+		hand.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a.midi) < int(b.midi))
+		# Enforce hand span: drop top notes until span is within limit
+		var span_limit: int = MAX_HAND_SPAN if hand.size() <= 2 else MAX_THREE_NOTE_SPAN
+		while hand.size() > 1 and int(hand[hand.size() - 1].midi) - int(hand[0].midi) > span_limit:
+			if hand.size() + other.size() <= 2:
+				break  # preserve at least 2 total notes
+			hand.pop_back()
+			span_limit = MAX_HAND_SPAN if hand.size() <= 2 else MAX_THREE_NOTE_SPAN
+		# Enforce adjacent gap: drop notes that create too-wide gaps
+		var valid: Array[Dictionary] = [hand[0]]
+		for i in range(1, hand.size()):
+			var gap: int = int(hand[i].midi) - int(valid[valid.size() - 1].midi)
+			if gap <= MAX_ADJACENT_GAP:
+				valid.append(hand[i])
+			elif valid.size() + other.size() <= 1:
+				valid.append(hand[i])  # keep to preserve minimum notes
+		# Rebuild notes array
+		notes.clear()
+		notes.append_array(other)
+		notes.append_array(valid)
+	notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.midi) < int(b.midi))
 
 
 static func _fix_adjacent_gaps(notes: Array[Dictionary], split_midi: int, _root_letter: String, _root_acc: int, _sig_map: Dictionary) -> void:
