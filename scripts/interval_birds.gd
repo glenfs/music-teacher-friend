@@ -98,12 +98,12 @@ const GRAND_STAFF_BASS_LEDGER_STEP_EXTRA_DOWN := 0
 const GRAND_STAFF_CLEF_RIGHT_NUDGE := 18.0
 const GRAND_STAFF_CLEF_DOWN_SPACES := 1.0
 const GRAND_STAFF_TREBLE_CLEF_EXTRA_RIGHT := 3.0
-const GRAND_STAFF_BASS_CLEF_EXTRA_RAISE_SPACES := 1.15
+const GRAND_STAFF_BASS_CLEF_EXTRA_RAISE_SPACES := 1.50
 const GRAND_STAFF_LEDGER_RIGHT_NUDGE := 0.0
 const SIGHT_CLEF_ANCHOR_FACTOR_TREBLE := 1.02
 const SIGHT_CLEF_ANCHOR_FACTOR_BASS := 1.62
 const SIGHT_CLEF_EXTRA_RAISE_TREBLE := 17.0
-const SIGHT_CLEF_EXTRA_RAISE_BASS := 13.0
+const SIGHT_CLEF_EXTRA_RAISE_BASS := 23.0
 const SIGHT_ACCIDENTAL_X_OFFSET := 18.0
 const GRAND_STAFF_ACCIDENTAL_X_OFFSET := 16.0
 const SIGHT_ACCIDENTAL_RAISE_Y := 3.0
@@ -112,6 +112,10 @@ const SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS := 0.28
 const SIGHT_GRAND_STAFF_REPLAY_VERTICAL_GAP := 14.0
 const SIGHT_CHORD_NOTE_PREVIEW_DURATION := 0.32
 const SIGHT_CHORD_NOTE_TAP_PROMPT_SECONDS := 1.0
+const FOCUS_MISSES_QUESTION_COUNT := 5
+const FIRST_RUN_ASSESSMENT_TOTAL_QUESTIONS := 5
+const FIRST_RUN_ASSESSMENT_EASY_NOTES := ["C4", "D4", "E4", "F4", "G4"]
+const FIRST_RUN_ASSESSMENT_CHALLENGE_NOTES := ["A4", "B4", "C5"]
 const STARTUP_LOADING_FADE_SECONDS := 0.24
 const STARTUP_LOADING_PROGRESS_TWEEN_SECONDS := 0.22
 const STARTUP_LOADING_MIN_VISIBLE_SECONDS := 0.90
@@ -939,6 +943,7 @@ var _quiz_start_time: float = 0.0
 var _hud_left_style_cache: StyleBoxFlat = null
 var _ear_intro_overlay: ColorRect
 var _ear_intro_dismiss: Button
+var _ear_intro_title: Label = null
 var _ear_intro_body: Label = null
 var _note_chase_intro_overlay: ColorRect
 var _note_chase_intro_dismiss: Button
@@ -1207,6 +1212,9 @@ var _focus_missed_ids: Array[String] = []
 # Item 10: First-run ear intro
 var _ear_intro_seen: bool = false
 var _first_run_onboarding_done: bool = false
+var _first_run_assessment_pending: bool = false
+var _first_run_assessment_active: bool = false
+var _first_run_assessment_steps: Array[int] = []
 var _quick_practice_button: Button = null
 # Difficulty presets
 var _interval_difficulty_preset: String = "beginner"
@@ -1622,11 +1630,9 @@ func _complete_startup_boot_sequence() -> void:
 		_startup_loading_overlay.visible = false
 		_startup_loading_overlay.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		_startup_loading_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# First-run auto-launch: skip home menu, go straight into a short practice session
-	if not _first_run_onboarding_done and not _qa_enabled:
-		_first_run_onboarding_done = true
-		_save_ear_settings()
-		_on_quick_practice_pressed.call_deferred()
+	_update_first_run_assessment_pending()
+	if _first_run_assessment_pending:
+		call_deferred("_on_mode_selected")
 
 
 func _ensure_rhythm_tap_input_action() -> void:
@@ -4021,14 +4027,6 @@ func _build_ui() -> void:
 	if _home_footer_row != null:
 		_home_footer_row.add_child(_home_start_action_row)
 
-	_quick_practice_button = Button.new()
-	_quick_practice_button.text = "%s  Quick Practice" % char(0x26A1)
-	_quick_practice_button.custom_minimum_size = Vector2(170, 48)
-	_quick_practice_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_quick_practice_button.pressed.connect(_on_quick_practice_pressed)
-	_home_start_action_row.add_child(_quick_practice_button)
-	_home_material_buttons.append(_quick_practice_button)
-
 	_home_start_button = Button.new()
 	_home_start_button.text = "%s  Let's Play!" % char(0x25B6)
 	_home_start_button.custom_minimum_size = Vector2(220, 58)
@@ -5693,6 +5691,7 @@ func _build_ui_game_panel() -> void:
 	intro_panel.add_child(intro_col)
 	var intro_title := Label.new()
 	intro_title.text = "Welcome to Ear Training!"
+	_ear_intro_title = intro_title
 	intro_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	intro_title.add_theme_font_size_override("font_size", 24)
 	intro_title.add_theme_color_override("font_color", Color(1.0, 0.93, 0.70, 1.0))
@@ -9987,6 +9986,9 @@ func _set_note_chase_bottom_metric(label: RichTextLabel, icon_text: String, valu
 
 
 func _result_box_show(title_text: String, subtitle_text: String) -> void:
+	if _first_run_assessment_active:
+		_first_run_assessment_active = false
+		_first_run_assessment_steps.clear()
 	# Dynamic title for completions based on session accuracy
 	var display_title := title_text
 	if title_text == "Complete":
@@ -10016,7 +10018,7 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 				_result_action_home_button.text = "Home"
 				_result_action_home_button.disabled = false
 			if _result_action_focus_button != null:
-				var is_ear_mode := _selected_mode in [MODE_INTERVAL, MODE_CHORD]
+				var is_ear_mode := _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE]
 				var has_misses := is_ear_mode and not _compute_missed_ids().is_empty()
 				_result_action_focus_button.visible = has_misses
 				_result_action_focus_button.disabled = false
@@ -10119,6 +10121,8 @@ func _on_result_action_primary_pressed() -> void:
 func _on_result_action_focus_pressed() -> void:
 	_play_ui_click_sfx()
 	_focus_missed_ids = _compute_missed_ids()
+	if _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE] and _question_spin != null:
+		_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
 	_on_restart_quiz_pressed()
 
 
@@ -10128,7 +10132,7 @@ func _compute_missed_ids() -> Array[String]:
 	if _selected_mode == MODE_INTERVAL:
 		stats_asked = _interval_stats_asked
 		stats_correct = _interval_stats_correct
-	elif _selected_mode == MODE_CHORD:
+	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_CADENCE:
 		stats_asked = _chord_stats_asked
 		stats_correct = _chord_stats_correct
 	else:
@@ -11277,27 +11281,37 @@ func _qa_should_simulate_missing_resource(path: String, kind: String) -> bool:
 	return true
 
 
+func _update_first_run_assessment_pending() -> void:
+	_first_run_assessment_pending = not _first_run_onboarding_done and not _qa_enabled
+	if not _first_run_assessment_pending and not _first_run_assessment_active:
+		_first_run_assessment_steps.clear()
+
+
 func _load_ear_settings() -> void:
 	_ear_choice_count = 6
 	_ui_theme_id = FIXED_MENU_THEME_ID
 	_use_descending_intervals = false
 	_use_harmonic_intervals = false
+	_practice_mode_enabled = true
 	_rhythm_flow_saved_maps = []
 	_rhythm_flow_tap_latency_ms = 0
 	if not FileAccess.file_exists(EAR_SETTINGS_PATH):
 		_rhythm_flow_ensure_saved_maps_slots()
 		if _home_tokens != null:
 			_home_tokens.set_theme(_ui_theme_id)
+		_update_first_run_assessment_pending()
 		return
 	var f := FileAccess.open(EAR_SETTINGS_PATH, FileAccess.READ)
 	if f == null:
 		if _home_tokens != null:
 			_home_tokens.set_theme(_ui_theme_id)
+		_update_first_run_assessment_pending()
 		return
 	var txt := f.get_as_text()
 	f.close()
 	var parsed: Variant = JSON.parse_string(txt)
 	if typeof(parsed) != TYPE_DICTIONARY:
+		_update_first_run_assessment_pending()
 		return
 	var d := parsed as Dictionary
 	if d.has("choice_count"):
@@ -11350,6 +11364,7 @@ func _load_ear_settings() -> void:
 	if _home_tokens != null:
 		_home_tokens.set_theme(_ui_theme_id)
 		_ui_theme_id = _home_tokens.theme_id()
+	_update_first_run_assessment_pending()
 
 
 func _save_ear_settings() -> void:
@@ -11650,6 +11665,11 @@ func _on_mode_selected() -> void:
 	var show_overview := not _home_mode_detail_active and not show_settings and show_home_main
 	var show_detail := practice_flow and _home_mode_detail_active and not show_settings and show_home_main
 	var sight_in_more_settings := show_detail and _selected_mode == MODE_SIGHT and _sight_settings_screen_active
+	if _first_run_assessment_pending:
+		show_settings = false
+		show_overview = false
+		show_detail = false
+		sight_in_more_settings = false
 
 	if _home_q_row != null:
 		_home_q_row.visible = false
@@ -11706,7 +11726,7 @@ func _on_mode_selected() -> void:
 	_set_home_section_visible(_note_chase_options_box, show_detail and bool(vis["show_chase"]))
 	_set_home_section_visible(_read_options_box, show_detail and bool(vis["show_read"]))
 	if _home_info_label != null:
-		_home_info_label.visible = show_detail
+		_home_info_label.visible = show_detail or _first_run_assessment_pending
 	if _home_mode_back_button != null:
 		var can_nav := show_home_main and (_home_mode_detail_active or _ear_settings_screen_active or _sight_settings_screen_active)
 		var can_go_back := can_nav
@@ -11718,19 +11738,24 @@ func _on_mode_selected() -> void:
 	elif _home_mode_home_button != null:
 		_home_mode_home_button.visible = false
 	if _sight_settings_button != null:
-		_sight_settings_button.visible = show_home_main
+		_sight_settings_button.visible = show_home_main and not _first_run_assessment_pending
 	_apply_top_hud_nav_button_skin()
 	if _home_sight_mode_row != null:
 		var show_sight_row := not sight_in_more_settings
+		if _first_run_assessment_pending:
+			show_sight_row = false
 		if show_detail and _selected_mode != MODE_SIGHT and _selected_mode != MODE_NOTE_CHASE:
 			show_sight_row = false
 		_home_sight_mode_row.visible = show_sight_row
 	if _sight_clef_row != null:
 		# Hide clef row for Rhythm Flow only; Chords shows Treble/Bass/Grand Staff
-		_sight_clef_row.visible = _selected_mode == MODE_SIGHT and _sight_mode != "Rhythm Flow"
+		_sight_clef_row.visible = not _first_run_assessment_pending and _selected_mode == MODE_SIGHT and _sight_mode != "Rhythm Flow"
 
 	if _home_start_button != null:
-		if show_detail:
+		if _first_run_assessment_pending and show_home_main:
+			_home_start_button.text = "Test Your Skills"
+			_home_start_button.visible = true
+		elif show_detail:
 			_home_start_button.text = "%s  Let's Play!" % char(0x25B6)
 			_home_start_button.visible = true
 		elif learn_flow and show_home_main:
@@ -11739,7 +11764,7 @@ func _on_mode_selected() -> void:
 		else:
 			_home_start_button.visible = false
 	if _how_to_play_button != null:
-		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_NOTE_CHASE, MODE_CADENCE]
+		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_SIGHT, MODE_NOTE_CHASE, MODE_CADENCE]
 		_how_to_play_button.visible = has_intro
 	if _home_footer_bar != null:
 		var show_footer_actions := (_home_settings_button != null and _home_settings_button.visible) or (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible)
@@ -11752,10 +11777,13 @@ func _on_mode_selected() -> void:
 		_refresh_home_subtitle()
 		_refresh_game_title()
 		_force_home_top_ui_state()
-	if _home_info_label != null and show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE]:
-		var _progress_line := _progress_home_line(_selected_mode)
-		if not _progress_line.is_empty():
-			_home_info_label.text = _progress_line
+	if _home_info_label != null:
+		if _first_run_assessment_pending:
+			_home_info_label.text = "Start with a short 5-question sight check."
+		elif show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE]:
+			var _progress_line := _progress_home_line(_selected_mode)
+			if not _progress_line.is_empty():
+				_home_info_label.text = _progress_line
 
 	_refresh_mode_buttons()
 	_refresh_home_hub_buttons()
@@ -11808,6 +11836,9 @@ func _refresh_sight_submode_ui_fast() -> void:
 
 func _refresh_home_subtitle() -> void:
 	if _home_title_label == null:
+		return
+	if _first_run_assessment_pending:
+		_home_title_label.text = "Welcome"
 		return
 	if _ear_settings_screen_active:
 		_home_title_label.text = "Settings"
@@ -12303,17 +12334,31 @@ func _refresh_chord_tier_header(tier_name: String) -> void:
 
 
 func _set_ear_intro_text_for_mode() -> void:
+	if _ear_intro_body == null and _ear_intro_title == null:
+		return
+	if _selected_mode == MODE_SIGHT:
+		if _ear_intro_title != null:
+			_ear_intro_title.text = "Welcome to Sight Reading!"
+		if _ear_intro_body == null:
+			return
+		if _sight_mode == "Chords":
+			_ear_intro_body.text = "1.  Look at the staff - all notes of the chord are shown in your selected clef\n\n2.  Identify the chord name from the answer buttons\n\n3.  Check chord shape + accidentals: root, quality, and extra tones\n\n4.  Use replay when needed, then answer for score and streak"
+			return
+		_ear_intro_body.text = "1.  Read the note shown on the staff in your selected clef\n\n2.  Match it to the correct note choice\n\n3.  Watch line/space position and key-signature accidentals\n\n4.  Replay if needed, then answer to build streak"
+		return
+	if _ear_intro_title != null:
+		_ear_intro_title.text = "Welcome to Ear Training!"
 	if _ear_intro_body == null:
 		return
 	if _selected_mode == MODE_CHORD:
-		_ear_intro_body.text = "1.  Listen — a chord will play: several notes sounding together\n\n2.  Identify — recognise the chord family from the answer buttons\n    (Major, Minor, Diminished, Augmented, Dominant 7th…)\n\n3.  Practice — right answers build your streak!\n    Wrong answers replay the chord so you can train your ear"
+		_ear_intro_body.text = "1.  Listen - a chord will play: several notes sounding together\n\n2.  Identify - recognise the chord family from the answer buttons\n    (Major, Minor, Diminished, Augmented, Dominant 7th...)\n\n3.  Practice - right answers build your streak!\n    Wrong answers replay the chord so you can train your ear"
 	else:
-		_ear_intro_body.text = "1.  Listen — two notes will play in sequence (or together for harmonic intervals)\n\n2.  Identify — recognise the interval between the notes from the answer buttons\n\n3.  Practice — right answers build your streak!\n    Wrong answers replay the interval so you can train your ear"
+		_ear_intro_body.text = "1.  Listen - two notes will play in sequence (or together for harmonic intervals)\n\n2.  Identify - recognise the interval between the notes from the answer buttons\n\n3.  Practice - right answers build your streak!\n    Wrong answers replay the interval so you can train your ear"
 
 
 func _on_how_to_play_pressed() -> void:
 	var mode_at_open := _selected_mode
-	if _selected_mode in [MODE_INTERVAL, MODE_CHORD]:
+	if _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_SIGHT]:
 		if _ear_intro_overlay != null and _ear_intro_dismiss != null:
 			_set_ear_intro_text_for_mode()
 			_ear_intro_overlay.visible = true
@@ -12337,20 +12382,6 @@ func _on_how_to_play_pressed() -> void:
 func _on_quick_practice_pressed() -> void:
 	if _startup_boot_blocking_input():
 		return
-	# Quick Practice: auto-configure a short ear training session
-	# Use focus-missed items if available, otherwise beginner intervals
-	_selected_mode = MODE_INTERVAL
-	_practice_mode_enabled = true
-	_interval_difficulty_preset = "beginner"
-	_apply_interval_preset("beginner")
-	var missed := _compute_missed_ids()
-	if not missed.is_empty():
-		_focus_missed_ids = missed
-	else:
-		_focus_missed_ids.clear()
-	# Short session: 10 questions
-	if _question_spin != null:
-		_question_spin.value = 10
 	_on_start_quiz_pressed()
 
 
@@ -14139,13 +14170,83 @@ func _reset_game_hud_for_pre_round() -> void:
 		_cadence_roman_label.visible = false
 
 
+func _append_first_run_assessment_steps(note_names: Array, desired_count: int, out_steps: Array[int]) -> void:
+	var labels: Array[String] = []
+	for n in note_names:
+		labels.append(str(n))
+	labels.shuffle()
+	for label in labels:
+		if desired_count <= 0:
+			return
+		var step := _sight_step_for_label_in_clef(label, "Treble")
+		if step == 999:
+			continue
+		out_steps.append(step)
+		desired_count -= 1
+
+
+func _build_first_run_assessment_steps() -> Array[int]:
+	var steps: Array[int] = []
+	_append_first_run_assessment_steps(FIRST_RUN_ASSESSMENT_EASY_NOTES, 3, steps)
+	_append_first_run_assessment_steps(FIRST_RUN_ASSESSMENT_CHALLENGE_NOTES, 2, steps)
+	while steps.size() < FIRST_RUN_ASSESSMENT_TOTAL_QUESTIONS:
+		var fallback_pool: Array = FIRST_RUN_ASSESSMENT_EASY_NOTES if steps.size() < 3 else FIRST_RUN_ASSESSMENT_CHALLENGE_NOTES
+		var fallback_label := str(fallback_pool[_rng.randi_range(0, fallback_pool.size() - 1)])
+		var fallback_step := _sight_step_for_label_in_clef(fallback_label, "Treble")
+		if fallback_step == 999:
+			break
+		steps.append(fallback_step)
+	return steps
+
+
+func _first_run_assessment_step_for_question(question_number: int) -> int:
+	if not _first_run_assessment_active:
+		return 999
+	var idx := question_number - 1
+	if idx < 0 or idx >= _first_run_assessment_steps.size():
+		return 999
+	return _first_run_assessment_steps[idx]
+
+
+func _begin_first_run_sight_assessment() -> void:
+	_selected_mode = MODE_SIGHT
+	_sight_mode = "Notes"
+	_selected_clef = "Treble"
+	_sight_key_signature = "C"
+	_home_mode_detail_active = true
+	_ear_settings_screen_active = false
+	_sight_settings_screen_active = false
+	_focus_missed_ids.clear()
+	_sight_selected_notes_by_clef["Treble"] = _sanitize_sight_note_set_for_clef("Treble", PackedStringArray([
+		"C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"
+	]))
+	var c4_step := _sight_step_for_label_in_clef("C4", "Treble")
+	var c5_step := _sight_step_for_label_in_clef("C5", "Treble")
+	if c4_step != 999 and c5_step != 999:
+		_sight_range_min_step = mini(c4_step, c5_step)
+		_sight_range_max_step = maxi(c4_step, c5_step)
+	_first_run_assessment_steps = _build_first_run_assessment_steps()
+	_first_run_assessment_active = not _first_run_assessment_steps.is_empty()
+	_first_run_assessment_pending = false
+	_first_run_onboarding_done = true
+	if _sight_question_spin != null:
+		_sight_question_spin.value = FIRST_RUN_ASSESSMENT_TOTAL_QUESTIONS
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
+
+
 func _on_start_quiz_pressed() -> void:
 	if _startup_boot_blocking_input():
 		return
+	if _first_run_assessment_pending:
+		_begin_first_run_sight_assessment()
 	await _ensure_session_controller().start_quiz_from_home(self)
 
 
 func _on_end_quiz_pressed() -> void:
+	if _first_run_assessment_active:
+		_first_run_assessment_active = false
+		_first_run_assessment_steps.clear()
 	_clear_gameplay_transient_visuals()
 	_invalidate_audio_sequence_schedule()
 	_ensure_session_controller().apply_end_state(self)
@@ -14273,6 +14374,26 @@ func _selected_cadence_ids() -> Array[String]:
 	return out
 
 
+func _selected_cadence_ids_for_current_round() -> Array[String]:
+	var selected := _selected_cadence_ids()
+	if _focus_missed_ids.is_empty():
+		return selected
+	var focused: Array[String] = []
+	for miss_any in _focus_missed_ids:
+		var miss := str(miss_any)
+		for key_any in CADENCE_DEFS.keys():
+			var key := str(key_any)
+			var def: Dictionary = CADENCE_DEFS.get(key, {})
+			var label := str(def.get("label", key))
+			if miss != key and miss != label:
+				continue
+			if not focused.has(key):
+				focused.append(key)
+	if focused.is_empty():
+		return selected
+	return focused
+
+
 func _selected_ear_mode_choices() -> Array[String]:
 	if _selected_mode == MODE_PROGRESSION:
 		var labels: Array[String] = []
@@ -14283,7 +14404,7 @@ func _selected_ear_mode_choices() -> Array[String]:
 		return _selected_scale_mode_ids()
 	if _selected_mode == MODE_CADENCE:
 		var out: Array[String] = []
-		for key in _selected_cadence_ids():
+		for key in _selected_cadence_ids_for_current_round():
 			out.append(str(CADENCE_DEFS[key]["label"]))
 		return out
 	return []
@@ -14330,7 +14451,7 @@ func _build_theory_question_payload() -> Dictionary:
 			"scale_notes": scale_notes
 		}
 	if _selected_mode == MODE_CADENCE:
-		var selected_cadences := _selected_cadence_ids()
+		var selected_cadences := _selected_cadence_ids_for_current_round()
 		var queue3 = _review_queue_for_mode(MODE_CADENCE)
 		var cadence_id := str(queue3.pick_next(selected_cadences)) if queue3 != null else ""
 		if cadence_id == "":
@@ -22671,7 +22792,7 @@ func _sight_chord_candidates(include_accidental_variants: bool = false) -> Array
 	)
 
 func _generate_sight_chord_round() -> void:
-	var triad: Dictionary = {}
+	var chord_candidate: Dictionary = {}
 	var centers: Array[float] = []
 	var found := false
 	var chosen_inversion := 0
@@ -22710,37 +22831,58 @@ func _generate_sight_chord_round() -> void:
 		_generate_sight_chord_round_grand_staff(candidates)
 		return
 
-	var triad_candidates: Array[Dictionary] = []
-	for c2 in candidates:
-		var intervals_v: Variant = c2.get("intervals", [])
-		if intervals_v is Array and (intervals_v as Array).size() == 3:
-			triad_candidates.append(c2)
-	if triad_candidates.is_empty():
-		_generate_sight_chord_round_grand_staff(candidates)
-		return
-	candidates = triad_candidates
+	var drawable_candidates: Array[Dictionary] = []
+	for candidate in candidates:
+		var tone_letters_v: Variant = candidate.get("tone_letters", [])
+		if tone_letters_v is Array and (tone_letters_v as Array).size() >= 2:
+			drawable_candidates.append(candidate)
+	if drawable_candidates.is_empty():
+		# Keep fallback local to single-clef rendering path.
+		drawable_candidates = [{
+			"id": "Major",
+			"tier": 1,
+			"quality": "Major",
+			"voicing_quality": "Major",
+			"name": "C Major",
+			"label": "Major",
+			"root_letter": "C",
+			"root_accidental": 0,
+			"tone_letters": ["C", "E", "G"],
+			"tone_accidentals": [0, 0, 0],
+			"intervals": [0, 4, 7],
+			"is_accidental": false
+		}]
+	candidates = drawable_candidates
 
-	for attempt in range(40):
+	for attempt in range(50):
 		var t: Dictionary = candidates[_rng.randi_range(0, candidates.size() - 1)]
-		var root_t := str(t.get("root_letter", "C"))
-		var quality_t := str(t.get("quality", "Major"))
-		var inversion_t := _rng.randi_range(0, 2)
-		var c := _pick_staff_centers_for_triad(root_t, quality_t, inversion_t)
+		var tones_any: Variant = t.get("tone_letters", [])
+		if typeof(tones_any) != TYPE_ARRAY:
+			continue
+		var tones: Array = tones_any as Array
+		if tones.size() < 2:
+			continue
+		var inversion_t := _rng.randi_range(0, tones.size() - 1)
+		var c := _pick_staff_centers_for_chord(tones, inversion_t)
 		if not c.is_empty():
-			triad = t
+			chord_candidate = t
 			centers = c
 			chosen_inversion = inversion_t
 			found = true
 			break
 	if not found:
 		for t in candidates:
-			var root_t := str(t.get("root_letter", "C"))
-			var quality_t := str(t.get("quality", "Major"))
-			for inversion_t in [0, 1, 2]:
-				var c := _pick_staff_centers_for_triad(root_t, quality_t, inversion_t)
+			var tones_any: Variant = t.get("tone_letters", [])
+			if typeof(tones_any) != TYPE_ARRAY:
+				continue
+			var tones: Array = tones_any as Array
+			if tones.size() < 2:
+				continue
+			for inversion_t in range(tones.size()):
+				var c := _pick_staff_centers_for_chord(tones, inversion_t)
 				if c.is_empty():
 					continue
-				triad = t
+				chord_candidate = t
 				centers = c
 				chosen_inversion = inversion_t
 				found = true
@@ -22748,32 +22890,28 @@ func _generate_sight_chord_round() -> void:
 			if found:
 				break
 	if not found:
-		triad = {"root_letter": "C", "quality": "Major", "name": "C Major", "tone_letters": ["C", "E", "G"], "tone_accidentals": [0, 0, 0]}
-		centers = _pick_staff_centers_for_triad("C", "Major", 0)
+		chord_candidate = {"root_letter": "C", "quality": "Major", "name": "C Major", "tone_letters": ["C", "E", "G"], "tone_accidentals": [0, 0, 0]}
+		centers = _pick_staff_centers_for_chord(["C", "E", "G"], 0)
 		chosen_inversion = 0
 		if centers.is_empty():
 			var b := _effective_sight_step_bounds()
 			centers = [_staff_center_y_for_step(b.y), _staff_center_y_for_step(maxi(b.x, b.y - 2)), _staff_center_y_for_step(maxi(b.x, b.y - 4))]
 
-	var display_accidentals: Array[int] = [0, 0, 0]
-	var display_letters: Array[String] = ["C", "E", "G"]
-	var base_acc: Array = triad.get("tone_accidentals", [0, 0, 0])
-	var base_letters: Array = triad.get("tone_letters", ["C", "E", "G"])
-	if base_acc.size() >= 3:
-		if chosen_inversion == 1:
-			display_accidentals = [int(base_acc[1]), int(base_acc[2]), int(base_acc[0])]
-			display_letters = [str(base_letters[1]), str(base_letters[2]), str(base_letters[0])]
-		elif chosen_inversion == 2:
-			display_accidentals = [int(base_acc[2]), int(base_acc[0]), int(base_acc[1])]
-			display_letters = [str(base_letters[2]), str(base_letters[0]), str(base_letters[1])]
-		else:
-			display_accidentals = [int(base_acc[0]), int(base_acc[1]), int(base_acc[2])]
-			display_letters = [str(base_letters[0]), str(base_letters[1]), str(base_letters[2])]
-	triad["display_accidentals"] = display_accidentals
-	triad["display_letters"] = display_letters
-	_current_sight_chord_def = triad
-	_current_sight_chord_name = str(triad.get("name", "C Major"))
-	_position_sight_chord(centers, triad)
+	var display_accidentals: Array[int] = []
+	var display_letters: Array[String] = []
+	var base_acc: Array = chord_candidate.get("tone_accidentals", [0, 0, 0])
+	var base_letters: Array = chord_candidate.get("tone_letters", ["C", "E", "G"])
+	var rotated_letters: Array = _rotate_sight_chord_values_for_inversion(base_letters, chosen_inversion)
+	var rotated_acc: Array = _rotate_sight_chord_values_for_inversion(base_acc, chosen_inversion)
+	for i in range(rotated_letters.size()):
+		display_letters.append(str(rotated_letters[i]))
+		var acc_value := int(rotated_acc[i]) if i < rotated_acc.size() else 0
+		display_accidentals.append(acc_value)
+	chord_candidate["display_accidentals"] = display_accidentals
+	chord_candidate["display_letters"] = display_letters
+	_current_sight_chord_def = chord_candidate
+	_current_sight_chord_name = str(chord_candidate.get("name", "C Major"))
+	_position_sight_chord(centers, chord_candidate)
 
 	var all_names: Array[String] = []
 	for t in candidates:
@@ -23018,6 +23156,21 @@ func _pick_staff_centers_for_triad(root: String, _quality: String, inversion: in
 	return _ensure_sight_renderer().pick_staff_centers_for_triad(self, root, inversion, NOTE_NAME_ORDER)
 
 
+func _pick_staff_centers_for_chord(tone_letters: Array, inversion: int) -> Array[float]:
+	return _ensure_sight_renderer().pick_staff_centers_for_chord(self, tone_letters, inversion)
+
+
+func _rotate_sight_chord_values_for_inversion(values: Array, inversion: int) -> Array:
+	var out: Array = []
+	if values.is_empty():
+		return out
+	var count := values.size()
+	var shift := posmod(inversion, count)
+	for i in range(count):
+		out.append(values[(i + shift) % count])
+	return out
+
+
 func _has_sight_chord_available_in_range() -> bool:
 	return _ensure_sight_renderer().has_sight_chord_available_in_range(
 		self,
@@ -23080,15 +23233,19 @@ func _update_staff_ledger_lines_for_notes(note_centers: Array[float], note_cente
 func _pick_sight_note_slot() -> Dictionary:
 	var step := _rng.randi_range(_sight_range_min_step, _sight_range_max_step)
 	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
-		var allowed := _sight_note_set_for_clef(_selected_clef)
-		var allowed_steps: Array[int] = []
-		for note_name in allowed:
-			var s := _sight_step_for_label_in_clef(str(note_name), _selected_clef)
-			if s != 999:
-				allowed_steps.append(s)
-		if not allowed_steps.is_empty():
-			var idx := _rng.randi_range(0, allowed_steps.size() - 1)
-			step = allowed_steps[idx]
+		var forced_step := _first_run_assessment_step_for_question(_question_index)
+		if forced_step != 999:
+			step = forced_step
+		else:
+			var allowed := _sight_note_set_for_clef(_selected_clef)
+			var allowed_steps: Array[int] = []
+			for note_name in allowed:
+				var s := _sight_step_for_label_in_clef(str(note_name), _selected_clef)
+				if s != 999:
+					allowed_steps.append(s)
+			if not allowed_steps.is_empty():
+				var idx := _rng.randi_range(0, allowed_steps.size() - 1)
+				step = allowed_steps[idx]
 	var base_name := _staff_step_name_for_clef(step, _selected_clef)
 	var sig_map := _key_signature_accidental_map()
 	var letter := base_name.substr(0, 1) if base_name.length() > 0 else ""
