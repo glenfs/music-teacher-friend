@@ -41,6 +41,12 @@ const APP_VERSION_LABEL := "v1.0.2"
 const APP_TAGLINE_LABEL := "Music Learning that actually sticks"
 const MENU_PRIMARY_ACCENT := Color(0.9098, 0.6275, 0.1255, 1.0) # #E8A020
 const MENU_CARD_CREAM_ACCENT := Color(1.0, 1.0, 1.0, 1.0)
+const MENU_CARD_LEARNING_ACCENT := Color(0.3686, 0.8157, 0.8392, 1.0) # #5ED0D6
+const MENU_CARD_LEARNING_BG := Color(0.1216, 0.3059, 0.4196, 0.76) # #1F4E6B @76%
+const MENU_CARD_LEARNING_HOVER := Color(0.1647, 0.4353, 0.4784, 0.80) # #2A6F7A @80%
+const MENU_CARD_LEARNING_PRESSED := Color(0.0941, 0.2980, 0.3333, 0.78) # #184C55 @78%
+const MENU_CARD_LEARNING_TITLE := Color(0.9176, 0.9686, 0.9765, 1.0) # #EAF7F9
+const MENU_CARD_LEARNING_SUBTITLE := Color(0.7490, 0.8941, 0.9098, 1.0) # #BFE4E8
 const MENU_CARD_BG := Color(1.0, 1.0, 1.0, 0.88) # rgba(255,255,255,0.88)
 const MENU_CARD_BORDER := Color(0.0, 0.0, 0.0, 0.06)
 const MENU_TITLE_TEXT := Color(0.9176, 0.9529, 1.0, 1.0) # #EAF3FF
@@ -69,6 +75,10 @@ const RhythmGlyphScene = preload("res://scenes/rhythm/RhythmGlyph.tscn")
 const VirtualPianoSelectorScene = preload("res://ui/components/virtual_piano_selector.tscn")
 const RhythmGeneratorScript = preload("res://scripts/rhythm/rhythm_generator.gd")
 const ChordVoicingGeneratorScript = preload("res://scripts/music_theory/chord_voicing_generator.gd")
+const LearningMapScript = preload("res://scripts/learning/learning_map.gd")
+const LessonPlayerScript = preload("res://scripts/learning/lesson_player.gd")
+const LearningRegistryScript = preload("res://scripts/learning/learning_module_registry.gd")
+const LearningProgressScript = preload("res://scripts/learning/module_progress.gd")
 
 const NOTE_DURATION := 0.7
 const GAP_DURATION := 0.25
@@ -528,6 +538,11 @@ var _home_hub_buttons: Dictionary = {}
 var _home_section_cards: Dictionary = {}
 var _home_option_group_cards: Array[PanelContainer] = []
 var _home_flow := "Practice" # Practice | Learn | Teacher
+var _learning_mode_card_button: Button = null
+var _learning_map: Control
+var _learning_lesson_player: Control
+var _learning_progress: RefCounted
+var _learning_mode_active := false
 var _home_mode_label: Label
 var _home_mode_buttons_row: Control
 var _home_q_row: HBoxContainer
@@ -3147,6 +3162,13 @@ func _build_ui() -> void:
 
 	_build_mode_card("Ear Training", "Train your musical ear", ICON_EAR_PATH, MODE_INTERVAL, "Ear", MENU_CARD_CREAM_ACCENT, _home_overview_grid)
 	_build_mode_card("Sight Reading", "Read notes on the staff", ICON_PIANO_PATH, MODE_SIGHT, "Sight", MENU_CARD_CREAM_ACCENT, _home_overview_grid)
+
+	var learning_card_btn := _build_home_overview_card(_home_overview_grid, "Learning Mode", "Step-by-step music lessons", ICON_GRADUATION_PATH, MENU_CARD_LEARNING_ACCENT, _on_learning_mode_pressed)
+	if learning_card_btn != null:
+		_learning_mode_card_button = learning_card_btn
+		learning_card_btn.set_meta("main_menu_mode_key", "Learning")
+		_home_material_buttons.append(learning_card_btn)
+		_set_home_selection_state(learning_card_btn, false)
 
 	_home_hub_row = HBoxContainer.new()
 	_home_hub_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -6494,6 +6516,8 @@ func _apply_pro_style() -> void:
 		var hbtn: Button = _home_hub_buttons[hub_key]
 		if hbtn != null and hbtn.has_meta("mode_card_panel"):
 			_set_home_selection_state(hbtn, str(hub_key) == _home_flow)
+	if _learning_mode_card_button != null and _learning_mode_card_button.has_meta("mode_card_panel"):
+		_set_home_selection_state(_learning_mode_card_button, false)
 	# Style streak label
 	if _home_streak_label != null:
 		_home_streak_label.add_theme_font_override("font", _ui_font)
@@ -8572,13 +8596,15 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	# Treat overview mode cards as glass cards even if `flat` is changed elsewhere.
 	var mode_card_flat := btn.has_meta("mode_card_panel")
 	var main_menu_card := mode_card_flat and btn.has_meta("main_menu_mode_key") and _is_main_menu_overview_active()
+	var main_menu_key := str(btn.get_meta("main_menu_mode_key", ""))
+	var learning_main_menu_card := mode_card_flat and main_menu_key == "Learning"
 	var accent_meta: Variant = btn.get_meta("mode_card_accent_color", MENU_CARD_CREAM_ACCENT)
 	var card_accent: Color = accent_meta if accent_meta is Color else MENU_CARD_CREAM_ACCENT
 	var selected_border: Color = token_colors.get("focus_border", Color(0.95, 0.76, 0.31, 1.0))
 	if mode_card_flat:
 		selected_border = Color(card_accent.r, card_accent.g, card_accent.b, 0.56)
 		if main_menu_card:
-			selected_border = Color(0.96, 0.82, 0.36, 0.94)
+			selected_border = Color(card_accent.r, card_accent.g, card_accent.b, 0.94) if learning_main_menu_card else Color(0.96, 0.82, 0.36, 0.94)
 	var selected_bg: Color = pal["selected_bg"]
 	if not mode_card_flat:
 		var contrast_delta := absf(selected_border.get_luminance() - selected_bg.get_luminance())
@@ -8595,19 +8621,27 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if mode_card_flat:
 		# Use a true glass look: low-opacity white fill, panel-driven visuals.
 		if main_menu_card:
-			# Main menu overview cards use the contract CTA family.
-			selected_btn_bg = Color(contract.get("cta_bg", Color(0.9098, 0.6275, 0.1255, 0.98)))
-			selected_btn_bg.a = 0.78
-			selected_btn_hover_bg = Color(contract.get("cta_hover", Color(0.95, 0.70, 0.20, 0.99)))
-			selected_btn_hover_bg.a = 0.82
-			selected_btn_pressed_bg = Color(contract.get("cta_pressed", Color(0.82, 0.54, 0.08, 0.99)))
-			selected_btn_pressed_bg.a = 0.74
-			base_btn_bg = Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
-			base_btn_bg.a = 0.66
-			base_btn_hover_bg = Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
-			base_btn_hover_bg.a = 0.72
-			base_btn_pressed_bg = Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
-			base_btn_pressed_bg.a = 0.64
+			if learning_main_menu_card:
+				selected_btn_bg = MENU_CARD_LEARNING_HOVER
+				selected_btn_hover_bg = Color(0.1725, 0.4980, 0.5412, 0.86) # #2C7F8A
+				selected_btn_pressed_bg = MENU_CARD_LEARNING_PRESSED
+				base_btn_bg = MENU_CARD_LEARNING_BG
+				base_btn_hover_bg = MENU_CARD_LEARNING_HOVER
+				base_btn_pressed_bg = MENU_CARD_LEARNING_PRESSED
+			else:
+				# Main menu overview cards use the contract CTA family.
+				selected_btn_bg = Color(contract.get("cta_bg", Color(0.9098, 0.6275, 0.1255, 0.98)))
+				selected_btn_bg.a = 0.78
+				selected_btn_hover_bg = Color(contract.get("cta_hover", Color(0.95, 0.70, 0.20, 0.99)))
+				selected_btn_hover_bg.a = 0.82
+				selected_btn_pressed_bg = Color(contract.get("cta_pressed", Color(0.82, 0.54, 0.08, 0.99)))
+				selected_btn_pressed_bg.a = 0.74
+				base_btn_bg = Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+				base_btn_bg.a = 0.66
+				base_btn_hover_bg = Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
+				base_btn_hover_bg.a = 0.72
+				base_btn_pressed_bg = Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
+				base_btn_pressed_bg.a = 0.64
 		else:
 			selected_btn_bg = Color(1.0, 1.0, 1.0, 0.06)
 			selected_btn_hover_bg = Color(1.0, 1.0, 1.0, 0.07)
@@ -8713,7 +8747,7 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.12) if mode_card_flat else Color(0.0, 0.0, 0.0, 0.35))
 		btn.add_theme_constant_override("outline_size", 1)
 	if mode_card_flat:
-		var card_text := Color(0.16, 0.22, 0.31, 1.0) if main_menu_card else MENU_TITLE_TEXT
+		var card_text := MENU_CARD_LEARNING_TITLE if learning_main_menu_card else (Color(0.16, 0.22, 0.31, 1.0) if main_menu_card else MENU_TITLE_TEXT)
 		btn.add_theme_color_override("font_color", card_text)
 		btn.add_theme_color_override("font_hover_color", card_text)
 		btn.add_theme_color_override("font_pressed_color", card_text)
@@ -8732,7 +8766,10 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			if mode_card_flat:
 				if selected:
 					card_sb.bg_color = selected_btn_bg
-					card_sb.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.86, 0.45, 0.96))) if main_menu_card else Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
+					if main_menu_card:
+						card_sb.border_color = Color(card_accent.r, card_accent.g, card_accent.b, 0.86) if learning_main_menu_card else Color(contract.get("panel_border_strong", Color(0.98, 0.86, 0.45, 0.96)))
+					else:
+						card_sb.border_color = Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
 					card_sb.border_width_left = 1
 					card_sb.border_width_top = 1
 					card_sb.border_width_right = 1
@@ -8741,7 +8778,10 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 					card_sb.shadow_size = 0 if main_menu_card else int(contract.get("shadow_panel_size", 6))
 				else:
 					card_sb.bg_color = base_btn_bg
-					card_sb.border_color = Color(contract.get("panel_border", Color(0.96, 0.82, 0.36, 0.74))) if main_menu_card else Color(1.0, 1.0, 1.0, 0.06)
+					if main_menu_card:
+						card_sb.border_color = Color(card_accent.r, card_accent.g, card_accent.b, 0.72) if learning_main_menu_card else Color(contract.get("panel_border", Color(0.96, 0.82, 0.36, 0.74)))
+					else:
+						card_sb.border_color = Color(1.0, 1.0, 1.0, 0.06)
 					card_sb.border_width_left = 1
 					card_sb.border_width_top = 1
 					card_sb.border_width_right = 1
@@ -8778,17 +8818,28 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		if btn.has_meta("mode_card_icon"):
 			var card_icon: TextureRect = btn.get_meta("mode_card_icon")
 			if card_icon != null and is_instance_valid(card_icon):
-				card_icon.modulate = (Color(0.16, 0.22, 0.31, 0.96) if main_menu_card else Color(0.18, 0.20, 0.24, 0.95)) if mode_card_flat else Color(card_accent.r, card_accent.g, card_accent.b, 1.0)
+				if mode_card_flat:
+					if learning_main_menu_card:
+						card_icon.modulate = Color(0.90, 0.97, 0.99, 0.96)
+					elif main_menu_card:
+						card_icon.modulate = Color(0.16, 0.22, 0.31, 0.96)
+					else:
+						card_icon.modulate = Color(0.18, 0.20, 0.24, 0.95)
+				else:
+					card_icon.modulate = Color(card_accent.r, card_accent.g, card_accent.b, 1.0)
 		if btn.has_meta("mode_card_name_label"):
 			var nlbl: Label = btn.get_meta("mode_card_name_label")
 			if nlbl != null and is_instance_valid(nlbl):
-				nlbl.add_theme_color_override("font_color", Color(0.18, 0.24, 0.34, 1.0) if main_menu_card else MENU_TITLE_TEXT)
+				nlbl.add_theme_color_override("font_color", MENU_CARD_LEARNING_TITLE if learning_main_menu_card else (Color(0.18, 0.24, 0.34, 1.0) if main_menu_card else MENU_TITLE_TEXT))
 		if btn.has_meta("mode_card_desc_label"):
 			var dlbl: Label = btn.get_meta("mode_card_desc_label")
 			if dlbl != null and is_instance_valid(dlbl):
 				var token_c2: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
 				if mode_card_flat:
-					dlbl.add_theme_color_override("font_color", Color(0.28, 0.35, 0.46, 1.0) if main_menu_card else MENU_SUBTITLE_TEXT)
+					if learning_main_menu_card:
+						dlbl.add_theme_color_override("font_color", MENU_CARD_LEARNING_SUBTITLE)
+					else:
+						dlbl.add_theme_color_override("font_color", Color(0.28, 0.35, 0.46, 1.0) if main_menu_card else MENU_SUBTITLE_TEXT)
 				else:
 					dlbl.add_theme_color_override("font_color", token_c2.get("text_primary", Color(0.98, 0.96, 0.88)) if selected else token_c2.get("text_muted", Color(0.88, 0.86, 0.80)))
 		if btn.has_meta("mode_card_check"):
@@ -11883,6 +11934,9 @@ func _on_mode_button_pressed(mode: int) -> void:
 func _on_home_hub_pressed(hub_name: String) -> void:
 	if _startup_boot_blocking_input():
 		return
+	if hub_name == "Learn":
+		_on_learning_mode_pressed()
+		return
 	_clear_gameplay_transient_visuals()
 	_home_mode_detail_active = false
 	_sight_settings_screen_active = false
@@ -11890,6 +11944,189 @@ func _on_home_hub_pressed(hub_name: String) -> void:
 	_home_flow_controller.on_home_hub_pressed(hub_name, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
 	_sync_runtime_from_home_state()
 	_on_mode_selected()
+
+
+# ─── Learning Mode ────────────────────────────────────────────────
+
+func _on_learning_mode_pressed() -> void:
+	if _learning_progress == null:
+		_learning_progress = LearningProgressScript.new()
+	_play_ui_click_sfx()
+	_show_learning_map()
+
+
+func _show_learning_map() -> void:
+	_learning_mode_active = true
+	if _home_panel != null:
+		_home_panel.visible = false
+	if _game_panel != null:
+		_game_panel.visible = false
+	if _root_margin_container != null:
+		_root_margin_container.visible = false
+	_hide_learning_lesson()
+
+	if _learning_map != null and is_instance_valid(_learning_map):
+		_learning_map.visible = true
+		_learning_map.refresh()
+		return
+
+	_learning_map = LearningMapScript.new()
+	_learning_map.name = "LearningMap"
+	add_child(_learning_map)
+	move_child(_learning_map, get_child_count() - 1)
+	# Force full viewport size since anchors may not resolve until next frame
+	var vp := get_viewport_rect().size
+	_learning_map.position = Vector2.ZERO
+	_learning_map.size = vp
+	_learning_map.setup(_learning_progress)
+	_learning_map.module_selected.connect(_on_learning_module_selected)
+	_learning_map.test_out_selected.connect(_on_learning_test_out_selected)
+	_learning_map.back_pressed.connect(_on_learning_back_to_home)
+	_learning_map.review_weak_pressed.connect(_on_learning_review_weak)
+
+
+func _on_learning_module_selected(module_id: String) -> void:
+	var module_data: Dictionary = LearningRegistryScript.get_module_by_id(module_id)
+	if module_data.is_empty():
+		return
+	if module_data.get("steps", []).is_empty():
+		return
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+
+
+func _on_learning_test_out_selected(module_id: String) -> void:
+	var module_data: Dictionary = LearningRegistryScript.get_module_by_id(module_id)
+	if module_data.is_empty():
+		return
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress, false, true)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+
+
+func _on_learning_lesson_completed(_module_id: String) -> void:
+	_hide_learning_lesson()
+	_show_learning_map()
+
+
+func _on_learning_lesson_back_to_map() -> void:
+	_hide_learning_lesson()
+	_show_learning_map()
+
+
+func _on_learning_review_weak() -> void:
+	if _learning_progress == null:
+		return
+	var rq: RefCounted = _learning_progress.get_review_queue()
+	if rq == null:
+		return
+	var review_items: Array = rq.get_review_items(8)
+	if review_items.is_empty():
+		return
+	# Build a review module from weak/new concepts
+	var LMD_Script = preload("res://scripts/learning/learning_module_data.gd")
+	var steps: Array[Dictionary] = []
+	steps.append(LMD_Script.create_intro_step(
+		"Review Practice",
+		"Let's practice the notes you've been struggling with! Focus and take your time.",
+		"Strengthen your weak spots"
+	))
+	# Build a pool of note quiz items from review_items (concept IDs like "treble:C4")
+	var pool: Array = []
+	for concept_id in review_items:
+		var parts: PackedStringArray = concept_id.split(":")
+		if parts.size() < 2:
+			continue
+		var clef: String = parts[0]
+		if clef != "treble" and clef != "bass":
+			continue
+		var note_id: String = parts[1]
+		if note_id.length() < 2:
+			continue
+		var letter: String = note_id[0]
+		# Find the step position for this note
+		var found_step: int = -999
+		if clef == "treble":
+			for entry in LMD_Script.treble_note_pool_full():
+				if entry.get("note_id", "") == note_id:
+					found_step = int(entry.get("note_step", -999))
+					break
+		else:
+			for entry in LMD_Script.bass_note_pool_full():
+				if entry.get("note_id", "") == note_id:
+					found_step = int(entry.get("note_step", -999))
+					break
+		if found_step != -999:
+			pool.append({"clef": clef, "note_name": letter, "note_step": found_step, "note_id": note_id})
+	if pool.is_empty():
+		return
+	steps.append(LMD_Script.create_cumulative_quiz_step(
+		"Review Quiz",
+		"Name each note! These are the ones that need extra practice.",
+		pool,
+		mini(pool.size(), 8)
+	))
+	var module_data: Dictionary = LMD_Script.create_module(
+		"_review_practice",
+		"Review Practice",
+		"Practice your weak notes",
+		"",
+		steps,
+		3,
+		""
+	)
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+
+
+func _on_learning_back_to_home() -> void:
+	_learning_mode_active = false
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	if _root_margin_container != null:
+		_root_margin_container.visible = true
+	if _home_panel != null:
+		_home_panel.visible = true
+	_on_mode_selected()
+
+
+func _hide_learning_lesson() -> void:
+	if _learning_lesson_player != null and is_instance_valid(_learning_lesson_player):
+		_learning_lesson_player.queue_free()
+		_learning_lesson_player = null
 
 
 func _refresh_home_hub_buttons() -> void:
@@ -13611,6 +13848,8 @@ func _refresh_mode_buttons() -> void:
 		if _home_menu_ui != null and not read_btn.has_meta("mode_card_panel"):
 			_home_menu_ui.set_selected_text_marker(read_btn, selected_allowed and _selected_mode == MODE_READ)
 		read_btn.visible = false
+	if _learning_mode_card_button != null and _learning_mode_card_button.has_meta("mode_card_panel"):
+		_set_home_selection_state(_learning_mode_card_button, false)
 
 
 func _refresh_ear_mode_buttons(final_pass: bool = true) -> void:
@@ -15585,6 +15824,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("ui_cancel"):
 		return
 	if _is_note_dragging:
+		return
+	if _learning_mode_active:
+		if _learning_lesson_player != null and is_instance_valid(_learning_lesson_player):
+			_on_learning_lesson_back_to_map()
+		else:
+			_on_learning_back_to_home()
+		get_viewport().set_input_as_handled()
 		return
 	if _game_panel != null and _game_panel.visible:
 		_on_end_quiz_pressed()
