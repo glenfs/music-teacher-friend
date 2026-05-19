@@ -11,9 +11,9 @@ const _NOTE_TO_PC := {
 }
 
 const _WHITE_KEY_W := 40.0
-const _WHITE_KEY_H := 130.0
+const _WHITE_KEY_H := 146.0
 const _BLACK_KEY_W := 24.0
-const _BLACK_KEY_H := 82.0
+const _BLACK_KEY_H := 92.0
 const _LABEL_H := 20.0
 const _MIN_WHITE_KEY_W := 26.0
 
@@ -38,17 +38,26 @@ var _cached_sb_normal_unsel: StyleBoxFlat = null
 var _cached_sb_hover_unsel: StyleBoxFlat = null
 var _cached_sb_pressed_unsel: StyleBoxFlat = null
 var _cached_style_color := Color(0.0, 0.0, 0.0, 0.0)
+var _feedback_tween: Tween = null
+var _switch_tween: Tween = null
 
 @onready var _scroll: ScrollContainer = $Scroll
 @onready var _keyboard: Control = $Scroll/Keyboard
 @onready var _white_layer: Control = $Scroll/Keyboard/WhiteLayer
 @onready var _black_layer: Control = $Scroll/Keyboard/BlackLayer
 @onready var _labels_layer: Control = $Scroll/Keyboard/LabelsLayer
+@onready var _feedback_label: Label = $FeedbackLabel
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(0, _WHITE_KEY_H + _LABEL_H + 6.0)
+	custom_minimum_size = Vector2(0, _selector_total_height())
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if _feedback_label != null:
+		_feedback_label.visible = false
+		_feedback_label.add_theme_font_size_override("font_size", 12)
+		_feedback_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.72, 1.0))
+		_feedback_label.add_theme_color_override("font_outline_color", Color(0.04, 0.08, 0.14, 0.86))
+		_feedback_label.add_theme_constant_override("outline_size", 2)
 	if _default_selected_notes.is_empty():
 		_default_selected_notes = PackedStringArray([start_note, end_note])
 	_rebuild_keyboard()
@@ -76,6 +85,29 @@ func configure(config: Dictionary) -> void:
 	_default_selected_notes = _to_note_array(defaults_v)
 	_rebuild_keyboard()
 	set_selection(_default_selected_notes, false)
+
+
+func transition_to_config(config: Dictionary, selected_notes: Variant) -> void:
+	var can_animate := is_node_ready() and _keyboard != null and _white_buttons.size() > 0
+	if not can_animate:
+		configure(config)
+		set_selection(selected_notes, false)
+		return
+	if _switch_tween != null and _switch_tween.is_running():
+		_switch_tween.kill()
+	modulate = Color(1, 1, 1, 1)
+	_keyboard.position.x = 0.0
+	_switch_tween = create_tween()
+	_switch_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_switch_tween.tween_property(self, "modulate:a", 0.0, 0.08)
+	_switch_tween.parallel().tween_property(_keyboard, "position:x", -8.0, 0.08)
+	_switch_tween.tween_callback(func() -> void:
+		configure(config)
+		set_selection(selected_notes, false)
+		_keyboard.position.x = 8.0
+	)
+	_switch_tween.tween_property(self, "modulate:a", 1.0, 0.10)
+	_switch_tween.parallel().tween_property(_keyboard, "position:x", 0.0, 0.10)
 
 
 func set_selection(selected_notes: Variant, emit_now: bool = true) -> void:
@@ -138,7 +170,7 @@ func _rebuild_keyboard() -> void:
 	var total_w := float(width_cfg.get("total_w", white_count * _WHITE_KEY_W))
 	var fills_available_width := bool(width_cfg.get("fills_available_width", false))
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED if fills_available_width else ScrollContainer.SCROLL_MODE_AUTO
-	_keyboard.custom_minimum_size = Vector2(total_w, _WHITE_KEY_H + _LABEL_H + 6.0)
+	_keyboard.custom_minimum_size = Vector2(total_w, _selector_total_height())
 	_white_layer.custom_minimum_size = _keyboard.custom_minimum_size
 	_black_layer.custom_minimum_size = _keyboard.custom_minimum_size
 	_labels_layer.custom_minimum_size = _keyboard.custom_minimum_size
@@ -220,7 +252,9 @@ func _on_white_key_pressed(midi_note: int) -> void:
 		if _selected_midi_set.size() <= min_selected_count:
 			btn.button_pressed = true
 			_shake_button(btn)
-			emit_signal("selection_rejected", "Select at least %d notes." % min_selected_count)
+			var msg := "Select at least %d notes." % min_selected_count
+			_show_rejection_feedback(msg)
+			emit_signal("selection_rejected", msg)
 			return
 		_selected_midi_set.erase(midi_note)
 	else:
@@ -290,6 +324,8 @@ func _apply_white_key_style(btn: Button, selected: bool) -> void:
 		btn.add_theme_stylebox_override("normal", _cached_sb_normal_unsel)
 		btn.add_theme_stylebox_override("hover", _cached_sb_hover_unsel)
 		btn.add_theme_stylebox_override("pressed", _cached_sb_pressed_unsel)
+	_set_white_key_gloss_enabled(btn, not selected)
+	_apply_white_key_pressed_depth(btn, selected)
 	btn.material = null
 
 
@@ -357,6 +393,55 @@ func _apply_white_key_finish(btn: Button) -> void:
 	gloss_sb.corner_radius_bottom_left = 10
 	gloss_sb.corner_radius_bottom_right = 10
 	gloss.add_theme_stylebox_override("panel", gloss_sb)
+
+
+func _apply_white_key_pressed_depth(btn: Button, selected: bool) -> void:
+	var depth := _ensure_overlay_layer(btn, "KeyPressedDepth", 24)
+	depth.visible = selected
+	if not selected:
+		return
+	var depth_h := maxf(12.0, btn.size.y * 0.24)
+	depth.position = Vector2(1.0, btn.size.y - depth_h - 2.0)
+	depth.size = Vector2(maxf(0.0, btn.size.x - 2.0), depth_h)
+	var depth_sb := StyleBoxFlat.new()
+	depth_sb.bg_color = Color(0.0, 0.0, 0.0, 0.14)
+	depth_sb.corner_radius_top_left = 0
+	depth_sb.corner_radius_top_right = 0
+	depth_sb.corner_radius_bottom_left = 8
+	depth_sb.corner_radius_bottom_right = 8
+	depth.add_theme_stylebox_override("panel", depth_sb)
+
+
+func _set_white_key_gloss_enabled(btn: Button, enabled: bool) -> void:
+	var gloss := btn.get_node_or_null("KeyGloss") as Panel
+	if gloss != null:
+		gloss.visible = enabled
+
+
+func _show_rejection_feedback(message: String) -> void:
+	if _feedback_label == null or message == "":
+		return
+	if _feedback_tween != null and _feedback_tween.is_running():
+		_feedback_tween.kill()
+	_feedback_label.text = message
+	_feedback_label.visible = true
+	_feedback_label.modulate = Color(1.0, 0.94, 0.72, 0.0)
+	_feedback_label.scale = Vector2(1.0, 1.0)
+	_feedback_tween = create_tween()
+	_feedback_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_feedback_tween.tween_property(_feedback_label, "modulate:a", 1.0, 0.10)
+	_feedback_tween.parallel().tween_property(_feedback_label, "scale", Vector2(1.02, 1.02), 0.10)
+	_feedback_tween.tween_interval(0.55)
+	_feedback_tween.tween_property(_feedback_label, "modulate:a", 0.0, 0.20)
+	_feedback_tween.finished.connect(func() -> void:
+		if _feedback_label != null:
+			_feedback_label.visible = false
+			_feedback_label.scale = Vector2.ONE
+	)
+
+
+func _selector_total_height() -> float:
+	return _WHITE_KEY_H + _LABEL_H + 8.0
 
 
 func _apply_black_key_finish(key_panel: Panel) -> void:

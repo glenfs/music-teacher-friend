@@ -31,10 +31,29 @@ const CHICKEN_COMBO_TARGET := 3
 const HomeMenuTokensScript = preload("res://scripts/ui/home_menu_tokens.gd")
 const HomeMenuStateScript = preload("res://scripts/ui/home_menu_state.gd")
 const HomeMenuUIScript = preload("res://scripts/ui/home_menu_ui.gd")
-const APP_VERSION_LABEL := "v1.0.2"
+const AudioEngineScript = preload("res://scripts/product/audio_engine.gd")
+const HomeFlowControllerScript = preload("res://scripts/product/home_flow_controller.gd")
+const ProgressStoreScript = preload("res://scripts/product/progress_store.gd")
+const SessionControllerScript = preload("res://scripts/product/session_controller.gd")
+const SightRendererScript = preload("res://scripts/product/sight_renderer.gd")
+const TeacherStoreScript = preload("res://scripts/product/teacher_store.gd")
+const TeacherDashboardScript = preload("res://scripts/teacher/teacher_dashboard.gd")
+const ActiveStudentScript = preload("res://scripts/students/active_student.gd")
+const LessonSessionScript = preload("res://scripts/students/lesson_session.gd")
+const PitchDetectorScript = preload("res://scripts/audio/pitch_detector.gd")
+const _CLEFIRA_LOGO_PATH := "res://assets/logos/clefira-logo.svg"
+const _CLEFIRA_LOGO_FALLBACK := "res://assets/logos/clefira_logo.svg"
+var CLEFIRA_LOGO_TEXTURE: Texture2D = null
+const APP_VERSION_LABEL := "v1.0.0"
 const APP_TAGLINE_LABEL := "Music Learning that actually sticks"
 const MENU_PRIMARY_ACCENT := Color(0.9098, 0.6275, 0.1255, 1.0) # #E8A020
 const MENU_CARD_CREAM_ACCENT := Color(1.0, 1.0, 1.0, 1.0)
+const MENU_CARD_LEARNING_ACCENT := Color(0.3686, 0.8157, 0.8392, 1.0) # #5ED0D6
+const MENU_CARD_LEARNING_BG := Color(0.1216, 0.3059, 0.4196, 0.76) # #1F4E6B @76%
+const MENU_CARD_LEARNING_HOVER := Color(0.1647, 0.4353, 0.4784, 0.80) # #2A6F7A @80%
+const MENU_CARD_LEARNING_PRESSED := Color(0.0941, 0.2980, 0.3333, 0.78) # #184C55 @78%
+const MENU_CARD_LEARNING_TITLE := Color(0.9176, 0.9686, 0.9765, 1.0) # #EAF7F9
+const MENU_CARD_LEARNING_SUBTITLE := Color(0.7490, 0.8941, 0.9098, 1.0) # #BFE4E8
 const MENU_CARD_BG := Color(1.0, 1.0, 1.0, 0.88) # rgba(255,255,255,0.88)
 const MENU_CARD_BORDER := Color(0.0, 0.0, 0.0, 0.06)
 const MENU_TITLE_TEXT := Color(0.9176, 0.9529, 1.0, 1.0) # #EAF3FF
@@ -49,6 +68,7 @@ const MENU_SETUP_CARD_FILL := Color(0.0588, 0.1529, 0.2510, 0.72) # #0F2740 @72%
 const MENU_SETUP_CARD_FILL_COOL := Color(0.0902, 0.2235, 0.3608, 0.74) # #17395C @74%
 const MENU_SETUP_BORDER := Color(0.9098, 0.6275, 0.1255, 0.78) # #E8A020
 const MENU_SETUP_HIGHLIGHT := Color(0.9098, 0.6275, 0.1255, 0.94) # #E8A020
+const FIXED_MENU_THEME_ID := "azure_cascade"
 const SIGHT_NOTES_SETUP_ACCENT := MENU_SETUP_HIGHLIGHT
 const SIGHT_NOTES_SETUP_TEXT_PRIMARY := Color(0.9176, 0.9529, 1.0, 1.0) # #EAF3FF
 const SIGHT_NOTES_SETUP_TEXT_BODY := Color(0.7176, 0.7804, 0.8549, 1.0) # #B7C7DA
@@ -61,6 +81,27 @@ const TrainingSessionScript = preload("res://scripts/training/training_session.g
 const RhythmGlyphScene = preload("res://scenes/rhythm/RhythmGlyph.tscn")
 const VirtualPianoSelectorScene = preload("res://ui/components/virtual_piano_selector.tscn")
 const RhythmGeneratorScript = preload("res://scripts/rhythm/rhythm_generator.gd")
+const ChordVoicingGeneratorScript = preload("res://scripts/music_theory/chord_voicing_generator.gd")
+const ChordRecognizerScript = preload("res://scripts/music_theory/chord_recognizer.gd")
+const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
+const MusicXMLEncoderScript = preload("res://scripts/exercises/musicxml_encoder.gd")
+const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
+const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
+const ScoreModelScript = preload("res://scripts/score_engine/score_model.gd")
+const StaffRendererScript = preload("res://scripts/score_engine/staff_renderer.gd")
+const SMuFLFontScript = preload("res://scripts/score_engine/smufl_font.gd")
+const RECOGNIZER_QUALITY_TO_CHOICE := {
+	"Major": "Major", "Minor": "Minor", "5": "Power", "dim": "Dim", "aug": "Aug",
+	"sus2": "Sus2", "sus4": "Sus4",
+	"7": "Dom7", "maj7": "Maj7", "m7": "Min7", "dim7": "Dim7", "m7b5": "Half-dim",
+	"mMaj7": "mMaj7", "aug7": "Aug7", "augMaj7": "AugMaj7", "7sus4": "7sus4",
+	"6": "Maj6", "m6": "Min6", "6/9": "6-9",
+	"9": "Dom9", "maj9": "Maj9", "m9": "Min9", "add9": "Add9",
+}
+const LearningMapScript = preload("res://scripts/learning/learning_map.gd")
+const LessonPlayerScript = preload("res://scripts/learning/lesson_player.gd")
+const LearningRegistryScript = preload("res://scripts/learning/learning_module_registry.gd")
+const LearningProgressScript = preload("res://scripts/learning/module_progress.gd")
 
 const NOTE_DURATION := 0.7
 const GAP_DURATION := 0.25
@@ -73,6 +114,18 @@ const MODE_NOTE_CHASE := 4
 const MODE_PROGRESSION := 5
 const MODE_SCALE_MODE := 6
 const MODE_CADENCE := 7
+const LEARNING_MODE_ENABLED := false
+# Edition flag — build-time constant for the SKU split.
+# Teacher Edition: full app with teacher dashboard, student switching, per-student
+# attribution. Student Edition (set to false for the free build): solo workflow,
+# teacher mode hidden, no roster, no attribution gates.
+const IS_TEACHER_EDITION := true
+const EDITION_LABEL := "Teacher Edition" if IS_TEACHER_EDITION else "Student Edition"
+# Derived: the teacher dashboard hub card is only shown in the Teacher Edition.
+# Keeping the old constant name avoids touching every existing gate.
+const TEACHER_MODE_ENABLED := IS_TEACHER_EDITION
+const MVP_LOCKED_HINT_TITLE := "Not in this version yet"
+const MVP_LOCKED_HINT_BODY := "Were polishing this module. Itll be available in a future update."
 const STAFF_LEFT_X := 56.0
 const STAFF_LINE_WIDTH := 620.0
 const STAFF_TOP_LINE_Y := 104.0
@@ -81,29 +134,115 @@ const STAFF_STEP_Y := 27.0
 const STAFF_NOTE_SNAP_X := 223.0
 const SIGHT_NOTE_CENTER_OFFSET_Y := 7.0
 const SIGHT_CHORD_NOTE_CENTER_OFFSET_Y := 5.0
+const GRAND_STAFF_NOTEHEAD_HEIGHT_RATIO := 0.88
+const GRAND_STAFF_NOTEHEAD_WIDTH_RATIO := 1.14
+const GRAND_STAFF_SECOND_INTERVAL_SHIFT_RATIO := 0.70
+const SIGHT_CHORD_SECOND_INTERVAL_SHIFT_RATIO := 0.66
+const GRAND_STAFF_BASS_LEDGER_STEP_EXTRA_DOWN := 0
+const GRAND_STAFF_CLEF_RIGHT_NUDGE := 18.0
+const GRAND_STAFF_CLEF_DOWN_SPACES := 1.0
+const GRAND_STAFF_TREBLE_CLEF_EXTRA_RIGHT := 3.0
+const GRAND_STAFF_BASS_CLEF_EXTRA_RAISE_SPACES := 1.85
+const GRAND_STAFF_LEDGER_RIGHT_NUDGE := 0.0
 const SIGHT_CLEF_ANCHOR_FACTOR_TREBLE := 1.02
 const SIGHT_CLEF_ANCHOR_FACTOR_BASS := 1.62
-const SIGHT_CLEF_EXTRA_RAISE_TREBLE := 17.0
-const SIGHT_CLEF_EXTRA_RAISE_BASS := 13.0
+const SIGHT_CLEF_EXTRA_RAISE_TREBLE := -10.0
+const SIGHT_CLEF_EXTRA_RAISE_BASS := 27.0
+const SIGHT_ACCIDENTAL_X_OFFSET := 18.0
+const GRAND_STAFF_ACCIDENTAL_X_OFFSET := 16.0
+const SIGHT_ACCIDENTAL_RAISE_Y := 3.0
+const SIGHT_GRAND_STAFF_REPLAY_DURATION := 1.35
+const SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS := 0.28
+const SIGHT_GRAND_STAFF_REPLAY_VERTICAL_GAP := 14.0
+const SIGHT_CHORD_NOTE_PREVIEW_DURATION := 0.32
+const SIGHT_CHORD_NOTE_TAP_PROMPT_SECONDS := 1.0
+const FOCUS_MISSES_QUESTION_COUNT := 5
+const FIRST_RUN_ASSESSMENT_TOTAL_QUESTIONS := 5
+const FIRST_RUN_ASSESSMENT_EASY_NOTES := ["C4", "D4", "E4", "F4", "G4"]
+const FIRST_RUN_ASSESSMENT_CHALLENGE_NOTES := ["A4", "B4", "C5"]
+const STARTUP_LOADING_FADE_SECONDS := 0.24
+const STARTUP_LOADING_PROGRESS_TWEEN_SECONDS := 0.22
+const STARTUP_LOADING_MIN_VISIBLE_SECONDS := 0.90
 const NOTEHEAD_SHIMMER_ENABLED := false
 const STAFF_TOP_LINE_STEP := 0
 const STAFF_BOTTOM_LINE_STEP := 8
 const CHORD_INTERVALS := {
 	"Major": [0, 4, 7],
 	"Minor": [0, 3, 7],
+	"Power": [0, 7],
+	"Dim": [0, 3, 6],
+	"Aug": [0, 4, 8],
+	"Sus2": [0, 2, 7],
+	"Sus4": [0, 5, 7],
 	"Maj7": [0, 4, 7, 11],
 	"Dom7": [0, 4, 7, 10],
 	"Min7": [0, 3, 7, 10],
 	"Dim7": [0, 3, 6, 9],
-	"Dim": [0, 3, 6],
-	"Aug": [0, 4, 8],
-	"Sus2": [0, 2, 7],
-	"Sus4": [0, 5, 7]
+	"Half-dim": [0, 3, 6, 10],
+	"mMaj7": [0, 3, 7, 11],
+	"Aug7": [0, 4, 8, 10],
+	"AugMaj7": [0, 4, 8, 11],
+	"7sus4": [0, 5, 7, 10],
+	"Maj6": [0, 4, 7, 9],
+	"Min6": [0, 3, 7, 9],
+	"6/9": [0, 4, 7, 9, 14],
+	"Dom9": [0, 4, 7, 10, 14],
+	"Maj9": [0, 4, 7, 11, 14],
+	"Min9": [0, 3, 7, 10, 14],
+	"Add9": [0, 4, 7, 14],
 }
-const CHORD_GROUP_1 := ["Major", "Minor"]
-const CHORD_GROUP_2 := ["Aug", "Dim"]
-const CHORD_GROUP_3 := ["Sus2", "Sus4", "Maj7", "Dom7", "Min7", "Dim7"]
-const CHORD_GROUP_4 := ["Major", "Minor", "Aug", "Dim", "Sus2", "Sus4", "Maj7", "Dom7", "Min7", "Dim7"]
+const SIGHT_CHORD_DEFINITIONS := {
+	"Major": {"id": "Major", "label": "Major", "tier": 1, "intervals": [0, 4, 7], "degrees": [0, 2, 4]},
+	"Minor": {"id": "Minor", "label": "Minor", "tier": 1, "intervals": [0, 3, 7], "degrees": [0, 2, 4]},
+	"Power": {"id": "Power", "label": "Power", "tier": 2, "intervals": [0, 7], "degrees": [0, 4]},
+	"Dim": {"id": "Dim", "label": "Dim", "tier": 2, "intervals": [0, 3, 6], "degrees": [0, 2, 4]},
+	"Aug": {"id": "Aug", "label": "Aug", "tier": 2, "intervals": [0, 4, 8], "degrees": [0, 2, 4]},
+	"Sus2": {"id": "Sus2", "label": "Sus2", "tier": 2, "intervals": [0, 2, 7], "degrees": [0, 1, 4]},
+	"Sus4": {"id": "Sus4", "label": "Sus4", "tier": 2, "intervals": [0, 5, 7], "degrees": [0, 3, 4]},
+	"Maj7": {"id": "Maj7", "label": "Maj7", "tier": 3, "intervals": [0, 4, 7, 11], "degrees": [0, 2, 4, 6]},
+	"Dom7": {"id": "Dom7", "label": "Dom7", "tier": 3, "intervals": [0, 4, 7, 10], "degrees": [0, 2, 4, 6]},
+	"Min7": {"id": "Min7", "label": "Min7", "tier": 3, "intervals": [0, 3, 7, 10], "degrees": [0, 2, 4, 6]},
+	"Dim7": {"id": "Dim7", "label": "Dim7", "tier": 3, "intervals": [0, 3, 6, 9], "degrees": [0, 2, 4, 6]},
+	"Half-dim": {"id": "Half-dim", "label": "Half-dim", "tier": 3, "intervals": [0, 3, 6, 10], "degrees": [0, 2, 4, 6]},
+	"mMaj7": {"id": "mMaj7", "label": "mMaj7", "tier": 3, "intervals": [0, 3, 7, 11], "degrees": [0, 2, 4, 6]},
+	"Aug7": {"id": "Aug7", "label": "Aug7", "tier": 3, "intervals": [0, 4, 8, 10], "degrees": [0, 2, 4, 6]},
+	"AugMaj7": {"id": "AugMaj7", "label": "AugMaj7", "tier": 3, "intervals": [0, 4, 8, 11], "degrees": [0, 2, 4, 6]},
+	"7sus4": {"id": "7sus4", "label": "7sus4", "tier": 3, "intervals": [0, 5, 7, 10], "degrees": [0, 3, 4, 6]},
+	"Maj6": {"id": "Maj6", "label": "Maj6", "tier": 4, "intervals": [0, 4, 7, 9], "degrees": [0, 2, 4, 5]},
+	"Min6": {"id": "Min6", "label": "Min6", "tier": 4, "intervals": [0, 3, 7, 9], "degrees": [0, 2, 4, 5]},
+	"6/9": {"id": "6/9", "label": "6/9", "tier": 4, "intervals": [0, 4, 7, 9, 14], "degrees": [0, 2, 4, 5, 8]},
+	"Dom9": {"id": "Dom9", "label": "Dom9", "tier": 5, "intervals": [0, 4, 7, 10, 14], "degrees": [0, 2, 4, 6, 8]},
+	"Maj9": {"id": "Maj9", "label": "Maj9", "tier": 5, "intervals": [0, 4, 7, 11, 14], "degrees": [0, 2, 4, 6, 8]},
+	"Min9": {"id": "Min9", "label": "Min9", "tier": 5, "intervals": [0, 3, 7, 10, 14], "degrees": [0, 2, 4, 6, 8]},
+	"Add9": {"id": "Add9", "label": "Add9", "tier": 5, "intervals": [0, 4, 7, 14], "degrees": [0, 2, 4, 8]},
+}
+const SIGHT_CHORD_TIER_IDS := {
+	1: ["Major", "Minor"],
+	2: ["Major", "Minor", "Power", "Dim", "Aug", "Sus2", "Sus4"],
+	3: ["Maj7", "Dom7", "Min7", "Dim7", "Half-dim", "mMaj7", "Aug7", "AugMaj7", "7sus4"],
+	4: ["Maj6", "Min6", "6/9"],
+	5: ["Dom9", "Maj9", "Min9", "Add9"],
+}
+const SIGHT_CHORD_TIER_NAMES := {
+	1: "Basic Triads",
+	2: "All Triads",
+	3: "7th Chords",
+	4: "6th Chords",
+	5: "Extensions",
+}
+const SIGHT_CHORD_MAX_TIER := 5
+const CHORD_TIER_TRIADS := ["Major", "Minor", "Power", "Dim", "Aug", "Sus2", "Sus4"]
+const CHORD_TIER_7THS := ["Maj7", "Dom7", "Min7", "Dim7", "Half-dim", "mMaj7", "Aug7", "AugMaj7", "7sus4"]
+const CHORD_TIER_6THS := ["Maj6", "Min6", "6/9"]
+const CHORD_TIER_EXTENSIONS := ["Dom9", "Maj9", "Min9", "Add9"]
+const CHORD_TIERS := {
+	"Triads": CHORD_TIER_TRIADS,
+	"7th Chords": CHORD_TIER_7THS,
+	"6th Chords": CHORD_TIER_6THS,
+	"Extensions": CHORD_TIER_EXTENSIONS,
+}
+const CHORD_TIER_ORDER := ["Triads", "7th Chords", "6th Chords", "Extensions"]
+const CHORD_DEFAULT_SELECTED := ["Major", "Minor"]
 const PROGRESSION_DEFS := {
 	"IVviIV": {"label": "IV-vi-IV", "steps": [3, 5, 3]},
 	"iiVI": {"label": "ii-V-I", "steps": [1, 4, 0]},
@@ -131,10 +270,20 @@ const SCALE_MODE_DEFS := {
 	"Phrygian": [0, 1, 3, 5, 7, 8, 10, 12]
 }
 const CADENCE_DEFS := {
-	"Perfect": {"label": "Perfect (V-I)", "steps": [4, 0]},
-	"Plagal": {"label": "Plagal (IV-I)", "steps": [3, 0]},
-	"Half": {"label": "Half (I-V)", "steps": [0, 4]},
-	"Deceptive": {"label": "Deceptive (V-vi)", "steps": [4, 5]}
+	"Perfect":       {"label": "Perfect (V-I)",       "steps": [4, 0]},
+	"Plagal":        {"label": "Plagal (IV-I)",        "steps": [3, 0]},
+	"Half":          {"label": "Half (I-V)",           "steps": [0, 4]},
+	"Deceptive":     {"label": "Deceptive (V-vi)",     "steps": [4, 5]},
+	"Interrupted":   {"label": "Interrupted (V-IV)",   "steps": [4, 3]},
+	"ImperfectAuth": {"label": "Imperfect (VII-I)",    "steps": [6, 0]},
+}
+# C3, D3, F3, G3 — comfortable key rotation for cadence training
+const CADENCE_KEY_ROOTS := [48, 50, 53, 55]
+# Difficulty ranking for interval distractors and session ramping (0=easiest)
+const INTERVAL_DIFFICULTY_RANK := {
+	"P1": 0, "P8": 1, "P5": 2, "P4": 3,
+	"M3": 4, "m3": 5, "M6": 6, "m6": 7,
+	"M2": 8, "M7": 9, "m2": 10, "m7": 11, "TT": 12
 }
 const SIGHT_TRIADS := [
 	{"root": "C", "quality": "Major", "name": "C Major"},
@@ -147,19 +296,19 @@ const SIGHT_TRIADS := [
 ]
 const NOTE_NAME_ORDER := ["C", "D", "E", "F", "G", "A", "B"]
 const CHICKEN_HINT_PROMPT_LINES := [
-	"If you need help, tap me.",
-	"Click me for a hint.",
-	"Need a clue? Tap me.",
-	"Stuck? I can nudge you.",
-	"I can give a theory clue.",
-	"Want a song-based hint?",
-	"Tap me for a smarter hint.",
-	"Need a clearer clue? Tap again.",
-	"Chicken coach ready. Click me.",
-	"Need a reading shortcut? Tap me.",
-	"I can break this down step-by-step.",
-	"Want ear-training help? Click me.",
-	"Tap me if this one feels tricky."
+	"Tap me for a hint!",
+	"Every interval has a song — tap to learn!",
+	"Struggling? Tap me and I'll coach you.",
+	"Two taps for more detail. Three for the answer.",
+	"I can name a real song for this — tap!",
+	"Want to know the music theory? Tap me.",
+	"Let's work it out together — tap!",
+	"I'll give you a listening shortcut.",
+	"Tap again for a clearer clue.",
+	"Want to know WHY it sounds that way?",
+	"I can break this down step by step.",
+	"Tap me — I coach, not just hint.",
+	"One more listen + a clue — tap me!"
 ]
 const INTERVAL_HINT_PROFILES := {
 	"P1": {"color": "same-note lock", "pull": "no tension, pure stability", "shape": "zero distance", "song": "Think of matching a drone exactly.", "theory": "Both notes share the same pitch class; resonance feels fused.", "compare": "No gap at all, just alignment."},
@@ -203,6 +352,15 @@ const TREE_LAYERS := []
 const BIRD_TEXTURE_PATH := "res://assets/birds/chicken.png"
 const TUTORIAL_CHICKEN_PATH := "res://assets/birds/chicken.svg"
 const BIRD_TINT := Color(1.0, 1.0, 1.0, 1.0)
+const BIRD_SPRITESHEET_HAPPY := "res://assets/birds/spritesheet/happy.png"
+const BIRD_SPRITESHEET_HOP := "res://assets/birds/spritesheet/hop.png"
+const BIRD_SPRITESHEET_SAD := "res://assets/birds/spritesheet/sad.png"
+const BIRD_SPRITESHEET_JUMP := "res://assets/birds/spritesheet/front jump.png"
+const BIRD_SPRITESHEET_EAT := "res://assets/birds/spritesheet/peack eat.png"
+const BIRD_SPRITESHEET_IDLE := "res://assets/birds/idle.png"
+const BIRD_SPRITESHEET_FRAME_W := 914
+const BIRD_SPRITESHEET_FRAME_H := 838
+const BIRD_SPRITESHEET_COLS := 8
 const UI_FONT_PATH := "res://assets/fonts/Nunito-Regular.ttf"
 const UI_TITLE_FONT_PATH := "res://assets/fonts/Baloo2-SemiBold.ttf"
 const SIGHT_BACK_ICON_PATH := "res://assets/icons/lucide/arrow-big-left.svg"
@@ -288,9 +446,22 @@ const SIGHT_NOTE_COLORS := [
 	Color(0.94, 0.54, 0.88, 0.98),
 	Color(0.42, 0.84, 0.76, 0.98)
 ]
+const PIANO_NUMBERED_DIR := "res://assets/audio/piano/piano"
+const PIANO_NUMBERED_FIRST_INDEX := 1
+const PIANO_NUMBERED_LAST_INDEX := 88
+const PIANO_NUMBERED_BASE_MIDI := 21 # 1 => A0 (MIDI 21)
 const PIANO_SAMPLED_DIR := "res://assets/audio/piano/sampled"
+const PIANO_SAMPLED_MIDI_OVERRIDES := {
+	# Legacy sampled-bank override (fallback-only when numbered MP3 bank is missing):
+	# Verified anomaly in this sample set (main-menu playback + pitch check):
+	# - a1.ogg   is A#1
+	# - a1_2.ogg is A1 natural
+	"a1": 34,    # A#1
+	"a1_2": 33,  # A1
+}
 const TEACHER_DATA_PATH := "user://teacher_data.json"
 const EAR_SETTINGS_PATH := "user://ear_settings.json"
+const PROGRESS_DATA_PATH := "user://progress_data.json"
 const TEACHER_EXPORT_DIR := "user://exports"
 const TUTORIAL_CUE_CHORDS := [
 	[0, 4, 7],
@@ -336,6 +507,8 @@ var _ui_sfx_player: AudioStreamPlayer
 var _rhythm_metronome_player: AudioStreamPlayer
 var _shield_sfx_player: AudioStreamPlayer
 var _music_player: AudioStreamPlayer
+var _home_ambient_player: AudioStreamPlayer
+var _home_ambient_run_id: int = 0
 var _piano_samples: Dictionary = {}
 var _piano_interval_anchor_samples: Dictionary = {}
 var _chord_players: Array[AudioStreamPlayer] = []
@@ -364,8 +537,17 @@ var _sight_ledger_color := Color(0.35, 0.58, 0.98, 0.98)
 var _sight_staff_frame_border_color := Color(0.95, 0.84, 0.42, 0.88)
 
 var _home_panel: VBoxContainer
+# Phase 1 student switcher / picker — full-screen modal overlay listing roster.
+var _student_picker_overlay: PanelContainer = null
+var _student_picker_list_vbox: VBoxContainer = null
+var _student_picker_after_select: Callable = Callable()  # optional one-shot callback
+# Persistent "active student" chip top-right, visible whenever Teacher Edition
+# is active and we're NOT inside the teacher dashboard (which has its own selector).
+var _active_student_chip: PanelContainer = null
+var _active_student_chip_label: Label = null
 var _home_scroll: ScrollContainer
 var _game_panel: VBoxContainer
+var _build_ui_game_panel_main_col: VBoxContainer
 var _root_margin_container: MarginContainer
 var _root_main_col: VBoxContainer
 var _brand_label: Label
@@ -394,10 +576,90 @@ var _music_note_tweens: Array[Tween] = []
 var _home_hub_row: HBoxContainer
 var _home_overview_anchor: MarginContainer
 var _home_overview_grid: GridContainer
+var _home_overview_section_grids: Array[GridContainer] = []
 var _home_hub_buttons: Dictionary = {}
 var _home_section_cards: Dictionary = {}
 var _home_option_group_cards: Array[PanelContainer] = []
 var _home_flow := "Practice" # Practice | Learn | Teacher
+var _learning_mode_card_button: Button = null
+var _learning_map: Control
+var _learning_lesson_player: Control
+
+# --- Chord Explorer mode ---
+var _chord_explorer_panel: Control = null
+var _chord_explorer_active: bool = false
+# Arpeggio window model: every recent note-on lives here until the window expires.
+# Re-pressing a pitch refreshes its timestamp; the next note-on after expiry wipes the set.
+var _chord_explorer_recent_notes: Dictionary = {}  # pitch (int) -> last note-on time (float)
+var _chord_explorer_window_expires_at: float = -1.0
+var _chord_explorer_key_pc: int = 0  # 0=C
+var _chord_explorer_key_is_minor: bool = false
+var _chord_explorer_chord_name_label: Label = null
+var _chord_explorer_full_name_label: Label = null
+var _chord_explorer_intervals_label: Label = null
+var _chord_explorer_roman_label: Label = null
+var _chord_explorer_diatonic_label: Label = null
+var _chord_explorer_inversion_label: Label = null
+var _chord_explorer_staff_area: Control = null
+var _chord_explorer_key_option: OptionButton = null
+var _chord_explorer_minor_check: CheckButton = null
+var _chord_explorer_back_button: Button = null
+var _chord_explorer_clear_button: Button = null
+var _chord_explorer_play_button: Button = null
+var _chord_explorer_help_label: Label = null
+var _chord_explorer_window_bar: ProgressBar = null
+var _chord_explorer_note_nodes: Array[Control] = []
+var _chord_explorer_last_info: Dictionary = {}
+var _chord_explorer_keyboard: Control = null
+var _chord_explorer_keyboard_keys: Dictionary = {}  # pitch -> Button
+const CHORD_EXPLORER_ARPEGGIO_WINDOW_SEC := 1.5  # MIDI: how long a recent note-on stays in the chord
+const CHORD_EXPLORER_CLICK_WINDOW_SEC := 12.0  # Click: much longer so users can build chords at their own pace
+const CHORD_EXPLORER_KEYBOARD_LOW := 36   # C2
+const CHORD_EXPLORER_KEYBOARD_HIGH := 84  # C6
+const CHORD_EXPLORER_WHITE_W := 40.0
+const CHORD_EXPLORER_WHITE_H := 196.0
+const CHORD_EXPLORER_BLACK_W := 26.0
+const CHORD_EXPLORER_BLACK_H := 124.0
+# Function colors used on staff and on the interactive piano.
+const CHORD_FN_ROOT  := Color(1.00, 0.78, 0.22, 1.0)  # gold
+const CHORD_FN_THIRD := Color(0.36, 0.78, 1.00, 1.0)  # cyan
+const CHORD_FN_FIFTH := Color(0.40, 0.92, 0.55, 1.0)  # green
+const CHORD_FN_SEVENTH := Color(0.95, 0.50, 0.85, 1.0) # magenta
+const CHORD_FN_EXTENSION := Color(0.78, 0.74, 1.00, 1.0) # lavender (9/11/13)
+const CHORD_FN_OTHER := Color(0.86, 0.86, 0.94, 1.0)  # silver
+
+# --- Practice Drills (technical exercises) ---
+var _practice_drills_panel: Control = null
+var _practice_drills_active: bool = false
+var _practice_current_exercise: Dictionary = {}
+var _practice_type_option: OptionButton = null
+var _practice_skill_option: OptionButton = null
+var _practice_current_skill_filter: String = "all"
+var _practice_key_option: OptionButton = null
+var _practice_minor_check: CheckButton = null
+var _practice_octaves_spin: SpinBox = null
+var _practice_level_spin: SpinBox = null
+var _practice_staff_option: OptionButton = null
+var _practice_tempo_label: Label = null
+var _practice_title_label: Label = null
+var _practice_status_label: Label = null
+var _practice_staff_area: Control = null
+var _practice_play_button: Button = null
+var _practice_stop_button: Button = null
+var _practice_export_button: Button = null
+var _practice_generate_button: Button = null
+var _practice_back_button: Button = null
+var _practice_playback_active: bool = false
+var _practice_playback_token: int = 0
+var _practice_playback_index: int = 0
+const PRACTICE_KEY_OPTIONS := [
+	["C", 0], ["G", 7], ["D", 2], ["A", 9], ["E", 4], ["B", 11], ["F#", 6],
+	["F", 5], ["Bb", 10], ["Eb", 3], ["Ab", 8], ["Db", 1], ["Gb", 6],
+]
+var _learning_progress: RefCounted
+var _learning_mode_active := false
+var _teacher_dashboard: Control = null
+var _teacher_mode_active := false
 var _home_mode_label: Label
 var _home_mode_buttons_row: Control
 var _home_q_row: HBoxContainer
@@ -414,6 +676,7 @@ var _ear_settings_button: Button
 var _ear_settings_screen: VBoxContainer
 var _ear_settings_back_button: Button
 var _ear_settings_more_panel: VBoxContainer
+var _settings_exit_button: Button
 var _ear_choice_count_select: OptionButton
 var _ear_theme_select: OptionButton
 var _ear_settings_header_label: Label
@@ -438,6 +701,29 @@ var _selected_clef := "Treble"
 var _sight_mode_buttons: Dictionary = {}
 var _sight_note_chase_button: Button
 var _sight_mode := "Notes" # Notes | Chords | Placement
+var _mic_mode_enabled := false
+var _mic_toggle_button: Button = null
+var _pitch_detector: RefCounted = null
+var _mic_listening := false
+var _mic_status_label: Label = null
+var _midi_enabled := false
+var _midi_any_octave := true
+var _score_font_name := "Bravura"  # SMuFL font for music notation rendering; user-selectable
+var _score_font_options: Array[OptionButton] = []  # all dropdown instances (kept in sync)
+var _midi_inputs_open := false
+var _midi_active := false
+var _midi_toggle_button: CheckButton = null
+var _midi_any_octave_button: CheckButton = null
+var _midi_status_label: Label = null
+var _midi_piano_viz: Control = null
+var _midi_piano_viz_keys: Dictionary = {}
+var _midi_piano_viz_lit_until: Dictionary = {}
+var _midi_piano_viz_pressed_at: Dictionary = {}
+var _midi_button_pop_tweens: Dictionary = {}
+var _midi_chord_buffer: Array[int] = []
+var _midi_chord_window_start: float = -1.0
+const MIDI_CHORD_WINDOW_SEC := 0.18  # collect notes within ~180ms of first press
+const MIDI_NOTE_LETTER_ORDER := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 var _sight_settings_button: Button
 var _sight_settings_more_panel: VBoxContainer
 var _sight_settings_back_button: Button
@@ -446,7 +732,11 @@ var _sight_key_signature := "C" # C | 2# | 3# | 2b | 3b
 var _sight_key_sig_buttons: Dictionary = {}
 var _sight_key_sig_row: HBoxContainer
 var _sight_key_sig_label: Label
+var _sight_selected_chord_tier := 1
+var _sight_chord_tier_row: HBoxContainer
+var _sight_chord_tier_buttons: Dictionary = {}
 var _sight_accidentals_toggle: CheckButton
+var _sight_accidentals_row: HBoxContainer
 var _read_module_buttons: Dictionary = {}
 var _selected_read_module := 1
 var _sight_range_container: VBoxContainer
@@ -466,6 +756,8 @@ var _sight_notes_setup_group: VBoxContainer
 var _sight_notes_setup_title_label: Label
 var _sight_notes_range_card: PanelContainer
 var _sight_notes_range_group: VBoxContainer
+var _sight_midi_card: PanelContainer = null
+var _sight_midi_group: VBoxContainer = null
 var _sight_notes_range_title_label: Label
 var _sight_chord_options_title_label: Label
 var _sight_notes_local_overlay: ColorRect
@@ -483,8 +775,12 @@ var _sight_selected_notes_by_clef: Dictionary = {
 }
 var _inversion_toggle: Button
 var _adaptive_toggle: CheckButton
-var _chord_group_buttons: Dictionary = {}
-var _selected_chord_group := 1
+var _chord_group_buttons: Dictionary = {}  # legacy — unused
+var _selected_chord_group := 1  # legacy — unused
+var _chord_tier_toggles: Dictionary = {}  # chord_name -> Button
+var _chord_tier_headers: Dictionary = {}  # tier_name -> Button (collapsible)
+var _chord_tier_containers: Dictionary = {}  # tier_name -> HBoxContainer
+var _selected_chord_types: Array[String] = []
 var _degree_toggles: Dictionary = {}
 var _include_minor_toggle: Button
 var _descending_intervals_toggle: Button
@@ -501,7 +797,8 @@ var _note_chase_selected_notes: Array[String] = ["C", "E", "G"]
 var _note_chase_clef_mode := "Treble" # Treble | Bass | Both
 var _home_material_buttons: Array[Button] = []
 var _home_tokens
-var _home_state
+var _home_state: HomeMenuState
+var _home_flow_controller: HomeFlowController
 var _home_menu_ui
 var _menu_setup_theme: Theme
 var _menu_setup_card_stylebox: StyleBoxFlat
@@ -509,10 +806,17 @@ var _menu_setup_chip_stylebox: StyleBoxFlat
 var _device_profile_resolver
 var _device_profile: Dictionary = {}
 var _conductor
+var _audio_engine: AudioEngine
 var _progression_review_queue
 var _scale_review_queue
 var _cadence_review_queue
+var _interval_review_queue
+var _chord_review_queue
 var _advanced_session
+var _progress_store: ProgressStore
+var _session_controller: SessionController
+var _sight_renderer: SightRenderer
+var _teacher_store: TeacherStore
 var _current_theory_item_id := ""
 var _nearest_cache: Dictionary = {}
 var _logged_chord_player_shortage := false
@@ -521,6 +825,7 @@ var _home_hint_labels: Dictionary = {}
 var _home_disabled_reason_label: Label
 var _home_sight_mode_row: Control
 var _sight_clef_row: Control
+var _sight_clef_label: Label
 var _home_interval_degree_row: Control
 var _home_chase_note_row: Control
 var _home_chase_clef_row: Control
@@ -749,8 +1054,19 @@ var _sight_keyboard_row: GridContainer
 var _sight_chord_choice_row: VBoxContainer
 var _staff_area: Control
 var _staff_note: Panel
+# Floating note-name label rendered directly above the note head after the user
+# commits an answer in Sight Reading - Notes mode. Hidden by default; shown
+# green (correct) or red (wrong) so the answer is immediately visible without
+# adding any wait.
+var _sight_note_name_label: Label = null
 var _staff_chord_notes: Array[Panel] = []
 var _staff_chord_accidental_labels: Array[Label] = []
+var _sight_note_chip: PanelContainer
+var _sight_note_chip_label: Label
+var _sight_note_chip_nonce := 0
+var _sight_note_chip_hover_index := -1
+var _sight_note_chip_tween: Tween = null
+var _sight_note_preview_nonce := 0
 var _staff_clef_label: Label
 var _staff_key_sig_labels: Array[Label] = []
 var _note_chase_clef_clone: Label
@@ -760,6 +1076,14 @@ var _note_chase_overlay: ColorRect
 var _note_chase_overlay_label: Label
 var _note_chase_staff_frame: Panel
 var _staff_lines: Array[ColorRect] = []
+var _grand_staff_bass_lines: Array[ColorRect] = []
+var _grand_staff_bass_clef_label: Label
+var _grand_staff_brace_label: Label
+var _grand_staff_bass_key_sig_labels: Array[Label] = []
+var _grand_staff_left_connector: ColorRect
+var _grand_staff_right_connector: ColorRect
+var _grand_staff_label: Label  # "Grand Staff (Piano)" label in chord options
+var _grand_staff_active := false  # true when sight chord mode is rendering grand staff
 var _note_chase_staff_clone_lines: Array[ColorRect] = []
 var _staff_line_number_labels: Array[Label] = []
 var _staff_ledger_lines: Array[ColorRect] = []
@@ -775,8 +1099,26 @@ var _result_action_row: HBoxContainer
 var _result_action_primary_button: Button
 var _result_action_secondary_button: Button
 var _result_action_home_button: Button
+var _result_action_focus_button: Button
+var _streak_toast_label: Label = null
+var _streak_toast_tween: Tween = null
+var _quiz_start_time: float = 0.0
+var _hud_left_style_cache: StyleBoxFlat = null
+var _ear_intro_overlay: ColorRect
+var _ear_intro_dismiss: Button
+var _ear_intro_title: Label = null
+var _ear_intro_body: Label = null
+var _note_chase_intro_overlay: ColorRect
+var _note_chase_intro_dismiss: Button
+var _note_chase_intro_seen: bool = false
+var _cadence_intro_overlay: ColorRect
+var _cadence_intro_dismiss: Button
+var _cadence_intro_seen: bool = false
+var _session_broken_btn: Button = null
+var _how_to_play_button: Button = null
 var _sky_area: Control
 var _bird_sprite: TextureRect
+var _bird_anim: AnimatedSprite2D = null
 var _food_token: Panel
 var _bird_idle_tween: Tween
 var _bird_flap_tween: Tween
@@ -787,6 +1129,7 @@ var _chord_buttons: Dictionary = {}
 var _sight_key_buttons: Dictionary = {}
 var _sight_chord_choice_buttons: Array[Button] = []
 var _sight_notes_chords_skin_active := false
+var _continuous_sight_skin_active := false
 var _sight_progress_ratio_target := 0.0
 var _sight_progress_ratio_display := 0.0
 var _sight_progress_tween: Tween
@@ -797,6 +1140,20 @@ var _sight_streak_display_value := 0
 var _sight_score_display_value := 0
 var _replay_button: Button
 var _round_start_button: Button
+# Floating overlay card shown during Sight Reading "ready to begin?" state.
+# Lives at high z above the game panel so it doesn't shift menu items below it.
+var _sight_round_start_card: PanelContainer = null
+var _sight_round_start_label: Label = null
+var _sight_round_start_overlay_button: Button = null
+# Big interactive piano shown during Sight Reading rounds — click any key to answer.
+var _sight_big_piano: Control = null
+var _sight_big_piano_keys: Dictionary = {}  # pitch -> Button
+var _sight_big_piano_frame: Panel = null  # wood-grain outer frame (resized on layout)
+var _sight_big_piano_felt: Panel = null   # red felt strip (resized on layout)
+var _sight_big_piano_keys_root: Control = null  # container that holds key buttons
+var _sight_big_piano_lit_until: Dictionary = {}  # pitch -> auto-release timestamp; -1 = held until note-off
+var _sight_big_piano_pressed_at: Dictionary = {}  # pitch -> time pressed (for safety auto-release)
+const SIGHT_BIG_PIANO_MAX_HOLD_SEC := 1.5  # auto-release if no note-off arrives (matches old viz behavior)
 var _slow_toggle: CheckBox
 var _end_button: Button
 var _restart_button: Button
@@ -805,6 +1162,14 @@ var _control_row: HBoxContainer
 var _interval_center_top_spacer: Control
 var _interval_center_bottom_spacer: Control
 var _interval_prompt_top_spacer: Control
+var _chord_grid: GridContainer = null
+var _compare_bar: HBoxContainer = null
+var _compare_your_btn: Button = null
+var _compare_correct_play_btn: Button = null
+var _compare_chosen_root: int = 0
+var _compare_chosen_second: int = 0
+var _cadence_roman_label: Label = null
+var _chord_recent_results: Array[bool] = []
 var _interval_choices_top_spacer: Control
 var _interval_choices_row: HBoxContainer
 var _sight_side_controls: VBoxContainer
@@ -825,6 +1190,7 @@ var _tutorial_bubble: PanelContainer
 var _tutorial_bubble_label: Label
 var _tutorial_bubble_tail: Panel
 var _tutorial_bubble_dots: Array[Panel] = []
+var _chicken_bubble_close_btn: Button = null
 var _tutorial_chicken: TextureRect
 var _teacher_students_list: ItemList
 var _teacher_name_edit: LineEdit
@@ -910,9 +1276,10 @@ var _scale_selected_modes: Array[String] = ["Major", "Natural Minor", "Dorian", 
 var _scale_asc_desc := false
 var _scale_tempo := 90
 var _cadence_key := "C"
-var _cadence_selected: Array[String] = ["Perfect", "Plagal", "Half", "Deceptive"]
+var _cadence_selected: Array[String] = ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]
 var _cadence_broken := false
 var _cadence_tempo := 90
+var _cadence_play_root: int = 48  # randomized key per question
 var _selected_mode := MODE_INTERVAL
 var _lives := 3
 var _streak := 0
@@ -954,6 +1321,7 @@ var _bird_home_ready := false
 var _chicken_hint_busy := false
 var _chicken_hint_cooldown_until := 0.0
 var _chicken_hint_clicks_this_turn := 0
+var _chicken_hint_used_this_turn := false
 var _chicken_hint_turn_token := 0
 var _chicken_last_prompt_line := ""
 var _chicken_last_hint_by_topic: Dictionary = {}
@@ -974,11 +1342,19 @@ var _chord_stats_correct: Dictionary = {}
 var _sight_stats_asked: Dictionary = {}
 var _sight_stats_correct: Dictionary = {}
 var _teacher_data: Dictionary = {"students": []}
+# Phase 1: per-student data routing. Owns the active_student_id and resolves
+# per-student file paths. See scripts/students/active_student.gd.
+var _active_student = null  # ActiveStudentScript instance (class_name not visible at parse time via preload)
+# Phase 3: lesson-session bookends. Active when teacher tapped "Start Lesson".
+var _lesson_session = null  # LessonSessionScript instance
+var _lesson_session_button: Button = null
+var _lesson_session_elapsed_label: Label = null
+var _lesson_session_elapsed_timer: Timer = null
 var _teacher_selected_student_id := ""
 var _teacher_list_student_ids: Array[String] = []
 var _tutorial_module_recorded := false
 var _ear_choice_count := 6
-var _ui_theme_id := "golden_harvest"
+var _ui_theme_id := FIXED_MENU_THEME_ID
 var _ear_settings_screen_active := false
 var _qa_enabled := false
 var _qa_runner: Node = null
@@ -995,15 +1371,75 @@ var _qa_exposed_tempos: Array[int] = [60, 90, 140]
 # --- Performance caches ---
 var _cached_button_palette: Dictionary = {}
 var _cached_palette_theme_id: String = ""
+var _button_style_cache: Dictionary = {}
+var _button_style_cache_theme_id: String = ""
 var _last_responsive_vp: Vector2 = Vector2.ZERO
 var _cached_staff_frame_sb: StyleBoxFlat = null
 var _cached_staff_frame_border: Color = Color()
 var _cached_glass_btn_sb: StyleBoxFlat = null
 var _last_setup_theme_active := false
 var _setup_theme_dirty := true
+# B1: streak flash tween kill-guards
+var _sight_streak_flash_tween_1: Tween = null
+var _sight_streak_flash_tween_2: Tween = null
+# B2: bird reaction tween kill-guard
+var _bird_action_tween: Tween = null
+# C6: shared game-card stylebox (identical in both sight skins)
+var _sight_game_card_style_cache: StyleBoxFlat = null
+# D3: HUD label dirty-tracking (avoids str() + Label relayout every frame)
+var _hud_combo_displayed: int = -1
+var _hud_level_displayed: int = -1
+var _hud_acc_displayed: int = -1
+# Fix 3: Practice Mode — no lives lost on wrong answers
+var _practice_mode_enabled: bool = true
+var _home_practice_toggle: Button = null
+# Fix 9: Focus Misses — interval/chord IDs to restrict next session to
+var _focus_missed_ids: Array[String] = []
+# Item 10: First-run ear intro
+var _ear_intro_seen: bool = false
+var _first_run_onboarding_done: bool = false
+var _first_run_assessment_pending: bool = false
+var _first_run_assessment_active: bool = false
+var _first_run_assessment_steps: Array[int] = []
+# Phase 5: minimal single-user profile (Student Edition mostly; Teacher Edition
+# uses the roster instead). Saved in ear_settings.json so it survives launches
+# without adding another file.
+var _player_name: String = ""
+var _player_level: String = ""  # "Beginner" | "Intermediate" | "Advanced" | ""
+var _player_profile_seen: bool = false  # first-run profile prompt was shown/skipped
+var _profile_prompt_overlay: ColorRect = null
+var _quick_practice_button: Button = null
+# Difficulty presets
+var _interval_difficulty_preset: String = "beginner"
+var _cadence_difficulty_preset: String = "beginner"
+var _interval_preset_btns: Array[Button] = []
+var _cadence_preset_btns: Array[Button] = []
+# Cross-session lifetime stats
+var _lifetime_stats: Dictionary = {}
+var _startup_boot_active := false
+var _startup_boot_completed := false
+var _startup_loading_overlay: ColorRect
+var _startup_loading_panel: PanelContainer
+var _startup_loading_title_label: Label
+var _startup_loading_stage_label: Label
+var _startup_loading_progress_bar: ProgressBar
+var _startup_loading_progress_glow: TextureRect
+var _startup_loading_note_icon: Label
+var _startup_loading_note_icon_base_y := 0.0
+var _startup_loading_ratio_display := 0.0
+var _startup_loading_progress_tween: Tween = null
+var _startup_loading_finish_tween: Tween = null
+var _startup_loading_glow_tween: Tween = null
+var _startup_loading_note_tween: Tween = null
+var _startup_boot_started_at_sec := 0.0
 
 
 func _ready() -> void:
+	if CLEFIRA_LOGO_TEXTURE == null:
+		if ResourceLoader.exists(_CLEFIRA_LOGO_PATH):
+			CLEFIRA_LOGO_TEXTURE = load(_CLEFIRA_LOGO_PATH)
+		elif ResourceLoader.exists(_CLEFIRA_LOGO_FALLBACK):
+			CLEFIRA_LOGO_TEXTURE = load(_CLEFIRA_LOGO_FALLBACK)
 	var qa_args: PackedStringArray = OS.get_cmdline_args()
 	var qa_user_args: PackedStringArray = OS.get_cmdline_user_args()
 	_qa_enabled = qa_args.has("--qa") or qa_user_args.has("--qa")
@@ -1019,33 +1455,410 @@ func _ready() -> void:
 	_ensure_rhythm_tap_input_action()
 	_home_tokens = HomeMenuTokensScript.new()
 	_home_state = HomeMenuStateScript.new()
+	_home_flow_controller = HomeFlowControllerScript.new(_home_state)
 	_home_menu_ui = HomeMenuUIScript.new()
 	_device_profile_resolver = DeviceProfileResolverScript.new()
 	_conductor = ConductorScript.new()
 	add_child(_conductor)
+	_audio_engine = AudioEngineScript.new()
+	_progress_store = ProgressStoreScript.new()
+	_session_controller = SessionControllerScript.new()
+	_sight_renderer = SightRendererScript.new()
+	_teacher_store = TeacherStoreScript.new()
 	_progression_review_queue = ReviewQueueScript.new()
 	_scale_review_queue = ReviewQueueScript.new()
 	_cadence_review_queue = ReviewQueueScript.new()
+	_interval_review_queue = ReviewQueueScript.new()
+	_chord_review_queue = ReviewQueueScript.new()
 	_advanced_session = TrainingSessionScript.new()
 	_home_menu_ui.setup(_home_tokens)
 	_refresh_device_profile(get_viewport_rect().size)
 	_sync_home_state_from_runtime()
 	_load_ear_settings()
+	# Phase 1: per-student plumbing. Boot order matters:
+	#   1. Bootstrap ActiveStudent (creates folders + migrates legacy data)
+	#   2. Load teacher data from disk
+	#   3. Recover from backup if live file regressed (lost students)
+	#   4. Ensure Teacher + Practice Mode reserved records exist (without
+	#      clobbering real students that already loaded)
+	#   5. Load progress data (routed through the active student path)
+	# Order is critical: steps 2-4 must run in this sequence or empty-store saves
+	# can overwrite real teacher data with just reserved IDs.
+	# In Student Edition, the multi-student plumbing is skipped — progress lives
+	# in the legacy single-user file via _resolve_progress_data_path's fallback.
+	_bootstrap_active_student_system()
+	if IS_TEACHER_EDITION:
+		_load_teacher_data()
+		_recover_teacher_data_from_backup_if_regressed()
+		_ensure_reserved_student_records()
+	_load_progress_data()
 	_load_menu_setup_style_resources()
+	_cache_button_styles()
 	_build_ui()
-	_setup_audio()
+	_begin_startup_boot_sequence()
+	_set_startup_loading_progress(0.14, "Preparing home screen...")
+	_setup_audio_players()
+	_set_startup_loading_progress(0.26, "Warming up audio...")
 	_show_home()
+	_set_startup_loading_progress(0.36, "Applying menu layout...")
 	# Always boot into the top-level home overview.
 	_home_mode_detail_active = false
 	_ear_settings_screen_active = false
 	_sight_settings_screen_active = false
 	_on_mode_selected()
-	call_deferred("_post_layout_init")
-	call_deferred("_update_game_card_layout")
-	call_deferred("_enforce_startup_home_overview")
-	if _qa_enabled:
+	_set_startup_loading_progress(0.48, "Finalizing startup state...")
+	# Build game panel + load assets across next frames so home menu paints fast
+	if not _qa_enabled:
+		_run_deferred_init_phase2()
+	else:
+		# QA needs everything synchronous
+		_set_startup_loading_progress(0.62, "Building game panels...")
+		_build_ui_game_panel()
+		_set_startup_button_interactivity(false)
+		_set_startup_loading_progress(0.76, "Loading visuals...")
+		_load_bird_sprites_deferred()
+		_set_startup_loading_progress(0.88, "Loading audio assets...")
+		_load_audio_assets_deferred()
+		_post_layout_init()
+		_update_game_card_layout()
+		_enforce_startup_home_overview()
+		_apply_answer_mode()
+		_set_startup_loading_progress(1.0, "Ready")
+		_finish_startup_boot_sequence(true)
 		_start_qa_runner()
 		call_deferred("_verify_qa_runner_started")
+
+
+func _run_deferred_init_phase2() -> void:
+	_set_startup_loading_progress(0.58, "Building game panels...")
+	await get_tree().process_frame
+	_build_ui_game_panel()
+	_set_startup_button_interactivity(false)
+	_set_startup_loading_progress(0.72, "Loading visuals...")
+	await get_tree().process_frame
+	_load_bird_sprites_deferred()
+	_set_startup_loading_progress(0.86, "Loading audio assets...")
+	await get_tree().process_frame
+	_load_audio_assets_deferred()
+	_post_layout_init()
+	_update_game_card_layout()
+	_enforce_startup_home_overview()
+	_apply_answer_mode()
+	await get_tree().process_frame
+	_set_startup_loading_progress(1.0, "Ready")
+	_finish_startup_boot_sequence()
+
+
+func _build_startup_loading_overlay() -> void:
+	if _startup_loading_overlay != null and is_instance_valid(_startup_loading_overlay):
+		return
+	_startup_loading_overlay = ColorRect.new()
+	_startup_loading_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_startup_loading_overlay.color = Color(0.01, 0.05, 0.10, 0.82)
+	_startup_loading_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_startup_loading_overlay.visible = false
+	_startup_loading_overlay.z_as_relative = false
+	_startup_loading_overlay.z_index = 880
+	add_child(_startup_loading_overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_startup_loading_overlay.add_child(center)
+
+	_startup_loading_panel = PanelContainer.new()
+	_startup_loading_panel.custom_minimum_size = Vector2(420, 0)
+	_startup_loading_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(_startup_loading_panel)
+	var panel_sb := StyleBoxFlat.new()
+	panel_sb.bg_color = Color(0.05, 0.11, 0.20, 0.95)
+	panel_sb.border_color = Color(0.52, 0.87, 1.0, 0.68)
+	panel_sb.border_width_left = 2
+	panel_sb.border_width_top = 2
+	panel_sb.border_width_right = 2
+	panel_sb.border_width_bottom = 3
+	panel_sb.corner_radius_top_left = 18
+	panel_sb.corner_radius_top_right = 18
+	panel_sb.corner_radius_bottom_left = 18
+	panel_sb.corner_radius_bottom_right = 18
+	panel_sb.shadow_color = Color(0, 0, 0, 0.45)
+	panel_sb.shadow_size = 20
+	panel_sb.content_margin_left = 24
+	panel_sb.content_margin_right = 24
+	panel_sb.content_margin_top = 20
+	panel_sb.content_margin_bottom = 18
+	_startup_loading_panel.add_theme_stylebox_override("panel", panel_sb)
+
+	var panel_col := VBoxContainer.new()
+	panel_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel_col.add_theme_constant_override("separation", 12)
+	_startup_loading_panel.add_child(panel_col)
+
+	var title_row := HBoxContainer.new()
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_row.add_theme_constant_override("separation", 10)
+	panel_col.add_child(title_row)
+
+	var splash_logo := TextureRect.new()
+	splash_logo.texture = CLEFIRA_LOGO_TEXTURE
+	splash_logo.custom_minimum_size = Vector2(36, 36)
+	splash_logo.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	splash_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	splash_logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_child(splash_logo)
+	_startup_loading_note_icon = Label.new()
+	_startup_loading_note_icon.text = ""
+	_startup_loading_note_icon.visible = false
+	_startup_loading_note_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_child(_startup_loading_note_icon)
+	_startup_loading_note_icon_base_y = 0.0
+
+	_startup_loading_title_label = Label.new()
+	# Student Edition gets a softer subtitle so the SKU is visible without shouting.
+	_startup_loading_title_label.text = "Preparing Clefira" if IS_TEACHER_EDITION else "Preparing Clefira — Student Edition"
+	_startup_loading_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_startup_loading_title_label.add_theme_font_size_override("font_size", 24)
+	_startup_loading_title_label.add_theme_color_override("font_color", Color(0.93, 0.97, 1.0, 1.0))
+	_startup_loading_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _ui_title_font != null:
+		_startup_loading_title_label.add_theme_font_override("font", _ui_title_font)
+	title_row.add_child(_startup_loading_title_label)
+
+	_startup_loading_stage_label = Label.new()
+	_startup_loading_stage_label.text = "Loading interface..."
+	_startup_loading_stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_startup_loading_stage_label.add_theme_font_size_override("font_size", 15)
+	_startup_loading_stage_label.add_theme_color_override("font_color", Color(0.70, 0.84, 0.98, 0.96))
+	_startup_loading_stage_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _ui_font != null:
+		_startup_loading_stage_label.add_theme_font_override("font", _ui_font)
+	panel_col.add_child(_startup_loading_stage_label)
+
+	var bar_host := Control.new()
+	bar_host.custom_minimum_size = Vector2(360, 20)
+	bar_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel_col.add_child(bar_host)
+
+	_startup_loading_progress_bar = ProgressBar.new()
+	_startup_loading_progress_bar.min_value = 0.0
+	_startup_loading_progress_bar.max_value = 100.0
+	_startup_loading_progress_bar.value = 0.0
+	_startup_loading_progress_bar.show_percentage = false
+	_startup_loading_progress_bar.set_anchors_preset(PRESET_FULL_RECT)
+	_startup_loading_progress_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_host.add_child(_startup_loading_progress_bar)
+
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.05, 0.14, 0.24, 0.94)
+	bar_bg.border_color = Color(0.55, 0.74, 0.92, 0.56)
+	bar_bg.border_width_left = 1
+	bar_bg.border_width_top = 1
+	bar_bg.border_width_right = 1
+	bar_bg.border_width_bottom = 1
+	bar_bg.corner_radius_top_left = 12
+	bar_bg.corner_radius_top_right = 12
+	bar_bg.corner_radius_bottom_left = 12
+	bar_bg.corner_radius_bottom_right = 12
+	_startup_loading_progress_bar.add_theme_stylebox_override("background", bar_bg)
+
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color(0.33, 0.86, 1.0, 0.98)
+	bar_fill.corner_radius_top_left = 10
+	bar_fill.corner_radius_top_right = 10
+	bar_fill.corner_radius_bottom_left = 10
+	bar_fill.corner_radius_bottom_right = 10
+	bar_fill.shadow_color = Color(0.24, 0.78, 1.0, 0.42)
+	bar_fill.shadow_size = 6
+	_startup_loading_progress_bar.add_theme_stylebox_override("fill", bar_fill)
+
+	_startup_loading_progress_glow = TextureRect.new()
+	_startup_loading_progress_glow.custom_minimum_size = Vector2(26, 26)
+	_startup_loading_progress_glow.size = Vector2(26, 26)
+	_startup_loading_progress_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_startup_loading_progress_glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_startup_loading_progress_glow.stretch_mode = TextureRect.STRETCH_SCALE
+	_startup_loading_progress_glow.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	var glow_grad := Gradient.new()
+	glow_grad.colors = PackedColorArray([
+		Color(1.0, 0.95, 0.72, 0.98),
+		Color(0.50, 0.90, 1.0, 0.42),
+		Color(0.50, 0.90, 1.0, 0.0)
+	])
+	glow_grad.offsets = PackedFloat32Array([0.0, 0.48, 1.0])
+	var glow_tex := GradientTexture2D.new()
+	glow_tex.gradient = glow_grad
+	glow_tex.width = 96
+	glow_tex.height = 96
+	glow_tex.fill = GradientTexture2D.FILL_RADIAL
+	_startup_loading_progress_glow.texture = glow_tex
+	bar_host.add_child(_startup_loading_progress_glow)
+
+
+func _startup_boot_blocking_input() -> bool:
+	return _startup_boot_active and not _startup_boot_completed
+
+
+func _set_startup_button_interactivity(enabled: bool) -> void:
+	_set_startup_button_interactivity_recursive(self, enabled)
+
+
+func _set_startup_button_interactivity_recursive(node: Node, enabled: bool) -> void:
+	if node is BaseButton:
+		var btn := node as BaseButton
+		if btn != null:
+			if enabled:
+				if btn.has_meta("startup_prev_disabled"):
+					btn.disabled = bool(btn.get_meta("startup_prev_disabled", false))
+					btn.remove_meta("startup_prev_disabled")
+			else:
+				if not btn.has_meta("startup_prev_disabled"):
+					btn.set_meta("startup_prev_disabled", btn.disabled)
+				btn.disabled = true
+	for child in node.get_children():
+		_set_startup_button_interactivity_recursive(child, enabled)
+
+
+func _begin_startup_boot_sequence() -> void:
+	_startup_boot_active = true
+	_startup_boot_completed = false
+	_startup_boot_started_at_sec = float(Time.get_ticks_msec()) / 1000.0
+	_set_startup_button_interactivity(false)
+	_build_startup_loading_overlay()
+	_startup_loading_ratio_display = 0.0
+	if _startup_loading_progress_tween != null and is_instance_valid(_startup_loading_progress_tween):
+		_startup_loading_progress_tween.kill()
+	_startup_loading_progress_tween = null
+	if _startup_loading_finish_tween != null and is_instance_valid(_startup_loading_finish_tween):
+		_startup_loading_finish_tween.kill()
+	_startup_loading_finish_tween = null
+	if _startup_loading_overlay == null:
+		return
+	_startup_loading_overlay.visible = true
+	_startup_loading_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_startup_loading_overlay.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	if _startup_loading_progress_bar != null:
+		_startup_loading_progress_bar.value = 0.0
+	if _startup_loading_stage_label != null:
+		_startup_loading_stage_label.text = "Loading interface..."
+	_startup_loading_start_animations()
+	_update_startup_loading_glow_position()
+	call_deferred("_update_startup_loading_glow_position")
+
+
+func _startup_loading_start_animations() -> void:
+	if _startup_loading_progress_glow != null:
+		if _startup_loading_glow_tween != null and is_instance_valid(_startup_loading_glow_tween):
+			_startup_loading_glow_tween.kill()
+		_startup_loading_glow_tween = create_tween()
+		_startup_loading_glow_tween.set_loops()
+		_startup_loading_glow_tween.tween_property(_startup_loading_progress_glow, "scale", Vector2(1.18, 1.18), 0.44).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_startup_loading_glow_tween.tween_property(_startup_loading_progress_glow, "scale", Vector2(0.94, 0.94), 0.44).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if _startup_loading_note_icon != null:
+		if _startup_loading_note_tween != null and is_instance_valid(_startup_loading_note_tween):
+			_startup_loading_note_tween.kill()
+		_startup_loading_note_icon.position.y = _startup_loading_note_icon_base_y
+		_startup_loading_note_tween = create_tween()
+		_startup_loading_note_tween.set_loops()
+		_startup_loading_note_tween.tween_property(_startup_loading_note_icon, "position:y", _startup_loading_note_icon_base_y - 5.0, 0.46).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_startup_loading_note_tween.tween_property(_startup_loading_note_icon, "position:y", _startup_loading_note_icon_base_y + 2.0, 0.46).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _startup_loading_stop_animations() -> void:
+	if _startup_loading_glow_tween != null and is_instance_valid(_startup_loading_glow_tween):
+		_startup_loading_glow_tween.kill()
+	_startup_loading_glow_tween = null
+	if _startup_loading_note_tween != null and is_instance_valid(_startup_loading_note_tween):
+		_startup_loading_note_tween.kill()
+	_startup_loading_note_tween = null
+	if _startup_loading_progress_glow != null:
+		_startup_loading_progress_glow.scale = Vector2.ONE
+	if _startup_loading_note_icon != null:
+		_startup_loading_note_icon.position.y = _startup_loading_note_icon_base_y
+
+
+func _set_startup_loading_progress(progress: float, stage_text: String = "") -> void:
+	if not _startup_boot_active:
+		return
+	var target := clampf(progress, 0.0, 1.0)
+	if stage_text != "" and _startup_loading_stage_label != null:
+		_startup_loading_stage_label.text = stage_text
+	if _startup_loading_progress_tween != null and is_instance_valid(_startup_loading_progress_tween):
+		_startup_loading_progress_tween.kill()
+	_startup_loading_progress_tween = create_tween()
+	_startup_loading_progress_tween.tween_method(Callable(self, "_set_startup_loading_ratio_display"), _startup_loading_ratio_display, target, STARTUP_LOADING_PROGRESS_TWEEN_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _set_startup_loading_ratio_display(value: float) -> void:
+	_startup_loading_ratio_display = clampf(value, 0.0, 1.0)
+	if _startup_loading_progress_bar != null:
+		_startup_loading_progress_bar.value = _startup_loading_ratio_display * 100.0
+	_update_startup_loading_glow_position()
+
+
+func _update_startup_loading_glow_position() -> void:
+	if _startup_loading_progress_glow == null or _startup_loading_progress_bar == null:
+		return
+	var bar_size := _startup_loading_progress_bar.size
+	if bar_size.x <= 1.0:
+		return
+	var ratio := clampf(_startup_loading_ratio_display, 0.0, 1.0)
+	var px := ratio * bar_size.x
+	var glow_size := _startup_loading_progress_glow.size
+	if glow_size.x <= 0.0 or glow_size.y <= 0.0:
+		glow_size = _startup_loading_progress_glow.custom_minimum_size
+	_startup_loading_progress_glow.position = Vector2(px - (glow_size.x * 0.5), (bar_size.y - glow_size.y) * 0.5)
+	var glow_alpha := clampf(0.22 + (ratio * 0.78), 0.0, 1.0)
+	_startup_loading_progress_glow.modulate.a = glow_alpha
+
+
+func _finish_startup_boot_sequence(instant: bool = false) -> void:
+	if not _startup_boot_active:
+		return
+	if _startup_loading_progress_tween != null and is_instance_valid(_startup_loading_progress_tween):
+		_startup_loading_progress_tween.kill()
+	_startup_loading_progress_tween = null
+	if _startup_loading_finish_tween != null and is_instance_valid(_startup_loading_finish_tween):
+		_startup_loading_finish_tween.kill()
+	_startup_loading_finish_tween = null
+	_set_startup_loading_ratio_display(1.0)
+	if _startup_loading_stage_label != null:
+		_startup_loading_stage_label.text = "Ready"
+	if instant:
+		_complete_startup_boot_sequence()
+		return
+	var now_sec := float(Time.get_ticks_msec()) / 1000.0
+	var elapsed := maxf(0.0, now_sec - _startup_boot_started_at_sec)
+	var extra_wait := maxf(0.0, STARTUP_LOADING_MIN_VISIBLE_SECONDS - elapsed)
+	_startup_loading_finish_tween = create_tween()
+	if extra_wait > 0.0:
+		_startup_loading_finish_tween.tween_interval(extra_wait)
+	if _startup_loading_overlay != null:
+		_startup_loading_finish_tween.tween_property(_startup_loading_overlay, "modulate:a", 0.0, STARTUP_LOADING_FADE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_startup_loading_finish_tween.tween_callback(_complete_startup_boot_sequence)
+
+
+func _complete_startup_boot_sequence() -> void:
+	if _startup_loading_finish_tween != null and is_instance_valid(_startup_loading_finish_tween):
+		_startup_loading_finish_tween.kill()
+	_startup_loading_finish_tween = null
+	_startup_loading_stop_animations()
+	_startup_boot_active = false
+	_startup_boot_completed = true
+	_startup_boot_started_at_sec = 0.0
+	_set_startup_button_interactivity(true)
+	if _startup_loading_overlay != null:
+		_startup_loading_overlay.visible = false
+		_startup_loading_overlay.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		_startup_loading_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_update_first_run_assessment_pending()
+	if _first_run_assessment_pending:
+		call_deferred("_on_mode_selected")
+	# Phase 5: first-launch profile prompt for the Student Edition (the Teacher
+	# Edition collects this via the roster instead). Deferred so the home menu
+	# paints before the modal pops, avoiding a flash of empty UI.
+	if not IS_TEACHER_EDITION and not _player_profile_seen and not _qa_enabled:
+		call_deferred("_show_profile_prompt")
 
 
 func _ensure_rhythm_tap_input_action() -> void:
@@ -1193,35 +2006,29 @@ func qa_set_exposed_setting(group_name: String, setting_name: String, value: Var
 	if group == "progression":
 		if setting == "key":
 			_progression_key = str(value)
-			if _home_state != null:
-				_home_state.progression_key = _progression_key
+			_sync_home_state_from_runtime()
 			return true
 		if setting == "tempo":
 			_progression_tempo = int(value)
-			if _home_state != null:
-				_home_state.progression_tempo = _progression_tempo
+			_sync_home_state_from_runtime()
 			return true
 	elif group == "scale_mode":
 		if setting == "root":
 			_scale_root = str(value)
-			if _home_state != null:
-				_home_state.scale_root = _scale_root
+			_sync_home_state_from_runtime()
 			return true
 		if setting == "tempo":
 			_scale_tempo = int(value)
-			if _home_state != null:
-				_home_state.scale_tempo = _scale_tempo
+			_sync_home_state_from_runtime()
 			return true
 	elif group == "cadence":
 		if setting == "key":
 			_cadence_key = str(value)
-			if _home_state != null:
-				_home_state.cadence_key = _cadence_key
+			_sync_home_state_from_runtime()
 			return true
 		if setting == "tempo":
 			_cadence_tempo = int(value)
-			if _home_state != null:
-				_home_state.cadence_tempo = _cadence_tempo
+			_sync_home_state_from_runtime()
 			return true
 	return false
 
@@ -1273,70 +2080,139 @@ func _verify_qa_runner_started() -> void:
 
 
 func _sync_home_state_from_runtime() -> void:
-	if _home_state == null:
+	if _home_flow_controller == null:
 		return
-	_home_state.home_flow = _home_flow
-	_home_state.selected_mode = _selected_mode
-	_home_state.ear_settings_screen_active = _ear_settings_screen_active
-	_home_state.selected_read_module = _selected_read_module
-	_home_state.selected_clef = _selected_clef
-	_home_state.sight_mode = _sight_mode
-	_home_state.sight_key_signature = _sight_key_signature
-	_home_state.sight_range_min_step = _sight_range_min_step
-	_home_state.sight_range_max_step = _sight_range_max_step
-	_home_state.sight_selected_notes_by_clef = _sight_selected_notes_by_clef.duplicate(true)
-	_home_state.include_minor_intervals = _include_minor_intervals
-	_home_state.use_descending_intervals = _use_descending_intervals
-	_home_state.use_harmonic_intervals = _use_harmonic_intervals
-	_home_state.progression_key = _progression_key
-	_home_state.progression_selected = _progression_selected.duplicate()
-	_home_state.progression_broken = _progression_broken
-	_home_state.progression_tempo = _progression_tempo
-	_home_state.scale_root = _scale_root
-	_home_state.scale_selected_modes = _scale_selected_modes.duplicate()
-	_home_state.scale_asc_desc = _scale_asc_desc
-	_home_state.scale_tempo = _scale_tempo
-	_home_state.cadence_key = _cadence_key
-	_home_state.cadence_selected = _cadence_selected.duplicate()
-	_home_state.cadence_broken = _cadence_broken
-	_home_state.cadence_tempo = _cadence_tempo
-	_home_state.note_chase_clef_mode = _note_chase_clef_mode
-	_home_state.note_chase_selected_notes = _note_chase_selected_notes.duplicate()
+	_home_flow_controller.sync_from_runtime({
+		"home_flow": _home_flow,
+		"selected_mode": _selected_mode,
+		"ear_settings_screen_active": _ear_settings_screen_active,
+		"selected_read_module": _selected_read_module,
+		"selected_clef": _selected_clef,
+		"sight_mode": _sight_mode,
+		"sight_key_signature": _sight_key_signature,
+		"sight_range_min_step": _sight_range_min_step,
+		"sight_range_max_step": _sight_range_max_step,
+		"sight_selected_notes_by_clef": _sight_selected_notes_by_clef.duplicate(true),
+		"include_minor_intervals": _include_minor_intervals,
+		"use_descending_intervals": _use_descending_intervals,
+		"use_harmonic_intervals": _use_harmonic_intervals,
+		"progression_key": _progression_key,
+		"progression_selected": _progression_selected.duplicate(),
+		"progression_broken": _progression_broken,
+		"progression_tempo": _progression_tempo,
+		"scale_root": _scale_root,
+		"scale_selected_modes": _scale_selected_modes.duplicate(),
+		"scale_asc_desc": _scale_asc_desc,
+		"scale_tempo": _scale_tempo,
+		"cadence_key": _cadence_key,
+		"cadence_selected": _cadence_selected.duplicate(),
+		"cadence_broken": _cadence_broken,
+		"cadence_tempo": _cadence_tempo,
+		"note_chase_clef_mode": _note_chase_clef_mode,
+		"note_chase_selected_notes": _note_chase_selected_notes.duplicate()
+	})
+	_home_state = _home_flow_controller.state
 
 
 func _sync_runtime_from_home_state() -> void:
-	if _home_state == null:
+	if _home_flow_controller == null:
 		return
-	_home_flow = _home_state.home_flow
-	_selected_mode = _home_state.selected_mode
-	_ear_settings_screen_active = _home_state.ear_settings_screen_active
-	_selected_read_module = _home_state.selected_read_module
-	_selected_clef = _home_state.selected_clef
-	_sight_mode = _normalize_sight_mode(_home_state.sight_mode)
-	_sight_key_signature = "C" if _home_state.sight_key_signature == "None" else _home_state.sight_key_signature
-	_sight_range_min_step = _home_state.sight_range_min_step
-	_sight_range_max_step = _home_state.sight_range_max_step
-	if _home_state.sight_selected_notes_by_clef is Dictionary:
-		_sight_selected_notes_by_clef = (_home_state.sight_selected_notes_by_clef as Dictionary).duplicate(true)
-	_include_minor_intervals = _home_state.include_minor_intervals
-	_use_descending_intervals = _home_state.use_descending_intervals
-	_use_harmonic_intervals = _home_state.use_harmonic_intervals
-	_progression_key = _home_state.progression_key
-	_progression_selected = _home_state.progression_selected.duplicate()
-	_progression_broken = _home_state.progression_broken
-	_progression_tempo = _home_state.progression_tempo
-	_scale_root = _home_state.scale_root
-	_scale_selected_modes = _home_state.scale_selected_modes.duplicate()
-	_scale_asc_desc = _home_state.scale_asc_desc
-	_scale_tempo = _home_state.scale_tempo
-	_cadence_key = _home_state.cadence_key
-	_cadence_selected = _home_state.cadence_selected.duplicate()
-	_cadence_broken = _home_state.cadence_broken
-	_cadence_tempo = _home_state.cadence_tempo
-	_note_chase_clef_mode = _home_state.note_chase_clef_mode
-	_note_chase_selected_notes = _home_state.note_chase_selected_notes.duplicate()
+	var snapshot: Dictionary = _home_flow_controller.runtime_snapshot()
+	_home_state = _home_flow_controller.state
+	_home_flow = str(snapshot.get("home_flow", _home_flow))
+	_selected_mode = int(snapshot.get("selected_mode", _selected_mode))
+	_ear_settings_screen_active = bool(snapshot.get("ear_settings_screen_active", _ear_settings_screen_active))
+	_selected_read_module = int(snapshot.get("selected_read_module", _selected_read_module))
+	_selected_clef = str(snapshot.get("selected_clef", _selected_clef))
+	_sight_mode = _normalize_sight_mode(str(snapshot.get("sight_mode", _sight_mode)))
+	_sight_key_signature = str(snapshot.get("sight_key_signature", _sight_key_signature))
+	if _sight_key_signature == "None":
+		_sight_key_signature = "C"
+	_sight_range_min_step = int(snapshot.get("sight_range_min_step", _sight_range_min_step))
+	_sight_range_max_step = int(snapshot.get("sight_range_max_step", _sight_range_max_step))
+	var sight_notes_any: Variant = snapshot.get("sight_selected_notes_by_clef", _sight_selected_notes_by_clef)
+	if typeof(sight_notes_any) == TYPE_DICTIONARY:
+		_sight_selected_notes_by_clef = (sight_notes_any as Dictionary).duplicate(true)
+	_include_minor_intervals = bool(snapshot.get("include_minor_intervals", _include_minor_intervals))
+	_use_descending_intervals = bool(snapshot.get("use_descending_intervals", _use_descending_intervals))
+	_use_harmonic_intervals = bool(snapshot.get("use_harmonic_intervals", _use_harmonic_intervals))
+	_progression_key = str(snapshot.get("progression_key", _progression_key))
+	var progression_selected_any: Variant = snapshot.get("progression_selected", _progression_selected)
+	if typeof(progression_selected_any) == TYPE_ARRAY:
+		_progression_selected = _variant_string_array(progression_selected_any)
+	_progression_broken = bool(snapshot.get("progression_broken", _progression_broken))
+	_progression_tempo = int(snapshot.get("progression_tempo", _progression_tempo))
+	_scale_root = str(snapshot.get("scale_root", _scale_root))
+	var scale_selected_any: Variant = snapshot.get("scale_selected_modes", _scale_selected_modes)
+	if typeof(scale_selected_any) == TYPE_ARRAY:
+		_scale_selected_modes = _variant_string_array(scale_selected_any)
+	_scale_asc_desc = bool(snapshot.get("scale_asc_desc", _scale_asc_desc))
+	_scale_tempo = int(snapshot.get("scale_tempo", _scale_tempo))
+	_cadence_key = str(snapshot.get("cadence_key", _cadence_key))
+	var cadence_selected_any: Variant = snapshot.get("cadence_selected", _cadence_selected)
+	if typeof(cadence_selected_any) == TYPE_ARRAY:
+		_cadence_selected = _variant_string_array(cadence_selected_any)
+	_cadence_broken = bool(snapshot.get("cadence_broken", _cadence_broken))
+	_cadence_tempo = int(snapshot.get("cadence_tempo", _cadence_tempo))
+	_note_chase_clef_mode = str(snapshot.get("note_chase_clef_mode", _note_chase_clef_mode))
+	var note_chase_selected_any: Variant = snapshot.get("note_chase_selected_notes", _note_chase_selected_notes)
+	if typeof(note_chase_selected_any) == TYPE_ARRAY:
+		_note_chase_selected_notes = _variant_string_array(note_chase_selected_any)
 	_sight_selected_notes_by_clef["Treble"] = _sanitize_sight_note_set_for_clef("Treble", _sight_note_set_for_clef("Treble"))
 	_sight_selected_notes_by_clef["Bass"] = _sanitize_sight_note_set_for_clef("Bass", _sight_note_set_for_clef("Bass"))
+	_enforce_mvp_menu_gates()
+
+
+func _variant_string_array(value: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if typeof(value) != TYPE_ARRAY:
+		return out
+	var source: Array = value as Array
+	for item in source:
+		out.append(str(item))
+	return out
+
+
+func _ensure_session_controller():
+	if _session_controller == null:
+		_session_controller = SessionControllerScript.new()
+	return _session_controller
+
+
+func _ensure_sight_renderer():
+	if _sight_renderer == null:
+		_sight_renderer = SightRendererScript.new()
+	return _sight_renderer
+
+
+func _sight_renderer_config() -> Dictionary:
+	return {
+		"mode_sight": MODE_SIGHT,
+		"mode_note_chase": MODE_NOTE_CHASE,
+		"staff_top_line_y": STAFF_TOP_LINE_Y,
+		"staff_line_gap_y": STAFF_LINE_GAP_Y,
+		"staff_step_y": STAFF_STEP_Y,
+		"staff_top_line_step": STAFF_TOP_LINE_STEP,
+		"staff_bottom_line_step": STAFF_BOTTOM_LINE_STEP,
+		"staff_left_x": STAFF_LEFT_X,
+		"staff_line_width": STAFF_LINE_WIDTH,
+		"staff_note_snap_x": STAFF_NOTE_SNAP_X,
+		"sight_note_center_offset_y": SIGHT_NOTE_CENTER_OFFSET_Y,
+		"sight_chord_note_center_offset_y": SIGHT_CHORD_NOTE_CENTER_OFFSET_Y,
+		"sight_accidental_x_offset": SIGHT_ACCIDENTAL_X_OFFSET,
+		"sight_accidental_raise_y": SIGHT_ACCIDENTAL_RAISE_Y,
+		"grand_staff_second_interval_shift_ratio": GRAND_STAFF_SECOND_INTERVAL_SHIFT_RATIO,
+		"sight_chord_second_interval_shift_ratio": SIGHT_CHORD_SECOND_INTERVAL_SHIFT_RATIO,
+		"grand_staff_accidental_x_offset": GRAND_STAFF_ACCIDENTAL_X_OFFSET,
+		"grand_staff_clef_right_nudge": GRAND_STAFF_CLEF_RIGHT_NUDGE,
+		"grand_staff_clef_down_spaces": GRAND_STAFF_CLEF_DOWN_SPACES,
+		"grand_staff_bass_clef_extra_raise_spaces": GRAND_STAFF_BASS_CLEF_EXTRA_RAISE_SPACES,
+		"grand_staff_bass_ledger_step_extra_down": GRAND_STAFF_BASS_LEDGER_STEP_EXTRA_DOWN,
+		"grand_staff_notehead_height_ratio": GRAND_STAFF_NOTEHEAD_HEIGHT_RATIO,
+		"grand_staff_notehead_width_ratio": GRAND_STAFF_NOTEHEAD_WIDTH_RATIO,
+		"grand_staff_ledger_right_nudge": GRAND_STAFF_LEDGER_RIGHT_NUDGE,
+		"notehead_shimmer_enabled": NOTEHEAD_SHIMMER_ENABLED,
+	}
 
 
 func _exit_tree() -> void:
@@ -1375,6 +2251,82 @@ func _normalize_sight_mode(mode_name: String) -> String:
 	return "Notes"
 
 
+func _default_selected_chord_types() -> Array[String]:
+	var selected: Array[String] = []
+	for chord_name in CHORD_DEFAULT_SELECTED:
+		selected.append(str(chord_name))
+	return selected
+
+
+func _mvp_is_ear_mode_enabled(mode: int) -> bool:
+	return mode == MODE_INTERVAL or mode == MODE_CHORD or mode == MODE_CADENCE
+
+
+func _mvp_is_sight_mode_enabled(mode_name: String) -> bool:
+	var normalized := _normalize_sight_mode(mode_name)
+	return normalized == "Notes" or normalized == "Chords"
+
+
+func _mvp_is_sight_key_signature_enabled(sig_name: String, mode_name: String = "") -> bool:
+	var normalized_mode := _normalize_sight_mode(mode_name if mode_name != "" else _sight_mode)
+	if normalized_mode == "Notes" or normalized_mode == "Chords":
+		return sig_name == "C"
+	return true
+
+
+func _mvp_is_sight_clef_enabled(clef_name: String, mode_name: String = "") -> bool:
+	var normalized_mode := _normalize_sight_mode(mode_name if mode_name != "" else _sight_mode)
+	if normalized_mode == "Chords":
+		return clef_name == "Treble" or clef_name == "Bass" or clef_name == "Grand Staff"
+	# Grand Staff only available for Chords mode
+	if clef_name == "Grand Staff":
+		return false
+	return true
+
+
+func _mvp_is_note_chase_clef_enabled(clef_mode: String) -> bool:
+	return clef_mode == "Treble"
+
+
+func _show_mvp_locked_hint() -> void:
+	var hint_text := "%s\n%s" % [MVP_LOCKED_HINT_TITLE, MVP_LOCKED_HINT_BODY]
+	if _home_info_label != null:
+		_home_info_label.text = hint_text
+
+
+func _apply_mvp_locked_button_visual(btn: Button, locked: bool) -> void:
+	if btn == null:
+		return
+	if locked:
+		btn.modulate = Color(1.0, 1.0, 1.0, 0.45)
+		btn.tooltip_text = MVP_LOCKED_HINT_TITLE
+		var muted := Color(0.80, 0.84, 0.90, 0.98)
+		btn.add_theme_color_override("font_color", muted)
+		btn.add_theme_color_override("font_hover_color", muted)
+		btn.add_theme_color_override("font_pressed_color", muted)
+	else:
+		btn.modulate = Color(1, 1, 1, 0.58) if btn.disabled else Color(1, 1, 1, 1)
+		if btn.tooltip_text == MVP_LOCKED_HINT_TITLE:
+			btn.tooltip_text = ""
+
+
+func _enforce_mvp_menu_gates() -> void:
+	if _is_ear_training_mode(_selected_mode) and not _mvp_is_ear_mode_enabled(_selected_mode):
+		_selected_mode = MODE_INTERVAL
+	if _selected_mode == MODE_SIGHT:
+		if not _mvp_is_sight_mode_enabled(_sight_mode):
+			_sight_mode = "Notes"
+		if not _mvp_is_sight_key_signature_enabled(_sight_key_signature, _sight_mode):
+			_sight_key_signature = "C"
+		if not _mvp_is_sight_clef_enabled(_selected_clef, _sight_mode):
+			_selected_clef = "Grand Staff" if _sight_mode == "Chords" else "Treble"
+	if _selected_mode == MODE_NOTE_CHASE:
+		if not _mvp_is_note_chase_clef_enabled(_note_chase_clef_mode):
+			_note_chase_clef_mode = "Treble"
+		if _note_chase_clef_mode == "Treble":
+			_selected_clef = "Treble"
+
+
 func _invalidate_audio_sequence_schedule() -> void:
 	_audio_sequence_run_id += 1
 	if _conductor != null and _conductor.has_method("clear"):
@@ -1390,6 +2342,10 @@ func _stop_prompt_audio_playback() -> void:
 	for p in _chord_players:
 		if p != null:
 			p.stop()
+	if _rhythm_metronome_player != null:
+		_rhythm_metronome_player.stop()
+	if _shield_sfx_player != null:
+		_shield_sfx_player.stop()
 	# Do not stop the generator player here. Prompt fallback audio writes into the
 	# generator ring buffer and stopping the player can leave later replays silent
 	# (or waiting indefinitely for free frames on some devices).
@@ -1422,6 +2378,7 @@ func _clear_gameplay_transient_visuals() -> void:
 		_staff_note.modulate = Color(1, 1, 1, 1)
 		_staff_note.visible = false
 		_staff_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hide_sight_note_name_label()
 	for n in _staff_chord_notes:
 		if n != null:
 			n.visible = false
@@ -1453,18 +2410,24 @@ func _ensure_generator_audio_running() -> void:
 
 
 func _review_queue_for_mode(mode: int):
+	if mode == MODE_INTERVAL:
+		return _interval_review_queue
 	if mode == MODE_PROGRESSION:
 		return _progression_review_queue
 	if mode == MODE_SCALE_MODE:
 		return _scale_review_queue
 	if mode == MODE_CADENCE:
 		return _cadence_review_queue
+	if mode == MODE_CHORD:
+		return _chord_review_queue
 	return null
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		call_deferred("_update_game_card_layout")
+		if _startup_boot_blocking_input():
+			call_deferred("_update_startup_loading_glow_position")
 		if _selected_mode == MODE_READ:
 			call_deferred("_position_tutorial_title")
 			call_deferred("_position_tutorial_button_row")
@@ -1516,6 +2479,13 @@ func _process(delta: float) -> void:
 		if _game_panel != null and _game_panel.visible:
 			_set_note_chase_staff_scrolling(false)
 			_note_chase_realign_staff_frame()
+		if _mic_listening and _quiz_active and _sight_mode == "Notes":
+			_poll_mic_pitch()
+	if _midi_active:
+		_midi_piano_viz_tick(delta)        # safe no-op when small viz not built
+		_sight_big_piano_tick(delta)       # new: drives the big sight piano fade-out
+		_midi_chord_buffer_tick()
+		_chord_explorer_tick()
 	if _bird_sprite != null and _bird_sprite.visible:
 		_ensure_bird_visible_in_gameplay()
 		_update_chicken_bubble_position()
@@ -1587,6 +2557,26 @@ func _apply_device_profile_runtime() -> void:
 
 func _is_touch_runtime_device() -> bool:
 	return bool(_device_profile.get("is_touch_primary", false)) or OS.has_feature("mobile") or OS.has_feature("android") or DisplayServer.is_touchscreen_available()
+
+
+func _home_overview_column_count_for_viewport(vp: Vector2) -> int:
+	return 2 if vp.x >= 760.0 else 1
+
+
+func _home_overview_content_width_for_viewport(vp: Vector2) -> int:
+	if _home_overview_column_count_for_viewport(vp) >= 2:
+		return int(roundf(clampf(vp.x * 0.42, 386.0, 430.0)))
+	return int(roundf(clampf(vp.x * 0.30, 260.0, 420.0)))
+
+
+func _sync_home_overview_section_columns(vp: Vector2) -> void:
+	var column_count := _home_overview_column_count_for_viewport(vp)
+	for grid in _home_overview_section_grids:
+		if grid == null or not is_instance_valid(grid):
+			continue
+		grid.columns = column_count
+		grid.add_theme_constant_override("h_separation", 10)
+		grid.add_theme_constant_override("v_separation", 10)
 
 
 func _layout_game_top_buttons(vp: Vector2) -> void:
@@ -1694,7 +2684,7 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	if very_compact_height_ui:
 		btn_h *= 0.90
 	var btn_w_boost := (1.22 if is_tablet else 1.03) * clampf(vp.x / 1366.0, 0.76, 1.10)
-	var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+	var home_visible := _is_home_ui_active()
 	var hud_height := clampf(vp.y * 0.085, 66.0, 102.0 if is_tablet else 84.0)
 	if _header_card != null:
 		_header_card.custom_minimum_size = Vector2(0, roundf(hud_height))
@@ -1739,9 +2729,9 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	if _home_overview_anchor != null:
 		var overview_visible := _home_overview_grid != null and _home_overview_grid.visible
 		if overview_visible:
-			var left_target: int = int(roundf(vp.x * 0.60))
+			var left_target: int = int(roundf(vp.x * 0.48))
 			var right_gutter: int = int(roundf(clampf(vp.x * 0.05, 22.0, 76.0)))
-			var min_content_width: int = int(roundf(clampf(vp.x * 0.30, 260.0, 420.0)))
+			var min_content_width: int = _home_overview_content_width_for_viewport(vp)
 			var max_left: int = maxi(0, int(vp.x) - right_gutter - min_content_width)
 			left_target = clampi(left_target, 0, max_left)
 			_home_overview_anchor.add_theme_constant_override("margin_left", left_target)
@@ -1756,6 +2746,7 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	if _home_overview_grid != null:
 		_home_overview_grid.add_theme_constant_override("h_separation", int(roundf((18 if is_tablet else 12) * viewport_scale)))
 		_home_overview_grid.add_theme_constant_override("v_separation", int(roundf((18 if is_tablet else 12) * viewport_scale)))
+		_sync_home_overview_section_columns(vp)
 	if _home_hub_row != null:
 		_home_hub_row.add_theme_constant_override("separation", int(roundf((18 if is_tablet else 12) * viewport_scale)))
 	if _home_footer_row != null:
@@ -1887,6 +2878,17 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 		if sig_btn == null:
 			continue
 		sig_btn.add_theme_font_size_override("font_size", int(roundf((18 if is_tablet else 13) * large_scale)))
+	for b in _sight_chord_tier_buttons.values():
+		var tier_btn := b as Button
+		if tier_btn == null:
+			continue
+		var tier_size := Vector2(188, 58) if is_tablet else Vector2(148, 46)
+		if compact_height_ui:
+			tier_size.y = minf(tier_size.y, 54.0 if is_tablet else 42.0)
+		if very_compact_height_ui:
+			tier_size.y = minf(tier_size.y, 50.0 if is_tablet else 40.0)
+		tier_btn.custom_minimum_size = tier_size
+		tier_btn.add_theme_font_size_override("font_size", int(roundf((20 if is_tablet else 15) * large_scale)))
 	for b in _note_chase_note_toggles.values():
 		var note_btn := b as Button
 		if note_btn == null:
@@ -2143,7 +3145,7 @@ func _build_ui() -> void:
 	_header_card.set_anchors_preset(PRESET_TOP_WIDE)
 	_header_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_header_card.custom_minimum_size = Vector2(0, 96)
-	_header_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_header_card.mouse_filter = Control.MOUSE_FILTER_PASS
 	main_col.add_child(_header_card)
 
 	var hud_grad := Gradient.new()
@@ -2234,34 +3236,21 @@ func _build_ui() -> void:
 	header_brand_row.add_theme_constant_override("separation", 10)
 	header_center_col.add_child(header_brand_row)
 
-	# Logo placeholder — swap out for actual app icon when available
+	# Clefira SVG logo
 	_home_logo_placeholder = PanelContainer.new()
 	_home_logo_placeholder.custom_minimum_size = Vector2(42, 42)
 	_home_logo_placeholder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_home_logo_placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var _ph_sb := StyleBoxFlat.new()
-	_ph_sb.bg_color = Color(0.95, 0.82, 0.30, 0.85)
-	_ph_sb.corner_radius_top_left    = 12
-	_ph_sb.corner_radius_top_right   = 12
-	_ph_sb.corner_radius_bottom_left = 12
-	_ph_sb.corner_radius_bottom_right = 12
-	_ph_sb.border_color = Color(1.0, 0.94, 0.58, 0.70)
-	_ph_sb.border_width_left = 2
-	_ph_sb.border_width_top = 2
-	_ph_sb.border_width_right = 2
-	_ph_sb.border_width_bottom = 2
-	_ph_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-	_ph_sb.shadow_size = 6
+	_ph_sb.bg_color = Color(0, 0, 0, 0)
 	_home_logo_placeholder.add_theme_stylebox_override("panel", _ph_sb)
-	var _ph_lbl := Label.new()
-	_ph_lbl.text = "♪"
-	_ph_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_ph_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_ph_lbl.set_anchors_preset(PRESET_FULL_RECT)
-	_ph_lbl.add_theme_font_size_override("font_size", 26)
-	_ph_lbl.add_theme_color_override("font_color", Color(0.20, 0.12, 0.02, 1.0))
-	_ph_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_home_logo_placeholder.add_child(_ph_lbl)
+	var logo_tex := TextureRect.new()
+	logo_tex.texture = CLEFIRA_LOGO_TEXTURE
+	logo_tex.custom_minimum_size = Vector2(42, 42)
+	logo_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	logo_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_home_logo_placeholder.add_child(logo_tex)
 	header_brand_row.add_child(_home_logo_placeholder)
 
 	_title_label = Label.new()
@@ -2270,7 +3259,7 @@ func _build_ui() -> void:
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_title_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_title_label.clip_text = true
+	_title_label.clip_text = false
 	_title_label.add_theme_font_size_override("font_size", 30)
 	_title_label.visible = true
 	header_brand_row.add_child(_title_label)
@@ -2290,8 +3279,8 @@ func _build_ui() -> void:
 	_header_tagline_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_header_tagline_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_header_tagline_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_header_tagline_label.clip_text = true
-	_header_tagline_label.add_theme_font_size_override("font_size", 12)
+	_header_tagline_label.clip_text = false
+	_header_tagline_label.add_theme_font_size_override("font_size", 14)
 	header_center_col.add_child(_header_tagline_label)
 
 	var header_back_slot := HBoxContainer.new()
@@ -2354,7 +3343,7 @@ func _build_ui() -> void:
 	_home_scroll = ScrollContainer.new()
 	_home_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_home_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_home_scroll.follow_focus = true
+	_home_scroll.follow_focus = false
 	_home_card.add_child(_home_scroll)
 
 	_home_panel = VBoxContainer.new()
@@ -2397,8 +3386,39 @@ func _build_ui() -> void:
 	_home_overview_grid.add_theme_constant_override("v_separation", 14)
 	home_overview_stack.add_child(_home_overview_grid)
 
-	_build_mode_card("Ear Training", "Train your musical ear", ICON_EAR_PATH, MODE_INTERVAL, "Ear", MENU_CARD_CREAM_ACCENT, _home_overview_grid)
-	_build_mode_card("Sight Reading", "Read notes on the staff", ICON_PIANO_PATH, MODE_SIGHT, "Sight", MENU_CARD_CREAM_ACCENT, _home_overview_grid)
+	var main_practice_grid := _build_home_overview_section(_home_overview_grid, "Main Practice")
+	_build_mode_card("Sight Reading", "Read notes and chords on the staff", ICON_PIANO_PATH, MODE_SIGHT, "Sight", MENU_CARD_CREAM_ACCENT, main_practice_grid)
+	_build_mode_card("Ear Training", "Train intervals, chords, and progressions", ICON_EAR_PATH, MODE_INTERVAL, "Ear", MENU_CARD_CREAM_ACCENT, main_practice_grid)
+
+	var tools_grid := _build_home_overview_section(_home_overview_grid, "Tools")
+	var practice_drills_card_btn := _build_home_overview_card(tools_grid, "Practice Drills", "Scales, arpeggios, and MusicXML export", ICON_PIANO_PATH, Color(0.96, 0.78, 0.42, 1.0), _on_practice_drills_open)
+	if practice_drills_card_btn != null:
+		practice_drills_card_btn.set_meta("main_menu_mode_key", "PracticeDrills")
+		_home_material_buttons.append(practice_drills_card_btn)
+		_set_home_selection_state(practice_drills_card_btn, false)
+	var chord_explorer_card_btn := _build_home_overview_card(tools_grid, "Chord Explorer", "Play notes and identify chords", ICON_PIANO_PATH, Color(0.62, 0.86, 0.96, 1.0), _on_chord_explorer_open)
+	if chord_explorer_card_btn != null:
+		chord_explorer_card_btn.set_meta("main_menu_mode_key", "ChordExplorer")
+		_home_material_buttons.append(chord_explorer_card_btn)
+		_set_home_selection_state(chord_explorer_card_btn, false)
+
+	if LEARNING_MODE_ENABLED:
+		var learning_grid := _build_home_overview_section(_home_overview_grid, "Lessons")
+		var learning_card_btn := _build_home_overview_card(learning_grid, "Learning Mode", "Step-by-step music lessons", ICON_GRADUATION_PATH, MENU_CARD_LEARNING_ACCENT, _on_learning_mode_pressed)
+		if learning_card_btn != null:
+			_learning_mode_card_button = learning_card_btn
+			learning_card_btn.set_meta("main_menu_mode_key", "Learning")
+			_home_material_buttons.append(learning_card_btn)
+			_set_home_selection_state(learning_card_btn, false)
+
+	if TEACHER_MODE_ENABLED:
+		var teacher_grid := _build_home_overview_section(_home_overview_grid, "For Teachers")
+		var teacher_card_btn := _build_home_overview_card(teacher_grid, "Teacher Dashboard", "Student tracking and lesson notes", ICON_GRADUATION_PATH, Color(0.475, 0.82, 0.80, 1.0), _on_teacher_dashboard_open)
+		if teacher_card_btn != null:
+			teacher_card_btn.set_meta("main_menu_mode_key", "Teacher")
+			_home_material_buttons.append(teacher_card_btn)
+			_set_home_selection_state(teacher_card_btn, false)
+	_sync_home_overview_section_columns(get_viewport_rect().size)
 
 	_home_hub_row = HBoxContainer.new()
 	_home_hub_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -2445,8 +3465,39 @@ func _build_ui() -> void:
 	_home_footer_row.add_child(_home_settings_button)
 	_home_material_buttons.append(_home_settings_button)
 
+	# Phase 5: Export Progress — bundles profile + learning progress + ear stats
+	# into a single JSON file the user can copy off-device for backup or to send
+	# to a teacher. Available on both editions because both editions accumulate
+	# practice history worth saving.
+	var export_btn := Button.new()
+	export_btn.text = "Export Progress"
+	export_btn.custom_minimum_size = Vector2(180, 54)
+	export_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	export_btn.pressed.connect(_on_export_progress_pressed)
+	_home_footer_row.add_child(export_btn)
+	_home_material_buttons.append(export_btn)
+
+	# Companion Import Progress button — restores from a previously-exported file.
+	var import_btn := Button.new()
+	import_btn.text = "Import Progress"
+	import_btn.custom_minimum_size = Vector2(180, 54)
+	import_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	import_btn.pressed.connect(_on_import_progress_pressed)
+	_home_footer_row.add_child(import_btn)
+	_home_material_buttons.append(import_btn)
+
+	# Edit Profile (Student Edition only — Teacher Edition uses the roster).
+	if not IS_TEACHER_EDITION:
+		var profile_btn := Button.new()
+		profile_btn.text = "Edit Profile"
+		profile_btn.custom_minimum_size = Vector2(160, 54)
+		profile_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		profile_btn.pressed.connect(_on_edit_profile_pressed)
+		_home_footer_row.add_child(profile_btn)
+		_home_material_buttons.append(profile_btn)
+
 	_home_footer_version_label = Label.new()
-	_home_footer_version_label.text = "Clefire %s" % APP_VERSION_LABEL
+	_home_footer_version_label.text = "Clefira %s" % APP_VERSION_LABEL
 	_home_footer_version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_home_footer_version_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_home_footer_version_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2477,6 +3528,7 @@ func _build_ui() -> void:
 	var ear_progression_btn := Button.new()
 	ear_progression_btn.text = "Progression"
 	ear_progression_btn.custom_minimum_size = Vector2(136, 44)
+	ear_progression_btn.visible = _mvp_is_ear_mode_enabled(MODE_PROGRESSION)
 	ear_progression_btn.pressed.connect(_on_ear_mode_button_pressed.bind(MODE_PROGRESSION))
 	_ear_mode_row.add_child(ear_progression_btn)
 	_ear_mode_buttons[MODE_PROGRESSION] = ear_progression_btn
@@ -2485,6 +3537,7 @@ func _build_ui() -> void:
 	var ear_scale_mode_btn := Button.new()
 	ear_scale_mode_btn.text = "Scale/Mode"
 	ear_scale_mode_btn.custom_minimum_size = Vector2(136, 44)
+	ear_scale_mode_btn.visible = _mvp_is_ear_mode_enabled(MODE_SCALE_MODE)
 	ear_scale_mode_btn.pressed.connect(_on_ear_mode_button_pressed.bind(MODE_SCALE_MODE))
 	_ear_mode_row.add_child(ear_scale_mode_btn)
 	_ear_mode_buttons[MODE_SCALE_MODE] = ear_scale_mode_btn
@@ -2513,6 +3566,7 @@ func _build_ui() -> void:
 	var theme_row := HBoxContainer.new()
 	theme_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	theme_row.add_theme_constant_override("separation", 10)
+	theme_row.visible = false  # Theme selector hidden for MVP release
 	_ear_settings_more_panel.add_child(theme_row)
 
 	var theme_label := Label.new()
@@ -2568,9 +3622,19 @@ func _build_ui() -> void:
 	_question_spin.custom_minimum_size = Vector2(110, 40)
 	q_row.add_child(_question_spin)
 
+	# Practice mode toggle lives on the home page footer button
+
 	var settings_section_spacer := Control.new()
 	settings_section_spacer.custom_minimum_size = Vector2(0, 16)
 	_ear_settings_screen.add_child(settings_section_spacer)
+
+	_settings_exit_button = Button.new()
+	_settings_exit_button.text = "Exit Settings"
+	_settings_exit_button.custom_minimum_size = Vector2(190, 48)
+	_settings_exit_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_settings_exit_button.pressed.connect(_on_settings_exit_pressed)
+	_ear_settings_screen.add_child(_settings_exit_button)
+	_home_material_buttons.append(_settings_exit_button)
 
 	_refresh_ear_settings_ui()
 
@@ -2587,6 +3651,27 @@ func _build_ui() -> void:
 	interval_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	interval_row.add_theme_constant_override("separation", 10)
 	var interval_main_group := _create_home_option_group(_interval_options_box)
+	# Difficulty preset row (above degree toggles)
+	var interval_preset_row := HBoxContainer.new()
+	interval_preset_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	interval_preset_row.add_theme_constant_override("separation", 8)
+	interval_main_group.add_child(interval_preset_row)
+	_interval_preset_btns.clear()
+	var _ipreset_defs := [
+		["beginner", "★ Beginner", "P4 · P5 · P8"],
+		["standard", "★★ Standard", "3rds + 6ths"],
+		["advanced", "★★★ Advanced", "All intervals"],
+	]
+	for _ipreset in _ipreset_defs:
+		var _ipreset_id: String = _ipreset[0]
+		var _ipbtn := Button.new()
+		_ipbtn.text = "%s\n%s" % [_ipreset[1], _ipreset[2]]
+		_ipbtn.custom_minimum_size = Vector2(134, 46)
+		_ipbtn.set_meta("compact_btn", true)
+		_ipbtn.pressed.connect(_apply_interval_preset.bind(_ipreset_id))
+		interval_preset_row.add_child(_ipbtn)
+		_interval_preset_btns.append(_ipbtn)
+		_home_material_buttons.append(_ipbtn)
 	interval_main_group.add_child(interval_row)
 	_home_interval_degree_row = interval_row
 
@@ -2649,28 +3734,11 @@ func _build_ui() -> void:
 	chord_options_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_chord_options_box.add_child(chord_options_title)
 
-	var family_inversion_row := HBoxContainer.new()
-	family_inversion_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	family_inversion_row.add_theme_constant_override("separation", 20)
-	var chord_family_group := _create_home_option_group(_chord_options_box)
-	chord_family_group.add_child(family_inversion_row)
-
-	var family_left_box := VBoxContainer.new()
-	family_left_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	family_left_box.custom_minimum_size = Vector2(360, 0)
-	family_inversion_row.add_child(family_left_box)
-
-	var family_row := HBoxContainer.new()
-	family_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	family_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	family_row.add_theme_constant_override("separation", 8)
-	family_left_box.add_child(family_row)
-
-	var inversion_right_box := VBoxContainer.new()
-	inversion_right_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	inversion_right_box.custom_minimum_size = Vector2(190, 0)
-	family_inversion_row.add_child(inversion_right_box)
-
+	# Inversion toggle row
+	var inversion_group := _create_home_option_group(_chord_options_box, true)
+	var inversion_row := HBoxContainer.new()
+	inversion_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	inversion_group.add_child(inversion_row)
 	_inversion_toggle = Button.new()
 	_inversion_toggle.toggle_mode = true
 	_inversion_toggle.text = "Inversions"
@@ -2679,33 +3747,60 @@ func _build_ui() -> void:
 	_inversion_toggle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_inversion_toggle.tooltip_text = "Root, 1st, and 2nd inversion"
 	_inversion_toggle.toggled.connect(_on_inversion_toggled)
-	inversion_right_box.add_child(_inversion_toggle)
+	inversion_row.add_child(_inversion_toggle)
 
-	var group_defs := {
-		1: "Maj/Min",
-		2: "Aug/Dim",
-		3: "Sus & 7th",
-		4: "All"
-	}
-	for group_id in [1, 2, 3, 4]:
-		var g_btn := Button.new()
-		g_btn.text = str(group_defs[group_id])
-		g_btn.custom_minimum_size = Vector2(104, 34)
-		g_btn.set_meta("compact_btn", true)
-		g_btn.pressed.connect(_on_chord_group_button_pressed.bind(group_id))
-		family_row.add_child(g_btn)
-		_chord_group_buttons[group_id] = g_btn
-		_home_material_buttons.append(g_btn)
+	# Collapsible chord tier sections
+	if _selected_chord_types.is_empty():
+		_selected_chord_types = _default_selected_chord_types()
+	_chord_tier_toggles.clear()
+	_chord_tier_headers.clear()
+	_chord_tier_containers.clear()
+	for tier_name in CHORD_TIER_ORDER:
+		var tier_chords: Array = CHORD_TIERS[tier_name]
+		var tier_group := _create_home_option_group(_chord_options_box, true)
 
-	_adaptive_toggle = CheckButton.new()
-	_adaptive_toggle.text = "Adaptive (All mode)"
-	_adaptive_toggle.button_pressed = true
-	_adaptive_toggle.disabled = true
-	_adaptive_toggle.custom_minimum_size = Vector2(280, 46)
-	_adaptive_toggle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_adaptive_toggle.tooltip_text = "All mode auto-progresses by streak"
-	var chord_adaptive_group := _create_home_option_group(_chord_options_box, true)
-	chord_adaptive_group.add_child(_adaptive_toggle)
+		# Collapsible header button
+		var header_btn := Button.new()
+		var tier_count := 0
+		for _cn in tier_chords:
+			if _selected_chord_types.has(str(_cn)):
+				tier_count += 1
+		header_btn.text = "%s  (%d/%d)" % [tier_name, tier_count, tier_chords.size()]
+		header_btn.custom_minimum_size = Vector2(0, 40)
+		header_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		header_btn.set_meta("compact_btn", true)
+		header_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		tier_group.add_child(header_btn)
+		_chord_tier_headers[tier_name] = header_btn
+
+		# Chord toggle buttons inside a flow container
+		var chord_flow := HBoxContainer.new()
+		chord_flow.alignment = BoxContainer.ALIGNMENT_CENTER
+		chord_flow.add_theme_constant_override("separation", 6)
+		var chord_flow_wrap := GridContainer.new()
+		chord_flow_wrap.columns = 4
+		chord_flow_wrap.add_theme_constant_override("h_separation", 6)
+		chord_flow_wrap.add_theme_constant_override("v_separation", 6)
+		tier_group.add_child(chord_flow_wrap)
+		_chord_tier_containers[tier_name] = chord_flow_wrap
+
+		for chord_name in tier_chords:
+			var c_toggle := Button.new()
+			c_toggle.toggle_mode = true
+			c_toggle.text = str(chord_name)
+			c_toggle.button_pressed = _selected_chord_types.has(str(chord_name))
+			c_toggle.custom_minimum_size = Vector2(90, 42)
+			c_toggle.set_meta("compact_btn", true)
+			c_toggle.toggled.connect(_on_chord_tier_toggle.bind(str(chord_name)))
+			chord_flow_wrap.add_child(c_toggle)
+			_chord_tier_toggles[str(chord_name)] = c_toggle
+			_home_material_buttons.append(c_toggle)
+
+		# Wire header to toggle collapse; collapse all tiers except the first
+		header_btn.pressed.connect(_toggle_chord_tier_collapse.bind(tier_name))
+		if tier_name != CHORD_TIER_ORDER[0]:
+			chord_flow_wrap.visible = false
+		_home_material_buttons.append(header_btn)
 
 	_progression_options_box = VBoxContainer.new()
 	_progression_options_box.add_theme_constant_override("separation", 16)
@@ -2788,11 +3883,32 @@ func _build_ui() -> void:
 	_cadence_options_box.add_child(cadence_title)
 
 	var cadence_group := _create_home_option_group(_cadence_options_box)
+	# Difficulty preset row (above cadence type buttons)
+	var cadence_preset_row := HBoxContainer.new()
+	cadence_preset_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cadence_preset_row.add_theme_constant_override("separation", 8)
+	cadence_group.add_child(cadence_preset_row)
+	_cadence_preset_btns.clear()
+	var _cpreset_defs := [
+		["beginner", "★ Beginner", "Perfect · Plagal"],
+		["standard", "★★ Standard", "+ Half · Deceptive"],
+		["advanced", "★★★ Advanced", "All 6 cadences"],
+	]
+	for _cpreset in _cpreset_defs:
+		var _cpreset_id: String = _cpreset[0]
+		var _cpbtn := Button.new()
+		_cpbtn.text = "%s\n%s" % [_cpreset[1], _cpreset[2]]
+		_cpbtn.custom_minimum_size = Vector2(134, 46)
+		_cpbtn.set_meta("compact_btn", true)
+		_cpbtn.pressed.connect(_apply_cadence_preset.bind(_cpreset_id))
+		cadence_preset_row.add_child(_cpbtn)
+		_cadence_preset_btns.append(_cpbtn)
+		_home_material_buttons.append(_cpbtn)
 	var cadence_row := HBoxContainer.new()
 	cadence_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	cadence_row.add_theme_constant_override("separation", 8)
 	cadence_group.add_child(cadence_row)
-	for cadence_name in ["Perfect", "Plagal", "Half", "Deceptive"]:
+	for cadence_name in ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]:
 		var c_btn := Button.new()
 		c_btn.text = cadence_name
 		c_btn.toggle_mode = true
@@ -2852,6 +3968,7 @@ func _build_ui() -> void:
 	var sight_continuous_btn := Button.new()
 	sight_continuous_btn.text = "Note Flow"
 	sight_continuous_btn.custom_minimum_size = Vector2(146, 44)
+	sight_continuous_btn.visible = _mvp_is_sight_mode_enabled("Continuous")
 	sight_continuous_btn.pressed.connect(_on_sight_mode_button_pressed.bind("Continuous"))
 	sight_mode_row.add_child(sight_continuous_btn)
 	_sight_mode_buttons["Continuous"] = sight_continuous_btn
@@ -2860,6 +3977,7 @@ func _build_ui() -> void:
 	var sight_rhythm_flow_btn := Button.new()
 	sight_rhythm_flow_btn.text = "Rhythm Flow"
 	sight_rhythm_flow_btn.custom_minimum_size = Vector2(156, 44)
+	sight_rhythm_flow_btn.visible = _mvp_is_sight_mode_enabled("Rhythm Flow")
 	sight_rhythm_flow_btn.pressed.connect(_on_sight_mode_button_pressed.bind("Rhythm Flow"))
 	sight_mode_row.add_child(sight_rhythm_flow_btn)
 	_sight_mode_buttons["Rhythm Flow"] = sight_rhythm_flow_btn
@@ -2923,6 +4041,13 @@ func _build_ui() -> void:
 	sight_setup_header_row.add_child(clef_row)
 	_sight_clef_row = clef_row
 
+	var clef_label := Label.new()
+	clef_label.text = "Clef:"
+	clef_label.set_meta("settings_small_label", true)
+	clef_label.visible = false
+	clef_row.add_child(clef_label)
+	_sight_clef_label = clef_label
+
 	var treble_btn := Button.new()
 	treble_btn.text = "Treble"
 	treble_btn.custom_minimum_size = Vector2(140, 34)
@@ -2940,6 +4065,16 @@ func _build_ui() -> void:
 	clef_row.add_child(bass_btn)
 	_clef_buttons["Bass"] = bass_btn
 	_home_material_buttons.append(bass_btn)
+
+	var grand_staff_btn := Button.new()
+	grand_staff_btn.text = "Grand Staff"
+	grand_staff_btn.custom_minimum_size = Vector2(160, 34)
+	grand_staff_btn.set_meta("compact_btn", true)
+	grand_staff_btn.visible = _mvp_is_sight_clef_enabled("Grand Staff", _sight_mode)
+	grand_staff_btn.pressed.connect(_on_clef_button_pressed.bind("Grand Staff"))
+	clef_row.add_child(grand_staff_btn)
+	_clef_buttons["Grand Staff"] = grand_staff_btn
+	_home_material_buttons.append(grand_staff_btn)
 
 	_sight_key_sig_row = HBoxContainer.new()
 	_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -2965,6 +4100,7 @@ func _build_ui() -> void:
 	sig_1s_btn.text = "1" + char(0x266F)
 	sig_1s_btn.custom_minimum_size = Vector2(56, 30)
 	sig_1s_btn.set_meta("compact_btn", true)
+	sig_1s_btn.visible = _mvp_is_sight_key_signature_enabled("1#", _sight_mode)
 	sig_1s_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("1#"))
 	_sight_key_sig_row.add_child(sig_1s_btn)
 	_sight_key_sig_buttons["1#"] = sig_1s_btn
@@ -2974,6 +4110,7 @@ func _build_ui() -> void:
 	sig_2s_btn.text = "2" + char(0x266F)
 	sig_2s_btn.custom_minimum_size = Vector2(56, 30)
 	sig_2s_btn.set_meta("compact_btn", true)
+	sig_2s_btn.visible = _mvp_is_sight_key_signature_enabled("2#", _sight_mode)
 	sig_2s_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("2#"))
 	_sight_key_sig_row.add_child(sig_2s_btn)
 	_sight_key_sig_buttons["2#"] = sig_2s_btn
@@ -2983,6 +4120,7 @@ func _build_ui() -> void:
 	sig_3s_btn.text = "3" + char(0x266F)
 	sig_3s_btn.custom_minimum_size = Vector2(56, 30)
 	sig_3s_btn.set_meta("compact_btn", true)
+	sig_3s_btn.visible = _mvp_is_sight_key_signature_enabled("3#", _sight_mode)
 	sig_3s_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("3#"))
 	_sight_key_sig_row.add_child(sig_3s_btn)
 	_sight_key_sig_buttons["3#"] = sig_3s_btn
@@ -2992,6 +4130,7 @@ func _build_ui() -> void:
 	sig_1b_btn.text = "1" + char(0x266D)
 	sig_1b_btn.custom_minimum_size = Vector2(56, 30)
 	sig_1b_btn.set_meta("compact_btn", true)
+	sig_1b_btn.visible = _mvp_is_sight_key_signature_enabled("1b", _sight_mode)
 	sig_1b_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("1b"))
 	_sight_key_sig_row.add_child(sig_1b_btn)
 	_sight_key_sig_buttons["1b"] = sig_1b_btn
@@ -3001,6 +4140,7 @@ func _build_ui() -> void:
 	sig_2b_btn.text = "2" + char(0x266D)
 	sig_2b_btn.custom_minimum_size = Vector2(56, 30)
 	sig_2b_btn.set_meta("compact_btn", true)
+	sig_2b_btn.visible = _mvp_is_sight_key_signature_enabled("2b", _sight_mode)
 	sig_2b_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("2b"))
 	_sight_key_sig_row.add_child(sig_2b_btn)
 	_sight_key_sig_buttons["2b"] = sig_2b_btn
@@ -3010,10 +4150,47 @@ func _build_ui() -> void:
 	sig_3b_btn.text = "3" + char(0x266D)
 	sig_3b_btn.custom_minimum_size = Vector2(56, 30)
 	sig_3b_btn.set_meta("compact_btn", true)
+	sig_3b_btn.visible = _mvp_is_sight_key_signature_enabled("3b", _sight_mode)
 	sig_3b_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("3b"))
 	_sight_key_sig_row.add_child(sig_3b_btn)
 	_sight_key_sig_buttons["3b"] = sig_3b_btn
 	_home_material_buttons.append(sig_3b_btn)
+
+	var midi_group := _create_home_option_group(_sight_options_box, true)
+	_sight_midi_group = midi_group
+	var midi_group_margin := midi_group.get_parent()
+	if midi_group_margin != null and midi_group_margin.get_parent() is PanelContainer:
+		_sight_midi_card = midi_group_margin.get_parent() as PanelContainer
+	var midi_title := Label.new()
+	midi_title.text = "MIDI Keyboard (Notes mode)"
+	midi_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	midi_group.add_child(midi_title)
+
+	var midi_toggle_row := HBoxContainer.new()
+	midi_toggle_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	midi_toggle_row.add_theme_constant_override("separation", 12)
+	midi_group.add_child(midi_toggle_row)
+
+	_midi_toggle_button = CheckButton.new()
+	_midi_toggle_button.text = "Use MIDI Keyboard"
+	_midi_toggle_button.button_pressed = _midi_enabled
+	_midi_toggle_button.custom_minimum_size = Vector2(220, 38)
+	_midi_toggle_button.toggled.connect(_on_midi_toggle_pressed)
+	midi_toggle_row.add_child(_midi_toggle_button)
+
+	_midi_any_octave_button = CheckButton.new()
+	_midi_any_octave_button.text = "Any Octave"
+	_midi_any_octave_button.button_pressed = _midi_any_octave
+	_midi_any_octave_button.custom_minimum_size = Vector2(160, 38)
+	_midi_any_octave_button.toggled.connect(_on_midi_any_octave_toggled)
+	midi_toggle_row.add_child(_midi_any_octave_button)
+
+	_midi_status_label = Label.new()
+	_midi_status_label.text = ""
+	_midi_status_label.add_theme_font_size_override("font_size", 13)
+	_midi_status_label.add_theme_color_override("font_color", Color(0.78, 0.92, 1.0, 0.92))
+	midi_group.add_child(_midi_status_label)
+	_refresh_midi_settings_ui()
 
 	var sight_chord_group := _create_home_option_group(_sight_options_box, true)
 	var sight_chord_title := Label.new()
@@ -3021,10 +4198,39 @@ func _build_ui() -> void:
 	sight_chord_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sight_chord_group.add_child(sight_chord_title)
 	_sight_chord_options_title_label = sight_chord_title
+
+	_grand_staff_label = Label.new()
+	_grand_staff_label.text = "Grand Staff (Piano)"
+	_grand_staff_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_grand_staff_label.add_theme_font_size_override("font_size", 14)
+	_grand_staff_label.add_theme_color_override("font_color", Color(0.72, 0.88, 1.0, 0.92))
+	sight_chord_group.add_child(_grand_staff_label)
+
+	var sight_tier_row := HBoxContainer.new()
+	sight_tier_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	sight_tier_row.add_theme_constant_override("separation", 8)
+	sight_chord_group.add_child(sight_tier_row)
+	_sight_chord_tier_row = sight_tier_row
+
+	var sight_tier_label := Label.new()
+	sight_tier_label.text = "Tier:"
+	sight_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	sight_tier_row.add_child(sight_tier_label)
+	for tier in range(1, SIGHT_CHORD_MAX_TIER + 1):
+		var tier_btn := Button.new()
+		tier_btn.text = str(SIGHT_CHORD_TIER_NAMES.get(tier, "Tier %d" % tier))
+		tier_btn.custom_minimum_size = Vector2(128, 42)
+		tier_btn.set_meta("compact_btn", true)
+		tier_btn.pressed.connect(_on_sight_chord_tier_button_pressed.bind(tier))
+		sight_tier_row.add_child(tier_btn)
+		_sight_chord_tier_buttons[tier] = tier_btn
+		_home_material_buttons.append(tier_btn)
+
 	var sight_acc_row := HBoxContainer.new()
 	sight_acc_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	sight_acc_row.add_theme_constant_override("separation", 10)
 	sight_chord_group.add_child(sight_acc_row)
+	_sight_accidentals_row = sight_acc_row
 
 	_sight_accidentals_toggle = CheckButton.new()
 	_sight_accidentals_toggle.text = "Accidentals"
@@ -3122,6 +4328,7 @@ func _build_ui() -> void:
 	chase_bass_btn.text = "Bass"
 	chase_bass_btn.custom_minimum_size = Vector2(102, 30)
 	chase_bass_btn.set_meta("compact_btn", true)
+	chase_bass_btn.visible = _mvp_is_note_chase_clef_enabled("Bass")
 	chase_bass_btn.pressed.connect(_on_note_chase_clef_mode_pressed.bind("Bass"))
 	chase_clef_row.add_child(chase_bass_btn)
 	_note_chase_clef_buttons["Bass"] = chase_bass_btn
@@ -3130,6 +4337,7 @@ func _build_ui() -> void:
 	chase_both_btn.text = "Both"
 	chase_both_btn.custom_minimum_size = Vector2(102, 30)
 	chase_both_btn.set_meta("compact_btn", true)
+	chase_both_btn.visible = _mvp_is_note_chase_clef_enabled("Both")
 	chase_both_btn.pressed.connect(_on_note_chase_clef_mode_pressed.bind("Both"))
 	chase_clef_row.add_child(chase_both_btn)
 	_note_chase_clef_buttons["Both"] = chase_both_btn
@@ -3179,6 +4387,36 @@ func _build_ui() -> void:
 	_home_start_action_row.add_child(_home_start_button)
 	_home_material_buttons.append(_home_start_button)
 
+	_how_to_play_button = Button.new()
+	_how_to_play_button.text = "%s How to Play" % char(0x2753)
+	_how_to_play_button.custom_minimum_size = Vector2(148, 42)
+	_how_to_play_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_how_to_play_button.visible = false
+	_how_to_play_button.pressed.connect(_on_how_to_play_pressed)
+	_home_start_action_row.add_child(_how_to_play_button)
+	_home_material_buttons.append(_how_to_play_button)
+
+	_home_practice_toggle = Button.new()
+	_home_practice_toggle.text = "Practice Mode on" if _practice_mode_enabled else "Game Mode on"
+	_home_practice_toggle.custom_minimum_size = Vector2(160, 42)
+	_home_practice_toggle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_home_practice_toggle.toggle_mode = true
+	_home_practice_toggle.button_pressed = _practice_mode_enabled
+	_home_practice_toggle.pressed.connect(_on_home_practice_toggle_pressed)
+	_home_start_action_row.add_child(_home_practice_toggle)
+	_home_material_buttons.append(_home_practice_toggle)
+
+	_mic_toggle_button = Button.new()
+	_mic_toggle_button.text = "Mic Mode: On" if _mic_mode_enabled else "Mic Mode: Off"
+	_mic_toggle_button.custom_minimum_size = Vector2(140, 42)
+	_mic_toggle_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_mic_toggle_button.toggle_mode = true
+	_mic_toggle_button.button_pressed = _mic_mode_enabled
+	_mic_toggle_button.visible = false
+	_mic_toggle_button.pressed.connect(_on_mic_toggle_pressed)
+	_home_start_action_row.add_child(_mic_toggle_button)
+	_home_material_buttons.append(_mic_toggle_button)
+
 	_rhythm_flow_demo_home_button = Button.new()
 	_rhythm_flow_demo_home_button.text = "Listen and Learn"
 	_rhythm_flow_demo_home_button.custom_minimum_size = Vector2(220, 56)
@@ -3198,10 +4436,18 @@ func _build_ui() -> void:
 	_home_disabled_reason_label.add_theme_font_size_override("font_size", 14)
 	_home_panel.add_child(_home_disabled_reason_label)
 	_finalize_home_menu_layout()
+	# Build game panel in next frame so the home menu renders immediately
+	_build_ui_game_panel_main_col = main_col
 
+
+func _build_ui_game_panel() -> void:
+	var main_col: VBoxContainer = _build_ui_game_panel_main_col
+	if main_col == null:
+		return
 	_game_card = PanelContainer.new()
 	_game_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_game_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_game_card.visible = false
 	main_col.add_child(_game_card)
 
 	_game_panel = VBoxContainer.new()
@@ -3276,6 +4522,14 @@ func _build_ui() -> void:
 	_sight_shield_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_sight_shield_chip_label.add_theme_font_size_override("font_size", 16)
 	_sight_shield_chip.add_child(_sight_shield_chip_label)
+	# Mic status label
+	_mic_status_label = Label.new()
+	_mic_status_label.text = "Mic: listening..."
+	_mic_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mic_status_label.add_theme_font_size_override("font_size", 14)
+	_mic_status_label.add_theme_color_override("font_color", Color(0.475, 0.82, 0.80, 0.95))
+	_mic_status_label.visible = false
+	hud_left_v.add_child(_mic_status_label)
 	_note_chase_target_box = PanelContainer.new()
 	_note_chase_target_box.custom_minimum_size = Vector2(222, 28)
 	hud_left_v.add_child(_note_chase_target_box)
@@ -3429,6 +4683,14 @@ func _build_ui() -> void:
 	_round_start_button.visible = false
 	_round_start_button.pressed.connect(_on_round_start_pressed)
 	_control_row.add_child(_round_start_button)
+
+	_session_broken_btn = Button.new()
+	_session_broken_btn.text = "Broken"
+	_session_broken_btn.custom_minimum_size = Vector2(100, 44)
+	_session_broken_btn.toggle_mode = true
+	_session_broken_btn.visible = false
+	_session_broken_btn.toggled.connect(_on_session_broken_toggled)
+	_control_row.add_child(_session_broken_btn)
 
 	_slow_toggle = CheckBox.new()
 	_slow_toggle.text = "Slow Mode"
@@ -3772,8 +5034,53 @@ func _build_ui() -> void:
 	_staff_note.z_index = 160
 	_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP
 	_staff_note.gui_input.connect(_on_staff_note_gui_input)
+	_staff_note.mouse_entered.connect(_on_sight_chord_note_mouse_entered.bind(0))
+	_staff_note.mouse_exited.connect(_on_sight_chord_note_mouse_exited.bind(0))
 	_apply_notehead_material(_staff_note, Color(1.0, 1.0, 1.0, 0.98), Color(0.08, 0.08, 0.10, 0.9))
 	_staff_area.add_child(_staff_note)
+
+	# Note-name overlay (Sight Notes). Lives on the staff area so it tracks the
+	# note head's coordinate space; z-index above the notehead so it floats over
+	# the ledger lines and stem area too.
+	_sight_note_name_label = Label.new()
+	_sight_note_name_label.text = ""
+	_sight_note_name_label.visible = false
+	_sight_note_name_label.z_index = 200
+	_sight_note_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sight_note_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sight_note_name_label.add_theme_font_size_override("font_size", 22)
+	_sight_note_name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.92))
+	_sight_note_name_label.add_theme_constant_override("outline_size", 5)
+	if _ui_title_font != null:
+		_sight_note_name_label.add_theme_font_override("font", _ui_title_font)
+	_staff_area.add_child(_sight_note_name_label)
+	_sight_note_chip = PanelContainer.new()
+	_sight_note_chip.visible = false
+	_sight_note_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sight_note_chip.z_index = 278
+	var note_chip_style := StyleBoxFlat.new()
+	note_chip_style.bg_color = Color(0.08, 0.14, 0.24, 0.93)
+	note_chip_style.corner_radius_top_left = 14
+	note_chip_style.corner_radius_top_right = 14
+	note_chip_style.corner_radius_bottom_left = 14
+	note_chip_style.corner_radius_bottom_right = 14
+	note_chip_style.border_width_left = 2
+	note_chip_style.border_width_top = 2
+	note_chip_style.border_width_right = 2
+	note_chip_style.border_width_bottom = 2
+	note_chip_style.border_color = Color(0.95, 0.84, 0.42, 0.92)
+	_sight_note_chip.add_theme_stylebox_override("panel", note_chip_style)
+	_sight_note_chip_label = Label.new()
+	_sight_note_chip_label.text = ""
+	_sight_note_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sight_note_chip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sight_note_chip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_sight_note_chip_label.add_theme_font_size_override("font_size", 19)
+	_sight_note_chip_label.add_theme_color_override("font_color", Color(1.0, 0.98, 0.90, 1.0))
+	_sight_note_chip_label.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.02, 0.75))
+	_sight_note_chip_label.add_theme_constant_override("outline_size", 2)
+	_sight_note_chip.add_child(_sight_note_chip_label)
+	_staff_area.add_child(_sight_note_chip)
 
 	for i in range(6):
 		var pl := ColorRect.new()
@@ -3800,18 +5107,21 @@ func _build_ui() -> void:
 		_staff_area.add_child(d)
 		_placement_target_dots.append(d)
 
-	for i in 2:
+	for i in 5:
 		var extra_note := Panel.new()
 		extra_note.size = _staff_note.size
 		extra_note.rotation_degrees = _staff_note.rotation_degrees
 		extra_note.z_index = 160
 		extra_note.visible = false
-		extra_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		extra_note.mouse_filter = Control.MOUSE_FILTER_STOP
+		extra_note.gui_input.connect(_on_sight_chord_note_gui_input.bind(i + 1))
+		extra_note.mouse_entered.connect(_on_sight_chord_note_mouse_entered.bind(i + 1))
+		extra_note.mouse_exited.connect(_on_sight_chord_note_mouse_exited.bind(i + 1))
 		_apply_notehead_material(extra_note, Color(1.0, 1.0, 1.0, 0.98), Color(0.08, 0.08, 0.10, 0.9))
 		_staff_area.add_child(extra_note)
 		_staff_chord_notes.append(extra_note)
 
-	for _i in 3:
+	for _i in 6:
 		var acc_lbl := Label.new()
 		acc_lbl.text = ""
 		acc_lbl.visible = false
@@ -3826,6 +5136,64 @@ func _build_ui() -> void:
 		acc_lbl.add_theme_constant_override("outline_size", 2)
 		_staff_area.add_child(acc_lbl)
 		_staff_chord_accidental_labels.append(acc_lbl)
+
+	# Grand staff bass lines + bass clef (visible only in Sight Chords mode)
+	_grand_staff_bass_clef_label = Label.new()
+	_grand_staff_bass_clef_label.text = char(0x1D122)  # bass clef
+	_grand_staff_bass_clef_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grand_staff_bass_clef_label.visible = false
+	_grand_staff_bass_clef_label.z_index = 120
+	_staff_area.add_child(_grand_staff_bass_clef_label)
+
+	for _i in 5:
+		var bass_line := ColorRect.new()
+		bass_line.color = Color(1.0, 1.0, 1.0, 0.95)
+		bass_line.size = Vector2(STAFF_LINE_WIDTH, 2)
+		bass_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bass_line.visible = false
+		_staff_area.add_child(bass_line)
+		_grand_staff_bass_lines.append(bass_line)
+
+	# Bass staff key signature labels (mirror of treble)
+	for _i in 3:
+		var ks := Label.new()
+		ks.text = ""
+		ks.visible = false
+		ks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ks.z_index = 126
+		ks.size = Vector2(24, 64)
+		ks.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ks.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ks.add_theme_font_size_override("font_size", 58)
+		ks.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
+		ks.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.02, 0.65))
+		ks.add_theme_constant_override("outline_size", 2)
+		_staff_area.add_child(ks)
+		_grand_staff_bass_key_sig_labels.append(ks)
+
+	_grand_staff_brace_label = Label.new()
+	_grand_staff_brace_label.text = "{"
+	_grand_staff_brace_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grand_staff_brace_label.visible = false
+	_grand_staff_brace_label.z_index = 115
+	_grand_staff_brace_label.add_theme_color_override("font_color", Color(0.94, 0.92, 0.84, 0.85))
+	_staff_area.add_child(_grand_staff_brace_label)
+
+	_grand_staff_left_connector = ColorRect.new()
+	_grand_staff_left_connector.color = Color(1.0, 1.0, 1.0, 0.95)
+	_grand_staff_left_connector.size = Vector2(3, 8)
+	_grand_staff_left_connector.visible = false
+	_grand_staff_left_connector.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grand_staff_left_connector.z_index = 118
+	_staff_area.add_child(_grand_staff_left_connector)
+
+	_grand_staff_right_connector = ColorRect.new()
+	_grand_staff_right_connector.color = Color(1.0, 1.0, 1.0, 0.95)
+	_grand_staff_right_connector.size = Vector2(3, 8)
+	_grand_staff_right_connector.visible = false
+	_grand_staff_right_connector.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_grand_staff_right_connector.z_index = 118
+	_staff_area.add_child(_grand_staff_right_connector)
 
 	_sight_bottom_spacer = Control.new()
 	_sight_bottom_spacer.custom_minimum_size = Vector2(0, 0)
@@ -3867,6 +5235,17 @@ func _build_ui() -> void:
 		_answer_buttons.append(acc_btn)
 		_sight_key_buttons[acc_note] = acc_btn
 		_style_key_button(acc_btn)
+
+	# Small MIDI piano viz is kept ONLY for Sight Chords mode (read-only MIDI
+	# input feedback). Sight Notes uses the big interactive piano instead.
+	# Visibility is gated in _start_midi_listening so it only appears in chord mode.
+	_build_midi_piano_viz()
+	_build_chord_explorer_panel()
+	_build_practice_drills_panel()
+	_build_sight_round_start_card()
+	_build_sight_big_piano()
+	_build_student_picker_overlay()
+	_build_active_student_chip()
 
 	_continuous_keyboard_row = HBoxContainer.new()
 	_continuous_keyboard_row.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -4175,18 +5554,22 @@ func _build_ui() -> void:
 	_sky_block.add_child(_sky_area)
 
 	_bird_sprite = TextureRect.new()
-	_bird_sprite.texture = _load_texture(BIRD_TEXTURE_PATH)
-	_bird_sprite.custom_minimum_size = Vector2(180, 96)
-	_bird_sprite.size = Vector2(180, 96)
+	_bird_sprite.custom_minimum_size = Vector2(150, 80)
+	_bird_sprite.size = Vector2(150, 80)
 	_bird_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_bird_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_bird_sprite.flip_h = true
 	_bird_sprite.modulate = BIRD_TINT
 	_bird_sprite.mouse_filter = Control.MOUSE_FILTER_STOP
 	_bird_sprite.position = Vector2(24, 110)
 	_bird_sprite.pivot_offset = _bird_sprite.custom_minimum_size * 0.5
 	_bird_sprite.gui_input.connect(_on_bird_gui_input)
 	_sky_area.add_child(_bird_sprite)
+
+	_bird_anim = AnimatedSprite2D.new()
+	_bird_anim.position = Vector2(75, 40)
+	_bird_anim.scale = Vector2(0.17, 0.17)
+	_bird_anim.flip_h = true
+	_bird_sprite.add_child(_bird_anim)
 
 	_tutorial_bubble = PanelContainer.new()
 	_tutorial_bubble.visible = false
@@ -4206,6 +5589,8 @@ func _build_ui() -> void:
 	bubble_style.shadow_color = Color(0, 0, 0, 0.23)
 	bubble_style.shadow_size = 5
 	_tutorial_bubble.add_theme_stylebox_override("panel", bubble_style)
+	_tutorial_bubble.z_as_relative = false
+	_tutorial_bubble.z_index = 91
 	_sky_area.add_child(_tutorial_bubble)
 
 	_tutorial_bubble_tail = Panel.new()
@@ -4243,18 +5628,43 @@ func _build_ui() -> void:
 		dot_style.corner_radius_bottom_right = rad
 		dot.add_theme_stylebox_override("panel", dot_style)
 		dot.size = Vector2(8 + (i * 6), 8 + (i * 6))
+		dot.z_as_relative = false
+		dot.z_index = 89
 		_sky_area.add_child(dot)
 		_tutorial_bubble_dots.append(dot)
 
 	_tutorial_bubble_label = Label.new()
 	_tutorial_bubble_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_tutorial_bubble_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_tutorial_bubble_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_tutorial_bubble_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_tutorial_bubble_label.add_theme_font_size_override("font_size", 22)
 	_tutorial_bubble_label.add_theme_color_override("font_color", Color(0.07, 0.07, 0.07, 1.0))
 	_tutorial_bubble_label.position = Vector2(24, 16)
 	_tutorial_bubble_label.size = Vector2(568, 114)
 	_tutorial_bubble.add_child(_tutorial_bubble_label)
+
+	# Small × dismiss button — sibling of bubble, positioned at its top-right corner
+	_chicken_bubble_close_btn = Button.new()
+	_chicken_bubble_close_btn.text = "×"
+	_chicken_bubble_close_btn.visible = false
+	_chicken_bubble_close_btn.custom_minimum_size = Vector2(24, 24)
+	_chicken_bubble_close_btn.size = Vector2(24, 24)
+	var close_btn_style := StyleBoxFlat.new()
+	close_btn_style.bg_color = Color(0.12, 0.12, 0.12, 0.92)
+	close_btn_style.corner_radius_top_left = 12
+	close_btn_style.corner_radius_top_right = 12
+	close_btn_style.corner_radius_bottom_left = 12
+	close_btn_style.corner_radius_bottom_right = 12
+	_chicken_bubble_close_btn.add_theme_stylebox_override("normal", close_btn_style)
+	var close_btn_hover := close_btn_style.duplicate() as StyleBoxFlat
+	close_btn_hover.bg_color = Color(0.30, 0.10, 0.10, 0.98)
+	_chicken_bubble_close_btn.add_theme_stylebox_override("hover", close_btn_hover)
+	_chicken_bubble_close_btn.add_theme_stylebox_override("pressed", close_btn_hover)
+	_chicken_bubble_close_btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.95))
+	_chicken_bubble_close_btn.add_theme_font_size_override("font_size", 16)
+	_chicken_bubble_close_btn.z_index = 10
+	_chicken_bubble_close_btn.pressed.connect(_hide_chicken_bubble)
+	_sky_area.add_child(_chicken_bubble_close_btn)
 
 	_tutorial_chicken = TextureRect.new()
 	_tutorial_chicken.texture = _load_texture(TUTORIAL_CHICKEN_PATH)
@@ -4414,21 +5824,45 @@ func _build_ui() -> void:
 		_answer_buttons.append(btn)
 		_interval_choice_buttons.append(btn)
 
-	var chord_grid := GridContainer.new()
-	chord_grid.columns = 5
-	chord_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	chord_grid.add_theme_constant_override("h_separation", 8)
-	chord_grid.add_theme_constant_override("v_separation", 8)
-	_game_panel.add_child(chord_grid)
+	_chord_grid = GridContainer.new()
+	_chord_grid.columns = 4
+	_chord_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_chord_grid.add_theme_constant_override("h_separation", 8)
+	_chord_grid.add_theme_constant_override("v_separation", 8)
+	_game_panel.add_child(_chord_grid)
 
 	for chord_name in CHORD_INTERVALS.keys():
 		var c_btn := Button.new()
 		c_btn.text = chord_name
 		c_btn.custom_minimum_size = Vector2(120, 56)
 		c_btn.pressed.connect(_on_chord_chosen.bind(chord_name))
-		chord_grid.add_child(c_btn)
+		_chord_grid.add_child(c_btn)
 		_answer_buttons.append(c_btn)
 		_chord_buttons[chord_name] = c_btn
+
+	# A/B compare bar — shown after wrong interval answer
+	_compare_bar = HBoxContainer.new()
+	_compare_bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	_compare_bar.add_theme_constant_override("separation", 12)
+	_compare_bar.visible = false
+	_game_panel.add_child(_compare_bar)
+
+	_compare_your_btn = Button.new()
+	_compare_your_btn.custom_minimum_size = Vector2(210, 44)
+	_compare_your_btn.pressed.connect(_on_compare_your_pressed)
+	_compare_bar.add_child(_compare_your_btn)
+
+	_compare_correct_play_btn = Button.new()
+	_compare_correct_play_btn.custom_minimum_size = Vector2(210, 44)
+	_compare_correct_play_btn.pressed.connect(_on_compare_correct_pressed)
+	_compare_bar.add_child(_compare_correct_play_btn)
+
+	# Cadence Roman numeral label — shown after answer reveal
+	_cadence_roman_label = Label.new()
+	_cadence_roman_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cadence_roman_label.add_theme_font_size_override("font_size", 22)
+	_cadence_roman_label.visible = false
+	_game_panel.add_child(_cadence_roman_label)
 
 	_interval_center_bottom_spacer = Control.new()
 	_interval_center_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -4447,6 +5881,7 @@ func _build_ui() -> void:
 	_end_button.offset_right = -24
 	_end_button.offset_top = 24
 	_end_button.offset_bottom = 68
+	_end_button.visible = false
 	_end_button.pressed.connect(_on_end_quiz_pressed)
 	add_child(_end_button)
 
@@ -4461,6 +5896,7 @@ func _build_ui() -> void:
 	_restart_button.offset_right = -188
 	_restart_button.offset_top = 24
 	_restart_button.offset_bottom = 68
+	_restart_button.visible = false
 	_restart_button.pressed.connect(_on_restart_quiz_pressed)
 	add_child(_restart_button)
 
@@ -4475,6 +5911,7 @@ func _build_ui() -> void:
 	_game_home_button.offset_right = 176
 	_game_home_button.offset_top = 24
 	_game_home_button.offset_bottom = 68
+	_game_home_button.visible = false
 	_game_home_button.pressed.connect(_on_game_home_pressed)
 	add_child(_game_home_button)
 
@@ -4519,6 +5956,7 @@ func _build_ui() -> void:
 	_result_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_result_overlay.z_as_relative = false
 	_result_overlay.z_index = 600
+	_result_overlay.visible = false
 	add_child(_result_overlay)
 
 	var result_center := CenterContainer.new()
@@ -4573,21 +6011,238 @@ func _build_ui() -> void:
 	_result_action_home_button.custom_minimum_size = Vector2(180, 48)
 	_result_action_home_button.pressed.connect(_on_result_action_home_pressed)
 	_result_action_row.add_child(_result_action_home_button)
+	_result_action_focus_button = Button.new()
+	_result_action_focus_button.text = "Focus Misses"
+	_result_action_focus_button.custom_minimum_size = Vector2(180, 48)
+	_result_action_focus_button.visible = false
+	_result_action_focus_button.pressed.connect(_on_result_action_focus_pressed)
+	_result_action_row.add_child(_result_action_focus_button)
 
 	if _ui_title_font != null:
 		_result_title.add_theme_font_override("font", _ui_title_font)
 		_result_action_primary_button.add_theme_font_override("font", _ui_title_font)
 		_result_action_secondary_button.add_theme_font_override("font", _ui_title_font)
 		_result_action_home_button.add_theme_font_override("font", _ui_title_font)
+		_result_action_focus_button.add_theme_font_override("font", _ui_title_font)
 	elif _ui_font != null:
 		_result_title.add_theme_font_override("font", _ui_font)
 		_result_action_primary_button.add_theme_font_override("font", _ui_font)
 		_result_action_secondary_button.add_theme_font_override("font", _ui_font)
 		_result_action_home_button.add_theme_font_override("font", _ui_font)
+		_result_action_focus_button.add_theme_font_override("font", _ui_font)
 	if _ui_font != null:
 		_result_subtitle.add_theme_font_override("font", _ui_font)
 	_style_result_overlay_theme()
 	_result_box_hide()
+
+	# Streak milestone toast label
+	_streak_toast_label = Label.new()
+	_streak_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_streak_toast_label.add_theme_font_size_override("font_size", 32)
+	_streak_toast_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.22, 1.0))
+	_streak_toast_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.55))
+	_streak_toast_label.add_theme_constant_override("shadow_offset_x", 0)
+	_streak_toast_label.add_theme_constant_override("shadow_offset_y", 3)
+	_streak_toast_label.z_as_relative = false
+	_streak_toast_label.z_index = 580
+	_streak_toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_streak_toast_label.visible = false
+	_streak_toast_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_streak_toast_label.set_anchors_preset(PRESET_CENTER_TOP)
+	_streak_toast_label.anchor_top = 0.22
+	_streak_toast_label.anchor_bottom = 0.22
+	_streak_toast_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	if _ui_title_font != null:
+		_streak_toast_label.add_theme_font_override("font", _ui_title_font)
+	add_child(_streak_toast_label)
+
+	# Item 10: First-run ear training intro overlay
+	_ear_intro_overlay = ColorRect.new()
+	_ear_intro_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_ear_intro_overlay.color = Color(0.0, 0.0, 0.0, 0.60)
+	_ear_intro_overlay.visible = false
+	_ear_intro_overlay.z_as_relative = false
+	_ear_intro_overlay.z_index = 650
+	add_child(_ear_intro_overlay)
+	var intro_center := CenterContainer.new()
+	intro_center.set_anchors_preset(PRESET_FULL_RECT)
+	_ear_intro_overlay.add_child(intro_center)
+	var intro_panel := PanelContainer.new()
+	intro_panel.custom_minimum_size = Vector2(560, 0)
+	var intro_sb := StyleBoxFlat.new()
+	intro_sb.bg_color = Color(0.12, 0.09, 0.05, 0.97)
+	intro_sb.border_color = Color(0.94, 0.82, 0.44, 0.85)
+	intro_sb.border_width_left = 3
+	intro_sb.border_width_top = 3
+	intro_sb.border_width_right = 3
+	intro_sb.border_width_bottom = 4
+	intro_sb.corner_radius_top_left = 18
+	intro_sb.corner_radius_top_right = 18
+	intro_sb.corner_radius_bottom_left = 18
+	intro_sb.corner_radius_bottom_right = 18
+	intro_sb.shadow_color = Color(0, 0, 0, 0.6)
+	intro_sb.shadow_size = 16
+	intro_sb.content_margin_left = 30
+	intro_sb.content_margin_right = 30
+	intro_sb.content_margin_top = 24
+	intro_sb.content_margin_bottom = 24
+	intro_panel.add_theme_stylebox_override("panel", intro_sb)
+	intro_center.add_child(intro_panel)
+	var intro_col := VBoxContainer.new()
+	intro_col.add_theme_constant_override("separation", 18)
+	intro_panel.add_child(intro_col)
+	var intro_title := Label.new()
+	intro_title.text = "Welcome to Ear Training!"
+	_ear_intro_title = intro_title
+	intro_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	intro_title.add_theme_font_size_override("font_size", 24)
+	intro_title.add_theme_color_override("font_color", Color(1.0, 0.93, 0.70, 1.0))
+	intro_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	intro_title.add_theme_constant_override("outline_size", 3)
+	if _ui_title_font != null:
+		intro_title.add_theme_font_override("font", _ui_title_font)
+	intro_col.add_child(intro_title)
+	var intro_body := Label.new()
+	intro_body.text = ""  # Set dynamically per mode before showing
+	intro_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_ear_intro_body = intro_body
+	intro_body.add_theme_font_size_override("font_size", 15)
+	intro_body.add_theme_color_override("font_color", Color(0.95, 0.92, 0.85, 1.0))
+	if _ui_font != null:
+		intro_body.add_theme_font_override("font", _ui_font)
+	intro_col.add_child(intro_body)
+	_ear_intro_dismiss = Button.new()
+	_ear_intro_dismiss.text = "Got it — let's train!"
+	_ear_intro_dismiss.custom_minimum_size = Vector2(240, 50)
+	_ear_intro_dismiss.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_style_button(_ear_intro_dismiss)
+	if _ui_title_font != null:
+		_ear_intro_dismiss.add_theme_font_override("font", _ui_title_font)
+	intro_col.add_child(_ear_intro_dismiss)
+
+	# Note Chase intro overlay
+	_note_chase_intro_overlay = ColorRect.new()
+	_note_chase_intro_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_note_chase_intro_overlay.color = Color(0.0, 0.0, 0.0, 0.60)
+	_note_chase_intro_overlay.visible = false
+	_note_chase_intro_overlay.z_as_relative = false
+	_note_chase_intro_overlay.z_index = 650
+	add_child(_note_chase_intro_overlay)
+	var nc_intro_center := CenterContainer.new()
+	nc_intro_center.set_anchors_preset(PRESET_FULL_RECT)
+	_note_chase_intro_overlay.add_child(nc_intro_center)
+	var nc_intro_panel := PanelContainer.new()
+	nc_intro_panel.custom_minimum_size = Vector2(580, 0)
+	var nc_intro_sb := StyleBoxFlat.new()
+	nc_intro_sb.bg_color = Color(0.04, 0.10, 0.18, 0.97)
+	nc_intro_sb.border_color = Color(0.30, 0.88, 1.0, 0.85)
+	nc_intro_sb.border_width_left = 3
+	nc_intro_sb.border_width_top = 3
+	nc_intro_sb.border_width_right = 3
+	nc_intro_sb.border_width_bottom = 4
+	nc_intro_sb.corner_radius_top_left = 18
+	nc_intro_sb.corner_radius_top_right = 18
+	nc_intro_sb.corner_radius_bottom_left = 18
+	nc_intro_sb.corner_radius_bottom_right = 18
+	nc_intro_sb.shadow_color = Color(0, 0, 0, 0.6)
+	nc_intro_sb.shadow_size = 16
+	nc_intro_sb.content_margin_left = 30
+	nc_intro_sb.content_margin_right = 30
+	nc_intro_sb.content_margin_top = 24
+	nc_intro_sb.content_margin_bottom = 24
+	nc_intro_panel.add_theme_stylebox_override("panel", nc_intro_sb)
+	nc_intro_center.add_child(nc_intro_panel)
+	var nc_intro_col := VBoxContainer.new()
+	nc_intro_col.add_theme_constant_override("separation", 18)
+	nc_intro_panel.add_child(nc_intro_col)
+	var nc_intro_title := Label.new()
+	nc_intro_title.text = "%s  Note Chase" % char(0x1F3B5)
+	nc_intro_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nc_intro_title.add_theme_font_size_override("font_size", 26)
+	nc_intro_title.add_theme_color_override("font_color", Color(0.40, 0.96, 1.0, 1.0))
+	nc_intro_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	nc_intro_title.add_theme_constant_override("outline_size", 3)
+	if _ui_title_font != null:
+		nc_intro_title.add_theme_font_override("font", _ui_title_font)
+	nc_intro_col.add_child(nc_intro_title)
+	var nc_intro_body := Label.new()
+	nc_intro_body.text = "Notes scroll across the staff from right to left.\n\n1.  Read — identify each note as it approaches the play line\n\n2.  Tap — press the correct note button before it passes\n\n3.  Build speed — hit consecutive notes to raise your combo multiplier\n\n4.  Shield — a shield icon occasionally drifts across the staff;\n    tap it before it disappears to block your next miss\n\nMissing a target note costs a life.  Five lives — make them count!"
+	nc_intro_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nc_intro_body.add_theme_font_size_override("font_size", 15)
+	nc_intro_body.add_theme_color_override("font_color", Color(0.92, 0.96, 1.0, 1.0))
+	if _ui_font != null:
+		nc_intro_body.add_theme_font_override("font", _ui_font)
+	nc_intro_col.add_child(nc_intro_body)
+	_note_chase_intro_dismiss = Button.new()
+	_note_chase_intro_dismiss.text = "Let's Chase Notes!"
+	_note_chase_intro_dismiss.custom_minimum_size = Vector2(240, 50)
+	_note_chase_intro_dismiss.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_style_button(_note_chase_intro_dismiss)
+	if _ui_title_font != null:
+		_note_chase_intro_dismiss.add_theme_font_override("font", _ui_title_font)
+	nc_intro_col.add_child(_note_chase_intro_dismiss)
+
+	# Cadence intro overlay — earthy green theme
+	_cadence_intro_overlay = ColorRect.new()
+	_cadence_intro_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_cadence_intro_overlay.color = Color(0.0, 0.0, 0.0, 0.60)
+	_cadence_intro_overlay.visible = false
+	_cadence_intro_overlay.z_as_relative = false
+	_cadence_intro_overlay.z_index = 650
+	add_child(_cadence_intro_overlay)
+	var cad_intro_center := CenterContainer.new()
+	cad_intro_center.set_anchors_preset(PRESET_FULL_RECT)
+	_cadence_intro_overlay.add_child(cad_intro_center)
+	var cad_intro_panel := PanelContainer.new()
+	cad_intro_panel.custom_minimum_size = Vector2(600, 0)
+	var cad_intro_sb := StyleBoxFlat.new()
+	cad_intro_sb.bg_color = Color(0.05, 0.12, 0.05, 0.97)
+	cad_intro_sb.border_color = Color(0.52, 0.88, 0.40, 0.85)
+	cad_intro_sb.border_width_left = 3
+	cad_intro_sb.border_width_top = 3
+	cad_intro_sb.border_width_right = 3
+	cad_intro_sb.border_width_bottom = 4
+	cad_intro_sb.corner_radius_top_left = 18
+	cad_intro_sb.corner_radius_top_right = 18
+	cad_intro_sb.corner_radius_bottom_left = 18
+	cad_intro_sb.corner_radius_bottom_right = 18
+	cad_intro_sb.shadow_color = Color(0, 0, 0, 0.6)
+	cad_intro_sb.shadow_size = 16
+	cad_intro_sb.content_margin_left = 30
+	cad_intro_sb.content_margin_right = 30
+	cad_intro_sb.content_margin_top = 24
+	cad_intro_sb.content_margin_bottom = 24
+	cad_intro_panel.add_theme_stylebox_override("panel", cad_intro_sb)
+	cad_intro_center.add_child(cad_intro_panel)
+	var cad_intro_col := VBoxContainer.new()
+	cad_intro_col.add_theme_constant_override("separation", 16)
+	cad_intro_panel.add_child(cad_intro_col)
+	var cad_intro_title := Label.new()
+	cad_intro_title.text = "%s  Cadence Ear Training" % char(0x1F3B6)
+	cad_intro_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cad_intro_title.add_theme_font_size_override("font_size", 24)
+	cad_intro_title.add_theme_color_override("font_color", Color(0.70, 1.0, 0.60, 1.0))
+	cad_intro_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	cad_intro_title.add_theme_constant_override("outline_size", 3)
+	if _ui_title_font != null:
+		cad_intro_title.add_theme_font_override("font", _ui_title_font)
+	cad_intro_col.add_child(cad_intro_title)
+	var cad_intro_body := Label.new()
+	cad_intro_body.text = "A cadence is the chord pattern that ends a musical phrase — like punctuation in music.\n\nYou will hear two chords in sequence and identify the cadence type:\n\n  \u2022  Perfect (V\u2013I)   \u2014  the strongest ending; sounds fully resolved\n  \u2022  Plagal (IV\u2013I)   \u2014  the \u201cAmen\u201d cadence; sounds gentle and settled\n  \u2022  Half (I\u2013V)      \u2014  stops on tension; sounds unfinished, expects more\n  \u2022  Deceptive (V\u2013vi)  \u2014  starts like Perfect but surprises you with a minor chord\n  \u2022  Interrupted (V\u2013IV)  \u2014  similar surprise; resolves sideways instead of home\n  \u2022  Imperfect (VII\u2013I)   \u2014  weaker resolution; ends on the leading tone chord\n\nListen for whether the two chords feel \u2018finished\u2019, \u2018interrupted\u2019, or \u2018still moving\u2019."
+	cad_intro_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cad_intro_body.add_theme_font_size_override("font_size", 14)
+	cad_intro_body.add_theme_color_override("font_color", Color(0.90, 0.96, 0.88, 1.0))
+	if _ui_font != null:
+		cad_intro_body.add_theme_font_override("font", _ui_font)
+	cad_intro_col.add_child(cad_intro_body)
+	_cadence_intro_dismiss = Button.new()
+	_cadence_intro_dismiss.text = "Let's Listen!"
+	_cadence_intro_dismiss.custom_minimum_size = Vector2(220, 50)
+	_cadence_intro_dismiss.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_style_button(_cadence_intro_dismiss)
+	if _ui_title_font != null:
+		_cadence_intro_dismiss.add_theme_font_override("font", _ui_title_font)
+	cad_intro_col.add_child(_cadence_intro_dismiss)
 
 	_rhythm_flow_slot_dialog = AcceptDialog.new()
 	_rhythm_flow_slot_dialog.title = "Rhythm Slots"
@@ -4622,6 +6277,9 @@ func _build_ui() -> void:
 	_end_button.move_to_front()
 	_restart_button.move_to_front()
 	_game_home_button.move_to_front()
+	_build_startup_loading_overlay()
+	if _startup_loading_overlay != null:
+		_startup_loading_overlay.move_to_front()
 
 
 func _build_background() -> void:
@@ -4730,20 +6388,34 @@ func _build_background() -> void:
 
 
 func _refresh_background_scene_emphasis() -> void:
-	var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+	var home_visible := _is_home_ui_active()
+	var note_chase_visible := _selected_mode == MODE_NOTE_CHASE and _game_card != null and _game_card.visible
+	var ear_training_visible := _is_ear_training_mode() and _game_card != null and _game_card.visible
 	if _background_tint != null:
-		_background_tint.color = Color(0.08, 0.12, 0.08, 0.00 if home_visible else 0.12)
+		if home_visible:
+			_background_tint.color = Color(0.08, 0.12, 0.08, 0.00)
+		elif note_chase_visible or ear_training_visible:
+			_background_tint.color = Color(0.04, 0.10, 0.22, 0.24)
+		else:
+			_background_tint.color = Color(0.08, 0.12, 0.08, 0.12)
 	if _background_grass_tint != null:
-		_background_grass_tint.color = Color(0.83, 0.78, 0.50, 0.00 if home_visible else 0.24)
+		if home_visible:
+			_background_grass_tint.color = Color(0.83, 0.78, 0.50, 0.00)
+		elif note_chase_visible or ear_training_visible:
+			_background_grass_tint.color = Color(0.22, 0.34, 0.58, 0.18)
+		else:
+			_background_grass_tint.color = Color(0.83, 0.78, 0.50, 0.24)
 	if _background_vignette_top != null:
-		_background_vignette_top.modulate = Color(1.0, 1.0, 1.0, 0.12 if home_visible else 0.28)
+		_background_vignette_top.modulate = Color(1.0, 1.0, 1.0, 0.12 if home_visible else (0.34 if note_chase_visible else 0.28))
 	if _background_vignette_bottom != null:
-		_background_vignette_bottom.modulate = Color(1.0, 1.0, 1.0, 0.10 if home_visible else 0.28)
+		_background_vignette_bottom.modulate = Color(1.0, 1.0, 1.0, 0.10 if home_visible else (0.34 if note_chase_visible else 0.28))
 	if _home_menu_overlay != null:
-		_home_menu_overlay.visible = home_visible
+		if _home_menu_overlay.visible != home_visible:
+			_home_menu_overlay.visible = home_visible
 	for lbl in _music_note_labels:
 		if lbl != null and is_instance_valid(lbl):
-			lbl.visible = home_visible
+			if lbl.visible != home_visible:
+				lbl.visible = home_visible
 	for tw in _music_note_tweens:
 		if tw != null and is_instance_valid(tw):
 			if home_visible:
@@ -4933,11 +6605,16 @@ func _setup_home_focus_navigation() -> void:
 		if _mode_buttons.has(key):
 			ordered.append(_mode_buttons[key])
 	for mode_key in _ear_mode_buttons.keys():
+		var mode_id := int(mode_key)
+		if not _mvp_is_ear_mode_enabled(mode_id):
+			continue
 		ordered.append(_ear_mode_buttons[mode_key])
 	for key_sig in _sight_mode_buttons.keys():
 		ordered.append(_sight_mode_buttons[key_sig])
 	if _sight_note_chase_button != null:
 		ordered.append(_sight_note_chase_button)
+	for tier_key in _sight_chord_tier_buttons.keys():
+		ordered.append(_sight_chord_tier_buttons[tier_key])
 	for clef in _clef_buttons.keys():
 		ordered.append(_clef_buttons[clef])
 	for chase_clef in _note_chase_clef_buttons.keys():
@@ -4979,7 +6656,7 @@ func _set_home_section_visible(section: VBoxContainer, visible: bool) -> void:
 
 
 func _is_hud_derived_setup_screen_active() -> bool:
-	var home_visible := _home_card != null and _home_card.visible and _home_panel != null and _home_panel.visible
+	var home_visible := _is_home_ui_active()
 	if not home_visible:
 		return false
 	if _ear_settings_screen_active or _sight_settings_screen_active:
@@ -4995,6 +6672,10 @@ func _is_hud_derived_setup_screen_active() -> bool:
 	return false
 
 
+func _is_home_ui_active() -> bool:
+	return _home_card != null and _home_card.visible and _home_panel != null and _home_panel.visible
+
+
 func _load_menu_setup_style_resources() -> void:
 	if _menu_setup_card_stylebox == null and ResourceLoader.exists(MENU_SETUP_CARD_STYLEBOX_PATH, "StyleBoxFlat"):
 		_menu_setup_card_stylebox = ResourceLoader.load(MENU_SETUP_CARD_STYLEBOX_PATH) as StyleBoxFlat
@@ -5003,36 +6684,37 @@ func _load_menu_setup_style_resources() -> void:
 
 
 func _setup_card_stylebox(compact: bool = false) -> StyleBoxFlat:
+	var contract := _menu_style_contract()
 	var base: StyleBoxFlat = null
 	if _menu_setup_card_stylebox != null:
 		base = _menu_setup_card_stylebox.duplicate() as StyleBoxFlat
 	if base == null:
 		base = StyleBoxFlat.new()
-		base.bg_color = MENU_SETUP_CARD_FILL
 		base.corner_radius_top_left = 18
 		base.corner_radius_top_right = 18
 		base.corner_radius_bottom_left = 18
 		base.corner_radius_bottom_right = 18
-		base.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.46)
 		base.border_width_left = 1
 		base.border_width_top = 1
 		base.border_width_right = 1
 		base.border_width_bottom = 1
-		base.shadow_color = Color(0.0, 0.0, 0.0, 0.14)
-		base.shadow_size = 6
+	base.bg_color = Color(contract.get("panel_bg", MENU_SETUP_CARD_FILL))
+	base.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.46)))
+	base.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+	base.shadow_size = int(contract.get("shadow_panel_size", 6))
 	if compact:
-		base.bg_color = MENU_SETUP_CARD_FILL_COOL
+		base.bg_color = Color(contract.get("panel_bg_compact", MENU_SETUP_CARD_FILL_COOL))
 		base.shadow_size = maxi(5, base.shadow_size - 1)
 	return base
 
 
 func _setup_chip_stylebox(selected: bool) -> StyleBoxFlat:
+	var contract := _menu_style_contract()
 	var base: StyleBoxFlat = null
 	if _menu_setup_chip_stylebox != null:
 		base = _menu_setup_chip_stylebox.duplicate() as StyleBoxFlat
 	if base == null:
 		base = StyleBoxFlat.new()
-		base.bg_color = MENU_SETUP_CARD_FILL_COOL
 		base.corner_radius_top_left = 14
 		base.corner_radius_top_right = 14
 		base.corner_radius_bottom_left = 14
@@ -5041,19 +6723,20 @@ func _setup_chip_stylebox(selected: bool) -> StyleBoxFlat:
 		base.border_width_top = 1
 		base.border_width_right = 1
 		base.border_width_bottom = 1
-		base.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.32)
-		base.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-		base.shadow_size = 2
+	base.bg_color = Color(contract.get("btn_inactive_bg", MENU_SETUP_CARD_FILL_COOL))
+	base.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.32)))
+	base.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	base.shadow_size = int(contract.get("shadow_chip_size", 2))
 	if selected:
-		base.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26) # #E8A020 tint
-		base.border_color = MENU_SETUP_HIGHLIGHT
+		base.bg_color = Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+		base.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
 		base.border_width_left = 2
 		base.border_width_top = 2
 		base.border_width_right = 2
 		base.border_width_bottom = 2
 	else:
-		base.bg_color = MENU_SETUP_CARD_FILL_COOL
-		base.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+		base.bg_color = Color(contract.get("btn_inactive_bg", MENU_SETUP_CARD_FILL_COOL))
+		base.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 		base.border_width_left = 1
 		base.border_width_top = 1
 		base.border_width_right = 1
@@ -5116,13 +6799,13 @@ func _apply_pro_style() -> void:
 	_title_label.add_theme_constant_override("shadow_offset_y", 1)
 	if _home_wordmark_clef_label != null:
 		_home_wordmark_clef_label.add_theme_font_override("font", _ui_title_font)
-		_home_wordmark_clef_label.add_theme_color_override("font_color", Color(0.98, 0.98, 0.98, 1.0))
+		_home_wordmark_clef_label.add_theme_color_override("font_color", Color(0.918, 0.953, 1.0, 1.0))  # #EAF3FF
 		_home_wordmark_clef_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.0))
 		_home_wordmark_clef_label.add_theme_constant_override("shadow_offset_x", 0)
 		_home_wordmark_clef_label.add_theme_constant_override("shadow_offset_y", 0)
 	if _home_wordmark_ira_label != null:
 		_home_wordmark_ira_label.add_theme_font_override("font", _ui_title_font)
-		_home_wordmark_ira_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.30, 1.0))
+		_home_wordmark_ira_label.add_theme_color_override("font_color", Color(0.96, 0.784, 0.259, 1.0))  # #F5C842 gold
 		_home_wordmark_ira_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.0))
 		_home_wordmark_ira_label.add_theme_constant_override("shadow_offset_x", 0)
 		_home_wordmark_ira_label.add_theme_constant_override("shadow_offset_y", 0)
@@ -5211,6 +6894,8 @@ func _apply_pro_style() -> void:
 		var hbtn: Button = _home_hub_buttons[hub_key]
 		if hbtn != null and hbtn.has_meta("mode_card_panel"):
 			_set_home_selection_state(hbtn, str(hub_key) == _home_flow)
+	if _learning_mode_card_button != null and _learning_mode_card_button.has_meta("mode_card_panel"):
+		_set_home_selection_state(_learning_mode_card_button, false)
 	# Style streak label
 	if _home_streak_label != null:
 		_home_streak_label.add_theme_font_override("font", _ui_font)
@@ -5273,7 +6958,7 @@ func _apply_pro_style() -> void:
 func _style_card(card: PanelContainer, color: Color) -> void:
 	if card == null:
 		return
-	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
+	var contract := _menu_style_contract()
 	var sb := StyleBoxFlat.new()
 	var is_home_shell := card == _home_card
 	if is_home_shell:
@@ -5281,7 +6966,7 @@ func _style_card(card: PanelContainer, color: Color) -> void:
 		if (not home_menu_visible) or _is_main_menu_overview_active():
 			card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 			return
-		sb.bg_color = Color(0.0588, 0.1529, 0.2510, 0.70)
+		sb.bg_color = Color(contract.get("panel_bg", Color(0.0588, 0.1529, 0.2510, 0.70)))
 		sb.corner_radius_top_left = 20
 		sb.corner_radius_top_right = 20
 		sb.corner_radius_bottom_left = 20
@@ -5290,9 +6975,9 @@ func _style_card(card: PanelContainer, color: Color) -> void:
 		sb.border_width_top = 2
 		sb.border_width_right = 2
 		sb.border_width_bottom = 2
-		sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-		sb.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
-		sb.shadow_size = 6
+		sb.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+		sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 		sb.content_margin_left = 0
 		sb.content_margin_top = 0
 		sb.content_margin_right = 0
@@ -5304,13 +6989,13 @@ func _style_card(card: PanelContainer, color: Color) -> void:
 	sb.corner_radius_top_right = _home_tokens.RADIUS["card"] if _home_tokens != null else 18
 	sb.corner_radius_bottom_left = _home_tokens.RADIUS["card"] if _home_tokens != null else 18
 	sb.corner_radius_bottom_right = _home_tokens.RADIUS["card"] if _home_tokens != null else 18
-	sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	sb.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 	sb.border_width_left = 2
 	sb.border_width_top = 2
 	sb.border_width_right = 2
 	sb.border_width_bottom = 2
-	sb.shadow_color = Color(0, 0, 0, 0.45)
-	sb.shadow_size = _home_tokens.SHADOW["card_size"] if _home_tokens != null else 8
+	sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+	sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 	sb.content_margin_left = 16
 	sb.content_margin_top = 16
 	sb.content_margin_right = 16
@@ -5323,29 +7008,31 @@ func _style_home_option_group_card(card: PanelContainer) -> void:
 		return
 	var setup_active := _is_hud_derived_setup_screen_active()
 	var compact := bool(card.get_meta("compact_group", false))
+	var contract := _menu_style_contract()
 	var sb := StyleBoxFlat.new()
 	if setup_active:
 		sb = _setup_card_stylebox(compact)
 	else:
-		sb.bg_color = Color(0.0902, 0.2235, 0.3608, 0.65 if compact else 0.72)
+		sb.bg_color = Color(contract.get("panel_bg_compact", Color(0.0902, 0.2235, 0.3608, 0.72)))
+		sb.bg_color.a = 0.65 if compact else 0.72
 		sb.corner_radius_top_left = 18
 		sb.corner_radius_top_right = 18
 		sb.corner_radius_bottom_left = 18
 		sb.corner_radius_bottom_right = 18
-		sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+		sb.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 		sb.border_width_left = 1
 		sb.border_width_top = 1
 		sb.border_width_right = 1
 		sb.border_width_bottom = 1
-		sb.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-		sb.shadow_size = 4 if compact else 6
+		sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		sb.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - (1 if compact else 0))
 	card.add_theme_stylebox_override("panel", sb)
 
 
 func _style_header_card(card: PanelContainer, color: Color) -> void:
 	if card == null:
 		return
-	var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+	var home_visible := _is_home_ui_active()
 	if home_visible:
 		card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 		return
@@ -5390,6 +7077,12 @@ func _style_controls_recursive(node: Node) -> void:
 				label.add_theme_constant_override("shadow_offset_x", 0)
 				label.add_theme_constant_override("shadow_offset_y", 1)
 				label.add_theme_constant_override("outline_size", 0)
+			elif label.has_meta("home_overview_section_header"):
+				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
+				label.add_theme_font_size_override("font_size", 12)
+				label.add_theme_color_override("font_color", Color(0.96, 0.91, 0.73, 0.88))
+				label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
+				label.add_theme_constant_override("outline_size", 0)
 			elif label.has_meta("settings_section_header"):
 				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
 				label.add_theme_font_size_override("font_size", 22)
@@ -5400,6 +7093,10 @@ func _style_controls_recursive(node: Node) -> void:
 				label.add_theme_font_override("font", _ui_font)
 				label.add_theme_font_size_override("font_size", 14)
 				label.add_theme_color_override("font_color", colors.get("text_muted", Color(0.92, 0.90, 0.82, 0.86)))
+			elif label.has_meta("mode_card_title_label"):
+				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
+				label.add_theme_font_size_override("font_size", 17)
+				label.add_theme_color_override("font_color", Color(0.16, 0.22, 0.31, 1.0))
 			else:
 				label.add_theme_font_override("font", _ui_font)
 				label.add_theme_color_override("font_color", colors.get("text_primary", Color(0.98, 0.96, 0.88)))
@@ -5422,7 +7119,10 @@ func _style_controls_recursive(node: Node) -> void:
 				continue
 			if btn.flat and btn.has_meta("mode_card_panel"):
 				if _is_menu_ui_control(btn):
-					_apply_menu_top_gloss(btn, 0.20, 0.24, 10.0, 34.0)
+					if btn.has_meta("main_menu_mode_key"):
+						_remove_menu_top_gloss(btn)
+					else:
+						_apply_menu_top_gloss(btn, 0.20, 0.24, 10.0, 34.0)
 				var click_call_card := Callable(self, "_on_any_ui_button_pressed")
 				if not btn.pressed.is_connected(click_call_card):
 					btn.pressed.connect(click_call_card)
@@ -5480,6 +7180,11 @@ func _is_menu_ui_control(ctrl: Control) -> bool:
 func _apply_menu_top_gloss(ctrl: Control, alpha: float = 0.22, height_ratio: float = 0.22, min_h: float = 10.0, max_h: float = 40.0) -> void:
 	if ctrl == null:
 		return
+	var contract := _menu_style_contract()
+	alpha = float(contract.get("gloss_alpha", alpha))
+	height_ratio = float(contract.get("gloss_height_ratio", height_ratio))
+	min_h = float(contract.get("gloss_min_h", min_h))
+	max_h = float(contract.get("gloss_max_h", max_h))
 	var gloss := ctrl.get_node_or_null("MenuTopGloss") as Panel
 	if gloss == null:
 		gloss = Panel.new()
@@ -5522,8 +7227,7 @@ func _layout_menu_top_gloss(ctrl: Control, alpha: float, height_ratio: float, mi
 		is_main_menu_mode_card = btn.has_meta("mode_card_panel") and btn.has_meta("main_menu_mode_key")
 	var sb := StyleBoxFlat.new()
 	if is_main_menu_mode_card:
-		# Keep card gloss subtle so the gold body remains visible.
-		sb.bg_color = Color(1.0, 0.98, 0.92, 0.26)
+		sb.bg_color = Color(1.0, 0.98, 0.92, 0.22)
 	else:
 		sb.bg_color = Color(1.0, 1.0, 1.0, clampf(alpha, 0.08, 0.42))
 	var r_top := int(roundf(clampf(gloss_h * 0.45, 5.0, 14.0)))
@@ -5543,170 +7247,157 @@ func _layout_menu_top_gloss(ctrl: Control, alpha: float, height_ratio: float, mi
 func _on_menu_gloss_host_resized(host: Control) -> void:
 	if host == null:
 		return
-	var alpha := 0.22
-	var ratio := 0.22
-	var min_h := 10.0
-	var max_h := 40.0
-	if host is Button:
-		alpha = 0.24
-		ratio = 0.24
-		max_h = 32.0
+	var contract := _menu_style_contract()
+	var alpha := float(contract.get("gloss_alpha", 0.24))
+	var ratio := float(contract.get("gloss_height_ratio", 0.24))
+	var min_h := float(contract.get("gloss_min_h", 10.0))
+	var max_h := float(contract.get("gloss_max_h", 32.0))
 	_layout_menu_top_gloss(host, alpha, ratio, min_h, max_h)
+
+
+func _build_cached_stylebox(bg: Color, border: Color, corner_radius: int, border_width: int, shadow_alpha: float = 0.0, shadow_size: int = 0) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.corner_radius_top_left = corner_radius
+	sb.corner_radius_top_right = corner_radius
+	sb.corner_radius_bottom_left = corner_radius
+	sb.corner_radius_bottom_right = corner_radius
+	sb.border_color = border
+	sb.border_width_left = border_width
+	sb.border_width_top = border_width
+	sb.border_width_right = border_width
+	sb.border_width_bottom = border_width
+	sb.shadow_color = Color(0.0, 0.0, 0.0, shadow_alpha)
+	sb.shadow_size = shadow_size
+	return sb
+
+
+func _cache_button_styles() -> void:
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
+	var shadow_alpha := float(contract.get("shadow_button_alpha", 0.28))
+	var shadow_size := int(contract.get("shadow_button_size", 4))
+	_button_style_cache = {
+		"button_normal": _build_cached_stylebox(Color(pal["base_bg"]), Color(pal["base_border"]), 12, 2, shadow_alpha, shadow_size),
+		"button_hover": _build_cached_stylebox(Color(pal["base_hover"]), Color(pal["base_border"]), 12, 2, shadow_alpha, shadow_size),
+		"button_pressed": _build_cached_stylebox(Color(pal["base_pressed"]), Color(pal["base_border"]), 12, 2, shadow_alpha, shadow_size),
+		"settings_normal": _build_cached_stylebox(Color(pal["settings_bg"]), Color(pal["settings_border"]), 12, 2, shadow_alpha, shadow_size),
+		"settings_hover": _build_cached_stylebox(Color(pal["settings_hover"]), Color(pal["settings_border"]), 12, 2, shadow_alpha, shadow_size),
+		"settings_pressed": _build_cached_stylebox(Color(pal["settings_pressed"]), Color(pal["settings_border"]), 12, 2, shadow_alpha, shadow_size),
+		"interval_on_normal": _build_cached_stylebox(Color(pal["toggle_on_bg"]), Color(pal["toggle_on_border"]), 22, 2, 0.0, 0),
+		"interval_on_hover": _build_cached_stylebox(Color(pal["toggle_on_bg"]).lightened(0.08), Color(pal["toggle_on_border"]), 22, 2, 0.0, 0),
+		"interval_on_pressed": _build_cached_stylebox(Color(pal["toggle_on_bg"]).darkened(0.08), Color(pal["toggle_on_border"]), 22, 2, 0.0, 0),
+		"interval_off_normal": _build_cached_stylebox(Color(pal["toggle_off_bg"]), Color(pal["toggle_off_border"]), 22, 2, 0.0, 0),
+		"interval_off_hover": _build_cached_stylebox(Color(pal["toggle_off_bg"]).lightened(0.08), Color(pal["toggle_off_border"]), 22, 2, 0.0, 0),
+		"interval_off_pressed": _build_cached_stylebox(Color(pal["toggle_off_bg"]).darkened(0.08), Color(pal["toggle_off_border"]), 22, 2, 0.0, 0),
+		"interval_disabled_normal": _build_cached_stylebox(Color(0.16, 0.20, 0.27, 0.58), Color(0.55, 0.60, 0.67, 0.45), 22, 2, 0.0, 0),
+		"interval_disabled_hover": _build_cached_stylebox(Color(0.16, 0.20, 0.27, 0.58).lightened(0.08), Color(0.55, 0.60, 0.67, 0.45), 22, 2, 0.0, 0),
+		"interval_disabled_pressed": _build_cached_stylebox(Color(0.16, 0.20, 0.27, 0.58).darkened(0.08), Color(0.55, 0.60, 0.67, 0.45), 22, 2, 0.0, 0),
+		"menu_on_normal": _build_cached_stylebox(Color(pal["toggle_on_bg"]), Color(pal["toggle_on_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_on_hover": _build_cached_stylebox(Color(pal["toggle_on_bg"]).lightened(0.08), Color(pal["toggle_on_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_on_pressed": _build_cached_stylebox(Color(pal["toggle_on_bg"]).darkened(0.08), Color(pal["toggle_on_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_off_normal": _build_cached_stylebox(Color(pal["toggle_off_bg"]), Color(pal["toggle_off_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_off_hover": _build_cached_stylebox(Color(pal["toggle_off_bg"]).lightened(0.08), Color(pal["toggle_off_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_off_pressed": _build_cached_stylebox(Color(pal["toggle_off_bg"]).darkened(0.08), Color(pal["toggle_off_border"]), 16, 3, shadow_alpha, shadow_size),
+		"menu_disabled_normal": _build_cached_stylebox(Color(0.30, 0.30, 0.30, 0.70), Color(0.52, 0.52, 0.52, 0.75), 16, 3, shadow_alpha, shadow_size),
+		"menu_disabled_hover": _build_cached_stylebox(Color(0.30, 0.30, 0.30, 0.70).lightened(0.08), Color(0.52, 0.52, 0.52, 0.75), 16, 3, shadow_alpha, shadow_size),
+		"menu_disabled_pressed": _build_cached_stylebox(Color(0.30, 0.30, 0.30, 0.70).darkened(0.08), Color(0.52, 0.52, 0.52, 0.75), 16, 3, shadow_alpha, shadow_size)
+	}
+	_button_style_cache_theme_id = _cached_palette_theme_id if _cached_palette_theme_id != "" else "menu_contract"
+
+
+func _ensure_button_style_cache() -> void:
+	_theme_button_palette()
+	var palette_id := _cached_palette_theme_id if _cached_palette_theme_id != "" else "menu_contract"
+	if _button_style_cache.is_empty() or _button_style_cache_theme_id != palette_id:
+		_cache_button_styles()
 
 
 func _invalidate_button_palette_cache() -> void:
 	_cached_button_palette = {}
 	_cached_palette_theme_id = ""
+	_button_style_cache = {}
+	_button_style_cache_theme_id = ""
+
+func _menu_style_contract() -> Dictionary:
+	var fallback := {
+		"panel_bg": MENU_SETUP_CARD_FILL,
+		"panel_bg_compact": MENU_SETUP_CARD_FILL_COOL,
+		"panel_border": Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.46),
+		"panel_border_strong": MENU_SETUP_HIGHLIGHT,
+		"btn_inactive_bg": Color(0.10, 0.19, 0.32, 0.82),
+		"btn_inactive_hover": Color(0.13, 0.24, 0.39, 0.88),
+		"btn_inactive_pressed": Color(0.08, 0.16, 0.28, 0.90),
+		"btn_inactive_border": Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44),
+		"btn_inactive_text": SIGHT_NOTES_SETUP_TEXT_BODY,
+		"btn_selected_bg": Color(0.9098, 0.6275, 0.1255, 0.26),
+		"btn_selected_hover": Color(0.9098, 0.6275, 0.1255, 0.34),
+		"btn_selected_pressed": Color(0.9098, 0.6275, 0.1255, 0.22),
+		"btn_selected_border": MENU_SETUP_HIGHLIGHT,
+		"btn_selected_text": SIGHT_NOTES_SETUP_TEXT_PRIMARY,
+		"btn_selected_text_dark": Color(0.12, 0.18, 0.27, 1.0),
+		"cta_bg": Color(0.9098, 0.6275, 0.1255, 0.98),
+		"cta_hover": Color(0.95, 0.70, 0.20, 0.99),
+		"cta_pressed": Color(0.82, 0.54, 0.08, 0.99),
+		"cta_border": Color(0.97, 0.86, 0.40, 0.94),
+		"cta_text": Color(0.12, 0.18, 0.27, 1.0),
+		"gloss_alpha": 0.24,
+		"gloss_height_ratio": 0.24,
+		"gloss_min_h": 10.0,
+		"gloss_max_h": 32.0,
+		"shadow_panel_alpha": 0.14,
+		"shadow_panel_size": 6,
+		"shadow_chip_alpha": 0.10,
+		"shadow_chip_size": 2,
+		"shadow_button_alpha": 0.28,
+		"shadow_button_size": 4,
+		"shadow_nav_alpha": 0.0,
+		"shadow_nav_size": 0,
+		"shadow_nav_hover_size": 0,
+		"shadow_nav_pressed_size": 0
+	}
+	if _home_tokens == null or not _home_tokens.has_method("menu_style_contract"):
+		return fallback
+	var contract_v: Variant = _home_tokens.menu_style_contract()
+	if not (contract_v is Dictionary):
+		return fallback
+	var merged := fallback.duplicate(true)
+	merged.merge(contract_v as Dictionary, true)
+	return merged
 
 func _theme_button_palette() -> Dictionary:
-	var id := _ui_theme_id
-	if _home_tokens != null:
-		id = _home_tokens.theme_id()
+	var id := "menu_contract"
 	if id == _cached_palette_theme_id and not _cached_button_palette.is_empty():
 		return _cached_button_palette
 	_cached_palette_theme_id = id
-	var result: Dictionary
-	match id:
-		"azure_cascade":
-			result = {
-				"base_bg": Color(0.44, 0.67, 0.88, 0.96),
-				"base_hover": Color(0.54, 0.76, 0.95, 1.0),
-				"base_pressed": Color(0.32, 0.56, 0.78, 1.0),
-				"base_border": Color(0.14, 0.32, 0.50, 0.72),
-				"base_text": Color(0.08, 0.16, 0.26, 1.0),
-				"selected_bg": Color(0.12, 0.34, 0.56, 0.98),
-				"selected_hover": Color(0.16, 0.40, 0.64, 0.99),
-				"selected_pressed": Color(0.08, 0.26, 0.44, 1.0),
-				"selected_text": Color(0.92, 0.98, 1.0, 1.0),
-				"settings_bg": Color(0.20, 0.56, 0.78, 0.98),
-				"settings_hover": Color(0.28, 0.64, 0.86, 1.0),
-				"settings_pressed": Color(0.14, 0.46, 0.66, 1.0),
-				"settings_border": Color(0.10, 0.30, 0.44, 0.98),
-				"settings_text": Color(0.92, 0.98, 1.0, 1.0),
-				"start_bg": Color(0.30, 0.70, 0.92, 0.98),
-				"start_hover": Color(0.40, 0.80, 1.0, 1.0),
-				"start_pressed": Color(0.24, 0.58, 0.80, 1.0),
-				"start_border": Color(0.10, 0.34, 0.52, 0.95),
-				"start_text": Color(0.05, 0.14, 0.24, 1.0),
-				"toggle_on_bg": Color(0.13, 0.36, 0.58, 0.98),
-				"toggle_on_border": Color(0.44, 0.90, 1.0, 1.0),
-				"toggle_off_bg": Color(0.44, 0.67, 0.88, 0.96),
-				"toggle_off_border": Color(0.14, 0.32, 0.50, 0.70),
-				"toggle_on_text": Color(0.93, 0.99, 1.0, 1.0),
-				"toggle_off_text": Color(0.08, 0.16, 0.26, 1.0)
-			}
-		"slate_foundry":
-			result = {
-				"base_bg": Color(0.62, 0.66, 0.72, 0.96),
-				"base_hover": Color(0.71, 0.75, 0.80, 1.0),
-				"base_pressed": Color(0.48, 0.52, 0.58, 1.0),
-				"base_border": Color(0.20, 0.22, 0.26, 0.75),
-				"base_text": Color(0.12, 0.13, 0.16, 1.0),
-				"selected_bg": Color(0.24, 0.27, 0.33, 0.98),
-				"selected_hover": Color(0.30, 0.34, 0.40, 0.99),
-				"selected_pressed": Color(0.18, 0.21, 0.26, 1.0),
-				"selected_text": Color(0.95, 0.96, 0.98, 1.0),
-				"settings_bg": Color(0.40, 0.48, 0.58, 0.98),
-				"settings_hover": Color(0.48, 0.56, 0.66, 1.0),
-				"settings_pressed": Color(0.30, 0.38, 0.48, 1.0),
-				"settings_border": Color(0.16, 0.20, 0.26, 0.98),
-				"settings_text": Color(0.94, 0.96, 1.0, 1.0),
-				"start_bg": Color(0.52, 0.58, 0.64, 0.98),
-				"start_hover": Color(0.62, 0.68, 0.74, 1.0),
-				"start_pressed": Color(0.42, 0.48, 0.54, 1.0),
-				"start_border": Color(0.18, 0.22, 0.28, 0.95),
-				"start_text": Color(0.10, 0.11, 0.14, 1.0),
-				"toggle_on_bg": Color(0.28, 0.32, 0.38, 0.98),
-				"toggle_on_border": Color(0.68, 0.84, 0.95, 1.0),
-				"toggle_off_bg": Color(0.62, 0.66, 0.72, 0.96),
-				"toggle_off_border": Color(0.20, 0.22, 0.26, 0.70),
-				"toggle_on_text": Color(0.95, 0.96, 0.98, 1.0),
-				"toggle_off_text": Color(0.12, 0.13, 0.16, 1.0)
-			}
-		"crimson_nocturne":
-			result = {
-				"base_bg": Color(0.86, 0.44, 0.38, 0.96),
-				"base_hover": Color(0.94, 0.52, 0.46, 1.0),
-				"base_pressed": Color(0.70, 0.30, 0.28, 1.0),
-				"base_border": Color(0.42, 0.14, 0.14, 0.76),
-				"base_text": Color(0.26, 0.06, 0.07, 1.0),
-				"selected_bg": Color(0.45, 0.12, 0.14, 0.98),
-				"selected_hover": Color(0.54, 0.16, 0.18, 0.99),
-				"selected_pressed": Color(0.34, 0.08, 0.10, 1.0),
-				"selected_text": Color(1.0, 0.93, 0.90, 1.0),
-				"settings_bg": Color(0.76, 0.24, 0.24, 0.98),
-				"settings_hover": Color(0.86, 0.30, 0.30, 1.0),
-				"settings_pressed": Color(0.62, 0.18, 0.18, 1.0),
-				"settings_border": Color(0.38, 0.10, 0.10, 0.98),
-				"settings_text": Color(1.0, 0.92, 0.90, 1.0),
-				"start_bg": Color(0.90, 0.34, 0.26, 0.98),
-				"start_hover": Color(1.0, 0.42, 0.32, 1.0),
-				"start_pressed": Color(0.76, 0.24, 0.20, 1.0),
-				"start_border": Color(0.44, 0.12, 0.10, 0.95),
-				"start_text": Color(0.24, 0.05, 0.05, 1.0),
-				"toggle_on_bg": Color(0.52, 0.14, 0.16, 0.98),
-				"toggle_on_border": Color(1.0, 0.58, 0.45, 1.0),
-				"toggle_off_bg": Color(0.86, 0.44, 0.38, 0.96),
-				"toggle_off_border": Color(0.42, 0.14, 0.14, 0.70),
-				"toggle_on_text": Color(1.0, 0.93, 0.90, 1.0),
-				"toggle_off_text": Color(0.26, 0.06, 0.07, 1.0)
-			}
-		"rose_velvet":
-			result = {
-				"base_bg": Color(0.90, 0.60, 0.76, 0.96),
-				"base_hover": Color(0.96, 0.68, 0.83, 1.0),
-				"base_pressed": Color(0.76, 0.46, 0.62, 1.0),
-				"base_border": Color(0.44, 0.20, 0.34, 0.74),
-				"base_text": Color(0.24, 0.08, 0.18, 1.0),
-				"selected_bg": Color(0.50, 0.20, 0.38, 0.98),
-				"selected_hover": Color(0.60, 0.26, 0.46, 0.99),
-				"selected_pressed": Color(0.40, 0.14, 0.30, 1.0),
-				"selected_text": Color(1.0, 0.94, 0.98, 1.0),
-				"settings_bg": Color(0.78, 0.36, 0.60, 0.98),
-				"settings_hover": Color(0.86, 0.44, 0.68, 1.0),
-				"settings_pressed": Color(0.64, 0.26, 0.50, 1.0),
-				"settings_border": Color(0.38, 0.14, 0.30, 0.98),
-				"settings_text": Color(1.0, 0.94, 0.98, 1.0),
-				"start_bg": Color(0.94, 0.52, 0.74, 0.98),
-				"start_hover": Color(1.0, 0.62, 0.82, 1.0),
-				"start_pressed": Color(0.80, 0.40, 0.62, 1.0),
-				"start_border": Color(0.44, 0.16, 0.34, 0.95),
-				"start_text": Color(0.24, 0.08, 0.18, 1.0),
-				"toggle_on_bg": Color(0.56, 0.22, 0.42, 0.98),
-				"toggle_on_border": Color(1.0, 0.66, 0.86, 1.0),
-				"toggle_off_bg": Color(0.90, 0.60, 0.76, 0.96),
-				"toggle_off_border": Color(0.44, 0.20, 0.34, 0.70),
-				"toggle_on_text": Color(1.0, 0.94, 0.98, 1.0),
-				"toggle_off_text": Color(0.24, 0.08, 0.18, 1.0)
-			}
-		_:
-			result = {
-				"base_bg": Color(0.84, 0.74, 0.42, 0.96),
-				"base_hover": Color(0.93, 0.82, 0.46, 1.0),
-				"base_pressed": Color(0.73, 0.61, 0.33, 1.0),
-				"base_border": Color(0.30, 0.23, 0.10, 0.68),
-				"base_text": Color(0.20, 0.14, 0.06, 1.0),
-				"selected_bg": Color(0.35, 0.27, 0.09, 0.98),
-				"selected_hover": Color(0.43, 0.33, 0.11, 0.99),
-				"selected_pressed": Color(0.27, 0.20, 0.07, 1.0),
-				"selected_text": Color(1.0, 0.97, 0.86, 1.0),
-				"settings_bg": Color(0.18, 0.46, 0.62, 0.98),
-				"settings_hover": Color(0.23, 0.54, 0.72, 1.0),
-				"settings_pressed": Color(0.14, 0.36, 0.50, 1.0),
-				"settings_border": Color(0.08, 0.24, 0.34, 0.98),
-				"settings_text": Color(0.93, 0.98, 1.0, 1.0),
-				"start_bg": Color(0.92, 0.67, 0.20, 0.98),
-				"start_hover": Color(0.98, 0.74, 0.27, 1.0),
-				"start_pressed": Color(0.82, 0.58, 0.15, 1.0),
-				"start_border": Color(0.46, 0.30, 0.06, 0.95),
-				"start_text": Color(0.18, 0.11, 0.03, 1.0),
-				"toggle_on_bg": Color(0.35, 0.27, 0.09, 0.98),
-				"toggle_on_border": Color(0.95, 0.76, 0.31, 1.0),
-				"toggle_off_bg": Color(0.84, 0.74, 0.42, 0.96),
-				"toggle_off_border": Color(0.30, 0.23, 0.10, 0.68),
-				"toggle_on_text": Color(1.0, 0.97, 0.86, 1.0),
-				"toggle_off_text": Color(0.20, 0.14, 0.06, 1.0)
-			}
+	var c := _menu_style_contract()
+	var result := {
+		"base_bg": c.get("btn_inactive_bg", Color(0.10, 0.19, 0.32, 0.82)),
+		"base_hover": c.get("btn_inactive_hover", Color(0.13, 0.24, 0.39, 0.88)),
+		"base_pressed": c.get("btn_inactive_pressed", Color(0.08, 0.16, 0.28, 0.90)),
+		"base_border": c.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)),
+		"base_text": c.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY),
+		"selected_bg": c.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)),
+		"selected_hover": c.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)),
+		"selected_pressed": c.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)),
+		"selected_text": c.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY),
+		"settings_bg": c.get("btn_inactive_bg", Color(0.10, 0.19, 0.32, 0.82)),
+		"settings_hover": c.get("btn_inactive_hover", Color(0.13, 0.24, 0.39, 0.88)),
+		"settings_pressed": c.get("btn_inactive_pressed", Color(0.08, 0.16, 0.28, 0.90)),
+		"settings_border": c.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)),
+		"settings_text": c.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY),
+		"start_bg": c.get("cta_bg", Color(0.9098, 0.6275, 0.1255, 0.98)),
+		"start_hover": c.get("cta_hover", Color(0.95, 0.70, 0.20, 0.99)),
+		"start_pressed": c.get("cta_pressed", Color(0.82, 0.54, 0.08, 0.99)),
+		"start_border": c.get("cta_border", Color(0.97, 0.86, 0.40, 0.94)),
+		"start_text": c.get("cta_text", Color(0.12, 0.18, 0.27, 1.0)),
+		"toggle_on_bg": c.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)),
+		"toggle_on_border": c.get("btn_selected_border", MENU_SETUP_HIGHLIGHT),
+		"toggle_off_bg": c.get("btn_inactive_bg", Color(0.10, 0.19, 0.32, 0.82)),
+		"toggle_off_border": c.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)),
+		"toggle_on_text": c.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY),
+		"toggle_off_text": c.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY)
+	}
 	_cached_button_palette = result
 	return result
 
@@ -5719,33 +7410,49 @@ func _pick_readable_text_color(bg: Color) -> Color:
 	return light if light_delta >= dark_delta else dark
 
 
+func _is_cached_button_stylebox(sb: StyleBoxFlat) -> bool:
+	if sb == null:
+		return false
+	for cached_v in _button_style_cache.values():
+		if cached_v is StyleBoxFlat and cached_v == sb:
+			return true
+	return false
+
+
+func _get_mutable_button_stylebox(btn: Button, state_name: String) -> StyleBoxFlat:
+	if btn == null:
+		return null
+	var sb_v: Variant = btn.get_theme_stylebox(state_name)
+	if not (sb_v is StyleBoxFlat):
+		return null
+	var sb := sb_v as StyleBoxFlat
+	if _is_cached_button_stylebox(sb):
+		var mutable_sb := sb.duplicate() as StyleBoxFlat
+		btn.add_theme_stylebox_override(state_name, mutable_sb)
+		return mutable_sb
+	return sb
+
+
+func _cached_button_style(key: String) -> StyleBoxFlat:
+	var sb_v: Variant = _button_style_cache.get(key, null)
+	if sb_v is StyleBoxFlat:
+		return sb_v as StyleBoxFlat
+	return null
+
+
 func _style_button(btn: Button) -> void:
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
 	var base_text: Color = _pick_readable_text_color(pal["base_bg"])
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = pal["base_bg"]
-	normal.corner_radius_top_left = 12
-	normal.corner_radius_top_right = 12
-	normal.corner_radius_bottom_left = 12
-	normal.corner_radius_bottom_right = 12
-	normal.border_color = pal["base_border"]
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
-	normal.shadow_size = 4
-	btn.add_theme_stylebox_override("normal", normal)
-
-	var hover := normal.duplicate()
-	hover.bg_color = pal["base_hover"]
-	hover.shadow_size = 6
-	btn.add_theme_stylebox_override("hover", hover)
-
-	var pressed := normal.duplicate()
-	pressed.bg_color = pal["base_pressed"]
-	pressed.shadow_size = 2
-	btn.add_theme_stylebox_override("pressed", pressed)
+	var normal := _cached_button_style("button_normal")
+	var hover := _cached_button_style("button_hover")
+	var pressed := _cached_button_style("button_pressed")
+	if normal != null:
+		btn.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		btn.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", base_text)
 	btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(pal["base_hover"]))
 	btn.add_theme_color_override("font_pressed_color", _pick_readable_text_color(pal["base_pressed"]))
@@ -5759,28 +7466,18 @@ func _style_button(btn: Button) -> void:
 func _style_settings_button(btn: Button) -> void:
 	if btn == null:
 		return
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
 	var settings_text := _pick_readable_text_color(pal["settings_bg"])
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = pal["settings_bg"]
-	normal.corner_radius_top_left = 12
-	normal.corner_radius_top_right = 12
-	normal.corner_radius_bottom_left = 12
-	normal.corner_radius_bottom_right = 12
-	normal.border_color = pal["settings_border"]
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.02, 0.08, 0.12, 0.36)
-	normal.shadow_size = 5
-	btn.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate()
-	hover.bg_color = pal["settings_hover"]
-	btn.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate()
-	pressed.bg_color = pal["settings_pressed"]
-	btn.add_theme_stylebox_override("pressed", pressed)
+	var normal := _cached_button_style("settings_normal")
+	var hover := _cached_button_style("settings_hover")
+	var pressed := _cached_button_style("settings_pressed")
+	if normal != null:
+		btn.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		btn.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", settings_text)
 	btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(pal["settings_hover"]))
 	btn.add_theme_color_override("font_pressed_color", _pick_readable_text_color(pal["settings_pressed"]))
@@ -5793,33 +7490,24 @@ func _style_settings_button(btn: Button) -> void:
 func _style_interval_option_toggle(btn: Button, enabled: bool, on_text: String, off_text: String, is_disabled: bool = false) -> void:
 	if btn == null:
 		return
-	var normal := StyleBoxFlat.new()
-	normal.corner_radius_top_left = 22
-	normal.corner_radius_top_right = 22
-	normal.corner_radius_bottom_left = 22
-	normal.corner_radius_bottom_right = 22
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
+	_ensure_button_style_cache()
+	var pal := _theme_button_palette()
+	var state_prefix := "interval_off"
 	if is_disabled:
-		normal.bg_color = Color(0.25, 0.25, 0.25, 0.58)
-		normal.border_color = Color(0.12, 0.12, 0.12, 0.55)
+		state_prefix = "interval_disabled"
 	elif enabled:
-		normal.bg_color = Color(0.52, 0.84, 0.62, 0.98)
-		normal.border_color = Color(0.16, 0.40, 0.22, 0.90)
-	else:
-		normal.bg_color = Color(0.30, 0.30, 0.30, 0.92)
-		normal.border_color = Color(0.12, 0.12, 0.12, 0.85)
-	btn.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate()
-	hover.bg_color = normal.bg_color.lightened(0.08)
-	btn.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate()
-	pressed.bg_color = normal.bg_color.darkened(0.08)
-	btn.add_theme_stylebox_override("pressed", pressed)
-	var on_color := Color(0.08, 0.20, 0.12, 1.0)
-	var off_color := Color(0.98, 0.98, 0.98, 1.0)
+		state_prefix = "interval_on"
+	var normal := _cached_button_style(state_prefix + "_normal")
+	var hover := _cached_button_style(state_prefix + "_hover")
+	var pressed := _cached_button_style(state_prefix + "_pressed")
+	if normal != null:
+		btn.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		btn.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		btn.add_theme_stylebox_override("pressed", pressed)
+	var on_color := Color(pal["toggle_on_text"])
+	var off_color := Color(pal["toggle_off_text"])
 	var text_color := off_color if (is_disabled or not enabled) else on_color
 	btn.add_theme_color_override("font_color", text_color)
 	btn.add_theme_color_override("font_hover_color", text_color)
@@ -5848,36 +7536,24 @@ func _style_harmonic_intervals_toggle(enabled: bool) -> void:
 func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) -> void:
 	if toggle == null:
 		return
+	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
-	var normal := StyleBoxFlat.new()
-	normal.corner_radius_top_left = 16
-	normal.corner_radius_top_right = 16
-	normal.corner_radius_bottom_left = 16
-	normal.corner_radius_bottom_right = 16
-	normal.border_width_left = 3
-	normal.border_width_top = 3
-	normal.border_width_right = 3
-	normal.border_width_bottom = 3
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.34)
-	normal.shadow_size = 5
+	var state_prefix := "menu_off"
 	if is_disabled:
-		normal.bg_color = Color(0.30, 0.30, 0.30, 0.70)
-		normal.border_color = Color(0.52, 0.52, 0.52, 0.75)
+		state_prefix = "menu_disabled"
 	elif enabled:
-		normal.bg_color = pal["toggle_on_bg"]
-		normal.border_color = pal["toggle_on_border"]
-	else:
-		normal.bg_color = pal["toggle_off_bg"]
-		normal.border_color = pal["toggle_off_border"]
-	toggle.add_theme_stylebox_override("normal", normal)
-	var hover := normal.duplicate()
-	hover.bg_color = normal.bg_color.lightened(0.08)
-	toggle.add_theme_stylebox_override("hover", hover)
-	var pressed := normal.duplicate()
-	pressed.bg_color = normal.bg_color.darkened(0.08)
-	toggle.add_theme_stylebox_override("pressed", pressed)
-	var on_text: Color = _pick_readable_text_color(pal["toggle_on_bg"])
-	var off_text: Color = _pick_readable_text_color(pal["toggle_off_bg"])
+		state_prefix = "menu_on"
+	var normal := _cached_button_style(state_prefix + "_normal")
+	var hover := _cached_button_style(state_prefix + "_hover")
+	var pressed := _cached_button_style(state_prefix + "_pressed")
+	if normal != null:
+		toggle.add_theme_stylebox_override("normal", normal)
+	if hover != null:
+		toggle.add_theme_stylebox_override("hover", hover)
+	if pressed != null:
+		toggle.add_theme_stylebox_override("pressed", pressed)
+	var on_text := Color(pal["toggle_on_text"])
+	var off_text := Color(pal["toggle_off_text"])
 	var disabled_text := Color(0.84, 0.84, 0.84, 0.78)
 	var font_color := disabled_text if is_disabled else (on_text if enabled else off_text)
 	toggle.add_theme_color_override("font_color", font_color)
@@ -5898,86 +7574,177 @@ func _style_menu_toggle(toggle: BaseButton, enabled: bool, is_disabled: bool) ->
 		_connect_button_hover_feedback(toggle as Button)
 
 
+func _run_control_scale_tween(ctrl: Control, target_scale: Vector2, duration: float, trans: int = Tween.TRANS_QUAD, ease: int = Tween.EASE_OUT) -> void:
+	if ctrl == null or not is_instance_valid(ctrl):
+		return
+	if ctrl.scale.is_equal_approx(target_scale):
+		return
+	var prev_v: Variant = ctrl.get_meta("_scale_tween", null)
+	if prev_v is Tween:
+		var prev_tw := prev_v as Tween
+		if is_instance_valid(prev_tw):
+			prev_tw.kill()
+	var tw := ctrl.create_tween()
+	tw.set_trans(trans)
+	tw.set_ease(ease)
+	tw.tween_property(ctrl, "scale", target_scale, duration)
+	ctrl.set_meta("_scale_tween", tw)
+
+
 func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 	if card == null or btn == null:
 		return
+	if card.has_meta("_card_hover_feedback_connected"):
+		return
+	card.set_meta("_card_hover_feedback_connected", true)
 	card.pivot_offset = card.size * 0.5
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	var is_main_menu_mode_card: bool = btn.has_meta("main_menu_mode_key")
+	var hover_scale: Vector2 = Vector2(1.055, 1.055) if is_main_menu_mode_card else Vector2(1.035, 1.035)
+	var press_scale: Vector2 = Vector2(0.975, 0.975) if is_main_menu_mode_card else Vector2(0.97, 0.97)
 	var hover_enter := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
+		var hover_active_v: Variant = card.get_meta("_card_hover_active", false)
+		var hover_active: bool = hover_active_v if hover_active_v is bool else false
+		if hover_active:
+			return
+		card.set_meta("_card_hover_active", true)
 		card.pivot_offset = card.size * 0.5
-		var tw := card.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(card, "scale", Vector2(1.025, 1.025), 0.12)
+		_run_control_scale_tween(card, hover_scale, 0.12, Tween.TRANS_BACK, Tween.EASE_OUT)
 		var sb: Variant = card.get_theme_stylebox("panel") if card is PanelContainer else null
 		if sb is StyleBoxFlat:
-			var hover_sb := (sb as StyleBoxFlat).duplicate()
-			hover_sb.shadow_size = mini(hover_sb.shadow_size + 4, 16)
-			hover_sb.shadow_color = Color(hover_sb.shadow_color.r, hover_sb.shadow_color.g, hover_sb.shadow_color.b, minf(hover_sb.shadow_color.a + 0.06, 0.5))
+			var base_sb := sb as StyleBoxFlat
+			var cached_base_v: Variant = card.get_meta("_hover_base_sb", null)
+			var cached_hover_v: Variant = card.get_meta("_hover_hover_sb", null)
+			var hover_sb: StyleBoxFlat = null
+			if cached_base_v is StyleBoxFlat and cached_hover_v is StyleBoxFlat and cached_base_v == base_sb:
+				hover_sb = cached_hover_v as StyleBoxFlat
+			else:
+				hover_sb = base_sb.duplicate()
+				if is_main_menu_mode_card:
+					hover_sb.shadow_size = maxi(12, mini(hover_sb.shadow_size + 10, 20))
+					hover_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.34)
+					hover_sb.border_width_left = maxi(2, hover_sb.border_width_left)
+					hover_sb.border_width_top = maxi(2, hover_sb.border_width_top)
+					hover_sb.border_width_right = maxi(2, hover_sb.border_width_right)
+					hover_sb.border_width_bottom = maxi(2, hover_sb.border_width_bottom)
+					hover_sb.border_color = Color(1.0, 0.92, 0.62, 0.96)
+				else:
+					hover_sb.shadow_size = mini(hover_sb.shadow_size + 6, 16)
+					hover_sb.shadow_color = Color(hover_sb.shadow_color.r, hover_sb.shadow_color.g, hover_sb.shadow_color.b, minf(hover_sb.shadow_color.a + 0.16, 0.52))
+				card.set_meta("_hover_base_sb", base_sb)
+				card.set_meta("_hover_hover_sb", hover_sb)
 			card.add_theme_stylebox_override("panel", hover_sb)
-			card.set_meta("_pre_hover_sb", sb)
+			card.set_meta("_pre_hover_sb", base_sb)
+		if btn.has_meta("mode_card_accent_bar"):
+			var accent_node: Variant = btn.get_meta("mode_card_accent_bar")
+			if accent_node is ColorRect:
+				var accent := accent_node as ColorRect
+				if accent != null and is_instance_valid(accent):
+					card.set_meta("_pre_hover_accent_color", accent.color)
+					card.set_meta("_pre_hover_accent_right", accent.offset_right)
+					accent.color = Color(accent.color.r, accent.color.g, accent.color.b, minf(accent.color.a + (0.26 if is_main_menu_mode_card else 0.16), 1.0))
+					accent.offset_right = 10 if is_main_menu_mode_card else 7
 	var hover_exit := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
+		var hover_active_v: Variant = card.get_meta("_card_hover_active", false)
+		var hover_active: bool = hover_active_v if hover_active_v is bool else false
+		if not hover_active:
+			return
+		card.set_meta("_card_hover_active", false)
 		card.pivot_offset = card.size * 0.5
-		var tw := card.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(card, "scale", Vector2.ONE, 0.15)
+		_run_control_scale_tween(card, Vector2.ONE, 0.15, Tween.TRANS_QUAD, Tween.EASE_OUT)
 		if card.has_meta("_pre_hover_sb"):
 			var old_sb: Variant = card.get_meta("_pre_hover_sb")
 			if old_sb is StyleBoxFlat:
 				card.add_theme_stylebox_override("panel", old_sb as StyleBoxFlat)
 			card.remove_meta("_pre_hover_sb")
+		if btn.has_meta("mode_card_accent_bar"):
+			var accent_node: Variant = btn.get_meta("mode_card_accent_bar")
+			if accent_node is ColorRect:
+				var accent := accent_node as ColorRect
+				if accent != null and is_instance_valid(accent):
+					var pre_color_v: Variant = card.get_meta("_pre_hover_accent_color", accent.color)
+					if pre_color_v is Color:
+						accent.color = pre_color_v as Color
+					var pre_right_v: Variant = card.get_meta("_pre_hover_accent_right", accent.offset_right)
+					if pre_right_v is float or pre_right_v is int:
+						accent.offset_right = float(pre_right_v)
+		if card.has_meta("_pre_hover_accent_color"):
+			card.remove_meta("_pre_hover_accent_color")
+		if card.has_meta("_pre_hover_accent_right"):
+			card.remove_meta("_pre_hover_accent_right")
 	var press_down := func() -> void:
 		if card == null or not is_instance_valid(card):
 			return
 		card.pivot_offset = card.size * 0.5
-		var tw := card.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		tw.tween_property(card, "scale", Vector2(0.97, 0.97), 0.06)
-		tw.tween_property(card, "scale", Vector2(1.025, 1.025), 0.14)
+		_run_control_scale_tween(card, press_scale, 0.06, Tween.TRANS_BACK, Tween.EASE_OUT)
+	# Hover can be eaten by a full-rect child button, so bind both emitters.
 	card.mouse_entered.connect(hover_enter)
 	card.mouse_exited.connect(hover_exit)
+	btn.mouse_entered.connect(hover_enter)
+	btn.mouse_exited.connect(hover_exit)
 	btn.button_down.connect(press_down)
 
 
 func _connect_button_hover_feedback(btn: Button) -> void:
 	if btn == null:
 		return
+	if btn.has_meta("_button_hover_feedback_connected"):
+		return
+	btn.set_meta("_button_hover_feedback_connected", true)
 	btn.pivot_offset = btn.size * 0.5
 	var hover_enter := func() -> void:
 		if btn == null or not is_instance_valid(btn):
 			return
 		btn.pivot_offset = btn.size * 0.5
-		var tw := btn.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(btn, "scale", Vector2(1.03, 1.03), 0.10)
+		_run_control_scale_tween(btn, Vector2(1.03, 1.03), 0.10, Tween.TRANS_QUAD, Tween.EASE_OUT)
 	var hover_exit := func() -> void:
 		if btn == null or not is_instance_valid(btn):
 			return
 		btn.pivot_offset = btn.size * 0.5
-		var tw := btn.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		tw.tween_property(btn, "scale", Vector2.ONE, 0.12)
+		_run_control_scale_tween(btn, Vector2.ONE, 0.12, Tween.TRANS_QUAD, Tween.EASE_OUT)
 	var press_down := func() -> void:
 		if btn == null or not is_instance_valid(btn):
 			return
 		btn.pivot_offset = btn.size * 0.5
-		var tw := btn.create_tween()
-		tw.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		tw.tween_property(btn, "scale", Vector2(0.96, 0.96), 0.05)
-		tw.tween_property(btn, "scale", Vector2.ONE, 0.12)
+		_run_control_scale_tween(btn, Vector2(0.96, 0.96), 0.05, Tween.TRANS_BACK, Tween.EASE_OUT)
 	btn.mouse_entered.connect(hover_enter)
 	btn.mouse_exited.connect(hover_exit)
 	btn.button_down.connect(press_down)
+
+
+func _build_home_overview_section(target_parent: Control, label: String) -> GridContainer:
+	var section := VBoxContainer.new()
+	section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section.add_theme_constant_override("separation", 7)
+	target_parent.add_child(section)
+
+	var section_label := Label.new()
+	section_label.text = label.to_upper()
+	section_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	section_label.add_theme_font_size_override("font_size", 12)
+	section_label.add_theme_color_override("font_color", Color(0.96, 0.91, 0.73, 0.88))
+	section_label.set_meta("home_overview_section_header", true)
+	section.add_child(section_label)
+
+	var section_grid := GridContainer.new()
+	section_grid.columns = 1
+	section_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section_grid.add_theme_constant_override("h_separation", 10)
+	section_grid.add_theme_constant_override("v_separation", 10)
+	section.add_child(section_grid)
+	_home_overview_section_grids.append(section_grid)
+	return section_grid
 
 
 func _build_home_overview_card(target_parent: Control, label: String, description: String, icon_path: String, accent_color: Color, press_callable: Callable) -> Button:
 	if target_parent == null:
 		return null
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(220, 136)
+	card.custom_minimum_size = Vector2(188, 126)
 	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var card_sb := StyleBoxFlat.new()
@@ -5991,8 +7758,8 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	card_sb.border_width_top = 1
 	card_sb.border_width_right = 1
 	card_sb.border_width_bottom = 1
-	card_sb.shadow_color = MENU_CARD_SHADOW
-	card_sb.shadow_size = 4
+	card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0)
+	card_sb.shadow_size = 0
 	card.add_theme_stylebox_override("panel", card_sb)
 	target_parent.add_child(card)
 
@@ -6013,21 +7780,21 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 
 	var margin := MarginContainer.new()
 	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
 	card.add_child(margin)
 
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 6)
+	col.add_theme_constant_override("separation", 4)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(col)
 
 	var icon := TextureRect.new()
 	icon.texture = _load_texture(icon_path)
-	icon.custom_minimum_size = Vector2(54, 54)
+	icon.custom_minimum_size = Vector2(46, 46)
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -6037,15 +7804,18 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	var name_lbl := Label.new()
 	name_lbl.text = label
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_lbl.add_theme_font_size_override("font_size", 18)
+	if _ui_title_font != null:
+		name_lbl.add_theme_font_override("font", _ui_title_font)
+	name_lbl.add_theme_font_size_override("font_size", 17)
 	name_lbl.add_theme_color_override("font_color", Color(0.16, 0.22, 0.31, 1.0))
+	name_lbl.set_meta("mode_card_title_label", true)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(name_lbl)
 
 	var desc_lbl := Label.new()
 	desc_lbl.text = description
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_lbl.add_theme_font_size_override("font_size", 13)
+	desc_lbl.add_theme_font_size_override("font_size", 12)
 	desc_lbl.add_theme_color_override("font_color", Color(0.28, 0.35, 0.46, 1.0))
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -6055,6 +7825,7 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	btn.flat = true
 	btn.set_anchors_preset(PRESET_FULL_RECT)
 	btn.focus_mode = Control.FOCUS_ALL
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.set_meta("mode_card_panel", card)
 	btn.set_meta("mode_card_icon", icon)
 	btn.set_meta("mode_card_name_label", name_lbl)
@@ -6113,14 +7884,15 @@ func _style_material_button(btn: Button) -> void:
 	if not btn.has_meta("base_text"):
 		btn.set_meta("base_text", btn.text)
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = pal["base_bg"]
 	normal.corner_radius_top_left = 18
 	normal.corner_radius_top_right = 18
 	normal.corner_radius_bottom_left = 18
 	normal.corner_radius_bottom_right = 18
-	normal.shadow_color = Color(0, 0, 0, 0.35)
-	normal.shadow_size = 5
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	normal.border_color = pal["base_border"]
 	normal.border_width_left = 2
 	normal.border_width_top = 2
@@ -6134,12 +7906,12 @@ func _style_material_button(btn: Button) -> void:
 
 	var hover := normal.duplicate()
 	hover.bg_color = pal["base_hover"]
-	hover.shadow_size = 7
+	hover.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("hover", hover)
 
 	var pressed := normal.duplicate()
 	pressed.bg_color = pal["base_pressed"]
-	pressed.shadow_size = 3
+	pressed.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("pressed", pressed)
 
 	var base_text: Color = _pick_readable_text_color(pal["base_bg"])
@@ -6201,37 +7973,46 @@ func _style_home_footer_bar() -> void:
 func _style_home_footer_button(btn: Button, accent: Color, fill_alpha: float = 0.22) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var is_play_cta := btn == _home_start_button or btn == _rhythm_flow_demo_home_button
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.98) if is_play_cta else Color(0.10, 0.22, 0.34, fill_alpha)
+	normal.bg_color = Color(pal["start_bg"]) if is_play_cta else Color(pal["base_bg"])
+	if not is_play_cta:
+		normal.bg_color.a = fill_alpha
 	normal.corner_radius_top_left = 16
 	normal.corner_radius_top_right = 16
 	normal.corner_radius_bottom_left = 16
 	normal.corner_radius_bottom_right = 16
-	normal.border_color = Color(0.97, 0.86, 0.40, 0.94) if is_play_cta else Color(accent.r, accent.g, accent.b, 0.62)
+	normal.border_color = Color(pal["start_border"]) if is_play_cta else Color(contract.get("btn_inactive_border", Color(accent.r, accent.g, accent.b, 0.62)))
 	normal.border_width_left = 2
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.02, 0.06, 0.10, 0.28)
-	normal.shadow_size = 5
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
-	hover.bg_color = Color(0.95, 0.70, 0.20, 0.99) if is_play_cta else Color(0.12, 0.26, 0.40, fill_alpha + 0.08)
-	hover.shadow_size = 7
+	hover.bg_color = Color(pal["start_hover"]) if is_play_cta else Color(pal["base_hover"])
+	if not is_play_cta:
+		hover.bg_color.a = fill_alpha + 0.08
+	hover.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.82, 0.54, 0.08, 0.99) if is_play_cta else Color(0.08, 0.19, 0.30, fill_alpha + 0.10)
-	pressed.shadow_size = 3
+	pressed.bg_color = Color(pal["start_pressed"]) if is_play_cta else Color(pal["base_pressed"])
+	if not is_play_cta:
+		pressed.bg_color.a = fill_alpha + 0.10
+	pressed.shadow_size = normal.shadow_size
 	btn.add_theme_stylebox_override("pressed", pressed)
 	if is_play_cta:
-		btn.add_theme_color_override("font_color", Color(0.10, 0.10, 0.12, 1.0))
-		btn.add_theme_color_override("font_hover_color", Color(0.08, 0.08, 0.10, 1.0))
-		btn.add_theme_color_override("font_pressed_color", Color(0.06, 0.06, 0.08, 1.0))
+		btn.add_theme_color_override("font_color", Color(pal["start_text"]))
+		btn.add_theme_color_override("font_hover_color", Color(pal["start_text"]))
+		btn.add_theme_color_override("font_pressed_color", Color(pal["start_text"]))
 	else:
-		btn.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 0.98))
-		btn.add_theme_color_override("font_hover_color", Color(0.97, 1.0, 1.0, 1.0))
-		btn.add_theme_color_override("font_pressed_color", Color(0.88, 0.95, 1.0, 0.98))
+		var base_text: Color = _pick_readable_text_color(Color(pal["base_bg"]))
+		btn.add_theme_color_override("font_color", base_text)
+		btn.add_theme_color_override("font_hover_color", base_text)
+		btn.add_theme_color_override("font_pressed_color", base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.00, 0.00, 0.00, 0.20))
 	btn.add_theme_constant_override("outline_size", 1)
 	if not btn.has_meta("_hover_feedback_connected"):
@@ -6279,29 +8060,33 @@ func _ensure_sight_notes_local_overlay() -> void:
 func _style_sight_notes_tab_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
 	normal.corner_radius_bottom_right = 12
-	normal.bg_color = Color(0.16, 0.29, 0.46, 0.88) if selected else Color(0.15, 0.24, 0.38, 0.82)
-	normal.border_color = SIGHT_NOTES_SETUP_ACCENT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.56)
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
+	normal.border_color = Color(contract.get("btn_selected_border", SIGHT_NOTES_SETUP_ACCENT)) if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.56)
 	normal.border_width_left = 2 if selected else 1
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 3 if selected else 1
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.19, 0.33, 0.52, 0.92) if selected else Color(0.18, 0.29, 0.45, 0.88)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.24, 0.38, 0.96) if selected else Color(0.11, 0.20, 0.33, 0.90)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 15)
@@ -6315,8 +8100,10 @@ func _style_sight_notes_tab_button(btn: Button, selected: bool) -> void:
 func _style_sight_notes_segment_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26) if selected else MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6325,19 +8112,21 @@ func _style_sight_notes_segment_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = MENU_SETUP_HIGHLIGHT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT)) if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.9098, 0.6275, 0.1255, 0.34) if selected else Color(0.12, 0.25, 0.40, 0.84)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.9098, 0.6275, 0.1255, 0.22) if selected else Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 15)
@@ -6350,8 +8139,10 @@ func _style_sight_notes_segment_button(btn: Button, selected: bool) -> void:
 func _style_sight_notes_key_chip_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26) if selected else MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
@@ -6360,19 +8151,21 @@ func _style_sight_notes_key_chip_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = MENU_SETUP_HIGHLIGHT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-	normal.shadow_size = 1
+	normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT)) if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.9098, 0.6275, 0.1255, 0.34) if selected else Color(0.12, 0.25, 0.40, 0.84)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.9098, 0.6275, 0.1255, 0.22) if selected else Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 14)
@@ -6385,8 +8178,10 @@ func _style_sight_notes_key_chip_button(btn: Button, selected: bool) -> void:
 func _style_sight_notes_range_nudge_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.12, 0.22, 0.38, 0.84)
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 10
 	normal.corner_radius_top_right = 10
 	normal.corner_radius_bottom_left = 10
@@ -6395,15 +8190,15 @@ func _style_sight_notes_range_nudge_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
-	normal.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-	normal.shadow_size = 1
+	normal.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.16, 0.29, 0.46, 0.90)
+	hover.bg_color = Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.09, 0.17, 0.30, 0.92)
+	pressed.bg_color = Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6420,8 +8215,10 @@ func _style_sight_notes_range_nudge_button(btn: Button) -> void:
 func _style_sight_notes_primary_cta_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.98)
+	normal.bg_color = Color(pal["start_bg"])
 	normal.corner_radius_top_left = 20
 	normal.corner_radius_top_right = 20
 	normal.corner_radius_bottom_left = 20
@@ -6430,19 +8227,19 @@ func _style_sight_notes_primary_cta_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 2
-	normal.border_color = Color(0.97, 0.86, 0.40, 0.94)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
-	normal.shadow_size = 6
+	normal.border_color = Color(pal["start_border"])
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.95, 0.70, 0.20, 0.99)
+	hover.bg_color = Color(pal["start_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.82, 0.54, 0.08, 0.99)
+	pressed.bg_color = Color(pal["start_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", Color(0.12, 0.18, 0.27, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color(0.10, 0.15, 0.22, 1.0))
-	btn.add_theme_color_override("font_pressed_color", Color(0.09, 0.13, 0.20, 1.0))
+	btn.add_theme_color_override("font_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_hover_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_pressed_color", Color(pal["start_text"]))
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 18)
@@ -6491,10 +8288,11 @@ func _set_sight_notes_setup_card_style(card: PanelContainer, active: bool, compa
 func _refresh_sight_notes_setup_menu_style() -> void:
 	_apply_menu_setup_theme_to_home()
 	var active := _is_sight_notes_setup_screen_active()
+	var contract := _menu_style_contract()
 	_ensure_sight_notes_local_overlay()
 	if _sight_notes_section_style_cached == null:
 		_sight_notes_section_style_cached = StyleBoxFlat.new()
-		_sight_notes_section_style_cached.bg_color = Color(0.0588, 0.1529, 0.2510, 0.70)
+		_sight_notes_section_style_cached.bg_color = Color(contract.get("panel_bg", Color(0.0588, 0.1529, 0.2510, 0.70)))
 		_sight_notes_section_style_cached.corner_radius_top_left = 20
 		_sight_notes_section_style_cached.corner_radius_top_right = 20
 		_sight_notes_section_style_cached.corner_radius_bottom_left = 20
@@ -6503,12 +8301,13 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_section_style_cached.border_width_top = 2
 		_sight_notes_section_style_cached.border_width_right = 2
 		_sight_notes_section_style_cached.border_width_bottom = 2
-		_sight_notes_section_style_cached.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-		_sight_notes_section_style_cached.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
-		_sight_notes_section_style_cached.shadow_size = 6
+		_sight_notes_section_style_cached.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+		_sight_notes_section_style_cached.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		_sight_notes_section_style_cached.shadow_size = int(contract.get("shadow_panel_size", 6))
 	if _sight_notes_tab_shell_style_cached == null:
 		_sight_notes_tab_shell_style_cached = StyleBoxFlat.new()
-		_sight_notes_tab_shell_style_cached.bg_color = Color(0.08, 0.16, 0.29, 0.44)
+		_sight_notes_tab_shell_style_cached.bg_color = Color(contract.get("panel_bg_compact", Color(0.08, 0.16, 0.29, 0.44)))
+		_sight_notes_tab_shell_style_cached.bg_color.a = 0.44
 		_sight_notes_tab_shell_style_cached.corner_radius_top_left = 16
 		_sight_notes_tab_shell_style_cached.corner_radius_top_right = 16
 		_sight_notes_tab_shell_style_cached.corner_radius_bottom_left = 16
@@ -6517,9 +8316,9 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_tab_shell_style_cached.border_width_top = 2
 		_sight_notes_tab_shell_style_cached.border_width_right = 2
 		_sight_notes_tab_shell_style_cached.border_width_bottom = 2
-		_sight_notes_tab_shell_style_cached.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.52)
-		_sight_notes_tab_shell_style_cached.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-		_sight_notes_tab_shell_style_cached.shadow_size = 5
+		_sight_notes_tab_shell_style_cached.border_color = Color(contract.get("panel_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.52)))
+		_sight_notes_tab_shell_style_cached.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+		_sight_notes_tab_shell_style_cached.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
 	if _sight_notes_tab_shell_empty_cached == null:
 		_sight_notes_tab_shell_empty_cached = StyleBoxEmpty.new()
 	var section_card_v: Variant = _home_section_cards.get(_sight_options_box, null)
@@ -6543,7 +8342,9 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 			_set_home_section_card_state(_sight_options_box, _selected_mode == MODE_SIGHT)
 	if _sight_notes_local_overlay != null and is_instance_valid(_sight_notes_local_overlay):
 		_sight_notes_local_overlay.visible = active
-		_sight_notes_local_overlay.color = Color(MENU_SETUP_TINT.r, MENU_SETUP_TINT.g, MENU_SETUP_TINT.b, 0.18)
+		var panel_bg := Color(contract.get("panel_bg", MENU_SETUP_TINT))
+		panel_bg.a = 0.18
+		_sight_notes_local_overlay.color = panel_bg
 	if _sight_options_box != null:
 		_sight_options_box.add_theme_constant_override("separation", 22 if active else 18)
 	if _sight_notes_tabs_shell != null:
@@ -6560,9 +8361,14 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		if tab_btn == null:
 			continue
 		if active:
-			_style_sight_notes_tab_button(tab_btn, _selected_mode == MODE_SIGHT and str(key) == _sight_mode)
+			var mode_name := str(key)
+			var locked := not _mvp_is_sight_mode_enabled(mode_name)
+			tab_btn.visible = not locked
+			_style_sight_notes_tab_button(tab_btn, not locked and _selected_mode == MODE_SIGHT and mode_name == _sight_mode)
+			_apply_mvp_locked_button_visual(tab_btn, locked)
 	if _sight_note_chase_button != null and active:
 		_style_sight_notes_tab_button(_sight_note_chase_button, _selected_mode == MODE_NOTE_CHASE)
+		_apply_mvp_locked_button_visual(_sight_note_chase_button, false)
 
 	_set_sight_notes_setup_card_style(_sight_notes_setup_card, active, false)
 	_set_sight_notes_setup_card_style(_sight_notes_range_card, active, true)
@@ -6576,14 +8382,17 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_range_container.add_theme_constant_override("separation", 12 if active else 4)
 	var sight_notes_mode := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
 	if _sight_notes_setup_title_label != null:
-		_sight_notes_setup_title_label.visible = active and not sight_notes_mode
+		var show_setup_title := active and not sight_notes_mode and not (_selected_mode == MODE_SIGHT and _sight_mode == "Chords")
+		_sight_notes_setup_title_label.visible = show_setup_title
+		_sight_notes_setup_title_label.text = "Clef & Key Signature"
 		_sight_notes_setup_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_sight_notes_setup_title_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 		_sight_notes_setup_title_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 		_sight_notes_setup_title_label.add_theme_constant_override("outline_size", 0)
 		_sight_notes_setup_title_label.add_theme_font_size_override("font_size", 18)
 	if _sight_key_sig_label != null:
-		_sight_key_sig_label.visible = true
+		var show_key_sig_label := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		_sight_key_sig_label.visible = show_key_sig_label
 		_sight_key_sig_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if active else HORIZONTAL_ALIGNMENT_CENTER
 		_sight_key_sig_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if active else Color(0.92, 0.90, 0.82, 0.92))
 		_sight_key_sig_label.add_theme_font_size_override("font_size", 15 if active else 16)
@@ -6596,6 +8405,14 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 			var clef_grid := _sight_clef_row as GridContainer
 			clef_grid.add_theme_constant_override("h_separation", 10 if active else 12)
 			clef_grid.add_theme_constant_override("v_separation", 8 if active else 10)
+	if _sight_clef_label != null:
+		var show_clef_label := _selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Note Flow")
+		_sight_clef_label.visible = show_clef_label
+		_sight_clef_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_sight_clef_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if active else SIGHT_NOTES_SETUP_TEXT_BODY)
+		_sight_clef_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
+		_sight_clef_label.add_theme_constant_override("outline_size", 0)
+		_sight_clef_label.add_theme_font_size_override("font_size", 15 if active else 14)
 	if _sight_key_sig_row != null:
 		_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_BEGIN if active else BoxContainer.ALIGNMENT_CENTER
 		_sight_key_sig_row.add_theme_constant_override("separation", 6 if active else 12)
@@ -6622,10 +8439,18 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 	if active:
 		for clef_name in _clef_buttons.keys():
 			var clef_btn := _clef_buttons[clef_name] as Button
-			_style_sight_notes_segment_button(clef_btn, clef_name == _selected_clef)
+			var clef_label := str(clef_name)
+			var clef_locked := not _mvp_is_sight_clef_enabled(clef_label, _sight_mode)
+			clef_btn.visible = not clef_locked
+			_style_sight_notes_segment_button(clef_btn, not clef_locked and clef_label == _selected_clef)
+			_apply_mvp_locked_button_visual(clef_btn, clef_locked)
 		for key_sig in _sight_key_sig_buttons.keys():
 			var chip_btn := _sight_key_sig_buttons[key_sig] as Button
-			_style_sight_notes_key_chip_button(chip_btn, str(key_sig) == _sight_key_signature)
+			var sig_name := str(key_sig)
+			var sig_locked := not _mvp_is_sight_key_signature_enabled(sig_name, _sight_mode)
+			chip_btn.visible = not sig_locked
+			_style_sight_notes_key_chip_button(chip_btn, not sig_locked and sig_name == _sight_key_signature)
+			_apply_mvp_locked_button_visual(chip_btn, sig_locked)
 		_style_sight_notes_range_nudge_button(_sight_range_lower_minus_button)
 		_style_sight_notes_range_nudge_button(_sight_range_lower_plus_button)
 		_style_sight_notes_range_nudge_button(_sight_range_upper_minus_button)
@@ -6688,8 +8513,10 @@ func _style_practice_setup_tab_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	_home_button_clean_base_text(btn)
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = Color(0.15, 0.24, 0.38, 0.90) if selected else Color(0.10, 0.19, 0.32, 0.82)
+	normal.bg_color = Color(pal["selected_bg"]) if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 12
 	normal.corner_radius_top_right = 12
 	normal.corner_radius_bottom_left = 12
@@ -6698,19 +8525,21 @@ func _style_practice_setup_tab_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 3 if selected else 1
-	normal.border_color = MENU_SETUP_HIGHLIGHT if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT)) if selected else Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.44)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.18, 0.29, 0.45, 0.92) if selected else Color(0.13, 0.24, 0.39, 0.88)
+	hover.bg_color = Color(pal["selected_hover"]) if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.10, 0.20, 0.33, 0.96) if selected else Color(0.08, 0.16, 0.28, 0.90)
+	pressed.bg_color = Color(pal["selected_pressed"]) if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.add_theme_font_size_override("font_size", 15)
@@ -6724,13 +8553,15 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	_home_button_clean_base_text(btn)
-	var selected_bg := Color(0.9098, 0.6275, 0.1255, 0.26) # #E8A020 tint
-	var selected_hover := Color(0.9098, 0.6275, 0.1255, 0.34)
-	var selected_pressed := Color(0.9098, 0.6275, 0.1255, 0.22)
-	var selected_border := MENU_SETUP_HIGHLIGHT
-	var selected_text := SIGHT_NOTES_SETUP_TEXT_PRIMARY
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
+	var selected_bg := Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+	var selected_hover := Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
+	var selected_pressed := Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
+	var selected_border := Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
+	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = selected_bg if selected else MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = selected_bg if selected else Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6739,19 +8570,20 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	normal.border_width_top = 2 if selected else 1
 	normal.border_width_right = 2 if selected else 1
 	normal.border_width_bottom = 2 if selected else 1
-	normal.border_color = selected_border if selected else Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 2
+	normal.border_color = selected_border if selected else Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = selected_hover if selected else Color(0.13, 0.24, 0.39, 0.84)
+	hover.bg_color = selected_hover if selected else Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = selected_pressed if selected else Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = selected_pressed if selected else Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_BODY)
-	btn.add_theme_color_override("font_hover_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
-	btn.add_theme_color_override("font_pressed_color", selected_text if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
+	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_hover_color", selected_text if selected else base_text)
+	btn.add_theme_color_override("font_pressed_color", selected_text if selected else base_text)
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	if not btn.has_meta("_hover_feedback_connected"):
@@ -6762,8 +8594,10 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_disabled: bool = false) -> void:
 	if toggle == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = MENU_SETUP_CARD_FILL_COOL
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
@@ -6772,12 +8606,12 @@ func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_d
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
-	normal.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.10)
-	normal.shadow_size = 2
+	normal.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
+	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	if enabled:
-		normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.26)
-		normal.border_color = MENU_SETUP_HIGHLIGHT
+		normal.bg_color = Color(pal["selected_bg"])
+		normal.border_color = Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
 		normal.border_width_left = 2
 		normal.border_width_top = 2
 		normal.border_width_right = 2
@@ -6795,7 +8629,7 @@ func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_d
 	toggle.add_theme_stylebox_override("pressed", pressed)
 	var text_col := SIGHT_NOTES_SETUP_TEXT_BODY
 	if enabled:
-		text_col = SIGHT_NOTES_SETUP_TEXT_PRIMARY
+		text_col = Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
 	if is_disabled:
 		text_col = Color(0.62, 0.66, 0.73, 0.88)
 	toggle.add_theme_color_override("font_color", text_col)
@@ -6811,8 +8645,10 @@ func _style_practice_setup_toggle_button(toggle: BaseButton, enabled: bool, is_d
 func _style_practice_setup_secondary_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.10, 0.19, 0.32, 0.78)
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 18
 	normal.corner_radius_top_right = 18
 	normal.corner_radius_bottom_left = 18
@@ -6821,15 +8657,15 @@ func _style_practice_setup_secondary_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 1
-	normal.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
-	normal.shadow_size = 4
+	normal.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.40)))
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.13, 0.24, 0.39, 0.84)
+	hover.bg_color = Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.08, 0.16, 0.28, 0.88)
+	pressed.bg_color = Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
 	btn.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 	btn.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6845,8 +8681,10 @@ func _style_practice_setup_secondary_button(btn: Button) -> void:
 func _style_practice_setup_input_control(ctrl: Control) -> void:
 	if ctrl == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.10, 0.19, 0.32, 0.82)
+	sb.bg_color = Color(pal["base_bg"])
 	sb.corner_radius_top_left = 12
 	sb.corner_radius_top_right = 12
 	sb.corner_radius_bottom_left = 12
@@ -6855,12 +8693,12 @@ func _style_practice_setup_input_control(ctrl: Control) -> void:
 	sb.border_width_top = 1
 	sb.border_width_right = 1
 	sb.border_width_bottom = 1
-	sb.border_color = Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.38)
+	sb.border_color = Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.38)))
 	if ctrl is OptionButton:
 		var opt := ctrl as OptionButton
 		opt.add_theme_stylebox_override("normal", sb)
 		var hover := sb.duplicate() as StyleBoxFlat
-		hover.bg_color = Color(0.13, 0.24, 0.39, 0.86)
+		hover.bg_color = Color(pal["base_hover"])
 		opt.add_theme_stylebox_override("hover", hover)
 		opt.add_theme_stylebox_override("pressed", hover)
 		opt.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
@@ -6880,8 +8718,10 @@ func _style_practice_setup_input_control(ctrl: Control) -> void:
 func _style_practice_setup_primary_cta_button(btn: Button) -> void:
 	if btn == null:
 		return
+	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.9098, 0.6275, 0.1255, 0.98)
+	normal.bg_color = Color(pal["start_bg"])
 	normal.corner_radius_top_left = 20
 	normal.corner_radius_top_right = 20
 	normal.corner_radius_bottom_left = 20
@@ -6890,19 +8730,19 @@ func _style_practice_setup_primary_cta_button(btn: Button) -> void:
 	normal.border_width_top = 1
 	normal.border_width_right = 1
 	normal.border_width_bottom = 2
-	normal.border_color = Color(0.97, 0.86, 0.40, 0.94)
-	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
-	normal.shadow_size = 6
+	normal.border_color = Color(pal["start_border"])
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+	normal.shadow_size = int(contract.get("shadow_button_size", 4))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.95, 0.70, 0.20, 0.99)
+	hover.bg_color = Color(pal["start_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.82, 0.54, 0.08, 0.99)
+	pressed.bg_color = Color(pal["start_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_color_override("font_color", Color(0.12, 0.18, 0.27, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color(0.10, 0.15, 0.22, 1.0))
-	btn.add_theme_color_override("font_pressed_color", Color(0.09, 0.13, 0.20, 1.0))
+	btn.add_theme_color_override("font_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_hover_color", Color(pal["start_text"]))
+	btn.add_theme_color_override("font_pressed_color", Color(pal["start_text"]))
 	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
 	btn.add_theme_constant_override("outline_size", 0)
 	btn.custom_minimum_size = Vector2(maxf(240.0, btn.custom_minimum_size.x), maxf(56.0, btn.custom_minimum_size.y))
@@ -6995,9 +8835,14 @@ func _refresh_practice_setup_theme() -> void:
 		for key in _sight_mode_buttons.keys():
 			var sbtn := _sight_mode_buttons[key] as Button
 			if sbtn != null:
-				_style_practice_setup_tab_button(sbtn, _selected_mode == MODE_SIGHT and str(key) == _sight_mode)
+				var mode_name := str(key)
+				var locked := not _mvp_is_sight_mode_enabled(mode_name)
+				sbtn.visible = not locked
+				_style_practice_setup_tab_button(sbtn, not locked and _selected_mode == MODE_SIGHT and mode_name == _sight_mode)
+				_apply_mvp_locked_button_visual(sbtn, locked)
 		if _sight_note_chase_button != null:
 			_style_practice_setup_tab_button(_sight_note_chase_button, _selected_mode == MODE_NOTE_CHASE)
+			_apply_mvp_locked_button_visual(_sight_note_chase_button, false)
 
 	if _is_ear_training_mode():
 		if _ear_mode_row is GridContainer:
@@ -7011,16 +8856,20 @@ func _refresh_practice_setup_theme() -> void:
 		for key in _ear_mode_buttons.keys():
 			var ebtn := _ear_mode_buttons[key] as Button
 			if ebtn != null:
-				_style_practice_setup_tab_button(ebtn, int(key) == _selected_mode)
+				var mode_id := int(key)
+				var locked := not _mvp_is_ear_mode_enabled(mode_id)
+				ebtn.visible = not locked
+				_style_practice_setup_tab_button(ebtn, not locked and mode_id == _selected_mode)
+				_apply_mvp_locked_button_visual(ebtn, locked)
 
 	for degree_key in _degree_toggles.keys():
 		var degree_btn := _degree_toggles[degree_key] as Button
 		if degree_btn != null:
 			_style_practice_setup_chip_button(degree_btn, degree_btn.button_pressed)
-	for group_key in _chord_group_buttons.keys():
-		var cgroup_btn := _chord_group_buttons[group_key] as Button
-		if cgroup_btn != null:
-			_style_practice_setup_chip_button(cgroup_btn, int(group_key) == _selected_chord_group)
+	for chord_key in _chord_tier_toggles.keys():
+		var ctoggle_btn := _chord_tier_toggles[chord_key] as Button
+		if ctoggle_btn != null:
+			_style_practice_setup_chip_button(ctoggle_btn, ctoggle_btn.button_pressed)
 	for prog_key in _progression_pattern_buttons.keys():
 		var prog_btn := _progression_pattern_buttons[prog_key] as Button
 		if prog_btn != null:
@@ -7033,6 +8882,8 @@ func _refresh_practice_setup_theme() -> void:
 		var cad_btn := _cadence_type_buttons[cad_key] as Button
 		if cad_btn != null:
 			_style_practice_setup_chip_button(cad_btn, cad_btn.button_pressed)
+	_refresh_interval_preset_buttons()
+	_refresh_cadence_preset_buttons()
 	for note_key in _note_chase_note_toggles.keys():
 		var note_btn := _note_chase_note_toggles[note_key] as Button
 		if note_btn != null:
@@ -7040,15 +8891,31 @@ func _refresh_practice_setup_theme() -> void:
 	for clef_mode in _note_chase_clef_buttons.keys():
 		var chase_clef_btn := _note_chase_clef_buttons[clef_mode] as Button
 		if chase_clef_btn != null:
-			_style_practice_setup_chip_button(chase_clef_btn, str(clef_mode) == _note_chase_clef_mode)
+			var chase_clef_mode := str(clef_mode)
+			var chase_locked := not _mvp_is_note_chase_clef_enabled(chase_clef_mode)
+			chase_clef_btn.visible = not chase_locked
+			_style_practice_setup_chip_button(chase_clef_btn, not chase_locked and chase_clef_mode == _note_chase_clef_mode)
+			_apply_mvp_locked_button_visual(chase_clef_btn, chase_locked)
 	for clef_name in _clef_buttons.keys():
 		var clef_btn := _clef_buttons[clef_name] as Button
 		if clef_btn != null:
-			_style_practice_setup_chip_button(clef_btn, str(clef_name) == _selected_clef)
+			var clef_label := str(clef_name)
+			var clef_locked := not _mvp_is_sight_clef_enabled(clef_label, _sight_mode)
+			clef_btn.visible = not clef_locked
+			_style_practice_setup_chip_button(clef_btn, not clef_locked and clef_label == _selected_clef)
+			_apply_mvp_locked_button_visual(clef_btn, clef_locked)
 	for key_sig in _sight_key_sig_buttons.keys():
 		var sig_btn := _sight_key_sig_buttons[key_sig] as Button
 		if sig_btn != null:
-			_style_practice_setup_chip_button(sig_btn, str(key_sig) == _sight_key_signature)
+			var sig_name := str(key_sig)
+			var sig_locked := not _mvp_is_sight_key_signature_enabled(sig_name, _sight_mode)
+			sig_btn.visible = not sig_locked
+			_style_practice_setup_chip_button(sig_btn, not sig_locked and sig_name == _sight_key_signature)
+			_apply_mvp_locked_button_visual(sig_btn, sig_locked)
+	for tier_key in _sight_chord_tier_buttons.keys():
+		var tier_btn := _sight_chord_tier_buttons[tier_key] as Button
+		if tier_btn != null:
+			_style_practice_setup_chip_button(tier_btn, int(tier_key) == _sight_selected_chord_tier)
 
 	_style_practice_setup_toggle_button(_include_minor_toggle, _include_minor_intervals, false)
 	_style_practice_setup_toggle_button(_descending_intervals_toggle, _use_descending_intervals, _use_harmonic_intervals and not _use_descending_intervals)
@@ -7080,7 +8947,7 @@ func _refresh_practice_setup_theme() -> void:
 	_style_practice_setup_secondary_button(_rhythm_flow_save_button_menu)
 	_style_practice_setup_secondary_button(_rhythm_flow_next_button)
 	_style_practice_setup_primary_cta_button(_home_start_button)
-	_style_practice_setup_secondary_button(_rhythm_flow_demo_home_button)
+	_style_practice_setup_primary_cta_button(_rhythm_flow_demo_home_button)
 
 
 func _home_button_base_text(btn: Button) -> String:
@@ -7137,19 +9004,22 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if btn == null:
 		return
 	var pal := _theme_button_palette()
+	var contract := _menu_style_contract()
 	_set_home_button_label_state(btn, selected)
 	_animate_home_button_selection(btn, selected)
 	var token_colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
 	# Treat overview mode cards as glass cards even if `flat` is changed elsewhere.
 	var mode_card_flat := btn.has_meta("mode_card_panel")
 	var main_menu_card := mode_card_flat and btn.has_meta("main_menu_mode_key") and _is_main_menu_overview_active()
+	var main_menu_key := str(btn.get_meta("main_menu_mode_key", ""))
+	var learning_main_menu_card := mode_card_flat and main_menu_key == "Learning"
 	var accent_meta: Variant = btn.get_meta("mode_card_accent_color", MENU_CARD_CREAM_ACCENT)
 	var card_accent: Color = accent_meta if accent_meta is Color else MENU_CARD_CREAM_ACCENT
 	var selected_border: Color = token_colors.get("focus_border", Color(0.95, 0.76, 0.31, 1.0))
 	if mode_card_flat:
 		selected_border = Color(card_accent.r, card_accent.g, card_accent.b, 0.56)
 		if main_menu_card:
-			selected_border = Color(0.96, 0.82, 0.36, 0.94)
+			selected_border = Color(card_accent.r, card_accent.g, card_accent.b, 0.94) if learning_main_menu_card else Color(0.96, 0.82, 0.36, 0.94)
 	var selected_bg: Color = pal["selected_bg"]
 	if not mode_card_flat:
 		var contrast_delta := absf(selected_border.get_luminance() - selected_bg.get_luminance())
@@ -7166,13 +9036,27 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if mode_card_flat:
 		# Use a true glass look: low-opacity white fill, panel-driven visuals.
 		if main_menu_card:
-			# Main menu overview cards should use the same warm gold family as primary CTA.
-			selected_btn_bg = Color(0.9098, 0.6275, 0.1255, 0.78)
-			selected_btn_hover_bg = Color(0.945, 0.700, 0.220, 0.82)
-			selected_btn_pressed_bg = Color(0.860, 0.575, 0.105, 0.74)
-			base_btn_bg = Color(0.9098, 0.6275, 0.1255, 0.66)
-			base_btn_hover_bg = Color(0.930, 0.670, 0.185, 0.72)
-			base_btn_pressed_bg = Color(0.835, 0.545, 0.095, 0.64)
+			if learning_main_menu_card:
+				selected_btn_bg = MENU_CARD_LEARNING_HOVER
+				selected_btn_hover_bg = Color(0.1725, 0.4980, 0.5412, 0.86) # #2C7F8A
+				selected_btn_pressed_bg = MENU_CARD_LEARNING_PRESSED
+				base_btn_bg = MENU_CARD_LEARNING_BG
+				base_btn_hover_bg = MENU_CARD_LEARNING_HOVER
+				base_btn_pressed_bg = MENU_CARD_LEARNING_PRESSED
+			else:
+				# Main menu overview cards use the contract CTA family.
+				selected_btn_bg = Color(contract.get("cta_bg", Color(0.9098, 0.6275, 0.1255, 0.98)))
+				selected_btn_bg.a = 0.78
+				selected_btn_hover_bg = Color(contract.get("cta_hover", Color(0.95, 0.70, 0.20, 0.99)))
+				selected_btn_hover_bg.a = 0.82
+				selected_btn_pressed_bg = Color(contract.get("cta_pressed", Color(0.82, 0.54, 0.08, 0.99)))
+				selected_btn_pressed_bg.a = 0.74
+				base_btn_bg = Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
+				base_btn_bg.a = 0.66
+				base_btn_hover_bg = Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
+				base_btn_hover_bg.a = 0.72
+				base_btn_pressed_bg = Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
+				base_btn_pressed_bg.a = 0.64
 		else:
 			selected_btn_bg = Color(1.0, 1.0, 1.0, 0.06)
 			selected_btn_hover_bg = Color(1.0, 1.0, 1.0, 0.07)
@@ -7197,9 +9081,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		btn.add_theme_stylebox_override("normal", _cached_glass_btn_sb)
 		btn.add_theme_stylebox_override("hover", _cached_glass_btn_sb)
 		btn.add_theme_stylebox_override("pressed", _cached_glass_btn_sb)
-	var normal := btn.get_theme_stylebox("normal")
-	if normal is StyleBoxFlat:
-		var sb := normal as StyleBoxFlat
+	var sb := _get_mutable_button_stylebox(btn, "normal")
+	if sb != null:
 		if mode_card_flat:
 			pass  # Glass SB already applied with correct values
 		elif selected:
@@ -7209,8 +9092,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			sb.border_width_top = 4
 			sb.border_width_right = 4
 			sb.border_width_bottom = 4
-			sb.shadow_color = Color(0.20, 0.14, 0.04, 0.92)
-			sb.shadow_size = 9
+			sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			sb.shadow_size = int(contract.get("shadow_button_size", 4))
 		else:
 			sb.bg_color = base_btn_bg
 			sb.border_color = pal["base_border"]
@@ -7218,11 +9101,10 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			sb.border_width_top = 2
 			sb.border_width_right = 2
 			sb.border_width_bottom = 2
-			sb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-			sb.shadow_size = 5
-	var hover := btn.get_theme_stylebox("hover")
-	if hover is StyleBoxFlat:
-		var hb := hover as StyleBoxFlat
+			sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			sb.shadow_size = int(contract.get("shadow_button_size", 4))
+	var hb := _get_mutable_button_stylebox(btn, "hover")
+	if hb != null:
 		if mode_card_flat:
 			pass  # Glass SB already applied
 		elif selected:
@@ -7232,8 +9114,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			hb.border_width_top = 4
 			hb.border_width_right = 4
 			hb.border_width_bottom = 4
-			hb.shadow_color = Color(0.20, 0.14, 0.04, 0.92)
-			hb.shadow_size = 10
+			hb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			hb.shadow_size = int(contract.get("shadow_button_size", 4))
 		else:
 			hb.bg_color = base_btn_hover_bg
 			hb.border_color = pal["base_border"]
@@ -7241,11 +9123,10 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			hb.border_width_top = 2
 			hb.border_width_right = 2
 			hb.border_width_bottom = 2
-			hb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-			hb.shadow_size = 7
-	var pressed := btn.get_theme_stylebox("pressed")
-	if pressed is StyleBoxFlat:
-		var pb := pressed as StyleBoxFlat
+			hb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			hb.shadow_size = int(contract.get("shadow_button_size", 4))
+	var pb := _get_mutable_button_stylebox(btn, "pressed")
+	if pb != null:
 		if mode_card_flat:
 			pass  # Glass SB already applied
 		elif selected:
@@ -7255,8 +9136,8 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			pb.border_width_top = 4
 			pb.border_width_right = 4
 			pb.border_width_bottom = 4
-			pb.shadow_color = Color(0.20, 0.14, 0.04, 0.92)
-			pb.shadow_size = 6
+			pb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			pb.shadow_size = int(contract.get("shadow_button_size", 4))
 		else:
 			pb.bg_color = base_btn_pressed_bg
 			pb.border_color = pal["base_border"]
@@ -7264,12 +9145,13 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 			pb.border_width_top = 2
 			pb.border_width_right = 2
 			pb.border_width_bottom = 2
-			pb.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-			pb.shadow_size = 3
+			pb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_button_alpha", 0.28)))
+			pb.shadow_size = int(contract.get("shadow_button_size", 4))
 	if selected:
-		btn.add_theme_color_override("font_color", _pick_readable_text_color(selected_btn_bg))
-		btn.add_theme_color_override("font_hover_color", _pick_readable_text_color(selected_btn_hover_bg))
-		btn.add_theme_color_override("font_pressed_color", _pick_readable_text_color(selected_btn_pressed_bg))
+		var selected_text := Color(pal["selected_text"])
+		btn.add_theme_color_override("font_color", selected_text)
+		btn.add_theme_color_override("font_hover_color", selected_text)
+		btn.add_theme_color_override("font_pressed_color", selected_text)
 		btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.16) if mode_card_flat else Color(0.0, 0.0, 0.0, 0.55))
 		btn.add_theme_constant_override("outline_size", 1 if mode_card_flat else 2)
 	else:
@@ -7280,7 +9162,7 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.12) if mode_card_flat else Color(0.0, 0.0, 0.0, 0.35))
 		btn.add_theme_constant_override("outline_size", 1)
 	if mode_card_flat:
-		var card_text := Color(0.16, 0.22, 0.31, 1.0) if main_menu_card else MENU_TITLE_TEXT
+		var card_text := MENU_CARD_LEARNING_TITLE if learning_main_menu_card else (Color(0.16, 0.22, 0.31, 1.0) if main_menu_card else MENU_TITLE_TEXT)
 		btn.add_theme_color_override("font_color", card_text)
 		btn.add_theme_color_override("font_hover_color", card_text)
 		btn.add_theme_color_override("font_pressed_color", card_text)
@@ -7291,52 +9173,58 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 	if btn.has_meta("mode_card_panel"):
 		var card_panel: PanelContainer = btn.get_meta("mode_card_panel")
 		if card_panel != null and is_instance_valid(card_panel):
-			var sb := StyleBoxFlat.new()
-			sb.corner_radius_top_left = 18
-			sb.corner_radius_top_right = 18
-			sb.corner_radius_bottom_left = 18
-			sb.corner_radius_bottom_right = 18
+			var card_sb := StyleBoxFlat.new()
+			card_sb.corner_radius_top_left = 18
+			card_sb.corner_radius_top_right = 18
+			card_sb.corner_radius_bottom_left = 18
+			card_sb.corner_radius_bottom_right = 18
 			if mode_card_flat:
 				if selected:
-					sb.bg_color = selected_btn_bg
-					sb.border_color = Color(0.98, 0.86, 0.45, 0.96) if main_menu_card else Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
-					sb.border_width_left = 1
-					sb.border_width_top = 1
-					sb.border_width_right = 1
-					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.18, 0.12, 0.03, 0.24) if main_menu_card else MENU_CARD_SHADOW
-					sb.shadow_size = 8 if main_menu_card else 6
+					card_sb.bg_color = selected_btn_bg
+					if main_menu_card:
+						card_sb.border_color = Color(card_accent.r, card_accent.g, card_accent.b, 0.86) if learning_main_menu_card else Color(contract.get("panel_border_strong", Color(0.98, 0.86, 0.45, 0.96)))
+					else:
+						card_sb.border_color = Color(card_accent.r, card_accent.g, card_accent.b, 0.10)
+					card_sb.border_width_left = 1
+					card_sb.border_width_top = 1
+					card_sb.border_width_right = 1
+					card_sb.border_width_bottom = 1
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = 0 if main_menu_card else int(contract.get("shadow_panel_size", 6))
 				else:
-					sb.bg_color = base_btn_bg
-					sb.border_color = Color(0.96, 0.82, 0.36, 0.74) if main_menu_card else Color(1.0, 1.0, 1.0, 0.06)
-					sb.border_width_left = 1
-					sb.border_width_top = 1
-					sb.border_width_right = 1
-					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.16, 0.10, 0.03, 0.20) if main_menu_card else MENU_CARD_SHADOW
-					sb.shadow_size = 8 if main_menu_card else 5
-				card_panel.add_theme_stylebox_override("panel", sb)
+					card_sb.bg_color = base_btn_bg
+					if main_menu_card:
+						card_sb.border_color = Color(card_accent.r, card_accent.g, card_accent.b, 0.72) if learning_main_menu_card else Color(contract.get("panel_border", Color(0.96, 0.82, 0.36, 0.74)))
+					else:
+						card_sb.border_color = Color(1.0, 1.0, 1.0, 0.06)
+					card_sb.border_width_left = 1
+					card_sb.border_width_top = 1
+					card_sb.border_width_right = 1
+					card_sb.border_width_bottom = 1
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.0) if main_menu_card else Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = 0 if main_menu_card else maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
+				card_panel.add_theme_stylebox_override("panel", card_sb)
 			else:
 				if selected:
 					var selected_card_bg := Color(selected_btn_bg.r, selected_btn_bg.g, selected_btn_bg.b, selected_btn_bg.a)
-					sb.bg_color = selected_card_bg
-					sb.border_color = token_colors.get("focus_border", Color(0.95, 0.76, 0.31))
-					sb.border_width_left = 3
-					sb.border_width_top = 3
-					sb.border_width_right = 3
-					sb.border_width_bottom = 3
-					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
-					sb.shadow_size = 10
+					card_sb.bg_color = selected_card_bg
+					card_sb.border_color = token_colors.get("focus_border", Color(0.95, 0.76, 0.31))
+					card_sb.border_width_left = 3
+					card_sb.border_width_top = 3
+					card_sb.border_width_right = 3
+					card_sb.border_width_bottom = 3
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = int(contract.get("shadow_panel_size", 6))
 				else:
-					sb.bg_color = Color(base_btn_bg.r, base_btn_bg.g, base_btn_bg.b, 0.55)
-					sb.border_color = pal["base_border"]
-					sb.border_width_left = 1
-					sb.border_width_top = 1
-					sb.border_width_right = 1
-					sb.border_width_bottom = 1
-					sb.shadow_color = Color(0.0, 0.0, 0.0, 0.28)
-					sb.shadow_size = 5
-				card_panel.add_theme_stylebox_override("panel", sb)
+					card_sb.bg_color = Color(base_btn_bg.r, base_btn_bg.g, base_btn_bg.b, 0.55)
+					card_sb.border_color = pal["base_border"]
+					card_sb.border_width_left = 1
+					card_sb.border_width_top = 1
+					card_sb.border_width_right = 1
+					card_sb.border_width_bottom = 1
+					card_sb.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_panel_alpha", 0.14)))
+					card_sb.shadow_size = maxi(1, int(contract.get("shadow_panel_size", 6)) - 1)
+				card_panel.add_theme_stylebox_override("panel", card_sb)
 		if btn.has_meta("mode_card_accent_bar"):
 			var accent := btn.get_meta("mode_card_accent_bar") as ColorRect
 			if accent != null and is_instance_valid(accent):
@@ -7345,17 +9233,28 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		if btn.has_meta("mode_card_icon"):
 			var card_icon: TextureRect = btn.get_meta("mode_card_icon")
 			if card_icon != null and is_instance_valid(card_icon):
-				card_icon.modulate = (Color(0.16, 0.22, 0.31, 0.96) if main_menu_card else Color(0.18, 0.20, 0.24, 0.95)) if mode_card_flat else Color(card_accent.r, card_accent.g, card_accent.b, 1.0)
+				if mode_card_flat:
+					if learning_main_menu_card:
+						card_icon.modulate = Color(0.90, 0.97, 0.99, 0.96)
+					elif main_menu_card:
+						card_icon.modulate = Color(0.16, 0.22, 0.31, 0.96)
+					else:
+						card_icon.modulate = Color(0.18, 0.20, 0.24, 0.95)
+				else:
+					card_icon.modulate = Color(card_accent.r, card_accent.g, card_accent.b, 1.0)
 		if btn.has_meta("mode_card_name_label"):
 			var nlbl: Label = btn.get_meta("mode_card_name_label")
 			if nlbl != null and is_instance_valid(nlbl):
-				nlbl.add_theme_color_override("font_color", Color(0.18, 0.24, 0.34, 1.0) if main_menu_card else MENU_TITLE_TEXT)
+				nlbl.add_theme_color_override("font_color", MENU_CARD_LEARNING_TITLE if learning_main_menu_card else (Color(0.18, 0.24, 0.34, 1.0) if main_menu_card else MENU_TITLE_TEXT))
 		if btn.has_meta("mode_card_desc_label"):
 			var dlbl: Label = btn.get_meta("mode_card_desc_label")
 			if dlbl != null and is_instance_valid(dlbl):
 				var token_c2: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {}
 				if mode_card_flat:
-					dlbl.add_theme_color_override("font_color", Color(0.28, 0.35, 0.46, 1.0) if main_menu_card else MENU_SUBTITLE_TEXT)
+					if learning_main_menu_card:
+						dlbl.add_theme_color_override("font_color", MENU_CARD_LEARNING_SUBTITLE)
+					else:
+						dlbl.add_theme_color_override("font_color", Color(0.28, 0.35, 0.46, 1.0) if main_menu_card else MENU_SUBTITLE_TEXT)
 				else:
 					dlbl.add_theme_color_override("font_color", token_c2.get("text_primary", Color(0.98, 0.96, 0.88)) if selected else token_c2.get("text_muted", Color(0.88, 0.86, 0.80)))
 		if btn.has_meta("mode_card_check"):
@@ -7437,6 +9336,14 @@ func _refresh_home_section_emphasis() -> void:
 	_set_home_section_card_state(_read_options_box, _selected_mode == MODE_READ)
 
 
+func _inversion_name(inversion: int) -> String:
+	match inversion:
+		1: return "1st Inversion"
+		2: return "2nd Inversion"
+		3: return "3rd Inversion"
+		_: return "Root Position"
+
+
 func _interval_display_name(interval_id: String) -> String:
 	match interval_id:
 		"P1":
@@ -7501,6 +9408,36 @@ func _interval_id_for_semitones(semitones: int) -> String:
 			return "P1"
 
 
+func _refresh_practice_hud_style() -> void:
+	if _hud_left_box == null:
+		return
+	var want_practice_style := _practice_mode_enabled and _quiz_active and not _is_sight_notes_style_mode() and _selected_mode != MODE_NOTE_CHASE
+	var sig := "practice" if want_practice_style else "default"
+	if _hud_left_box.get_meta("_prac_style_sig", "") == sig:
+		return
+	_hud_left_box.set_meta("_prac_style_sig", sig)
+	if want_practice_style:
+		if _hud_left_style_cache == null:
+			_hud_left_style_cache = StyleBoxFlat.new()
+			_hud_left_style_cache.corner_radius_top_left = 10
+			_hud_left_style_cache.corner_radius_top_right = 10
+			_hud_left_style_cache.corner_radius_bottom_left = 10
+			_hud_left_style_cache.corner_radius_bottom_right = 10
+			_hud_left_style_cache.border_width_left = 1
+			_hud_left_style_cache.border_width_top = 1
+			_hud_left_style_cache.border_width_right = 1
+			_hud_left_style_cache.border_width_bottom = 1
+			_hud_left_style_cache.content_margin_left = 10
+			_hud_left_style_cache.content_margin_right = 10
+			_hud_left_style_cache.content_margin_top = 8
+			_hud_left_style_cache.content_margin_bottom = 8
+		_hud_left_style_cache.bg_color = Color(0.05, 0.18, 0.22, 0.88)
+		_hud_left_style_cache.border_color = Color(0.30, 0.90, 0.85, 0.70)
+		_hud_left_box.add_theme_stylebox_override("panel", _hud_left_style_cache)
+	else:
+		_style_hud_box(_hud_left_box)
+
+
 func _style_hud_box(box: PanelContainer) -> void:
 	if box == null:
 		return
@@ -7528,6 +9465,10 @@ func _is_sight_notes_chords_game_mode() -> bool:
 
 func _is_sight_notes_chords_mode() -> bool:
 	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+
+
+func _is_sight_notes_style_mode() -> bool:
+	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow")
 
 
 func _sight_skin_is_desktop_hybrid_profile() -> bool:
@@ -7599,15 +9540,22 @@ func _refresh_sight_question_progress_ui(animate: bool = false) -> void:
 	if _sight_progress_track == null or _progress_label == null:
 		return
 	var in_notes_chords := _is_sight_notes_chords_game_mode()
+	var in_ear := _is_ear_training_mode() and _game_panel != null and _game_panel.visible
 	var has_questions := _total_questions > 0
-	_sight_progress_track.visible = in_notes_chords and has_questions and _quiz_active and _question_index > 0
+	_sight_progress_track.visible = (in_notes_chords or in_ear) and has_questions and _quiz_active and _question_index > 0
 	if not _sight_progress_track.visible:
 		_set_sight_progress_ratio(0.0, false)
+		if in_ear and _progress_label != null:
+			_progress_label.text = ""
 		return
 	var question_clamped := clampi(_question_index, 0, _total_questions)
 	var ratio := float(question_clamped) / float(maxi(1, _total_questions))
 	_set_sight_progress_ratio(ratio, animate)
-	_progress_label.text = "Question %d of %d" % [maxi(1, question_clamped), _total_questions]
+	if in_ear:
+		# Bar is the visual indicator; label just shows count
+		_progress_label.text = "Question %d of %d" % [maxi(1, question_clamped), _total_questions]
+	else:
+		_progress_label.text = "Question %d of %d" % [maxi(1, question_clamped), _total_questions]
 
 
 func _update_sight_progress_pulse(delta: float) -> void:
@@ -7719,17 +9667,21 @@ func _animate_sight_streak_score_feedback(prev_streak: int, prev_score: int, now
 	_sight_streak_anim_tween.tween_method(Callable(self, "_set_sight_streak_display_score"), float(prev_score), float(now_score), 0.26)
 	var flash := Color(1.0, 0.86, 0.38, 1.0) if is_positive else Color(1.0, 0.52, 0.52, 1.0)
 	if _sight_streak_value_label != null:
-		var t1 := create_tween()
-		t1.set_trans(Tween.TRANS_SINE)
-		t1.set_ease(Tween.EASE_OUT)
-		t1.tween_property(_sight_streak_value_label, "modulate", flash, 0.08)
-		t1.tween_property(_sight_streak_value_label, "modulate", Color(1, 1, 1, 1), 0.22)
+		if _sight_streak_flash_tween_1 != null and is_instance_valid(_sight_streak_flash_tween_1):
+			_sight_streak_flash_tween_1.kill()
+		_sight_streak_flash_tween_1 = create_tween()
+		_sight_streak_flash_tween_1.set_trans(Tween.TRANS_SINE)
+		_sight_streak_flash_tween_1.set_ease(Tween.EASE_OUT)
+		_sight_streak_flash_tween_1.tween_property(_sight_streak_value_label, "modulate", flash, 0.08)
+		_sight_streak_flash_tween_1.tween_property(_sight_streak_value_label, "modulate", Color(1, 1, 1, 1), 0.22)
 	if _sight_streak_score_label != null:
-		var t2 := create_tween()
-		t2.set_trans(Tween.TRANS_SINE)
-		t2.set_ease(Tween.EASE_OUT)
-		t2.tween_property(_sight_streak_score_label, "modulate", flash, 0.08)
-		t2.tween_property(_sight_streak_score_label, "modulate", Color(1, 1, 1, 1), 0.22)
+		if _sight_streak_flash_tween_2 != null and is_instance_valid(_sight_streak_flash_tween_2):
+			_sight_streak_flash_tween_2.kill()
+		_sight_streak_flash_tween_2 = create_tween()
+		_sight_streak_flash_tween_2.set_trans(Tween.TRANS_SINE)
+		_sight_streak_flash_tween_2.set_ease(Tween.EASE_OUT)
+		_sight_streak_flash_tween_2.tween_property(_sight_streak_score_label, "modulate", flash, 0.08)
+		_sight_streak_flash_tween_2.tween_property(_sight_streak_score_label, "modulate", Color(1, 1, 1, 1), 0.22)
 	if delta_score != 0:
 		var score_text := "%s%d" % ["+" if delta_score > 0 else "", delta_score]
 		_spawn_sight_stat_pop_text(score_text, flash, _sight_staff_note_anchor_global_position())
@@ -7752,6 +9704,7 @@ func _apply_top_hud_nav_button_skin() -> void:
 func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: Texture2D = null) -> void:
 	if btn == null:
 		return
+	var contract := _menu_style_contract()
 	btn.text = icon_text
 	btn.icon = icon_tex
 	btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -7769,32 +9722,32 @@ func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: T
 	btn.add_theme_font_size_override("font_size", 24 if icon_tex == null else 18)
 	btn.add_theme_constant_override("icon_max_width", 28)
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.09, 0.17, 0.29, 0.86)
+	normal.bg_color = Color(contract.get("btn_inactive_bg", Color(0.09, 0.17, 0.29, 0.86)))
 	normal.corner_radius_top_left = 23
 	normal.corner_radius_top_right = 23
 	normal.corner_radius_bottom_left = 23
 	normal.corner_radius_bottom_right = 23
-	normal.border_color = Color(0.92, 0.78, 0.32, 0.92)
+	normal.border_color = Color(contract.get("btn_selected_border", Color(0.92, 0.78, 0.32, 0.92)))
 	normal.border_width_left = 2
 	normal.border_width_top = 2
 	normal.border_width_right = 2
 	normal.border_width_bottom = 2
-	normal.shadow_color = Color(0.02, 0.03, 0.06, 0.36)
-	normal.shadow_size = 4
+	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_nav_alpha", 0.0)))
+	normal.shadow_size = int(contract.get("shadow_nav_size", 0))
 	normal.content_margin_left = 0
 	normal.content_margin_right = 0
 	normal.content_margin_top = 0
 	normal.content_margin_bottom = 0
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate()
-	hover.bg_color = Color(0.12, 0.23, 0.38, 0.92)
-	hover.border_color = Color(0.98, 0.84, 0.40, 0.98)
-	hover.shadow_size = 6
+	hover.bg_color = Color(contract.get("btn_inactive_hover", Color(0.12, 0.23, 0.38, 0.92)))
+	hover.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.84, 0.40, 0.98)))
+	hover.shadow_size = int(contract.get("shadow_nav_hover_size", 0))
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate()
-	pressed.bg_color = Color(0.06, 0.12, 0.21, 0.94)
-	pressed.border_color = Color(0.86, 0.70, 0.26, 0.96)
-	pressed.shadow_size = 2
+	pressed.bg_color = Color(contract.get("btn_inactive_pressed", Color(0.06, 0.12, 0.21, 0.94)))
+	pressed.border_color = Color(contract.get("btn_selected_border", Color(0.86, 0.70, 0.26, 0.96)))
+	pressed.shadow_size = int(contract.get("shadow_nav_pressed_size", 0))
 	btn.add_theme_stylebox_override("pressed", pressed)
 	var is_settings_button: bool = btn == _sight_settings_button
 	var base_icon_color: Color = Color(1.0, 1.0, 1.0, 1.0) if is_settings_button else Color(0.98, 0.94, 0.84, 1.0)
@@ -7871,33 +9824,100 @@ func _build_sight_hearts_text(lives: int, max_hearts: int = 3) -> String:
 func _refresh_sight_lives_feed_shield_ui() -> void:
 	if _sight_lives_panel == null:
 		return
-	var in_notes_chords := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
-	_sight_lives_panel.visible = in_notes_chords and _game_panel != null and _game_panel.visible
-	if not _sight_lives_panel.visible:
+	var in_notes_style := _is_sight_notes_style_mode()
+	var in_ear := _is_ear_training_mode()
+	var hide_sight_practice_panel := in_notes_style and not in_ear and _practice_mode_enabled
+	var show_panel := (in_notes_style or in_ear) and _game_panel != null and _game_panel.visible and not hide_sight_practice_panel
+	_sight_lives_panel.visible = show_panel
+	if not show_panel:
+		return
+	# Ear training — hearts only, no feed/shield chips in this panel
+	if in_ear:
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.text = "PRACTICE" if _practice_mode_enabled else "LIVES"
+		if _sight_lives_hearts_label != null:
+			if _practice_mode_enabled:
+				_sight_lives_hearts_label.text = "%s %d" % [char(0x1F3B5), _streak]
+				_sight_lives_hearts_label.add_theme_font_size_override("font_size", 22)
+			else:
+				_sight_lives_hearts_label.text = _build_sight_hearts_text(_lives, 3)
+				_sight_lives_hearts_label.add_theme_font_size_override("font_size", 30)
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = false
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = false
+		return
+	if _sight_mode == "Rhythm Flow":
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.text = "COMBO"
+		if _sight_lives_hearts_label != null:
+			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = false
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = false
 		return
 	if _sight_lives_title_label != null:
 		_sight_lives_title_label.text = "LIVES"
 	if _sight_lives_hearts_label != null:
-		_sight_lives_hearts_label.text = _build_sight_hearts_text(_lives, 3)
+		if _sight_mode == "Continuous":
+			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+		else:
+			_sight_lives_hearts_label.text = _build_sight_hearts_text(_lives, 3)
+	if _sight_feed_chip != null:
+		_sight_feed_chip.visible = _sight_mode != "Rhythm Flow"
+	if _sight_shield_chip != null:
+		_sight_shield_chip.visible = _sight_mode != "Rhythm Flow"
 	if _sight_feed_chip_label != null:
-		_sight_feed_chip_label.text = "Feed %d/%d" % [_chicken_combo_charge, CHICKEN_COMBO_TARGET]
+		var feed_display := CHICKEN_COMBO_TARGET if _chicken_combo_shields > 0 else _chicken_combo_charge
+		_sight_feed_chip_label.text = "Feed %d/%d" % [feed_display, CHICKEN_COMBO_TARGET]
 	if _sight_shield_chip_label != null:
-		_sight_shield_chip_label.text = "%s Shield" % char(0x1F6E1)
 		var shield_ready := _chicken_combo_shields > 0
+		_sight_shield_chip_label.text = "%s Shield Active" % char(0x1F6E1) if shield_ready else "%s Shield" % char(0x1F6E1)
 		_style_sight_stat_chip(_sight_shield_chip, Color(0.58, 0.88, 1.0, 0.96) if shield_ready else Color(0.55, 0.62, 0.72, 0.84))
 		_sight_shield_chip_label.modulate = Color(0.82, 0.94, 1.0, 0.98) if shield_ready else Color(0.74, 0.76, 0.82, 0.84)
+		# Running border glow when shield is active
+		if shield_ready and _sight_shield_chip != null:
+			var existing_sb: StyleBox = _sight_shield_chip.get_theme_stylebox("panel")
+			if existing_sb is StyleBoxFlat:
+				var sb: StyleBoxFlat = existing_sb as StyleBoxFlat
+				sb.border_color = Color(0.58, 0.95, 1.0, 0.95)
+				sb.border_width_left = 2
+				sb.border_width_top = 2
+				sb.border_width_right = 2
+				sb.border_width_bottom = 2
+			_sight_shield_chip.pivot_offset = _sight_shield_chip.size / 2.0
+			var glow_tw := _sight_shield_chip.create_tween()
+			glow_tw.set_loops()
+			glow_tw.tween_property(_sight_shield_chip, "modulate", Color(1.3, 1.3, 1.4, 1.0), 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			glow_tw.tween_property(_sight_shield_chip, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _refresh_sight_streak_panel_ui() -> void:
 	if _sight_streak_panel == null:
 		return
-	var in_notes_chords := _is_sight_notes_chords_game_mode()
-	_sight_streak_panel.visible = in_notes_chords and _game_panel != null and _game_panel.visible
+	var in_notes_style := _is_sight_notes_style_mode()
+	_sight_streak_panel.visible = in_notes_style and _game_panel != null and _game_panel.visible
 	if not _sight_streak_panel.visible:
 		_sight_streak_animating = false
 		return
+	if _sight_mode == "Rhythm Flow":
+		if _sight_streak_title_label != null:
+			_sight_streak_title_label.text = "BPM"
+		if _sight_streak_value_label != null:
+			_sight_streak_value_label.text = str(_rhythm_flow_bpm)
+		if _sight_streak_score_label != null:
+			var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
+			_sight_streak_score_label.text = "ACC %d%%" % acc
+		return
 	if _sight_streak_title_label != null:
 		_sight_streak_title_label.text = "STREAK"
+	if _sight_mode == "Continuous":
+		if _sight_streak_value_label != null:
+			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_combo]
+		if _sight_streak_score_label != null:
+			_sight_streak_score_label.text = "Score: %d" % _score
+		return
 	if _sight_streak_animating:
 		_set_sight_streak_display_values(_sight_streak_display_value, _sight_score_display_value)
 		return
@@ -7936,27 +9956,60 @@ func _style_sight_answer_button_neon(btn: Button) -> void:
 	btn.add_theme_constant_override("outline_size", 1)
 
 
+func _style_sight_grand_staff_replay_button(btn: Button) -> void:
+	if btn == null:
+		return
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.30, 0.86, 0.96, 0.98)
+	normal.corner_radius_top_left = 14
+	normal.corner_radius_top_right = 14
+	normal.corner_radius_bottom_left = 14
+	normal.corner_radius_bottom_right = 14
+	normal.border_color = Color(0.10, 0.34, 0.40, 0.96)
+	normal.border_width_left = 2
+	normal.border_width_top = 2
+	normal.border_width_right = 2
+	normal.border_width_bottom = 4
+	normal.shadow_color = Color(0.02, 0.08, 0.12, 0.50)
+	normal.shadow_size = 6
+	btn.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate()
+	hover.bg_color = Color(0.44, 0.92, 0.99, 0.99)
+	hover.shadow_size = 8
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed := normal.duplicate()
+	pressed.bg_color = Color(0.18, 0.74, 0.84, 0.99)
+	pressed.shadow_size = 3
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_color_override("font_color", Color(0.05, 0.20, 0.24, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color(0.04, 0.16, 0.20, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(0.03, 0.13, 0.17, 1.0))
+	btn.add_theme_color_override("font_outline_color", Color(0.90, 1.0, 1.0, 0.26))
+	btn.add_theme_constant_override("outline_size", 1)
+
+
 func _apply_sight_notes_chords_skin() -> void:
 	_sight_notes_chords_skin_active = true
 	if _game_card != null:
-		var game_card_sb := StyleBoxFlat.new()
-		game_card_sb.bg_color = Color(0.03, 0.12, 0.23, 0.62)
-		game_card_sb.corner_radius_top_left = 18
-		game_card_sb.corner_radius_top_right = 18
-		game_card_sb.corner_radius_bottom_left = 18
-		game_card_sb.corner_radius_bottom_right = 18
-		game_card_sb.border_color = Color(0.26, 0.80, 0.98, 0.34)
-		game_card_sb.border_width_left = 2
-		game_card_sb.border_width_top = 2
-		game_card_sb.border_width_right = 2
-		game_card_sb.border_width_bottom = 2
-		game_card_sb.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
-		game_card_sb.shadow_size = 10
-		game_card_sb.content_margin_left = 20
-		game_card_sb.content_margin_top = 16
-		game_card_sb.content_margin_right = 20
-		game_card_sb.content_margin_bottom = 16
-		_game_card.add_theme_stylebox_override("panel", game_card_sb)
+		if _sight_game_card_style_cache == null:
+			_sight_game_card_style_cache = StyleBoxFlat.new()
+			_sight_game_card_style_cache.bg_color = Color(0.03, 0.12, 0.23, 0.62)
+			_sight_game_card_style_cache.corner_radius_top_left = 18
+			_sight_game_card_style_cache.corner_radius_top_right = 18
+			_sight_game_card_style_cache.corner_radius_bottom_left = 18
+			_sight_game_card_style_cache.corner_radius_bottom_right = 18
+			_sight_game_card_style_cache.border_color = Color(0.26, 0.80, 0.98, 0.34)
+			_sight_game_card_style_cache.border_width_left = 2
+			_sight_game_card_style_cache.border_width_top = 2
+			_sight_game_card_style_cache.border_width_right = 2
+			_sight_game_card_style_cache.border_width_bottom = 2
+			_sight_game_card_style_cache.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
+			_sight_game_card_style_cache.shadow_size = 10
+			_sight_game_card_style_cache.content_margin_left = 20
+			_sight_game_card_style_cache.content_margin_top = 16
+			_sight_game_card_style_cache.content_margin_right = 20
+			_sight_game_card_style_cache.content_margin_bottom = 16
+		_game_card.add_theme_stylebox_override("panel", _sight_game_card_style_cache)
 	if _header_card != null:
 		_style_header_card(_header_card, Color(0.02, 0.08, 0.18, 0.30))
 	if _header_accent_line != null:
@@ -8061,7 +10114,7 @@ func _restore_sight_notes_chords_skin() -> void:
 	if _home_tokens != null:
 		var colors: Dictionary = _home_tokens.colors(false)
 		var panel_bg: Color = colors.get("panel_bg", Color(0.10, 0.14, 0.11, 0.74))
-		var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+		var home_visible := _is_home_ui_active()
 		var header_bg := Color(
 			clampf(panel_bg.r + 0.06, 0.0, 1.0),
 			clampf(panel_bg.g + 0.10, 0.0, 1.0),
@@ -8071,7 +10124,7 @@ func _restore_sight_notes_chords_skin() -> void:
 		_style_header_card(_header_card, header_bg)
 		_style_card(_game_card, Color(panel_bg.r, panel_bg.g, panel_bg.b, 0.70))
 	else:
-		var fallback_home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+		var fallback_home_visible := _is_home_ui_active()
 		_style_header_card(_header_card, Color(0.16, 0.24, 0.30, 0.24 if fallback_home_visible else 0.34))
 		_style_card(_game_card, Color(0.10, 0.14, 0.11, 0.70))
 	if _title_label != null:
@@ -8137,8 +10190,211 @@ func _refresh_sight_notes_chords_skin() -> void:
 	elif _sight_notes_chords_skin_active:
 		_restore_sight_notes_chords_skin()
 	elif _sight_settings_button != null:
-		var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+		var home_visible := _is_home_ui_active()
 		_sight_settings_button.visible = home_visible
+	var in_continuous_game := _is_continuous_flow_sight_mode() and _game_panel != null and _game_panel.visible
+	if in_continuous_game:
+		_apply_continuous_sight_skin()
+	elif _continuous_sight_skin_active:
+		_restore_continuous_sight_skin()
+
+
+func _apply_continuous_sight_skin() -> void:
+	_continuous_sight_skin_active = true
+	if _game_card != null:
+		if _sight_game_card_style_cache == null:
+			_sight_game_card_style_cache = StyleBoxFlat.new()
+			_sight_game_card_style_cache.bg_color = Color(0.03, 0.12, 0.23, 0.62)
+			_sight_game_card_style_cache.corner_radius_top_left = 18
+			_sight_game_card_style_cache.corner_radius_top_right = 18
+			_sight_game_card_style_cache.corner_radius_bottom_left = 18
+			_sight_game_card_style_cache.corner_radius_bottom_right = 18
+			_sight_game_card_style_cache.border_color = Color(0.26, 0.80, 0.98, 0.34)
+			_sight_game_card_style_cache.border_width_left = 2
+			_sight_game_card_style_cache.border_width_top = 2
+			_sight_game_card_style_cache.border_width_right = 2
+			_sight_game_card_style_cache.border_width_bottom = 2
+			_sight_game_card_style_cache.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
+			_sight_game_card_style_cache.shadow_size = 10
+			_sight_game_card_style_cache.content_margin_left = 20
+			_sight_game_card_style_cache.content_margin_top = 16
+			_sight_game_card_style_cache.content_margin_right = 20
+			_sight_game_card_style_cache.content_margin_bottom = 16
+		_game_card.add_theme_stylebox_override("panel", _sight_game_card_style_cache)
+	if _header_card != null:
+		_style_header_card(_header_card, Color(0.02, 0.08, 0.18, 0.30))
+	if _header_accent_line != null:
+		_header_accent_line.visible = false
+	if _title_label != null:
+		_title_label.text = "Sight Reading - %s" % _sight_mode
+		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_title_label.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
+		_title_label.remove_theme_color_override("font_outline_color")
+		_title_label.remove_theme_constant_override("outline_size")
+		_title_label.add_theme_color_override("font_shadow_color", Color(0.02, 0.07, 0.14, 0.38))
+		_title_label.add_theme_constant_override("shadow_offset_x", 0)
+		_title_label.add_theme_constant_override("shadow_offset_y", 1)
+	if _header_mode_label != null:
+		_header_mode_label.visible = false
+	if _header_tagline_label != null:
+		var tagline := "Tap the glyphs in time" if _sight_mode == "Rhythm Flow" else "Read the staff — answer before the note passes"
+		_header_tagline_label.text = tagline
+		_header_tagline_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.98, 0.90))
+	_apply_top_hud_nav_button_skin()
+	if _home_mode_back_button != null:
+		_home_mode_back_button.visible = true
+	if _home_mode_home_button != null:
+		_home_mode_home_button.visible = true
+	if _sight_settings_button != null:
+		_sight_settings_button.visible = true
+	# Neon HUD boxes — same palette as Notes/Chords
+	var desktop_hybrid := _sight_skin_is_desktop_hybrid_profile()
+	var icon_glow_alpha := 0.72 if desktop_hybrid else 0.42
+	_style_sight_hud_box_neon(_hud_left_box, Color(0.34, 0.88, 1.0, 0.96))
+	_style_sight_hud_box_neon(_hud_center_box, Color(0.95, 0.78, 0.35, 0.96))
+	_style_sight_hud_box_neon(_hud_right_box, Color(0.95, 0.82, 0.50, 0.90))
+	var is_rhythm := _sight_mode == "Rhythm Flow"
+	var hide_sight_practice_panel := _practice_mode_enabled
+	# Left panel: Note Flow uses Notes-style lives panel, Rhythm Flow keeps combo-focused panel.
+	if _sight_lives_panel != null:
+		_sight_lives_panel.visible = not hide_sight_practice_panel
+	if not hide_sight_practice_panel:
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.text = "COMBO" if is_rhythm else "LIVES"
+			_sight_lives_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
+		if _sight_lives_hearts_label != null:
+			if is_rhythm:
+				_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+				_sight_lives_hearts_label.add_theme_color_override("font_color", Color(0.44, 0.96, 1.0, 1.0))
+				_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.04, 0.14, 0.22, 0.76))
+				_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(0.20, 0.86, 1.0, icon_glow_alpha))
+			else:
+				_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+				_sight_lives_hearts_label.add_theme_color_override("font_color", Color(1.0, 0.36, 0.38, 1.0))
+				_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.17, 0.05, 0.08, 0.76))
+				_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.34, 0.26, icon_glow_alpha))
+			_sight_lives_hearts_label.add_theme_constant_override("outline_size", 1)
+			_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_x", 0)
+			_sight_lives_hearts_label.add_theme_constant_override("shadow_offset_y", 0)
+		# Keep Feed/Shield chips visible in Note Flow for parity with Notes HUD.
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = not is_rhythm
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = not is_rhythm
+	else:
+		if _sight_feed_chip != null:
+			_sight_feed_chip.visible = false
+		if _sight_shield_chip != null:
+			_sight_shield_chip.visible = false
+	_style_sight_stat_chip(_sight_feed_chip, Color(0.98, 0.82, 0.34, 0.94))
+	_style_sight_stat_chip(_sight_shield_chip, Color(0.55, 0.62, 0.72, 0.84))
+	if _sight_feed_chip_label != null:
+		_sight_feed_chip_label.add_theme_color_override("font_color", Color(0.98, 0.90, 0.54, 1.0))
+	if _sight_feed_chip_icon != null:
+		_sight_feed_chip_icon.modulate = Color(0.96, 0.78, 0.20, 1.0)
+		_sight_feed_chip_icon.visible = _sight_wheat_icon != null
+	if _sight_shield_chip_label != null:
+		_sight_shield_chip_label.add_theme_color_override("font_color", Color(0.70, 0.75, 0.82, 0.94))
+	# Right panel: Note Flow uses streak/score like Notes, Rhythm Flow keeps BPM.
+	if _sight_streak_panel != null:
+		_sight_streak_panel.visible = true
+	if _sight_streak_title_label != null:
+		_sight_streak_title_label.text = "BPM" if is_rhythm else "STREAK"
+		_sight_streak_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
+	if _sight_streak_value_label != null:
+		_sight_streak_value_label.text = str(_rhythm_flow_bpm) if is_rhythm else ("%s %d" % [char(0x1F525), _continuous_sight_combo])
+		_sight_streak_value_label.add_theme_color_override("font_color", Color(1.0, 0.76, 0.30, 0.99))
+		_sight_streak_value_label.add_theme_color_override("font_outline_color", Color(0.18, 0.10, 0.02, 0.80))
+		_sight_streak_value_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.66, 0.20, icon_glow_alpha))
+		_sight_streak_value_label.add_theme_constant_override("outline_size", 1)
+		_sight_streak_value_label.add_theme_constant_override("shadow_offset_x", 0)
+		_sight_streak_value_label.add_theme_constant_override("shadow_offset_y", 0)
+	if _sight_streak_score_label != null:
+		_sight_streak_score_label.text = "ACC %d%%" % int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0)) if is_rhythm else ("Score: %d" % _score)
+		_sight_streak_score_label.add_theme_color_override("font_color", Color(0.98, 0.86, 0.54, 0.98))
+	# Center box labels
+	if _lives_label != null:
+		_lives_label.visible = false
+	if _streak_label != null:
+		_streak_label.visible = false
+	if _xp_label != null:
+		_xp_label.visible = false
+	if _score_label != null:
+		_score_label.add_theme_color_override("font_color", Color(1.0, 0.93, 0.68, 1.0))
+	if _progress_label != null:
+		_progress_label.add_theme_color_override("font_color", Color(0.86, 0.95, 1.0, 0.98))
+	if _status_label != null:
+		_status_label.add_theme_color_override("font_color", Color(0.86, 0.96, 1.0, 0.98))
+	if not is_rhythm:
+		_refresh_sight_lives_feed_shield_ui()
+		_refresh_sight_streak_panel_ui()
+	if _staff_area != null:
+		_note_chase_realign_staff_frame()
+
+
+func _restore_continuous_sight_skin() -> void:
+	if _header_tagline_label != null:
+		_header_tagline_label.text = APP_TAGLINE_LABEL
+		_header_tagline_label.add_theme_color_override("font_color", Color(0.84, 0.92, 0.98, 0.70))
+	if _header_mode_label != null:
+		_header_mode_label.visible = false
+	if _header_accent_line != null:
+		_header_accent_line.visible = false
+	if _home_tokens != null:
+		var colors: Dictionary = _home_tokens.colors(false)
+		var panel_bg: Color = colors.get("panel_bg", Color(0.10, 0.14, 0.11, 0.74))
+		var home_visible := _is_home_ui_active()
+		var header_bg := Color(
+			clampf(panel_bg.r + 0.06, 0.0, 1.0),
+			clampf(panel_bg.g + 0.10, 0.0, 1.0),
+			clampf(panel_bg.b + 0.16, 0.0, 1.0),
+			0.24 if home_visible else 0.34
+		)
+		_style_header_card(_header_card, header_bg)
+		_style_card(_game_card, Color(panel_bg.r, panel_bg.g, panel_bg.b, 0.70))
+	else:
+		var fallback_home_visible := _is_home_ui_active()
+		_style_header_card(_header_card, Color(0.16, 0.24, 0.30, 0.24 if fallback_home_visible else 0.34))
+		_style_card(_game_card, Color(0.10, 0.14, 0.11, 0.70))
+	if _title_label != null:
+		var title_color := Color(0.98, 0.96, 0.88, 1.0)
+		if _home_tokens != null:
+			var title_colors: Dictionary = _home_tokens.colors(false)
+			title_color = Color(title_colors.get("text_primary", title_color))
+		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_title_label.add_theme_color_override("font_color", title_color)
+		_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.24))
+		_title_label.add_theme_constant_override("shadow_offset_x", 0)
+		_title_label.add_theme_constant_override("shadow_offset_y", 1)
+		_title_label.remove_theme_color_override("font_outline_color")
+		_title_label.remove_theme_constant_override("outline_size")
+	_apply_top_hud_nav_button_skin()
+	if _sight_lives_panel != null:
+		_sight_lives_panel.visible = false
+	if _sight_streak_panel != null:
+		_sight_streak_panel.visible = false
+	# Restore chip visibility for when Notes mode later shows the panel
+	if _sight_feed_chip != null:
+		_sight_feed_chip.visible = true
+	if _sight_shield_chip != null:
+		_sight_shield_chip.visible = true
+	if _lives_label != null:
+		_lives_label.visible = true
+	if _streak_label != null:
+		_streak_label.visible = true
+	if _xp_label != null:
+		_xp_label.visible = true
+	_style_hud_box(_hud_left_box)
+	_style_hud_box(_hud_center_box)
+	_style_hud_box(_hud_right_box)
+	if _score_label != null:
+		_score_label.remove_theme_color_override("font_color")
+	if _progress_label != null:
+		_progress_label.remove_theme_color_override("font_color")
+	if _status_label != null:
+		_status_label.remove_theme_color_override("font_color")
+	_refresh_game_title()
+	_continuous_sight_skin_active = false
 
 
 func _style_note_chase_metric_box(box: PanelContainer) -> void:
@@ -8214,7 +10470,14 @@ func _set_note_chase_bottom_metric(label: RichTextLabel, icon_text: String, valu
 
 
 func _result_box_show(title_text: String, subtitle_text: String) -> void:
-	_result_title.text = title_text
+	if _first_run_assessment_active:
+		_first_run_assessment_active = false
+		_first_run_assessment_steps.clear()
+	# Dynamic title for completions based on session accuracy
+	var display_title := title_text
+	if title_text == "Complete":
+		display_title = _accuracy_motivational_message(_score, _question_index)
+	_result_title.text = display_title
 	_result_subtitle.text = subtitle_text
 	if _result_action_row != null:
 		_result_action_row.visible = false
@@ -8226,7 +10489,7 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 		_result_subtitle.move_to_front()
 	if _result_action_row != null:
 		_result_action_row.move_to_front()
-		var show_standard_actions := title_text == "Complete" or title_text == "Game Over"
+		var show_standard_actions := title_text == "Complete" or title_text == "Keep Practicing!"
 		_result_action_row.visible = show_standard_actions
 		if show_standard_actions:
 			if _result_action_primary_button != null:
@@ -8238,7 +10501,23 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 			if _result_action_home_button != null:
 				_result_action_home_button.text = "Home"
 				_result_action_home_button.disabled = false
+			if _result_action_focus_button != null:
+				var is_ear_mode := _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE]
+				var has_misses := is_ear_mode and not _compute_missed_ids().is_empty()
+				_result_action_focus_button.visible = has_misses
+				_result_action_focus_button.disabled = false
+		else:
+			if _result_action_focus_button != null:
+				_result_action_focus_button.visible = false
 	_result_overlay.visible = true
+	# Bounce-in animation for result box
+	if _result_box_panel != null:
+		_result_box_panel.scale = Vector2(0.72, 0.72)
+		_result_box_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		var rbw := create_tween()
+		rbw.set_parallel(true)
+		rbw.tween_property(_result_box_panel, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		rbw.tween_property(_result_box_panel, "modulate:a", 1.0, 0.20).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _result_box_hide() -> void:
@@ -8290,6 +10569,8 @@ func _style_result_overlay_theme() -> void:
 		_style_button(_result_action_secondary_button)
 	if _result_action_home_button != null:
 		_style_button(_result_action_home_button)
+	if _result_action_focus_button != null:
+		_style_button(_result_action_focus_button)
 
 
 func _start_rhythm_flow_session_from_current_pattern(demo_mode: bool) -> void:
@@ -8314,10 +10595,33 @@ func _start_rhythm_flow_session_from_current_pattern(demo_mode: bool) -> void:
 
 func _on_result_action_primary_pressed() -> void:
 	_play_ui_click_sfx()
+	_focus_missed_ids.clear()  # Normal restart: use full settings pool
 	if _is_rhythm_flow_mode():
 		_start_rhythm_flow_session_from_current_pattern(_rhythm_flow_last_start_demo_mode)
 		return
 	_on_restart_quiz_pressed()
+
+
+func _on_result_action_focus_pressed() -> void:
+	_play_ui_click_sfx()
+	_focus_missed_ids = _compute_missed_ids()
+	if _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE] and _question_spin != null:
+		_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
+	_on_restart_quiz_pressed()
+
+
+func _compute_missed_ids() -> Array[String]:
+	var stats_asked: Dictionary
+	var stats_correct: Dictionary
+	if _selected_mode == MODE_INTERVAL:
+		stats_asked = _interval_stats_asked
+		stats_correct = _interval_stats_correct
+	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_CADENCE:
+		stats_asked = _chord_stats_asked
+		stats_correct = _chord_stats_correct
+	else:
+		return []
+	return _ensure_progress_store().compute_missed_ids(stats_asked, stats_correct)
 
 
 func _on_result_action_secondary_pressed() -> void:
@@ -8361,6 +10665,8 @@ func _should_advance_after_delay(expected_token: int) -> bool:
 
 
 func _on_any_ui_button_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	if _selected_mode == MODE_SIGHT and _quiz_active and _accepting_answer:
 		return
 	_play_ui_click_sfx()
@@ -8376,19 +10682,8 @@ func _on_bird_gui_input(event: InputEvent) -> void:
 		return
 	if _chicken_hint_busy:
 		return
-	if not _in_tutorial and _tutorial_bubble != null and _tutorial_bubble.visible:
-		# Toggle off any visible hint bubble on repeated chicken tap.
-		_hide_chicken_bubble()
-		_chicken_hint_locked_this_turn = false
-		_chicken_hint_clicks_this_turn = 0
-		_chicken_prompt_ready_at = 0.0
-		_chicken_hint_cooldown_until = 0.0
-		_refresh_bird_perch_from_layout(true)
-		return
 	var now := float(Time.get_ticks_msec()) / 1000.0
 	if now < _chicken_hint_cooldown_until:
-		if _status_label != null:
-			_status_label.text = "Chicken is thinking..."
 		return
 	_play_ui_click_sfx()
 	call_deferred("_request_chicken_hint")
@@ -8397,6 +10692,7 @@ func _on_bird_gui_input(event: InputEvent) -> void:
 func _cancel_chicken_turn_hint_cycle(hide_bubble: bool) -> void:
 	_chicken_hint_turn_token += 1
 	_chicken_hint_clicks_this_turn = 0
+	_chicken_hint_used_this_turn = false
 	_chicken_hint_locked_this_turn = false
 	_chicken_prompt_ready_at = 0.0
 	if hide_bubble:
@@ -8468,6 +10764,8 @@ func _set_chicken_bubble_text(text: String) -> void:
 	_tutorial_bubble_label.size = Vector2(target_w - 32.0, target_h - 24.0)
 	_tutorial_bubble_label.text = text
 	_tutorial_bubble.visible = true
+	if _chicken_bubble_close_btn != null and not _in_tutorial:
+		_chicken_bubble_close_btn.visible = true
 	# In gameplay hint mode, use thought dots only (no square-ish tail).
 	_tutorial_bubble_tail.visible = false
 	for dot in _tutorial_bubble_dots:
@@ -8491,6 +10789,8 @@ func _hide_chicken_bubble() -> void:
 	for dot in _tutorial_bubble_dots:
 		if dot != null:
 			dot.visible = false
+	if _chicken_bubble_close_btn != null:
+		_chicken_bubble_close_btn.visible = false
 
 
 func _lock_chicken_hint_line(text: String) -> void:
@@ -8523,9 +10823,9 @@ func _update_chicken_bubble_position() -> void:
 		bounds_top = _game_panel.global_position.y - _sky_area.global_position.y
 		bounds_right = bounds_left + _game_panel.size.x
 		bounds_bottom = bounds_top + _game_panel.size.y
-	# Keep hint cloud closer to chicken (higher and slightly nearer on X).
-	var target_x := _bird_sprite.position.x + (_bird_sprite.size.x * 0.72)
-	var target_y := _bird_sprite.position.y - (bubble_size.y * 0.55)
+	# Position bubble directly above the chicken
+	var target_x := _bird_sprite.position.x + (_bird_sprite.size.x * 0.5) - (bubble_size.x * 0.3)
+	var target_y := _bird_sprite.position.y - bubble_size.y - 8.0
 	var min_x := bounds_left + pad
 	var max_x := maxf(min_x, bounds_right - bubble_size.x - pad)
 	var min_y := bounds_top + pad
@@ -8536,6 +10836,9 @@ func _update_chicken_bubble_position() -> void:
 	var chicken_cap_y := _bird_sprite.position.y - (bubble_size.y * 0.28)
 	by = minf(by, maxf(min_y, chicken_cap_y))
 	_tutorial_bubble.position = Vector2(bx, by)
+	if _chicken_bubble_close_btn != null and _chicken_bubble_close_btn.visible:
+		var btn_size := _chicken_bubble_close_btn.size
+		_chicken_bubble_close_btn.position = Vector2(bx + bubble_size.x - btn_size.x * 0.5, by - btn_size.y * 0.5)
 	var tail_y := clampf(by + bubble_size.y - 34.0, min_y, maxf(min_y, bounds_bottom - 34.0))
 	var tail_x := clampf(bx - 14.0, bounds_left, maxf(bounds_left, bounds_right - 48.0))
 	_tutorial_bubble_tail.position = Vector2(tail_x, tail_y)
@@ -8580,6 +10883,7 @@ func _request_chicken_hint() -> void:
 			_status_label.text = "Wait for prompt audio to finish."
 		return
 	_chicken_hint_clicks_this_turn += 1
+	_chicken_hint_used_this_turn = true
 	# 1st and 2nd tap: gentle hints. 3rd+ tap: clear hint with reason.
 	var clear_hint := _chicken_hint_clicks_this_turn >= 3
 	_chicken_hint_busy = true
@@ -8596,14 +10900,39 @@ func _midi_pitch_class_name(midi: int) -> String:
 
 func _chord_family_id_from_name(quality_name: String) -> String:
 	var q := quality_name.to_lower()
+	# Order matters: check longer/more-specific strings first
+	if q == "augmaj7" or q.find("augmaj7") >= 0:
+		return "augmaj7"
+	if q == "aug7" or q.find("aug7") >= 0:
+		return "aug7"
+	if q == "mmaj7" or q.find("mmaj7") >= 0:
+		return "mmaj7"
+	if q == "half-dim" or q.find("half-dim") >= 0 or q.find("m7b5") >= 0:
+		return "halfdim"
 	if q.find("dim7") >= 0 or q.find("diminished 7") >= 0:
 		return "dim7"
+	if q == "maj9" or q.find("maj9") >= 0:
+		return "maj9"
+	if q == "min9" or q.find("min9") >= 0:
+		return "min9"
+	if q == "dom9" or q.find("dom9") >= 0:
+		return "dom9"
+	if q == "add9" or q.find("add9") >= 0:
+		return "add9"
 	if q.find("maj7") >= 0 or q.find("major 7") >= 0:
 		return "maj7"
 	if q.find("min7") >= 0 or q.find("minor 7") >= 0:
 		return "min7"
 	if q.find("dom7") >= 0 or q.find("dominant 7") >= 0:
 		return "dom7"
+	if q == "7sus4" or q.find("7sus4") >= 0:
+		return "7sus4"
+	if q == "6/9" or q.find("6/9") >= 0:
+		return "69"
+	if q == "maj6" or q.find("maj6") >= 0:
+		return "maj6"
+	if q == "min6" or q.find("min6") >= 0:
+		return "min6"
 	if q.find("power") >= 0:
 		return "power"
 	if q.find("aug") >= 0:
@@ -8623,29 +10952,19 @@ func _chord_family_id_from_name(quality_name: String) -> String:
 
 func _chord_hint_meta(quality_name: String) -> Dictionary:
 	var family := _chord_family_id_from_name(quality_name)
-	match family:
-		"maj7":
-			return {"intervals": [0, 4, 7, 11], "family": family}
-		"min7":
-			return {"intervals": [0, 3, 7, 10], "family": family}
-		"dom7":
-			return {"intervals": [0, 4, 7, 10], "family": family}
-		"dim7":
-			return {"intervals": [0, 3, 6, 9], "family": family}
-		"aug":
-			return {"intervals": [0, 4, 8], "family": family}
-		"dim":
-			return {"intervals": [0, 3, 6], "family": family}
-		"sus2":
-			return {"intervals": [0, 2, 7], "family": family}
-		"sus4":
-			return {"intervals": [0, 5, 7], "family": family}
-		"minor":
-			return {"intervals": [0, 3, 7], "family": family}
-		"power":
-			return {"intervals": [0, 7], "family": family}
-		_:
-			return {"intervals": [0, 4, 7], "family": "major"}
+	var _hint_intervals := {
+		"major": [0, 4, 7], "minor": [0, 3, 7], "power": [0, 7],
+		"dim": [0, 3, 6], "aug": [0, 4, 8],
+		"sus2": [0, 2, 7], "sus4": [0, 5, 7],
+		"maj7": [0, 4, 7, 11], "dom7": [0, 4, 7, 10], "min7": [0, 3, 7, 10],
+		"dim7": [0, 3, 6, 9], "halfdim": [0, 3, 6, 10], "mmaj7": [0, 3, 7, 11],
+		"aug7": [0, 4, 8, 10], "augmaj7": [0, 4, 8, 11],
+		"7sus4": [0, 5, 7, 10],
+		"maj6": [0, 4, 7, 9], "min6": [0, 3, 7, 9], "69": [0, 4, 7, 9, 14],
+		"dom9": [0, 4, 7, 10, 14], "maj9": [0, 4, 7, 11, 14], "min9": [0, 3, 7, 10, 14],
+		"add9": [0, 4, 7, 14],
+	}
+	return {"intervals": _hint_intervals.get(family, [0, 4, 7]), "family": family}
 
 
 func _parse_root_midi_from_chord_name(name: String) -> int:
@@ -8708,118 +11027,118 @@ func _interval_hint_lines(interval_id: String, clear_hint: bool) -> Array:
 	var semis := absi(_current_second_midi - _current_root_midi)
 	var bank := {
 		"P1": [
-			"It sounds like the same note again.",
-			"No jump, just one pitch repeated.",
-			"Unison: both notes match.",
-			"Try matching your voice to one note only.",
-			"Think 'same note, different time'."
+			"Unison: both notes are the exact same pitch.",
+			"No jump at all — the two tones blend into one.",
+			"You hear no movement, just a single solid sound.",
+			"If it sounds like nothing changed, it's Unison.",
+			"Memory hook: hum one note, then hear the same note again."
 		],
 		"m2": [
-			"Song idea: Jaws opening.",
-			"Very tiny, tense step.",
-			"Only 1 semitone apart.",
-			"Feels like notes are rubbing together.",
-			"Often sounds spooky."
+			"Song: the Jaws two-note motif — da-dum.",
+			"The smallest possible step: 1 semitone (one piano key apart).",
+			"Sounds tense and scratchy — notes rub against each other.",
+			"Often used in horror and suspense music for a reason!",
+			"Imagine two keys right next to each other on a piano."
 		],
 		"M2": [
-			"Song idea: Happy Birthday opening.",
-			"Small step, but less tense than m2.",
-			"2 semitones apart.",
-			"Common in simple melodies.",
-			"Feels like a gentle move forward."
+			"Song: the opening of Happy Birthday ('Hap-py').",
+			"A comfortable small step: 2 semitones apart.",
+			"Sounds smooth and natural — very common in melodies.",
+			"This is the distance between adjacent white keys in C major.",
+			"Gentle forward motion — less tense than the m2."
 		],
 		"m3": [
-			"Song idea: Greensleeves opening color.",
-			"Minor 3rd often sounds sadder.",
-			"3 semitones apart.",
-			"This interval helps form minor chords.",
-			"Bigger than a step, still close."
+			"Song: 'Greensleeves' — the opening drop has a minor 3rd feel.",
+			"Also: 'Smoke on the Water' riff, 'Iron Man' main riff.",
+			"3 semitones apart — a moody, slightly dark jump.",
+			"The minor 3rd is the interval that makes minor chords minor.",
+			"Think of it as a leap that has a touch of sadness."
 		],
 		"M3": [
-			"Song idea: Oh When the Saints opening.",
-			"Major 3rd often sounds brighter.",
-			"4 semitones apart.",
-			"This interval helps form major chords.",
-			"Happy, clear color."
+			"Song: 'When the Saints Go Marching In' — opening leap.",
+			"Also: 'Oh What a Beautiful Morning' opening.",
+			"4 semitones apart — bright and hopeful.",
+			"The major 3rd is what makes major chords sound happy.",
+			"One semitone wider than the minor 3rd — much brighter feel."
 		],
 		"P4": [
-			"Song idea: Here Comes the Bride.",
-			"Perfect 4th is a strong classic jump.",
-			"5 semitones apart.",
-			"Not too tight, not too wide.",
-			"Often sounds bold."
+			"Song: 'Here Comes the Bride' — the opening leap.",
+			"Also: 'Amazing Grace' and 'Auld Lang Syne' opening.",
+			"5 semitones apart — a strong, noble jump.",
+			"In ancient music, the perfect 4th was one of the 'perfect' intervals.",
+			"Wider than a 3rd, it sounds bold but not aggressive."
 		],
 		"TT": [
-			"Song idea: The Simpsons theme / Maria.",
-			"Tritone = augmented 4th or diminished 5th.",
-			"This was nicknamed 'Diabolus in Musica'.",
-			"In medieval times it was often avoided for harsh dissonance.",
-			"6 semitones: right in the middle of the octave."
+			"Song: 'Maria' from West Side Story opens with a tritone.",
+			"Also: The Simpsons theme opening leap.",
+			"6 semitones — exactly halfway through the octave.",
+			"Medieval musicians called it 'Diabolus in Musica' (Devil in Music).",
+			"It sounds restless and unstable — strongly wants to move somewhere."
 		],
 		"P5": [
-			"Song idea: Twinkle Twinkle Little Star.",
-			"Song idea: Star Wars main theme opening.",
-			"Perfect 5th sounds open and stable.",
-			"7 semitones apart.",
-			"Very common 'strong' interval."
+			"Song: 'Twinkle Twinkle' — 'Twin-kle Twin-kle' jump.",
+			"Also: Star Wars opening fanfare, 'Can't Help Falling in Love'.",
+			"7 semitones — the second strongest interval after the octave.",
+			"Perfect 5ths are the foundation of power chords in rock.",
+			"Open and ringing — feels strong and settled but not quite 'home'."
 		],
 		"m6": [
-			"Song idea: The Entertainer phrase color.",
-			"Minor 6th is a wide, darker jump.",
-			"8 semitones apart.",
-			"Feels bigger than a 5th.",
-			"Can sound dramatic."
+			"Song: 'The Entertainer' by Scott Joplin has a minor 6th flavour.",
+			"Also: 'Go Down Moses' — the opening leap.",
+			"8 semitones — a wide, emotionally charged jump.",
+			"It's the inversion of a major 3rd (flip it and you get M3).",
+			"Darker and more dramatic than the major 6th."
 		],
 		"M6": [
-			"Song idea: My Bonnie Lies Over the Ocean.",
-			"Major 6th is wide and warmer.",
-			"9 semitones apart.",
-			"Still singable, but clearly wide.",
-			"Brighter than minor 6th."
+			"Song: 'My Bonnie Lies Over the Ocean' opening — large bright leap.",
+			"Also: 'Nobody Knows the Trouble I've Seen' opening.",
+			"9 semitones — wide but warm and singable.",
+			"It's the inversion of a minor 3rd (flip it and you get m3).",
+			"Brighter and more open-feeling than the minor 6th."
 		],
 		"m7": [
-			"Song idea: Somewhere color (near octave).",
-			"Minor 7th sits just below octave.",
-			"10 semitones apart.",
-			"Wide and tense.",
-			"Feels almost complete."
+			"Song: 'Somewhere' from West Side Story — 'There's a place for us'.",
+			"Also: the opening riff of 'Fly Me to the Moon' uses a minor 7th.",
+			"10 semitones — very wide, just one step below the octave.",
+			"The minor 7th adds the 'blue' note in dominant 7th chords.",
+			"Sounds wide and slightly unresolved — yearning for the octave."
 		],
 		"M7": [
-			"Song idea: Take On Me leap color.",
-			"Major 7th is very close to octave.",
-			"11 semitones apart.",
-			"Strong pull to resolve to octave.",
-			"Bright and tense."
+			"Song: 'Take On Me' by A-Ha — the leap in the chorus.",
+			"Also: 'Over the Rainbow' has a major 7th in its inner melody.",
+			"11 semitones — one tiny step below the octave.",
+			"Creates the dreamy tension in major 7th chords (Cmaj7).",
+			"Very bright and tense — powerfully wants to resolve up to the octave."
 		],
 		"P8": [
-			"Song idea: Somewhere Over the Rainbow opening.",
-			"Octave means same note name, higher pitch.",
-			"12 semitones apart.",
-			"Big leap but very stable.",
-			"Home note repeated higher."
+			"Song: 'Somewhere Over the Rainbow' — the very first leap ('Some-where').",
+			"Also: 'Singin' in the Rain' opening leap.",
+			"12 semitones — same note name, one octave higher.",
+			"The octave is perfectly consonant — it sounds like 'home stretched up'.",
+			"The biggest jump in the standard 12 intervals."
 		]
 	}
-	var interval_lines: Array = bank.get(interval_id, ["Listen for size first.", "Use replay.", "Compare to octave.", "Use root as anchor.", "Then choose closest label."])
+	var interval_lines: Array = bank.get(interval_id, ["Listen for the size of the jump.", "Use the Replay button.", "Compare it to the octave — is it half? Less?", "Use the bottom note as your anchor.", "Then match the jump size to a label."])
 	var interval_extra := [
-		"Extra hint: this interval uses %d semitone(s)." % semis,
-		"Extra hint: compare %s to %s slowly." % [root_name, top_name],
-		"Extra hint: root is your fixed reference.",
-		"Extra hint: clap once for each tiny step if needed.",
-		"Extra hint: keep listening for jump size, not loudness."
+		"Extra: this interval spans %d semitone(s)." % semis,
+		"Extra: from %s up to %s." % [root_name, top_name],
+		"Extra: the bottom note (%s) is always your reference." % root_name,
+		"Extra: sing the bottom note, then try to sing up to the top.",
+		"Extra: small jump = fewer semitones; big jump = more semitones."
 	]
 	var hints: Array[String] = []
 	if clear_hint:
-		hints.append("Clear: this interval is %d semitone(s)." % semis)
-		hints.append("Clear: from %s to %s." % [root_name, top_name])
-		hints.append("Theory: interval = distance between two notes.")
-		hints.append("Theory: semitone is the smallest piano step.")
-		hints.append("Tip: use root as your home note.")
+		hints.append("This interval is %d semitone(s) — it is a %s." % [semis, interval_id])
+		hints.append("It goes from %s up to %s." % [root_name, top_name])
+		hints.append("Theory: an interval = the distance between two notes.")
+		hints.append("Theory: a semitone is the smallest step on a piano (one key).")
+		hints.append("Memory trick: find the song reference for this interval and sing it.")
 	for line in interval_lines:
 		hints.append(str(line))
 	for line2 in interval_extra:
 		hints.append(str(line2))
 	while hints.size() < 20:
-		hints.append("Replay and compare the jump size.")
+		hints.append("Replay and focus on the size of the jump between the two notes.")
 	return hints
 
 
@@ -8827,187 +11146,254 @@ func _chord_hint_lines(quality_name: String, clear_hint: bool) -> Array:
 	var meta: Dictionary = _chord_hint_meta(quality_name)
 	var family := str(meta.get("family", "major"))
 	var bank := {
-		"major": ["Bright and stable.", "Song color: Let It Be style major.", "Major chords often feel 'home'.", "Listen for open, clear mood.", "Major triad is root-3rd-5th."],
-		"minor": ["Darker, softer mood.", "Song color: House of the Rising Sun vibe.", "Minor chords often feel sadder.", "Listen for warm-dark tone.", "Minor triad has lowered 3rd."],
-		"maj7": ["Dreamy and smooth.", "Jazz-ballad color.", "Major 7 adds sweet tension.", "Soft top-note shimmer.", "Major triad + major 7th."],
-		"min7": ["Soulful and mellow.", "Common in R&B/jazz.", "Minor 7 is softer than dominant 7.", "Relaxed color on top.", "Minor triad + minor 7th."],
-		"dom7": ["Bluesy, wants to resolve.", "Very common in blues turnarounds.", "Dominant 7 creates pull.", "Can sound bright + tense.", "Major triad + flat 7th."],
-		"dim": ["Tight and tense.", "Spooky movie color.", "Feels unstable.", "Smaller stacked feel.", "Lowered 3rd and 5th."],
-		"dim7": ["Very tense and dramatic.", "Classic suspense chord.", "Symmetric stacked sound.", "Strong pull to move.", "Great for tension in harmony."],
-		"aug": ["Raised, floating sound.", "Unstable and bright.", "Cinematic lift feeling.", "Doesn't feel settled.", "Raised 5th gives the color."],
-		"sus2": ["Open and neutral.", "No major/minor 3rd feel.", "Suspended color.", "Pop intro vibe.", "Third replaced by second."],
-		"sus4": ["Suspended, unresolved.", "Wants to resolve.", "No clear major/minor color.", "Strong held tension.", "Third replaced by fourth."],
-		"power": ["Strong rock sound.", "Root + fifth only.", "No major/minor color.", "Big and direct.", "Very common in guitar riffs."]
+		"major": [
+			"Bright, stable, and at home — the most common chord in Western music.",
+			"Song color: 'Let It Be', 'Hey Jude', most folk/pop songs use major.",
+			"Made of three notes: root, major 3rd (4 semitones up), perfect 5th (7 semitones up).",
+			"Listen for the open, sunny feeling — not tense, not dark.",
+			"Ask: does it sound settled and bright? → Major."
+		],
+		"minor": [
+			"Darker, softer, more emotional than major.",
+			"Song color: 'Stairway to Heaven' intro, 'Losing My Religion', minor ballads.",
+			"Made of root, minor 3rd (3 semitones up), perfect 5th — one note flattened vs major.",
+			"Listen for the warmth but with a shadow — sadder or more serious than major.",
+			"Ask: does it feel like a major chord but slightly darker? → Minor."
+		],
+		"maj7": [
+			"Dreamy, lush, and soft — jazz and pop ballads love this chord.",
+			"Song color: 'Misty', the opening of 'Something' by The Beatles.",
+			"A major triad with an added major 7th just below the octave.",
+			"Listen for the shimmery, floating top note that adds gentle sweetness.",
+			"Ask: does it sound like major but with a soft, dreamy extra layer? → Maj7."
+		],
+		"min7": [
+			"Soulful and mellow — the chord of smooth jazz and R&B grooves.",
+			"Song color: 'What's Going On' by Marvin Gaye, neo-soul grooves.",
+			"A minor triad with a minor 7th added on top.",
+			"Less harsh than a dominant 7 — relaxed and soft even in the higher note.",
+			"Ask: does it feel dark + smooth + a little jazzy? → min7."
+		],
+		"dom7": [
+			"Tense and bluesy — it strongly wants to resolve to the next chord.",
+			"Song color: the 12-bar blues, 'Johnny B. Goode', 'Pride and Joy'.",
+			"A major triad with a flattened 7th — the 7th note sounds slightly low.",
+			"Hear the tension in the top layer: bright major body, slightly rough 7th.",
+			"Ask: does it sound like a major chord that wants to move somewhere? → Dom7."
+		],
+		"dim": [
+			"Tense, unstable, and spooky — a chord that wants to resolve urgently.",
+			"Song color: classic horror and suspense, dramatic film scores.",
+			"Two stacked minor 3rds (root, 3 semitones up, 3 more up = 6 semitones total).",
+			"The 5th is lowered (diminished), making the chord sound compressed and tight.",
+			"Ask: does it feel tense, hollow, and slightly creepy? → Diminished."
+		],
+		"dim7": [
+			"Fully diminished — four equally-spaced notes create an eerie symmetry.",
+			"Song color: dramatic scene transitions, thriller music, Bach's Passions.",
+			"Each note is a minor 3rd apart all the way up — mathematically symmetric.",
+			"Very tense and dramatic; often used to heighten emotional suspense.",
+			"Ask: is it even more tense and dramatic than a diminished triad? → Dim7."
+		],
+		"aug": [
+			"Raised and floating — the 5th note is pushed up one semitone.",
+			"Song color: 'Oh! You Pretty Things' by Bowie, impressionist piano music.",
+			"A major triad with the top note raised — two major 3rds stacked.",
+			"Unstable and cinematic — sounds like it's hovering, not landing.",
+			"Ask: does it sound like a bright chord that never quite settles? → Augmented."
+		],
+		"sus2": [
+			"Open and ambiguous — the middle note (3rd) is replaced by the 2nd.",
+			"Song color: 'Pinball Wizard' by The Who, U2-style anthems.",
+			"No major or minor 3rd means you can't tell if it's happy or sad.",
+			"The 2nd note gives an open, spacious quality — often in pop intros.",
+			"Ask: does it feel open and neutral, neither bright nor dark? → Sus2."
+		],
+		"sus4": [
+			"Suspended and unresolved — the 3rd is replaced by the 4th.",
+			"Song color: 'Crazy' by Seal, 'Space Oddity' by Bowie has sus4 moments.",
+			"Feels like it's leaning forward, wanting to resolve down to a major/minor.",
+			"The 4th note creates tension that typically resolves by lowering to the 3rd.",
+			"Ask: does it sound like it's on hold, waiting to resolve? → Sus4."
+		],
+		"power": [
+			"Root and fifth only — no 3rd, so no major or minor quality.",
+			"The sound of electric guitars in rock and metal music.",
+			"Song color: 'Smells Like Teen Spirit', 'Back in Black', power pop riffs.",
+			"Sounds strong and neutral — neither happy nor sad, just raw and direct.",
+			"Ask: does it sound like raw power with no emotional color either way? → Power."
+		],
+		"halfdim": [
+			"Minor with a flattened 5th plus a minor 7th — tense but not fully diminished.",
+			"Song color: the 'ii' chord in minor-key jazz — 'Autumn Leaves', 'Blue Bossa'.",
+			"Also called m7b5 — it's halfway between minor 7th and fully diminished.",
+			"Less dramatic than dim7 but more tense than min7 — a shadowy, restless sound.",
+			"Ask: does it feel like a dark minor 7th with extra tension in the 5th? → Half-dim."
+		],
+		"mmaj7": [
+			"A minor triad with a major 7th — dark body with a sharp, bright top note.",
+			"Song color: the 'James Bond chord' — dramatic, mysterious, cinematic.",
+			"The clash between the minor 3rd and major 7th creates an edgy, sophisticated tension.",
+			"Used in film scores for suspense and in jazz for passing harmonies.",
+			"Ask: does it sound minor but with a surprisingly bright, cutting top note? → mMaj7."
+		],
+		"aug7": [
+			"An augmented triad with a minor 7th — floating and bluesy.",
+			"Song color: altered dominants in jazz, bluesy turnarounds.",
+			"The raised 5th plus the lowered 7th create a restless, unresolved tension.",
+			"Wants to resolve even more strongly than a regular dominant 7th.",
+			"Ask: does it sound like a bright chord that's both floating AND bluesy? → Aug7."
+		],
+		"augmaj7": [
+			"An augmented triad with a major 7th — mysterious and shimmering.",
+			"Song color: film scores, impressionist music, dream sequences.",
+			"The raised 5th gives it the floating augmented quality; the major 7th adds lushness.",
+			"Rare but very distinctive — sounds otherworldly and ethereal.",
+			"Ask: does it feel augmented (floating) but with a dreamy, lush top note? → AugMaj7."
+		],
+		"7sus4": [
+			"A dominant 7th chord with the 3rd replaced by the 4th — suspended and bluesy.",
+			"Song color: 'Pinball Wizard' intro, gospel/R&B vamps, funk turnarounds.",
+			"Combines the tension of sus4 (wanting to resolve the 4th) with dominant 7th pull.",
+			"Very common in pop and gospel — often resolves to a regular dominant 7th.",
+			"Ask: does it feel suspended AND bluesy at the same time? → 7sus4."
+		],
+		"maj6": [
+			"A major triad with an added 6th — warm, jazzy, and settled.",
+			"Song color: swing era jazz, bossa nova endings, 'The Girl from Ipanema'.",
+			"Brighter and more grounded than Maj7 — the 6th adds warmth without dreaminess.",
+			"Often used as a final chord in jazz standards instead of Maj7.",
+			"Ask: does it sound like a warm, settled major chord with a jazzy glow? → Maj6."
+		],
+		"min6": [
+			"A minor triad with an added major 6th — dark but with a glimmer of brightness.",
+			"Song color: film noir, tango, 'Summertime' by Gershwin.",
+			"The minor 3rd gives darkness; the major 6th adds an unexpected brightness.",
+			"Creates a bittersweet, sophisticated quality — common in jazz and Latin music.",
+			"Ask: does it sound minor but with an unexpectedly warm, bright upper note? → Min6."
+		],
+		"69": [
+			"A major triad with both a 6th and a 9th — open, bright, and lush.",
+			"Song color: classic jazz endings, Wes Montgomery, bossa nova closers.",
+			"Five notes that create a very full, shimmery, open sound.",
+			"The 6th and 9th together give it a spacious, modern jazz quality.",
+			"Ask: does it sound like a rich, full major chord with extra shimmer? → 6/9."
+		],
+		"dom9": [
+			"A dominant 7th with an added 9th — funky, rich, and colorful.",
+			"Song color: Stevie Wonder, Nile Rodgers funk, Earth Wind & Fire.",
+			"The 9th on top of the dominant 7th creates a bright, funky extension.",
+			"Very recognizable in funk, soul, and R&B — five notes of groove.",
+			"Ask: does it sound like a funky, colorful dominant 7th with extra brightness? → Dom9."
+		],
+		"maj9": [
+			"A major 7th with an added 9th — dreamy, lush, and modern.",
+			"Song color: neo-soul, smooth jazz ballads, Erykah Badu.",
+			"Combines the dreaminess of Maj7 with the open quality of the 9th.",
+			"Feels like floating on a cloud — very gentle and sophisticated.",
+			"Ask: does it sound even dreamier and lusher than a regular Maj7? → Maj9."
+		],
+		"min9": [
+			"A minor 7th with an added 9th — smooth, mellow, and soulful.",
+			"Song color: lo-fi beats, R&B ballads, D'Angelo, smooth jazz.",
+			"The minor body stays dark; the 9th adds an open, airy quality on top.",
+			"Creates a spacious, relaxed mood — less tense than min7 alone.",
+			"Ask: does it feel like a relaxed, spacious minor 7th? → Min9."
+		],
+		"add9": [
+			"A major triad with just the 9th added — no 7th, so it's bright and open.",
+			"Song color: 'Every Breath You Take' by The Police, pop/worship ballads.",
+			"Simpler than a 9th chord — only four notes, giving it a clean sparkle.",
+			"The 9th adds color without the tension of a 7th — very pop-friendly.",
+			"Ask: does it sound like a bright major chord with a little extra sparkle? → Add9."
+		]
 	}
-	var lines: Array = bank.get(family, ["Listen for chord mood.", "Bright, dark, or tense?", "Use replay.", "Compare with major/minor.", "Pick closest family."])
+	var lines: Array = bank.get(family, ["Listen for the chord's emotional mood first.", "Is it bright (major) or dark (minor)?", "Is there extra tension in the top notes?", "Replay and hum the lowest note as an anchor.", "Choose the family that matches the overall colour."])
 	var chord_extra := [
-		"Extra hint: chord family here is %s." % family,
-		"Extra hint: start with mood, then label.",
-		"Extra hint: replay and hear the whole color.",
-		"Extra hint: bass note helps anchor the chord.",
-		"Extra hint: check if the chord feels stable or unresolved."
+		"Extra: the chord family you're listening for is '%s'." % family,
+		"Extra: start with mood — bright, dark, or tense — before labelling.",
+		"Extra: replay and focus only on the top note — is it smooth or rough?",
+		"Extra: the lowest note is your root; the other notes build the colour.",
+		"Extra: if it sounds stable, it's likely major or minor; if tense, check 7th/dim/aug."
 	]
 	var hints: Array[String] = []
 	if clear_hint:
-		hints.append("Clear: chord family is %s." % family)
-		hints.append("Theory: chord = notes played together.")
-		hints.append("Theory: the 3rd often decides major/minor.")
-		hints.append("Tip: choose family first, exact label second.")
-		hints.append("Tip: replay and focus on mood.")
+		hints.append("This chord is a '%s' chord." % family)
+		hints.append("Theory: a chord is three or more notes played together.")
+		hints.append("Theory: the 3rd (middle note) determines major vs minor colour.")
+		hints.append("Tip: choose mood first (bright/dark/tense), then match the label.")
+		hints.append("Tip: replay and let the overall emotional colour tell you the answer.")
 	for line in lines:
 		hints.append(str(line))
 	for line2 in chord_extra:
 		hints.append(str(line2))
 	while hints.size() < 20:
-		hints.append("Listen to the overall chord feeling.")
+		hints.append("Listen to the overall emotional colour of the chord.")
 	return hints
 
 
 func _sight_note_hint_lines(note_name: String, clef_name: String, clear_hint: bool) -> Array:
-	var letter := _note_letter_from_name(note_name)
-	var prof: Dictionary = SIGHT_NOTE_PROFILES.get(letter, SIGHT_NOTE_PROFILES["C"])
-	var is_line := posmod(_current_sight_display_step, 2) == 0
-	var lane_txt := "line" if is_line else "space"
-	var note_bank := {
-		"C": ["Look for middle-C area first.", "C is a common landmark.", "Find C, then move up/down.", "C often anchors reading.", "Say C first, then confirm."],
-		"D": ["D is one step from C.", "Find C then move to D.", "D sits close to center often.", "Check line/space around C.", "Use step counting for D."],
-		"E": ["E is easy near lower treble line.", "Find nearby D/F and step.", "E is often a chord tone.", "Check if it is line-based here.", "Anchor from C or G."],
-		"F": ["F is tied to bass clef marker note.", "In treble, F is first space.", "Use clef clue for F quickly.", "Find E/G and step.", "F is a strong landmark note."],
-		"G": ["G is tied to treble clef marker.", "Find treble clef curl line for G.", "G sits as a common anchor.", "Use F/A around it.", "G is often easy to spot."],
-		"A": ["A is one step above G.", "Find G then move to A.", "A appears often in melodies.", "Check if line or space here.", "Use neighbor notes to confirm A."],
-		"B": ["B sits near C anchor.", "Find C then step to B.", "B can be leading tone feel.", "Check accidental if key has sharps/flats.", "Use A/C around B."]
-	}
-	var lines: Array = note_bank.get(letter, ["Find nearby anchor.", "Count by steps.", "Check clef.", "Line or space first.", "Confirm letter."])
-	var note_extra := [
-		"Extra hint: target letter is %s." % letter,
-		"Extra hint: read %s clef first." % clef_name,
-		"Extra hint: confirm line vs space.",
-		"Extra hint: move by one alphabet step at a time.",
-		"Extra hint: use nearby landmark notes.",
-		"Treble lines (bottom to top): E G B D F.",
-		"Treble spaces (bottom to top): F A C E (FACE).",
-		"Bass lines (bottom to top): G B D F A.",
-		"Bass spaces (bottom to top): A C E G.",
-		"Treble first line is E. Start there and count.",
-		"Treble second line is G (the G-clef line).",
-		"Treble first space is F.",
-		"Bass first line is G.",
-		"Bass first space is A.",
-		"Bass fourth line is F (bass clef dots surround F).",
-		"Space-note tip (treble): FACE.",
-		"Line-note tip (treble): EGBDF.",
-		"Line-note tip (bass): GBDFA.",
-		"Space-note tip (bass): ACEG.",
-		"Landmark tip: find middle C, then count steps.",
-		"Landmark tip: treble G sits on the 2nd line.",
-		"Landmark tip: bass F sits on the 4th line."
-	]
-	var hints: Array[String] = []
-	if clear_hint:
-		hints.append("Clear: note is %s on a %s." % [letter, lane_txt])
-		hints.append("Clear: first check %s clef." % clef_name)
-		hints.append("Theory: notes go A-B-C-D-E-F-G.")
-		hints.append("Theory: line and space alternate by step.")
-		hints.append("Tip: use landmarks like C/F/G.")
-	for line in lines:
-		hints.append(str(line))
-	for line2 in note_extra:
-		hints.append(str(line2))
-	hints.append("In %s clef, look near %s." % [clef_name, str(prof.get("treble", "") if clef_name == "Treble" else prof.get("bass", ""))])
-	if not clear_hint:
-		if clef_name == "Treble" and lane_txt == "space":
-			hints.append("Treble spaces spell FACE.")
-		elif clef_name == "Treble":
-			hints.append("Treble lines: E-G-B-D-F.")
-		elif clef_name == "Bass" and lane_txt == "space":
-			hints.append("Bass spaces: A-C-E-G.")
-		else:
-			hints.append("Bass lines: G-B-D-F-A.")
-	while hints.size() < 20:
-		hints.append("Count one staff step at a time.")
-	return hints
+	return _ensure_sight_renderer().sight_note_hint_lines(
+		note_name,
+		clef_name,
+		clear_hint,
+		_current_sight_display_step,
+		SIGHT_NOTE_PROFILES,
+		Callable(self, "_note_letter_from_name")
+	)
 
 
 func _sight_chord_hint_lines(chord_name: String, clear_hint: bool) -> Array:
-	var clean_name := chord_name.strip_edges()
-	var root_token := clean_name.split(" ", false)[0] if not clean_name.is_empty() else "C"
-	var quality_part := clean_name
-	var split_once := clean_name.split(" ", false, 1)
-	if split_once.size() >= 2:
-		quality_part = str(split_once[1])
-	var family := _chord_family_id_from_name(quality_part)
-	var bank := {
-		"major": ["Start with root note.", "Major stacks look open and stable.", "Find bottom and top note first.", "Major often sounds bright.", "Then check middle note."],
-		"minor": ["Start with root note.", "Minor looks similar but sounds darker.", "Bottom note then top note.", "Minor often sounds sadder.", "Check middle note distance."],
-		"dim": ["Look for tight stacked look.", "Diminished feels tense.", "Root first, then compressed shape.", "Often used for tension.", "Double-check accidentals."],
-		"dim7": ["Very tense stack.", "Symmetric feeling shape.", "Root then count small jumps.", "Used in dramatic moments.", "Check all note spellings."],
-		"dom7": ["Dominant 7 often wants to resolve.", "Find major body + flat seventh.", "Listen for blues pull.", "Root first, top color second.", "Check the 7th note carefully."],
-		"maj7": ["Major 7 sounds dreamy.", "Find major triad + soft top.", "Root first.", "Check if top feels close/tender.", "Then verify chord name."],
-		"min7": ["Minor 7 sounds mellow.", "Find minor triad + extra top.", "Root first.", "Common in jazz/pop.", "Check the 7th note."],
-		"sus2": ["No 3rd sound, open feel.", "Third replaced by second.", "Root + 2 + 5 shape.", "Suspended, less major/minor.", "Find open stack."],
-		"sus4": ["No 3rd sound, unresolved feel.", "Third replaced by fourth.", "Root + 4 + 5 shape.", "Often wants to resolve.", "Check suspension feel."],
-		"aug": ["Raised 5th gives lift.", "Bright but unstable.", "Check if top note is raised.", "Root first, then odd top color.", "Augmented sounds floating."],
-		"power": ["Root + fifth only.", "No 3rd major/minor clue.", "Strong rock-style shape.", "Open, direct sound.", "Check if middle is missing."]
-	}
-	var lines: Array = bank.get(family, ["Root first.", "Read vertical stack.", "Check top note.", "Listen to mood.", "Choose closest family."])
-	var sight_chord_extra := [
-		"Extra hint: root token is %s." % root_token,
-		"Extra hint: this family reads as %s." % family,
-		"Extra hint: read bottom note first.",
-		"Extra hint: then check top color note.",
-		"Extra hint: choose family first, full chord next."
-	]
-	var hints: Array[String] = []
-	if clear_hint:
-		hints.append("Clear: root is %s." % root_token)
-		hints.append("Clear: chord family is %s." % family)
-		hints.append("Theory: chord notes are stacked vertically.")
-		hints.append("Theory: 3rd often sets major/minor quality.")
-		hints.append("Tip: choose family first, full name next.")
-	for line in lines:
-		hints.append(str(line))
-	for line2 in sight_chord_extra:
-		hints.append(str(line2))
-	while hints.size() < 20:
-		hints.append("Read bottom note first, then build upward.")
-	return hints
+	return _ensure_sight_renderer().sight_chord_hint_lines(chord_name, clear_hint, Callable(self, "_chord_family_id_from_name"))
 
 
 func _interval_reason_text(interval_id: String) -> String:
 	var reasons := {
-		"P1": "both notes are the same pitch (unison).",
-		"m2": "the notes are 1 semitone apart, a very tight sound.",
-		"M2": "the notes are 2 semitones apart, a small step.",
-		"m3": "the distance is 3 semitones with a minor color.",
-		"M3": "the distance is 4 semitones with a major color.",
-		"P4": "the notes are 5 semitones apart (perfect fourth).",
-		"TT": "the notes are 6 semitones apart (tritone).",
-		"P5": "the notes are 7 semitones apart (perfect fifth).",
-		"m6": "the notes are 8 semitones apart (minor sixth).",
-		"M6": "the notes are 9 semitones apart (major sixth).",
-		"m7": "the notes are 10 semitones apart (minor seventh).",
-		"M7": "the notes are 11 semitones apart (major seventh).",
-		"P8": "the notes are 12 semitones apart (octave)."
+		"P1": "both notes share the exact same pitch — zero distance (unison).",
+		"m2": "the notes are only 1 semitone apart — the smallest possible step, hence the tense, rubbing sound.",
+		"M2": "the notes are 2 semitones apart — a comfortable whole-step, the most common melodic motion.",
+		"m3": "the distance is 3 semitones — the minor 3rd gives chords their 'sad' or darker quality.",
+		"M3": "the distance is 4 semitones — the major 3rd gives chords their bright, happy quality.",
+		"P4": "the notes are 5 semitones apart — one of the 'perfect' intervals, stable in melody but can suspend in harmony.",
+		"TT": "the notes are exactly 6 semitones apart — the tritone splits the octave in half and was historically forbidden for its harshness.",
+		"P5": "the notes are 7 semitones apart — the strongest and most resonant interval after the octave, the basis of power chords.",
+		"m6": "the notes are 8 semitones apart — the inversion of a major 3rd; wider, slightly darker.",
+		"M6": "the notes are 9 semitones apart — the inversion of a minor 3rd; wide and warm.",
+		"m7": "the notes are 10 semitones apart — the inversion of a major 2nd; adds the blue note to dominant 7th chords.",
+		"M7": "the notes are 11 semitones apart — just one semitone below the octave, creating strong upward tension.",
+		"P8": "the notes are 12 semitones apart — same note name, one octave higher; perfectly consonant and stable."
 	}
-	return str(reasons.get(interval_id, "the distance matches this interval pattern."))
+	return str(reasons.get(interval_id, "the distance between the two notes matches this interval's semitone count."))
 
 
 func _chord_reason_text(quality_name: String) -> String:
 	var family := _chord_family_id_from_name(quality_name)
 	var reasons := {
-		"major": "it has a bright major color from its interval stack.",
-		"minor": "it has a darker minor color from its interval stack.",
-		"maj7": "it has major triad color plus a major 7th flavor.",
-		"min7": "it has minor triad color plus a minor 7th flavor.",
-		"dom7": "it has dominant 7th tension that wants to resolve.",
-		"dim": "it has a tight diminished stack and tense sound.",
-		"dim7": "it has a fully diminished, very tense color.",
-		"aug": "it has a raised 5th that sounds lifted/unstable.",
-		"sus2": "it replaces the 3rd with a 2nd, so it sounds suspended.",
-		"sus4": "it replaces the 3rd with a 4th, so it sounds suspended.",
-		"power": "it uses root and fifth without major/minor third."
+		"major": "it contains a major 3rd (4 semitones) above the root, giving it its bright, settled sound.",
+		"minor": "it contains a minor 3rd (3 semitones) above the root — one semitone flatter than major — giving it a darker, sadder colour.",
+		"maj7": "it adds a major 7th (11 semitones above root) to a major triad, creating that dreamy, lush, shimmering top note.",
+		"min7": "it adds a minor 7th (10 semitones above root) to a minor triad, creating a soulful, relaxed, jazzy colour.",
+		"dom7": "it adds a minor 7th to a major triad — the tension between the bright major body and the lowered 7th creates a strong pull to resolve.",
+		"dim": "both the 3rd and the 5th are lowered (diminished), creating a symmetrically tense, compressed sound.",
+		"dim7": "all four notes are spaced exactly 3 semitones apart, creating a perfectly symmetric, very tense sound.",
+		"aug": "the 5th is raised by one semitone, making it an augmented 5th — the chord floats and refuses to settle.",
+		"sus2": "the 3rd is replaced by the 2nd scale degree — removing the major/minor quality and creating an open, ambiguous sound.",
+		"sus4": "the 3rd is replaced by the 4th scale degree — the 4th creates suspension that typically resolves down to the 3rd.",
+		"power": "only the root and perfect 5th are used — no 3rd means no major or minor quality, just raw, open, neutral power.",
+		"halfdim": "it combines a diminished triad (minor 3rd + flat 5th) with a minor 7th — less tense than fully diminished but darker than minor 7th.",
+		"mmaj7": "it stacks a minor triad with a major 7th — the clash between the dark minor 3rd and the bright major 7th creates an edgy, cinematic tension.",
+		"aug7": "it combines an augmented triad (raised 5th) with a minor 7th — floating and bluesy, with a strong urge to resolve.",
+		"augmaj7": "it combines an augmented triad with a major 7th — the raised 5th gives it a floating quality while the major 7th adds ethereal lushness.",
+		"7sus4": "it replaces the 3rd of a dominant 7th with the 4th — combining suspended tension with dominant pull.",
+		"maj6": "it adds the major 6th (9 semitones) to a major triad — warm and jazzy without the dreaminess of a 7th.",
+		"min6": "it adds the major 6th to a minor triad — the bright 6th against the dark minor body creates a bittersweet quality.",
+		"69": "it stacks both the 6th and the 9th on a major triad — five notes that create a full, shimmery, open jazz sound.",
+		"dom9": "it extends a dominant 7th with the 9th — five notes of funky, colourful brightness that want to resolve.",
+		"maj9": "it extends a major 7th with the 9th — creating an extra-dreamy, lush, modern jazz texture.",
+		"min9": "it extends a minor 7th with the 9th — the added 9th opens up the dark minor sound into something smooth and spacious.",
+		"add9": "it adds just the 9th to a major triad (no 7th) — a clean, bright sparkle without the complexity of extended harmony.",
 	}
-	return str(reasons.get(family, "its stacked notes match this chord family."))
+	return str(reasons.get(family, "the stacked intervals match this chord family's unique pattern."))
 
 
 func _scale_mode_reason_text(mode_name: String) -> String:
@@ -9024,24 +11410,60 @@ func _scale_mode_reason_text(mode_name: String) -> String:
 
 func _scale_mode_hint_lines(mode_name: String, clear_hint: bool) -> Array:
 	var bank := {
-		"Major": ["Bright and familiar home-base sound.", "Think 'do re mi' major feel.", "Natural 3rd and natural 7th color.", "Stable and common in beginner songs.", "No unusually dark notes near the start."],
-		"Natural Minor": ["Darker than major from the 3rd note onward.", "Common 'sad song' scale color.", "Listen for the minor 3rd.", "No raised 6th/7th like melodic minor.", "Feels settled but darker."],
-		"Dorian": ["Minor feel, but a brighter middle than natural minor.", "Minor with a lifted 6th color.", "Sounds jazzy/folk in many songs.", "Compare with natural minor: this one is less dark.", "The minor color is there, but not gloomy."],
-		"Mixolydian": ["Major-ish sound with a blues/folk twist.", "Major color, but the 7th sounds lower.", "Feels like a dominant/bluesy scale.", "Bright start, slightly softer ending pull.", "Listen for a less 'leading-tone' finish than major."],
-		"Lydian": ["Major sound with a shiny raised 4th.", "A bright, floating major color.", "The middle of the scale sounds more open.", "Often feels dreamy or cinematic.", "Compare to major: one note sounds brighter."],
-		"Phrygian": ["Minor sound with a very close 2nd note.", "Dark color early in the scale.", "The 2nd note sounds tighter than usual.", "Strong dramatic/minor flavor.", "You hear tension right near the start."]
+		"Major": [
+			"Bright, confident, and settled — the most common scale in Western music.",
+			"Song color: 'Happy Birthday', 'Twinkle Twinkle', most pop melodies.",
+			"The 3rd note is natural (major), and the 7th is a half-step below the octave.",
+			"Solfège: Do Re Mi Fa Sol La Ti Do — this is the Major scale.",
+			"Key question: does it sound sunny and settled with a strong leading-tone pull home?"
+		],
+		"Natural Minor": [
+			"Darker, more emotional than major — the 3rd is lowered by a semitone.",
+			"Song color: 'Greensleeves', 'Stairway to Heaven', most rock ballads.",
+			"The 3rd AND 6th AND 7th are all lowered compared to major.",
+			"It sounds darker but still settled — no raised 7th to create strong upward pull.",
+			"Key question: does it feel like major's emotional, darker sibling?"
+		],
+		"Dorian": [
+			"Minor-sounding, but with one brighter note — the 6th is raised.",
+			"Song color: 'Scarborough Fair', 'So What' by Miles Davis, 'Oye Como Va'.",
+			"Think of it as Natural Minor with the 6th note raised by a semitone.",
+			"The raised 6th gives it a jazzy, folky, or Spanish brightness in the middle.",
+			"Key question: does it sound like minor, but not quite as dark or settled?"
+		],
+		"Mixolydian": [
+			"Major-sounding, but with a lowered 7th — less 'leading-tone' pull.",
+			"Song color: 'Sweet Home Alabama', 'Norwegian Wood', most blues-rock.",
+			"Think of it as Major with the 7th note flattened by a semitone.",
+			"The flattened 7th gives it a bluesy, rock, or folk looseness at the top.",
+			"Key question: does it sound like major, but the ending feels less 'final'?"
+		],
+		"Lydian": [
+			"Bright and dreamy — the 4th note is raised by a semitone.",
+			"Song color: 'Flying' by The Beatles, film scores by John Williams.",
+			"Think of it as Major with the 4th note sharpened — sounds more open and floating.",
+			"The raised 4th sits in the middle of the scale and sounds bright and ethereal.",
+			"Key question: does it feel like major, but even more open and floaty?"
+		],
+		"Phrygian": [
+			"Dark and dramatic — the 2nd note is lowered to create immediate tension.",
+			"Song color: flamenco music, 'White Zombie' riffs, Spanish guitar.",
+			"Think of it as Natural Minor with the 2nd note flattened by a semitone.",
+			"The half-step between root and 2nd creates an intense, exotic-sounding color.",
+			"Key question: does it feel dark and tense right from the very first step up?"
+		]
 	}
 	var hints: Array[String] = []
 	if clear_hint:
-		hints.append("Clear: the mode is %s." % mode_name)
-		hints.append("Theory: modes are different step patterns from the same tonic.")
-		hints.append("Tip: compare the 3rd first (major/minor color).")
-		hints.append("Tip: then listen for the 6th and 7th color notes.")
-		hints.append("Tip: replay and sing scale-degree numbers if needed.")
-	for line in bank.get(mode_name, ["Listen for mode color notes.", "Compare to major/minor first.", "Use replay and sing along.", "Focus on 3rd, 6th, 7th.", "Notice the ending pull."]):
+		hints.append("This is the %s mode/scale." % mode_name)
+		hints.append("Theory: modes are different arrangements of the major scale's steps.")
+		hints.append("Tip: first decide major or minor flavor (is the 3rd bright or dark?).")
+		hints.append("Tip: then listen for what's unusual — a raised 4th? A low 7th? A close 2nd?")
+		hints.append("Tip: replay and try humming along — sing to the root, then follow the scale.")
+	for line in bank.get(mode_name, ["Listen for mode colour notes.", "Compare to major/minor first.", "Focus on the 3rd (major vs minor), then the 7th.", "Notice the ending pull.", "One altered note is the key to identifying most modes."]):
 		hints.append(str(line))
 	while hints.size() < 20:
-		hints.append("Listen for one note that changes the color.")
+		hints.append("Listen for the one altered note that changes the scale's emotional colour.")
 	return hints
 
 
@@ -9082,21 +11504,52 @@ func _cadence_hint_lines(cadence_label: String, clear_hint: bool) -> Array:
 	return hints
 
 
+func _progression_hint_lines(progression_label: String, clear_hint: bool) -> Array:
+	# progression_label is the display label like "I-IV-V", "ii-V-I", "vi-IV-I-V", etc.
+	var bank := {
+		"I-IV-V":    ["Classic 3-chord backbone — used in rock, blues, folk.", "I is home, IV is a lift, V is tension pulling back.", "The V chord creates the strongest pull back to I.", "Listen for the steady 'home → away → tension → home' shape.", "Found in hundreds of songs: La Bamba, Twist and Shout."],
+		"ii-V-I":    ["The jazz turnaround — ii sets up V which resolves to I.", "Each chord moves down a 5th: it's a chain of tension releases.", "The ii chord gives mild tension; V gives strong tension.", "Listen for that smooth, inevitable pull toward the last chord.", "Common in jazz standards: Autumn Leaves, Misty."],
+		"vi-IV-I-V": ["The modern 'pop 4-chord'. Found in countless pop hits.", "Starts on vi, which feels like a softer, more emotional home.", "The IV gives lift, I grounds it, V creates the push back.", "Listen for the minor flavour right at the start (vi chord).", "Used in: Let It Be, With or Without You, Frozen's Let It Go."],
+		"I-vi-IV-V": ["The classic 1950s doo-wop/pop progression.", "I sounds home, vi gives bittersweet color, IV lifts, V tensions.", "Common in early rock and roll and Motown songs.", "Listen for the bittersweet vi chord second in the sequence.", "Used in: Stand By Me, Every Breath You Take, Blue Moon."],
+		"I-V-IV-V":  ["A rocking progression with V before IV — slightly unexpected.", "The V before IV gives it a stronger, bolder quality than I-IV-V.", "Common in hard rock and stadium rock.", "Listen for the big V chord appearing early in the sequence.", "Found in: many power rock anthems."],
+		"ii-IV-I":   ["A soft, gentle resolution. ii and IV both pre-resolve to I.", "Smooth, folky feel — less tension than ii-V-I.", "Listen for the gentle 'approach home' feeling at the end.", "Both ii and IV are subdominant-family chords.", "Softer than a V-I cadence — a subtle, calm landing."],
+		"I-IV-vi-V": ["Home, lift, shadow, then tension — a slightly dramatic arc.", "The vi (minor) gives an emotional dip before the final V tension.", "Listen for the darker color on the third chord.", "Common in emotional pop ballads.", "The V at the end makes it want to loop back to I."],
+		"I-iii-IV-V":["A bright, ascending-feel progression.", "iii is a 'color chord' between I and IV — adds warmth.", "Listen for the middle chord that sounds slightly richer than I.", "Builds from home toward IV and V in a clear upward arc.", "Used in many major-key pop songs for a hopeful lift."],
+		"I-V-vi-IV": ["Another widely used pop rotation of the 4-chord loop.", "Starts with the strong I-V pair, then the emotional vi-IV.", "The vi still gives the minor colour, just later in the loop.", "Listen for the minor-feeling dip after the V chord.", "Used in: Vivaldi's Canon in D progression, many pop songs."]
+	}
+	var default_lines := [
+		"Listen for the tonal centre — which chord feels like 'home'?",
+		"Count how many chords you hear before it repeats.",
+		"Does the progression end settled, open, or tense?",
+		"Focus on the first and last chord — they reveal the most.",
+		"Try to hear if any chord sounds like a minor chord (darker colour)."
+	]
+	var lines: Array = bank.get(progression_label, default_lines)
+	var hints: Array[String] = []
+	if clear_hint:
+		hints.append("This progression is: %s." % progression_label)
+		hints.append("Theory: Roman numerals count scale degrees (I=1st, IV=4th, V=5th).")
+		hints.append("Tip: lowercase numeral (ii, vi) = minor chord; uppercase = major.")
+		hints.append("Tip: listen for which chord sounds like 'home' — that is I.")
+		hints.append("Tip: the V chord before I creates the strongest 'pull home' sound.")
+	for line in lines:
+		hints.append(str(line))
+	while hints.size() < 15:
+		hints.append("Replay and follow the harmonic journey from first to last chord.")
+	return hints
+
+
 func _sight_note_reason_text(note_name: String, clef_name: String) -> String:
-	var letter := _note_letter_from_name(note_name)
-	var line_space := "line" if posmod(_current_sight_display_step, 2) == 0 else "space"
-	return "the note head position in %s clef matches %s on a %s." % [clef_name, letter, line_space]
+	return _ensure_sight_renderer().sight_note_reason_text(
+		note_name,
+		clef_name,
+		_current_sight_display_step,
+		Callable(self, "_note_letter_from_name")
+	)
 
 
 func _sight_chord_reason_text(chord_name: String) -> String:
-	var clean_name := chord_name.strip_edges()
-	var root_token := clean_name.split(" ", false)[0] if not clean_name.is_empty() else "C"
-	var quality_part := clean_name
-	var split_once := clean_name.split(" ", false, 1)
-	if split_once.size() >= 2:
-		quality_part = str(split_once[1])
-	var family := _chord_family_id_from_name(quality_part)
-	return "the stacked notes match root %s with %s chord color." % [root_token, family]
+	return _ensure_sight_renderer().sight_chord_reason_text(chord_name, Callable(self, "_chord_family_id_from_name"))
 
 
 func _provide_chicken_hint(clear_hint: bool) -> void:
@@ -9125,10 +11578,11 @@ func _provide_chicken_hint(clear_hint: bool) -> void:
 		_is_prompt_playing = false
 		return
 	if _selected_mode == MODE_PROGRESSION:
-		var line := "Listen for the harmonic story: where does it begin and where does it land?"
+		var prog_topic := "progression:%s:%s" % [_current_ear_text_answer, "clear" if clear_hint else "subtle"]
+		var prog_line := _pick_topic_hint_line(prog_topic, _progression_hint_lines(_current_ear_text_answer, clear_hint))
 		if _status_label != null:
-			_status_label.text = "Hint: %s" % line
-		_lock_chicken_hint_line(line)
+			_status_label.text = "Hint: %s" % prog_line
+		_lock_chicken_hint_line(prog_line)
 		if _is_prompt_playing:
 			return
 		_is_prompt_playing = true
@@ -9240,28 +11694,31 @@ func _load_texture(path: String) -> Texture2D:
 	return null
 
 
-func _setup_audio() -> void:
-	_piano_player = AudioStreamPlayer.new()
-	add_child(_piano_player)
-	_load_piano_samples()
-	for i in 5:
-		var chord_player := AudioStreamPlayer.new()
-		add_child(chord_player)
-		_chord_players.append(chord_player)
+func _setup_audio_players() -> void:
+	if _audio_engine == null:
+		_audio_engine = AudioEngineScript.new()
+	var players: Dictionary = _audio_engine.setup_players(self, 8)
+	_piano_player = players.get("piano_player", null) as AudioStreamPlayer
+	_chord_players.clear()
+	var chord_players_any: Variant = players.get("chord_players", [])
+	if typeof(chord_players_any) == TYPE_ARRAY:
+		var chord_players_source: Array = chord_players_any as Array
+		for player_any in chord_players_source:
+			if player_any is AudioStreamPlayer:
+				_chord_players.append(player_any as AudioStreamPlayer)
+	_sfx_player = players.get("sfx_player", null) as AudioStreamPlayer
+	_ui_sfx_player = players.get("ui_sfx_player", null) as AudioStreamPlayer
+	_rhythm_metronome_player = players.get("rhythm_metronome_player", null) as AudioStreamPlayer
+	_shield_sfx_player = players.get("shield_sfx_player", null) as AudioStreamPlayer
+	_music_player = players.get("music_player", null) as AudioStreamPlayer
+	_home_ambient_player = players.get("home_ambient_player", null) as AudioStreamPlayer
+	_audio_stream = players.get("audio_stream", null) as AudioStreamGenerator
+	_audio_player = players.get("audio_player", null) as AudioStreamPlayer
+	_playback = players.get("playback", null) as AudioStreamGeneratorPlayback
 
-	_sfx_player = AudioStreamPlayer.new()
-	add_child(_sfx_player)
-	_ui_sfx_player = AudioStreamPlayer.new()
-	add_child(_ui_sfx_player)
-	_rhythm_metronome_player = AudioStreamPlayer.new()
-	_rhythm_metronome_player.volume_db = -7.0
-	add_child(_rhythm_metronome_player)
-	_shield_sfx_player = AudioStreamPlayer.new()
-	add_child(_shield_sfx_player)
-	_music_player = AudioStreamPlayer.new()
-	_music_player.volume_db = -16.0
-	_music_player.autoplay = false
-	add_child(_music_player)
+
+func _load_audio_assets_deferred() -> void:
+	_load_piano_samples()
 	_ui_click_sfx = _load_audio_stream(UI_CLICK_SFX_PATH)
 	_ui_sight_answer_click_sfx = _load_audio_stream(UI_SIGHT_ANSWER_CLICK_SFX_PATH)
 	_rhythm_flow_tap_sfx = _load_audio_stream(RHYTHM_FLOW_TAP_SFX_PATH)
@@ -9283,35 +11740,16 @@ func _setup_audio() -> void:
 		var mp3 := _note_chase_bgm as AudioStreamMP3
 		mp3.loop = true
 
-	_audio_stream = AudioStreamGenerator.new()
-	_audio_stream.mix_rate = 44100
-	_audio_stream.buffer_length = 0.45
 
-	_audio_player = AudioStreamPlayer.new()
-	_audio_player.stream = _audio_stream
-	add_child(_audio_player)
-	_audio_player.play()
-	_playback = _audio_player.get_stream_playback()
+func _setup_audio() -> void:
+	_setup_audio_players()
+	_load_audio_assets_deferred()
 
 
 func _load_audio_stream(path: String) -> AudioStream:
-	if _qa_should_simulate_missing_resource(path, "audio"):
-		return null
-	if ResourceLoader.exists(path, "AudioStream"):
-		return ResourceLoader.load(path) as AudioStream
-
-	var abs_path := ProjectSettings.globalize_path(path)
-	if not FileAccess.file_exists(abs_path):
-		return null
-
-	if path.to_lower().ends_with(".mp3"):
-		var bytes := FileAccess.get_file_as_bytes(abs_path)
-		if bytes.size() > 0:
-			var stream := AudioStreamMP3.new()
-			stream.data = bytes
-			return stream
-
-	return null
+	if _audio_engine == null:
+		_audio_engine = AudioEngineScript.new()
+	return _audio_engine.load_audio_stream(path, Callable(self, "_qa_should_simulate_missing_resource"))
 
 
 func _qa_should_simulate_missing_resource(path: String, kind: String) -> bool:
@@ -9329,33 +11767,43 @@ func _qa_should_simulate_missing_resource(path: String, kind: String) -> bool:
 	return true
 
 
+func _update_first_run_assessment_pending() -> void:
+	_first_run_assessment_pending = not _first_run_onboarding_done and not _qa_enabled
+	if not _first_run_assessment_pending and not _first_run_assessment_active:
+		_first_run_assessment_steps.clear()
+
+
 func _load_ear_settings() -> void:
 	_ear_choice_count = 6
-	_ui_theme_id = "golden_harvest"
+	_ui_theme_id = FIXED_MENU_THEME_ID
 	_use_descending_intervals = false
 	_use_harmonic_intervals = false
+	_practice_mode_enabled = true
 	_rhythm_flow_saved_maps = []
 	_rhythm_flow_tap_latency_ms = 0
 	if not FileAccess.file_exists(EAR_SETTINGS_PATH):
 		_rhythm_flow_ensure_saved_maps_slots()
 		if _home_tokens != null:
 			_home_tokens.set_theme(_ui_theme_id)
+		_update_first_run_assessment_pending()
 		return
 	var f := FileAccess.open(EAR_SETTINGS_PATH, FileAccess.READ)
 	if f == null:
 		if _home_tokens != null:
 			_home_tokens.set_theme(_ui_theme_id)
+		_update_first_run_assessment_pending()
 		return
 	var txt := f.get_as_text()
 	f.close()
 	var parsed: Variant = JSON.parse_string(txt)
 	if typeof(parsed) != TYPE_DICTIONARY:
+		_update_first_run_assessment_pending()
 		return
 	var d := parsed as Dictionary
 	if d.has("choice_count"):
 		_ear_choice_count = clampi(int(d["choice_count"]), 2, 6)
-	if d.has("theme_id"):
-		_ui_theme_id = str(d["theme_id"]).strip_edges()
+	# Keep one fixed menu palette; ignore persisted theme_id.
+	_ui_theme_id = FIXED_MENU_THEME_ID
 	if d.has("use_descending_intervals"):
 		_use_descending_intervals = bool(d["use_descending_intervals"])
 	if d.has("use_harmonic_intervals"):
@@ -9370,16 +11818,55 @@ func _load_ear_settings() -> void:
 		_streak_count = maxi(0, int(d["streak_count"]))
 	if d.has("streak_last_date"):
 		_streak_last_date = str(d["streak_last_date"])
+	if d.has("ear_intro_seen"):
+		_ear_intro_seen = bool(d["ear_intro_seen"])
+	if d.has("first_run_onboarding_done"):
+		_first_run_onboarding_done = bool(d["first_run_onboarding_done"])
+	if d.has("practice_mode_enabled"):
+		_practice_mode_enabled = bool(d["practice_mode_enabled"])
+	if d.has("mic_mode_enabled"):
+		_mic_mode_enabled = bool(d["mic_mode_enabled"])
+	if d.has("midi_enabled"):
+		_midi_enabled = bool(d["midi_enabled"])
+	if d.has("midi_any_octave"):
+		_midi_any_octave = bool(d["midi_any_octave"])
+	if d.has("score_font_name"):
+		_score_font_name = str(d["score_font_name"])
+	# Apply the loaded font to the score engine immediately so first render uses it.
+	SMuFLFontScript.set_active_font(_score_font_name)
+	if d.has("note_chase_intro_seen"):
+		_note_chase_intro_seen = bool(d["note_chase_intro_seen"])
+	if d.has("cadence_intro_seen"):
+		_cadence_intro_seen = bool(d["cadence_intro_seen"])
+	if d.has("interval_preset"):
+		_interval_difficulty_preset = str(d["interval_preset"])
+	if d.has("cadence_preset"):
+		_cadence_difficulty_preset = str(d["cadence_preset"])
+	if d.has("selected_chord_types") and d["selected_chord_types"] is Array:
+		_selected_chord_types.clear()
+		for item in (d["selected_chord_types"] as Array):
+			var cn := str(item)
+			if CHORD_INTERVALS.has(cn) and not _selected_chord_types.has(cn):
+				_selected_chord_types.append(cn)
+	if d.has("sight_chord_tier"):
+		_sight_selected_chord_tier = clampi(int(d["sight_chord_tier"]), 1, SIGHT_CHORD_MAX_TIER)
+	if d.has("player_name"):
+		_player_name = str(d["player_name"]).strip_edges().substr(0, 24)
+	if d.has("player_level"):
+		_player_level = str(d["player_level"])
+	if d.has("player_profile_seen"):
+		_player_profile_seen = bool(d["player_profile_seen"])
+	if _selected_chord_types.is_empty():
+		_selected_chord_types = _default_selected_chord_types()
 	_update_daily_streak(false)
 	if _use_harmonic_intervals:
 		_use_descending_intervals = false
 	_rhythm_flow_ensure_saved_maps_slots()
-	if _home_state != null:
-		_home_state.use_descending_intervals = _use_descending_intervals
-		_home_state.use_harmonic_intervals = _use_harmonic_intervals
+	_sync_home_state_from_runtime()
 	if _home_tokens != null:
 		_home_tokens.set_theme(_ui_theme_id)
 		_ui_theme_id = _home_tokens.theme_id()
+	_update_first_run_assessment_pending()
 
 
 func _save_ear_settings() -> void:
@@ -9392,7 +11879,23 @@ func _save_ear_settings() -> void:
 		"rhythm_flow_saved_maps": _rhythm_flow_saved_maps,
 		"rhythm_flow_tap_latency_ms": _rhythm_flow_tap_latency_ms,
 		"streak_count": _streak_count,
-		"streak_last_date": _streak_last_date
+		"streak_last_date": _streak_last_date,
+		"ear_intro_seen": _ear_intro_seen,
+		"first_run_onboarding_done": _first_run_onboarding_done,
+		"practice_mode_enabled": _practice_mode_enabled,
+		"mic_mode_enabled": _mic_mode_enabled,
+		"midi_enabled": _midi_enabled,
+		"midi_any_octave": _midi_any_octave,
+		"score_font_name": _score_font_name,
+		"note_chase_intro_seen": _note_chase_intro_seen,
+		"cadence_intro_seen": _cadence_intro_seen,
+		"interval_preset": _interval_difficulty_preset,
+		"cadence_preset": _cadence_difficulty_preset,
+		"selected_chord_types": _selected_chord_types,
+		"sight_chord_tier": _sight_selected_chord_tier,
+		"player_name": _player_name,
+		"player_level": _player_level,
+		"player_profile_seen": _player_profile_seen,
 	}
 	var txt := JSON.stringify(data, "\t")
 	var f := FileAccess.open(EAR_SETTINGS_PATH, FileAccess.WRITE)
@@ -9402,31 +11905,340 @@ func _save_ear_settings() -> void:
 	f.close()
 
 
-func _update_daily_streak(just_played: bool) -> void:
-	var today_dict := Time.get_date_dict_from_system()
-	var today := "%04d-%02d-%02d" % [int(today_dict["year"]), int(today_dict["month"]), int(today_dict["day"])]
-	if just_played:
-		if _streak_last_date == today:
-			pass
+func _ensure_progress_store() -> ProgressStore:
+	if _progress_store == null:
+		_progress_store = ProgressStoreScript.new()
+	return _progress_store
+
+
+func _load_progress_data() -> void:
+	# Route through the active student. Falls back to legacy path when:
+	#   - Student Edition (no active student concept)
+	#   - Teacher Edition before a student is selected (boot-time bootstrap)
+	# All real per-student writes happen AFTER set_active_student is called.
+	var path: String = _resolve_progress_data_path()
+	_lifetime_stats = _ensure_progress_store().load_from_path(path)
+
+
+func _save_progress_data() -> void:
+	_ensure_progress_store().set_stats(_lifetime_stats)
+	var path: String = _resolve_progress_data_path()
+	_progress_store.save_to_path(path)
+
+
+# Resolves the progress-data file path for the active student. Returns the legacy
+# path when there's no active student (so we don't write to a "" path).
+func _resolve_progress_data_path() -> String:
+	if _active_student != null and _active_student.has_active_student():
+		var p: String = str(_active_student.active_module_progress_path())
+		if p != "":
+			return p
+	return PROGRESS_DATA_PATH
+
+
+# One-shot Phase 1 bootstrap: ensure ActiveStudent instance exists and run the
+# legacy progress-data migration. DOES NOT touch teacher_data — that's a separate
+# step ordered AFTER _load_teacher_data so we don't overwrite real students with
+# the empty-default store.
+func _bootstrap_active_student_system() -> void:
+	if _active_student == null:
+		_active_student = ActiveStudentScript.new()
+	# Student Edition: don't migrate the legacy single-user files into per-student
+	# folders. Keep _active_student empty so _resolve_progress_data_path falls back
+	# to PROGRESS_DATA_PATH (the legacy path). The instance still exists so the
+	# helper API can be called safely from shared code.
+	if not IS_TEACHER_EDITION:
+		return
+	var report: Dictionary = _active_student.migrate_legacy_if_needed()
+	if bool(report.get("migrated_progress", false)) or bool(report.get("migrated_learning", false)):
+		print("[ActiveStudent] Migrations applied: %s" % str(report.get("details", [])))
+	# QA bypass: the headless bot can't dismiss the student-picker overlay, so
+	# auto-attribute to the Teacher demo student. Real launches still show the
+	# picker; only the synthetic --qa run takes this path.
+	if _qa_enabled and not _active_student.has_active_student():
+		_active_student.set_active_id(ActiveStudentScript.RESERVED_ID_TEACHER)
+
+
+# Phase 2b: switch the LIVE LearningProgress instance to read/write the active
+# student's file. Called on every active-student switch (and once at startup
+# after the first student is picked).
+func _route_learning_progress_to_active_student() -> void:
+	if _learning_progress == null:
+		return
+	if not _learning_progress.has_method("set_save_path_and_reload"):
+		return  # legacy ModuleProgress without per-student support
+	if _active_student == null or not _active_student.has_active_student():
+		return
+	var path: String = str(_active_student.active_learning_progress_path())
+	if path == "":
+		return
+	_learning_progress.set_save_path_and_reload(path)
+
+
+# Run AFTER teacher data loads. If the live file lost real students due to a
+# bug (or any other regression), restore from the most recent backup that has
+# MORE real (non-reserved) students. One-shot recovery — silent no-op otherwise.
+func _recover_teacher_data_from_backup_if_regressed() -> void:
+	var store := _ensure_teacher_store()
+	var live: Dictionary = store.get_data()
+	var live_real: int = _count_real_students(live)
+	# Walk backups newest → oldest; first one with strictly more real students wins.
+	for slot in range(1, 4):  # backup_1, backup_2, backup_3
+		var bpath: String = "user://teacher_backups/teacher_backup_%d.json" % slot
+		if not FileAccess.file_exists(bpath):
+			continue
+		var f := FileAccess.open(bpath, FileAccess.READ)
+		if f == null:
+			continue
+		var txt := f.get_as_text()
+		f.close()
+		var parsed: Variant = JSON.parse_string(txt)
+		if typeof(parsed) != TYPE_DICTIONARY:
+			continue
+		var backup_data: Dictionary = parsed
+		var backup_real: int = _count_real_students(backup_data)
+		if backup_real <= live_real:
+			continue
+		# Restore: take the backup's students, keep any reserved records the live
+		# file may have already created (Teacher / Practice Mode), then re-save.
+		print("[TeacherRecovery] Restoring %d student(s) from %s (live had %d)" % [backup_real, bpath, live_real])
+		var merged: Dictionary = backup_data.duplicate(true)
+		_merge_reserved_students_into(merged, live)
+		store.set_data(merged)
+		store.save_to_path(TEACHER_DATA_PATH)
+		_teacher_data = store.get_data()
+		return
+
+
+# Count students that are NOT reserved IDs (the user's real students).
+func _count_real_students(data: Dictionary) -> int:
+	var n: int = 0
+	for s in data.get("students", []):
+		if typeof(s) != TYPE_DICTIONARY:
+			continue
+		var sid: String = str((s as Dictionary).get("id", ""))
+		if sid == ActiveStudentScript.RESERVED_ID_TEACHER:
+			continue
+		if sid == ActiveStudentScript.RESERVED_ID_PRACTICE:
+			continue
+		n += 1
+	return n
+
+
+# Copy reserved records (Teacher / Practice Mode) from `src` into `dst` if `dst`
+# doesn't already have them. Used during recovery so we don't lose the reserved
+# records the live file added.
+func _merge_reserved_students_into(dst: Dictionary, src: Dictionary) -> void:
+	var dst_students: Array = dst.get("students", [])
+	var has_teacher := false
+	var has_practice := false
+	for s in dst_students:
+		var sid: String = str((s as Dictionary).get("id", ""))
+		if sid == ActiveStudentScript.RESERVED_ID_TEACHER:
+			has_teacher = true
+		elif sid == ActiveStudentScript.RESERVED_ID_PRACTICE:
+			has_practice = true
+	for s in src.get("students", []):
+		if typeof(s) != TYPE_DICTIONARY:
+			continue
+		var sid2: String = str((s as Dictionary).get("id", ""))
+		if sid2 == ActiveStudentScript.RESERVED_ID_TEACHER and not has_teacher:
+			dst_students.append(s)
+		elif sid2 == ActiveStudentScript.RESERVED_ID_PRACTICE and not has_practice:
+			dst_students.append(s)
+	dst["students"] = dst_students
+
+
+# Ensure the Teacher demo and Practice Mode student records exist in
+# teacher_data.json. These are reserved IDs that the UI treats specially.
+func _ensure_reserved_student_records() -> void:
+	var store := _ensure_teacher_store()
+	var students_array: Array = store.get_data().get("students", [])
+	var seen_teacher := false
+	var seen_practice := false
+	for s in students_array:
+		if typeof(s) != TYPE_DICTIONARY:
+			continue
+		var sid := str((s as Dictionary).get("id", ""))
+		if sid == ActiveStudentScript.RESERVED_ID_TEACHER:
+			seen_teacher = true
+		elif sid == ActiveStudentScript.RESERVED_ID_PRACTICE:
+			seen_practice = true
+	var added := false
+	if not seen_teacher:
+		students_array.append({
+			"id": ActiveStudentScript.RESERVED_ID_TEACHER,
+			"name": ActiveStudentScript.RESERVED_TEACHER_NAME,
+			"level": "Demo / Test",
+			"instrument": "Any",
+			"lesson_log": [],
+			"reserved": true,
+		})
+		added = true
+	if not seen_practice:
+		students_array.append({
+			"id": ActiveStudentScript.RESERVED_ID_PRACTICE,
+			"name": ActiveStudentScript.RESERVED_PRACTICE_NAME,
+			"level": "(scratch space)",
+			"instrument": "Any",
+			"lesson_log": [],
+			"reserved": true,
+		})
+		added = true
+	if added:
+		var d := store.get_data()
+		d["students"] = students_array
+		store.set_data(d)
+		store.save_to_path(TEACHER_DATA_PATH)
+		_teacher_data = store.get_data()
+
+
+func _merge_session_into_lifetime() -> void:
+	_ensure_progress_store().set_stats(_lifetime_stats)
+	_lifetime_stats = _progress_store.merge_session(
+		_selected_mode,
+		MODE_INTERVAL,
+		MODE_CHORD,
+		MODE_CADENCE,
+		_interval_stats_asked,
+		_interval_stats_correct,
+		_chord_stats_asked,
+		_chord_stats_correct
+	)
+
+
+func _progress_home_line(mode: int) -> String:
+	_ensure_progress_store().set_stats(_lifetime_stats)
+	return _progress_store.progress_home_line(mode, MODE_INTERVAL, MODE_CHORD, MODE_CADENCE)
+
+
+func _apply_interval_preset(preset: String) -> void:
+	_interval_difficulty_preset = preset
+	match preset:
+		"beginner":
+			for _d in range(1, 9):
+				var _dbtn: Button = _degree_toggles.get(_d, null)
+				if _dbtn != null:
+					_dbtn.set_pressed_no_signal([1, 2, 3, 4, 5, 8].has(_d))
+			_include_minor_intervals = false
+			if _include_minor_toggle != null:
+				_include_minor_toggle.set_pressed_no_signal(false)
+				_style_include_minor_toggle(false)
+			if _descending_intervals_toggle != null:
+				_descending_intervals_toggle.set_pressed_no_signal(false)
+			_use_descending_intervals = false
+			if _harmonic_intervals_toggle != null:
+				_harmonic_intervals_toggle.set_pressed_no_signal(false)
+			_use_harmonic_intervals = false
+		"standard":
+			for _d in range(1, 9):
+				var _dbtn: Button = _degree_toggles.get(_d, null)
+				if _dbtn != null:
+					_dbtn.set_pressed_no_signal(true)
+			_include_minor_intervals = false
+			if _include_minor_toggle != null:
+				_include_minor_toggle.set_pressed_no_signal(false)
+				_style_include_minor_toggle(false)
+			if _descending_intervals_toggle != null:
+				_descending_intervals_toggle.set_pressed_no_signal(false)
+			_use_descending_intervals = false
+			if _harmonic_intervals_toggle != null:
+				_harmonic_intervals_toggle.set_pressed_no_signal(false)
+			_use_harmonic_intervals = false
+		"advanced":
+			for _d in range(1, 9):
+				var _dbtn: Button = _degree_toggles.get(_d, null)
+				if _dbtn != null:
+					_dbtn.set_pressed_no_signal(true)
+			_include_minor_intervals = true
+			if _include_minor_toggle != null:
+				_include_minor_toggle.set_pressed_no_signal(true)
+				_style_include_minor_toggle(true)
+	_sync_home_state_from_runtime()
+	_active_intervals = []
+	_refresh_degree_buttons()
+	_style_descending_intervals_toggle(_use_descending_intervals)
+	_style_harmonic_intervals_toggle(_use_harmonic_intervals)
+	_save_ear_settings()
+	_refresh_interval_preset_buttons()
+
+
+func _apply_cadence_preset(preset: String) -> void:
+	_cadence_difficulty_preset = preset
+	match preset:
+		"beginner":
+			_cadence_selected = ["Perfect", "Plagal"]
+		"standard":
+			_cadence_selected = ["Perfect", "Plagal", "Half", "Deceptive"]
+		"advanced":
+			_cadence_selected = ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]
+	for _cname in _cadence_type_buttons.keys():
+		var _cbtn: Button = _cadence_type_buttons[_cname]
+		if _cbtn != null:
+			_cbtn.set_pressed_no_signal(_cadence_selected.has(_cname))
+	_sync_home_state_from_runtime()
+	_refresh_cadence_buttons()
+	_save_ear_settings()
+	_refresh_cadence_preset_buttons()
+
+
+func _refresh_interval_preset_buttons() -> void:
+	var _preset_names := ["beginner", "standard", "advanced"]
+	var _mastery_intervals := {
+		"beginner": ["P1", "M2", "M3", "P4", "P5", "P8"],
+		"standard": ["P1", "M2", "M3", "P4", "P5", "M6", "M7", "P8"],
+		"advanced": [],
+	}
+	for _i in range(_interval_preset_btns.size()):
+		var _pbtn := _interval_preset_btns[_i]
+		if _pbtn == null:
+			continue
+		var _pname: String = _preset_names[_i] if _i < _preset_names.size() else ""
+		var _is_sel := _interval_difficulty_preset == _pname
+		_style_practice_setup_chip_button(_pbtn, _is_sel)
+		if not _is_sel and _pname != "advanced":
+			var _check_ids: Array = _mastery_intervals.get(_pname, [])
+			var _all_mastered := true
+			if _check_ids.is_empty():
+				_all_mastered = false
+			var _lt_int: Variant = _lifetime_stats.get("interval", {})
+			for _iid in _check_ids:
+				var _entry: Variant = (_lt_int as Dictionary).get(_iid, null) if typeof(_lt_int) == TYPE_DICTIONARY else null
+				if _entry == null or typeof(_entry) != TYPE_DICTIONARY:
+					_all_mastered = false
+					break
+				var _asked := int((_entry as Dictionary).get("asked", 0))
+				var _correct := int((_entry as Dictionary).get("correct", 0))
+				if _asked < 5 or float(_correct) / float(maxi(1, _asked)) < 0.70:
+					_all_mastered = false
+					break
+			_pbtn.modulate = Color(0.82, 1.0, 0.82, 1.0) if _all_mastered else Color.WHITE
 		else:
-			var yesterday_unix := Time.get_unix_time_from_system() - 86400.0
-			var yd := Time.get_date_dict_from_unix_time(int(yesterday_unix))
-			var yesterday := "%04d-%02d-%02d" % [int(yd["year"]), int(yd["month"]), int(yd["day"])]
-			if _streak_last_date == yesterday or _streak_last_date == "":
-				_streak_count += 1
-			else:
-				_streak_count = 1
-			_streak_last_date = today
+			_pbtn.modulate = Color.WHITE
+
+
+func _refresh_cadence_preset_buttons() -> void:
+	var _preset_names := ["beginner", "standard", "advanced"]
+	for _i in range(_cadence_preset_btns.size()):
+		var _pbtn := _cadence_preset_btns[_i]
+		if _pbtn == null:
+			continue
+		var _pname: String = _preset_names[_i] if _i < _preset_names.size() else ""
+		_style_practice_setup_chip_button(_pbtn, _cadence_difficulty_preset == _pname)
+		_pbtn.modulate = Color.WHITE
+
+
+func _update_daily_streak(just_played: bool) -> void:
+	# Daily streak is a Student-Edition-only concept. On a multi-student Teacher
+	# Edition device a single device-level streak is misleading (it'd combine
+	# every student's practice into one count). Skip entirely there.
+	if IS_TEACHER_EDITION:
+		return
+	var result := _ensure_progress_store().update_streak(_streak_count, _streak_last_date, just_played)
+	_streak_count = int(result["count"])
+	_streak_last_date = str(result["date"])
+	if result["changed"] or just_played:
 		_save_ear_settings()
-	else:
-		if _streak_last_date != "" and _streak_last_date != today:
-			var yesterday_unix2 := Time.get_unix_time_from_system() - 86400.0
-			var yd2 := Time.get_date_dict_from_unix_time(int(yesterday_unix2))
-			var yesterday2 := "%04d-%02d-%02d" % [int(yd2["year"]), int(yd2["month"]), int(yd2["day"])]
-			if _streak_last_date != yesterday2:
-				_streak_count = 0
-				_streak_last_date = ""
-				_save_ear_settings()
 	_refresh_streak_label()
 
 
@@ -9437,9 +12249,13 @@ func _refresh_streak_label() -> void:
 	if _streak_count >= 2:
 		_home_streak_label.text = "%s %d Day Streak!" % [flame, _streak_count]
 	elif _streak_count == 1:
-		_home_streak_label.text = "%s Day 1 Streak!" % flame
+		_home_streak_label.text = "%s Day 1 — Start your streak!" % flame
 	else:
-		_home_streak_label.text = "%s Start your streak today!" % flame
+		_home_streak_label.text = "%s Practice today to start a streak!" % flame
+	if _home_streak_panel != null:
+		# TopHUD is a PanelContainer; direct children can fill the entire header.
+		# Keep this placeholder hidden to avoid a dark overlay on Home.
+		_home_streak_panel.visible = false
 
 
 func _refresh_ear_settings_ui() -> void:
@@ -9525,8 +12341,9 @@ func _on_mode_selected() -> void:
 	_invalidate_audio_sequence_schedule()
 	_setup_theme_dirty = true
 	_sight_mode = _normalize_sight_mode(_sight_mode)
+	_enforce_mvp_menu_gates()
 	_sync_home_state_from_runtime()
-	var vis: Dictionary = _home_state.visibility(MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
+	var vis: Dictionary = _home_flow_controller.visibility(MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
 	var is_ear := bool(vis["is_ear"])
 	var practice_flow := bool(vis["practice_flow"])
 	var learn_flow := bool(vis["learn_flow"])
@@ -9535,6 +12352,11 @@ func _on_mode_selected() -> void:
 	var show_overview := not _home_mode_detail_active and not show_settings and show_home_main
 	var show_detail := practice_flow and _home_mode_detail_active and not show_settings and show_home_main
 	var sight_in_more_settings := show_detail and _selected_mode == MODE_SIGHT and _sight_settings_screen_active
+	if _first_run_assessment_pending:
+		show_settings = false
+		show_overview = false
+		show_detail = false
+		sight_in_more_settings = false
 
 	if _home_q_row != null:
 		_home_q_row.visible = false
@@ -9558,13 +12380,14 @@ func _on_mode_selected() -> void:
 	if _home_overview_anchor != null:
 		if show_overview:
 			var vp: Vector2 = get_viewport_rect().size
-			var left_target: int = int(roundf(vp.x * 0.60))
+			var left_target: int = int(roundf(vp.x * 0.48))
 			var right_gutter: int = int(roundf(clampf(vp.x * 0.05, 22.0, 76.0)))
-			var min_content_width: int = int(roundf(clampf(vp.x * 0.30, 260.0, 420.0)))
+			var min_content_width: int = _home_overview_content_width_for_viewport(vp)
 			var max_left: int = maxi(0, int(vp.x) - right_gutter - min_content_width)
 			left_target = clampi(left_target, 0, max_left)
 			_home_overview_anchor.add_theme_constant_override("margin_left", left_target)
 			_home_overview_anchor.add_theme_constant_override("margin_right", right_gutter)
+			_sync_home_overview_section_columns(vp)
 		else:
 			_home_overview_anchor.add_theme_constant_override("margin_left", 0)
 			_home_overview_anchor.add_theme_constant_override("margin_right", 0)
@@ -9591,7 +12414,7 @@ func _on_mode_selected() -> void:
 	_set_home_section_visible(_note_chase_options_box, show_detail and bool(vis["show_chase"]))
 	_set_home_section_visible(_read_options_box, show_detail and bool(vis["show_read"]))
 	if _home_info_label != null:
-		_home_info_label.visible = show_detail
+		_home_info_label.visible = show_detail or _first_run_assessment_pending
 	if _home_mode_back_button != null:
 		var can_nav := show_home_main and (_home_mode_detail_active or _ear_settings_screen_active or _sight_settings_screen_active)
 		var can_go_back := can_nav
@@ -9603,18 +12426,24 @@ func _on_mode_selected() -> void:
 	elif _home_mode_home_button != null:
 		_home_mode_home_button.visible = false
 	if _sight_settings_button != null:
-		_sight_settings_button.visible = show_home_main
+		_sight_settings_button.visible = show_home_main and not _first_run_assessment_pending
 	_apply_top_hud_nav_button_skin()
 	if _home_sight_mode_row != null:
 		var show_sight_row := not sight_in_more_settings
+		if _first_run_assessment_pending:
+			show_sight_row = false
 		if show_detail and _selected_mode != MODE_SIGHT and _selected_mode != MODE_NOTE_CHASE:
 			show_sight_row = false
 		_home_sight_mode_row.visible = show_sight_row
 	if _sight_clef_row != null:
-		_sight_clef_row.visible = _selected_mode == MODE_SIGHT and _sight_mode != "Rhythm Flow"
+		# Hide clef row for Rhythm Flow only; Chords shows Treble/Bass/Grand Staff
+		_sight_clef_row.visible = not _first_run_assessment_pending and _selected_mode == MODE_SIGHT and _sight_mode != "Rhythm Flow"
 
 	if _home_start_button != null:
-		if show_detail:
+		if _first_run_assessment_pending and show_home_main:
+			_home_start_button.text = "Test Your Skills"
+			_home_start_button.visible = true
+		elif show_detail:
 			_home_start_button.text = "%s  Let's Play!" % char(0x25B6)
 			_home_start_button.visible = true
 		elif learn_flow and show_home_main:
@@ -9622,6 +12451,11 @@ func _on_mode_selected() -> void:
 			_home_start_button.visible = true
 		else:
 			_home_start_button.visible = false
+	if _how_to_play_button != null:
+		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_SIGHT, MODE_NOTE_CHASE, MODE_CADENCE]
+		_how_to_play_button.visible = has_intro
+	if _mic_toggle_button != null:
+		_mic_toggle_button.visible = show_detail and _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
 	if _home_footer_bar != null:
 		var show_footer_actions := (_home_settings_button != null and _home_settings_button.visible) or (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible)
 		if _home_footer_row != null:
@@ -9631,6 +12465,15 @@ func _on_mode_selected() -> void:
 	_style_card(_home_card, Color(0, 0, 0, 0))
 	if show_home_main:
 		_refresh_home_subtitle()
+		_refresh_game_title()
+		_force_home_top_ui_state()
+	if _home_info_label != null:
+		if _first_run_assessment_pending:
+			_home_info_label.text = "Start with a short 5-question sight check."
+		elif show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_CADENCE]:
+			var _progress_line := _progress_home_line(_selected_mode)
+			if not _progress_line.is_empty():
+				_home_info_label.text = _progress_line
 
 	_refresh_mode_buttons()
 	_refresh_home_hub_buttons()
@@ -9669,6 +12512,7 @@ func _on_mode_selected() -> void:
 func _refresh_sight_submode_ui_fast() -> void:
 	_setup_theme_dirty = true
 	_sight_mode = _normalize_sight_mode(_sight_mode)
+	_enforce_mvp_menu_gates()
 	_sync_home_state_from_runtime()
 	_refresh_home_subtitle()
 	_refresh_sight_mode_buttons(false)
@@ -9682,6 +12526,9 @@ func _refresh_sight_submode_ui_fast() -> void:
 
 func _refresh_home_subtitle() -> void:
 	if _home_title_label == null:
+		return
+	if _first_run_assessment_pending:
+		_home_title_label.text = "Welcome"
 		return
 	if _ear_settings_screen_active:
 		_home_title_label.text = "Settings"
@@ -9710,23 +12557,621 @@ func _refresh_home_subtitle() -> void:
 
 
 func _on_mode_button_pressed(mode: int) -> void:
+	if _startup_boot_blocking_input():
+		return
 	_clear_gameplay_transient_visuals()
 	_home_mode_detail_active = true
 	_sight_settings_screen_active = false
 	_sync_home_state_from_runtime()
-	_home_state.on_mode_button_pressed(mode, MODE_INTERVAL, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
+	_home_flow_controller.on_mode_button_pressed(mode, MODE_INTERVAL, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
 	_sync_runtime_from_home_state()
 	_on_mode_selected()
 
 
 func _on_home_hub_pressed(hub_name: String) -> void:
+	if _startup_boot_blocking_input():
+		return
+	if hub_name == "Learn" and LEARNING_MODE_ENABLED:
+		_on_learning_mode_pressed()
+		return
 	_clear_gameplay_transient_visuals()
 	_home_mode_detail_active = false
 	_sight_settings_screen_active = false
 	_sync_home_state_from_runtime()
-	_home_state.on_home_hub_pressed(hub_name, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
+	_home_flow_controller.on_home_hub_pressed(hub_name, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
 	_sync_runtime_from_home_state()
 	_on_mode_selected()
+
+
+# ─── Learning Mode ────────────────────────────────────────────────
+
+func _on_learning_mode_pressed() -> void:
+	if _learning_progress == null:
+		_learning_progress = LearningProgressScript.new()
+	_play_ui_click_sfx()
+	_show_learning_map()
+
+
+func _show_learning_map() -> void:
+	_learning_mode_active = true
+	if _home_panel != null:
+		_home_panel.visible = false
+	if _game_panel != null:
+		_game_panel.visible = false
+	if _root_margin_container != null:
+		_root_margin_container.visible = false
+	_hide_learning_lesson()
+
+	if _learning_map != null and is_instance_valid(_learning_map):
+		_learning_map.visible = true
+		_learning_map.refresh()
+		return
+
+	_learning_map = LearningMapScript.new()
+	_learning_map.name = "LearningMap"
+	add_child(_learning_map)
+	move_child(_learning_map, get_child_count() - 1)
+	# Force full viewport size since anchors may not resolve until next frame
+	var vp := get_viewport_rect().size
+	_learning_map.position = Vector2.ZERO
+	_learning_map.size = vp
+	_learning_map.setup(_learning_progress)
+	_learning_map.module_selected.connect(_on_learning_module_selected)
+	_learning_map.test_out_selected.connect(_on_learning_test_out_selected)
+	_learning_map.placement_selected.connect(_on_learning_placement_selected)
+	_learning_map.back_pressed.connect(_on_learning_back_to_home)
+	_learning_map.review_weak_pressed.connect(_on_learning_review_weak)
+
+
+func _on_learning_module_selected(module_id: String) -> void:
+	var module_data: Dictionary = LearningRegistryScript.get_module_by_id(module_id)
+	if module_data.is_empty():
+		return
+	if module_data.get("steps", []).is_empty():
+		return
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+	_start_lesson_player_midi_if_enabled()
+
+
+func _on_learning_test_out_selected(module_id: String) -> void:
+	var module_data: Dictionary = LearningRegistryScript.get_module_by_id(module_id)
+	if module_data.is_empty():
+		return
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress, false, true)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+	_start_lesson_player_midi_if_enabled()
+
+
+func _on_learning_placement_selected() -> void:
+	var module_data: Dictionary = _build_learning_placement_module()
+	if module_data.is_empty():
+		return
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress, false, true)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+	_start_lesson_player_midi_if_enabled()
+
+
+func _build_learning_placement_module() -> Dictionary:
+	var LMD_Script = preload("res://scripts/learning/learning_module_data.gd")
+	var steps: Array[Dictionary] = []
+	for module_data in LearningRegistryScript.get_all_modules():
+		for step in module_data.get("steps", []):
+			if step is Dictionary:
+				steps.append((step as Dictionary).duplicate(true))
+	if steps.is_empty():
+		return {}
+	var placement_module: Dictionary = LMD_Script.create_module(
+		"_placement_assessment",
+		"Placement Check",
+		"Find the right starting point for your learning path.",
+		"",
+		steps,
+		5,
+		""
+	)
+	placement_module["placement_mode"] = true
+	placement_module["test_out_max_questions"] = 12
+	return placement_module
+
+
+func _on_learning_lesson_completed(_module_id: String) -> void:
+	_hide_learning_lesson()
+	_show_learning_map()
+
+
+func _on_learning_lesson_back_to_map() -> void:
+	_hide_learning_lesson()
+	_show_learning_map()
+
+
+func _on_learning_review_weak() -> void:
+	if _learning_progress == null:
+		return
+	var rq: RefCounted = _learning_progress.get_review_queue()
+	if rq == null:
+		return
+	var review_items: Array = rq.get_review_items(8)
+	if review_items.is_empty():
+		return
+	var module_data: Dictionary = _build_learning_review_module(review_items)
+	if module_data.is_empty():
+		return
+	_play_ui_click_sfx()
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	_learning_lesson_player = LessonPlayerScript.new()
+	_learning_lesson_player.name = "LessonPlayer"
+	add_child(_learning_lesson_player)
+	var vp2 := get_viewport_rect().size
+	_learning_lesson_player.position = Vector2.ZERO
+	_learning_lesson_player.size = vp2
+	_learning_lesson_player.load_module(module_data, _learning_progress)
+	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
+	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
+	_start_lesson_player_midi_if_enabled()
+
+
+func _build_learning_review_module(review_items: Array) -> Dictionary:
+	var LMD_Script = preload("res://scripts/learning/learning_module_data.gd")
+	var modules: Array = LearningRegistryScript.get_all_modules()
+	var steps: Array[Dictionary] = []
+	steps.append(LMD_Script.create_intro_step(
+		"Review Practice",
+		"Let's review the concepts that need the most support. Answer carefully and take your time.",
+		"Mixed review: notes, theory, listening, keyboard, and rhythm"
+	))
+	for concept_id_variant in review_items:
+		var review_step: Dictionary = _build_learning_review_step(str(concept_id_variant), modules, LMD_Script)
+		if not review_step.is_empty():
+			steps.append(review_step)
+	if steps.size() <= 1:
+		return {}
+	return LMD_Script.create_module(
+		"_review_practice",
+		"Review Practice",
+		"Practice your weak concepts",
+		"",
+		steps,
+		4,
+		""
+	)
+
+
+func _build_learning_review_step(concept_id: String, modules: Array, LMD_Script) -> Dictionary:
+	if concept_id.begins_with("treble:") or concept_id.begins_with("bass:"):
+		return _build_learning_note_review_step(concept_id, modules, LMD_Script)
+	if concept_id.begins_with("theory:"):
+		var theory_item: Dictionary = LMD_Script.find_theory_item_by_concept_id(concept_id)
+		if not theory_item.is_empty():
+			var quiz_step: Dictionary = LMD_Script.create_quiz_step(
+				str(theory_item.get("question", "")),
+				theory_item.get("choices", []),
+				int(theory_item.get("correct_index", 0)),
+				"Correct.",
+				"Not quite."
+			)
+			quiz_step["concept_id"] = concept_id
+			return quiz_step
+	if concept_id.begins_with("quiz:"):
+		for module_data in modules:
+			for step in module_data.get("steps", []):
+				if int(step.get("type", -1)) == 4 and ("quiz:" + str(step.get("question", "")).left(40)) == concept_id:
+					return step.duplicate(true)
+	if concept_id.begins_with("listening:"):
+		for module_data in modules:
+			for step in module_data.get("steps", []):
+				if int(step.get("type", -1)) != 10:
+					continue
+				for item in step.get("items", []):
+					if not (item is Dictionary):
+						continue
+					var item_dict: Dictionary = (item as Dictionary).duplicate(true)
+					var item_concept: String = str(item_dict.get("concept_id", _build_learning_listening_concept_id(item_dict)))
+					if item_concept == concept_id:
+						item_dict["concept_id"] = item_concept
+						return LMD_Script.create_listening_quiz_step(
+							"Listening Review",
+							"Listen once, then choose the best answer.",
+							[item_dict]
+						)
+	if concept_id.begins_with("keyboard:"):
+		for module_data in modules:
+			for step in module_data.get("steps", []):
+				if int(step.get("type", -1)) == 15 and _build_learning_keyboard_concept_id(step) == concept_id:
+					return step.duplicate(true)
+	if concept_id.begins_with("rhythm:"):
+		for module_data in modules:
+			for step in module_data.get("steps", []):
+				if int(step.get("type", -1)) == 12 and _build_learning_rhythm_concept_id(step) == concept_id:
+					return step.duplicate(true)
+	return {}
+
+
+func _build_learning_note_review_step(concept_id: String, modules: Array, LMD_Script) -> Dictionary:
+	var parts: PackedStringArray = concept_id.split(":")
+	if parts.size() < 2:
+		return {}
+	var clef: String = parts[0]
+	var note_id: String = parts[1]
+	var note_item: Dictionary = {}
+	var search_pool: Array = LMD_Script.treble_note_pool_full() if clef == "treble" else LMD_Script.bass_note_pool_full()
+	for entry in search_pool:
+		if str(entry.get("note_id", "")) == note_id:
+			note_item = entry.duplicate(true)
+			break
+	if note_item.is_empty():
+		for module_data in modules:
+			for step in module_data.get("steps", []):
+				var stype: int = int(step.get("type", -1))
+				if stype == 13 or stype == 14:
+					if str(step.get("clef", "")) == clef and str(step.get("target_note_id", "")) == note_id:
+						note_item = {
+							"clef": clef,
+							"note_name": note_id[0],
+							"note_step": int(step.get("target_step", 4)),
+							"note_id": note_id,
+						}
+						break
+			if not note_item.is_empty():
+				break
+	if note_item.is_empty():
+		return {}
+	var choice_data: Dictionary = _build_learning_note_choice_data(str(note_item.get("note_name", note_id[0])))
+	var quiz_step: Dictionary = LMD_Script.create_note_quiz_step(
+		clef,
+		str(note_item.get("note_name", note_id[0])),
+		int(note_item.get("note_step", 4)),
+		choice_data.get("choices", []),
+		int(choice_data.get("correct_index", 0)),
+		"Correct.",
+		"Not quite."
+	)
+	quiz_step["concept_id"] = concept_id
+	return quiz_step
+
+
+func _build_learning_note_choice_data(correct_letter: String) -> Dictionary:
+	var all_letters := ["C", "D", "E", "F", "G", "A", "B"]
+	var ci: int = all_letters.find(correct_letter)
+	var adjacent: Array[String] = []
+	var non_adjacent: Array[String] = []
+	for offset in [-1, 1]:
+		var didx: int = (ci + offset + 7) % 7
+		var d: String = all_letters[didx]
+		if d != correct_letter and not adjacent.has(d):
+			adjacent.append(d)
+	for offset in [-3, 3, -4, 4]:
+		var didx2: int = (ci + offset + 7) % 7
+		var d2: String = all_letters[didx2]
+		if d2 != correct_letter and not adjacent.has(d2) and not non_adjacent.has(d2):
+			non_adjacent.append(d2)
+		if non_adjacent.size() >= 2:
+			break
+	adjacent.shuffle()
+	non_adjacent.shuffle()
+	var distractors: Array[String] = []
+	if not adjacent.is_empty():
+		distractors.append(adjacent[0])
+	for d in non_adjacent:
+		distractors.append(d)
+		if distractors.size() >= 3:
+			break
+	if distractors.size() < 3 and adjacent.size() > 1:
+		distractors.append(adjacent[1])
+	var choices: Array[String] = [correct_letter]
+	for d in distractors:
+		choices.append(d)
+	choices.shuffle()
+	return {"choices": choices, "correct_index": choices.find(correct_letter)}
+
+
+func _build_learning_listening_concept_id(item: Dictionary) -> String:
+	var joined_ids := ""
+	for note_id in item.get("note_ids", []):
+		if joined_ids != "":
+			joined_ids += "_"
+		joined_ids += str(note_id)
+	return "listening:%s:%s" % [str(item.get("label", "item")), joined_ids]
+
+
+func _build_learning_keyboard_concept_id(step: Dictionary) -> String:
+	return "keyboard:%s" % str(step.get("target_note_id", ""))
+
+
+func _build_learning_rhythm_concept_id(step: Dictionary) -> String:
+	var pattern_text := ""
+	for beat in step.get("pattern", []):
+		if pattern_text != "":
+			pattern_text += "-"
+		pattern_text += str(beat)
+	return "rhythm:%s:%s" % [str(step.get("title", "pattern")), pattern_text]
+
+
+func _on_learning_back_to_home() -> void:
+	_learning_mode_active = false
+	if _learning_map != null:
+		_learning_map.visible = false
+	_hide_learning_lesson()
+	if _root_margin_container != null:
+		_root_margin_container.visible = true
+	if _home_panel != null:
+		_home_panel.visible = true
+	_on_mode_selected()
+
+
+func _hide_learning_lesson() -> void:
+	if _learning_lesson_player != null and is_instance_valid(_learning_lesson_player):
+		_stop_midi_listening()
+		_learning_lesson_player.queue_free()
+		_learning_lesson_player = null
+
+
+func _start_lesson_player_midi_if_enabled() -> void:
+	if _midi_enabled and _midi_platform_supported():
+		_start_midi_listening()
+
+
+func _on_teacher_dashboard_open() -> void:
+	_play_ui_click_sfx()
+	_show_teacher_dashboard()
+
+
+func _show_teacher_dashboard() -> void:
+	# Student Edition guard — should be unreachable via UI (the home card is hidden),
+	# but a programmatic call here would otherwise build an unused dashboard tree.
+	if not IS_TEACHER_EDITION:
+		return
+	_teacher_mode_active = true
+	if _home_panel != null:
+		_home_panel.visible = false
+	if _game_panel != null:
+		_game_panel.visible = false
+	if _root_margin_container != null:
+		_root_margin_container.visible = false
+	# Dashboard manages its own student selector — hide the persistent chip.
+	if _active_student_chip != null:
+		_active_student_chip.visible = false
+
+	var td := _teacher_store.get_data() if _teacher_store != null else {"students": []}
+	var mps: Dictionary = _build_module_progress_snapshot_for_teacher()
+
+	if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard):
+		_teacher_dashboard.visible = true
+		_teacher_dashboard.refresh(td, mps)
+		return
+
+	_teacher_dashboard = TeacherDashboardScript.new()
+	_teacher_dashboard.name = "TeacherDashboard"
+	add_child(_teacher_dashboard)
+	move_child(_teacher_dashboard, get_child_count() - 1)
+	var vp := get_viewport_rect().size
+	_teacher_dashboard.position = Vector2.ZERO
+	_teacher_dashboard.size = vp
+	_teacher_dashboard.setup(td, mps)
+	# Phase 2c: dashboard pulls each student's stats fresh when displaying them.
+	_teacher_dashboard.set_per_student_stats_provider(Callable(self, "_compute_practice_stats_for_student"))
+	_teacher_dashboard.back_pressed.connect(_on_teacher_dashboard_back)
+	_teacher_dashboard.student_selected.connect(_on_teacher_student_selected_from_dashboard)
+	_teacher_dashboard.student_saved.connect(_on_teacher_student_saved)
+	_teacher_dashboard.student_deleted.connect(_on_teacher_student_deleted)
+	_teacher_dashboard.piece_added.connect(_on_teacher_piece_added)
+	_teacher_dashboard.piece_updated.connect(_on_teacher_piece_updated)
+	_teacher_dashboard.piece_removed.connect(_on_teacher_piece_removed)
+	_teacher_dashboard.lesson_added.connect(_on_teacher_lesson_added)
+	_teacher_dashboard.assignment_added.connect(_on_teacher_assignment_added)
+	_teacher_dashboard.assignment_toggled.connect(_on_teacher_assignment_toggled)
+	_teacher_dashboard.assignment_removed.connect(_on_teacher_assignment_removed)
+	_teacher_dashboard.tech_added.connect(_on_teacher_tech_added)
+	_teacher_dashboard.tech_updated.connect(_on_teacher_tech_updated)
+	_teacher_dashboard.tech_removed.connect(_on_teacher_tech_removed)
+
+
+func _on_teacher_dashboard_back() -> void:
+	_teacher_mode_active = false
+	if _teacher_dashboard != null:
+		_teacher_dashboard.visible = false
+	if _root_margin_container != null:
+		_root_margin_container.visible = true
+	if _home_panel != null:
+		_home_panel.visible = true
+	_refresh_active_student_chip()  # show chip again once dashboard closes
+	_on_mode_selected()
+
+
+func _on_teacher_student_selected_from_dashboard(student_id: String) -> void:
+	_teacher_selected_student_id = student_id
+	if _teacher_store != null:
+		_teacher_store.set_active_student_id(student_id)
+
+
+func _on_teacher_student_saved(student: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.save_student(_teacher_store.ensure_student_defaults(student))
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_student_deleted(student_id: String) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.delete_student(student_id)
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_piece_added(student_id: String, piece: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.add_piece(student_id, _teacher_store.ensure_piece_defaults(piece))
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_piece_updated(student_id: String, piece_idx: int, piece: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.update_piece(student_id, piece_idx, piece)
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_piece_removed(student_id: String, piece_idx: int) -> void:
+	if _teacher_store == null:
+		return
+	var idx := _teacher_store.find_index_by_id(student_id)
+	if idx < 0:
+		return
+	var students := _teacher_store.students_array().duplicate(true)
+	var student: Dictionary = (students[idx] as Dictionary).duplicate(true)
+	var pieces: Array = student.get("current_pieces", []) as Array
+	if piece_idx >= 0 and piece_idx < pieces.size():
+		var removed_title := str((pieces[piece_idx] as Dictionary).get("title", ""))
+		pieces.remove_at(piece_idx)
+		student["current_pieces"] = pieces
+		students[idx] = student
+		_teacher_store.data["students"] = students
+		var history: Array = student.get("repertoire_history", []) as Array
+		history.append({"title": removed_title, "date": _today_str()})
+		student["repertoire_history"] = history
+		students[idx] = student
+		_teacher_store.data["students"] = students
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_lesson_added(student_id: String, entry: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.add_lesson_log_entry(student_id, entry)
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_assignment_added(student_id: String, task: String, due: String) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.add_assignment(student_id, task, due, _today_str())
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_assignment_toggled(student_id: String, idx: int) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.mark_assignment_done(student_id, idx, _today_str())
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_assignment_removed(student_id: String, idx: int) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.remove_assignment(student_id, idx)
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_tech_added(student_id: String, item: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	var idx := _teacher_store.find_index_by_id(student_id)
+	if idx < 0:
+		return
+	var students := _teacher_store.students_array().duplicate(true)
+	var student: Dictionary = (students[idx] as Dictionary).duplicate(true)
+	var tech: Array = student.get("current_technical", []) as Array
+	tech.append(_teacher_store.ensure_tech_defaults(item))
+	student["current_technical"] = tech
+	students[idx] = student
+	_teacher_store.data["students"] = students
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_tech_updated(student_id: String, tech_idx: int, item: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	var idx := _teacher_store.find_index_by_id(student_id)
+	if idx < 0:
+		return
+	var students := _teacher_store.students_array().duplicate(true)
+	var student: Dictionary = (students[idx] as Dictionary).duplicate(true)
+	var tech: Array = student.get("current_technical", []) as Array
+	if tech_idx >= 0 and tech_idx < tech.size():
+		tech[tech_idx] = _teacher_store.ensure_tech_defaults(item)
+		student["current_technical"] = tech
+		students[idx] = student
+		_teacher_store.data["students"] = students
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _on_teacher_tech_removed(student_id: String, tech_idx: int) -> void:
+	if _teacher_store == null:
+		return
+	var idx := _teacher_store.find_index_by_id(student_id)
+	if idx < 0:
+		return
+	var students := _teacher_store.students_array().duplicate(true)
+	var student: Dictionary = (students[idx] as Dictionary).duplicate(true)
+	var tech: Array = student.get("current_technical", []) as Array
+	if tech_idx >= 0 and tech_idx < tech.size():
+		var removed_title := str((tech[tech_idx] as Dictionary).get("title", ""))
+		tech.remove_at(tech_idx)
+		student["current_technical"] = tech
+		var history: Array = student.get("tech_history", []) as Array
+		history.append(removed_title)
+		student["tech_history"] = history
+		students[idx] = student
+		_teacher_store.data["students"] = students
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+
+
+func _refresh_teacher_dashboard() -> void:
+	if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
+		_teacher_dashboard.refresh(_teacher_store.get_data() if _teacher_store != null else {"students": []}, _build_module_progress_snapshot_for_teacher())
+
+
+func _today_str() -> String:
+	var d := Time.get_date_dict_from_system()
+	return "%04d-%02d-%02d" % [int(d.get("year", 0)), int(d.get("month", 0)), int(d.get("day", 0))]
 
 
 func _refresh_home_hub_buttons() -> void:
@@ -9739,19 +13184,23 @@ func _refresh_home_hub_buttons() -> void:
 
 
 func _on_ear_mode_button_pressed(mode: int) -> void:
+	if _startup_boot_blocking_input():
+		return
+	if not _mvp_is_ear_mode_enabled(mode):
+		_show_mvp_locked_hint()
+		return
 	_clear_gameplay_transient_visuals()
 	_home_mode_detail_active = true
 	_sight_settings_screen_active = false
 	_sync_home_state_from_runtime()
-	_home_state.on_ear_mode_pressed(mode, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE)
+	_home_flow_controller.on_ear_mode_pressed(mode, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE)
 	_sync_runtime_from_home_state()
 	_on_mode_selected()
 
 
 func _on_read_module_button_pressed(module_id: int) -> void:
 	_selected_read_module = clampi(module_id, 1, 2)
-	if _home_state != null:
-		_home_state.selected_read_module = _selected_read_module
+	_sync_home_state_from_runtime()
 	_refresh_read_module_buttons()
 
 
@@ -9761,14 +13210,17 @@ func _on_degree_toggled(enabled: bool, degree: int) -> void:
 		if btn != null:
 			btn.button_pressed = true
 			return
+	_interval_difficulty_preset = "custom"
 	_refresh_degree_buttons()
+	_refresh_interval_preset_buttons()
 
 
 func _on_include_minor_toggled(enabled: bool) -> void:
 	_include_minor_intervals = enabled
-	if _home_state != null:
-		_home_state.include_minor_intervals = enabled
+	_sync_home_state_from_runtime()
 	_style_include_minor_toggle(enabled)
+	_interval_difficulty_preset = "custom"
+	_refresh_interval_preset_buttons()
 	_save_ear_settings()
 	_refresh_practice_setup_theme()
 
@@ -9780,8 +13232,7 @@ func _on_descending_intervals_toggled(enabled: bool) -> void:
 			_descending_intervals_toggle.button_pressed = false
 		enabled = false
 	_use_descending_intervals = enabled
-	if _home_state != null:
-		_home_state.use_descending_intervals = enabled
+	_sync_home_state_from_runtime()
 	_style_descending_intervals_toggle(enabled)
 	_save_ear_settings()
 	_refresh_practice_setup_theme()
@@ -9789,14 +13240,11 @@ func _on_descending_intervals_toggled(enabled: bool) -> void:
 
 func _on_harmonic_intervals_toggled(enabled: bool) -> void:
 	_use_harmonic_intervals = enabled
-	if _home_state != null:
-		_home_state.use_harmonic_intervals = enabled
 	if enabled and _use_descending_intervals:
 		_use_descending_intervals = false
-		if _home_state != null:
-			_home_state.use_descending_intervals = false
 		if _descending_intervals_toggle != null:
 			_descending_intervals_toggle.button_pressed = false
+	_sync_home_state_from_runtime()
 	_style_harmonic_intervals_toggle(enabled)
 	_style_descending_intervals_toggle(_use_descending_intervals)
 	_save_ear_settings()
@@ -9816,14 +13264,12 @@ func _on_progression_toggle(enabled: bool, progression_id: String) -> void:
 				if btn != null:
 					btn.button_pressed = true
 	_refresh_progression_pattern_buttons()
-	if _home_state != null:
-		_home_state.progression_selected = _progression_selected.duplicate()
+	_sync_home_state_from_runtime()
 
 
 func _on_progression_broken_toggled(enabled: bool) -> void:
 	_progression_broken = enabled
-	if _home_state != null:
-		_home_state.progression_broken = enabled
+	_sync_home_state_from_runtime()
 	_refresh_practice_setup_theme()
 
 
@@ -9840,14 +13286,12 @@ func _on_scale_mode_toggle(enabled: bool, mode_name: String) -> void:
 				if btn != null:
 					btn.button_pressed = true
 	_refresh_scale_mode_buttons()
-	if _home_state != null:
-		_home_state.scale_selected_modes = _scale_selected_modes.duplicate()
+	_sync_home_state_from_runtime()
 
 
 func _on_scale_asc_desc_toggled(enabled: bool) -> void:
 	_scale_asc_desc = enabled
-	if _home_state != null:
-		_home_state.scale_asc_desc = enabled
+	_sync_home_state_from_runtime()
 	_refresh_practice_setup_theme()
 
 
@@ -9863,21 +13307,56 @@ func _on_cadence_toggle(enabled: bool, cadence_name: String) -> void:
 				var btn: Button = _cadence_type_buttons[cadence_name]
 				if btn != null:
 					btn.button_pressed = true
+	_cadence_difficulty_preset = "custom"
 	_refresh_cadence_buttons()
-	if _home_state != null:
-		_home_state.cadence_selected = _cadence_selected.duplicate()
+	_refresh_cadence_preset_buttons()
+	_sync_home_state_from_runtime()
 
 
 func _on_cadence_broken_toggled(enabled: bool) -> void:
 	_cadence_broken = enabled
-	if _home_state != null:
-		_home_state.cadence_broken = enabled
+	_sync_home_state_from_runtime()
 	_refresh_practice_setup_theme()
+
+
+func _on_session_broken_toggled(enabled: bool) -> void:
+	if _selected_mode == MODE_CADENCE:
+		_cadence_broken = enabled
+		if _cadence_broken_toggle != null:
+			_cadence_broken_toggle.button_pressed = enabled
+	elif _selected_mode == MODE_PROGRESSION:
+		_progression_broken = enabled
+		if _progression_broken_toggle != null:
+			_progression_broken_toggle.button_pressed = enabled
+	_sync_home_state_from_runtime()
+	if _session_broken_btn != null:
+		_session_broken_btn.text = "Broken  %s" % (char(0x2713) if enabled else char(0x25CB))
 
 
 func _on_inversion_toggled(enabled: bool) -> void:
 	_style_menu_toggle(_inversion_toggle, enabled, _inversion_toggle != null and _inversion_toggle.disabled)
 	_refresh_practice_setup_theme()
+
+
+func _sight_tier_allows_accidentals_toggle() -> bool:
+	return _sight_selected_chord_tier == 1
+
+
+func _sight_include_accidental_variants() -> bool:
+	if not _sight_tier_allows_accidentals_toggle():
+		return false
+	return _sight_accidentals_toggle != null and _sight_accidentals_toggle.button_pressed
+
+
+func _on_sight_chord_tier_button_pressed(tier: int) -> void:
+	var next_tier := clampi(tier, 1, SIGHT_CHORD_MAX_TIER)
+	if _sight_selected_chord_tier == next_tier:
+		return
+	_sight_selected_chord_tier = next_tier
+	_refresh_sight_chord_tier_buttons(false)
+	_refresh_sight_mode_buttons(false)
+	_refresh_practice_setup_theme()
+	_save_ear_settings()
 
 
 func _on_sight_accidentals_toggled(enabled: bool) -> void:
@@ -9903,8 +13382,7 @@ func _on_note_chase_note_toggled(note_name: String) -> void:
 			btn.button_pressed = true
 			_note_chase_selected_notes.append(note_name)
 	_refresh_note_chase_note_toggles()
-	if _home_state != null:
-		_home_state.note_chase_selected_notes = _note_chase_selected_notes.duplicate()
+	_sync_home_state_from_runtime()
 	_update_home_disabled_reason()
 
 
@@ -9918,13 +13396,17 @@ func _refresh_note_chase_note_toggles() -> void:
 
 
 func _on_clef_button_pressed(clef_name: String) -> void:
+	if not _mvp_is_sight_clef_enabled(clef_name, _sight_mode):
+		_show_mvp_locked_hint()
+		return
 	_selected_clef = clef_name
-	if _home_state != null:
-		_home_state.selected_clef = clef_name
+	_sync_home_state_from_runtime()
 	if _note_chase_clef_clone != null:
 		_note_chase_clef_clone.text = char(0x1D122) if _selected_clef == "Bass" else char(0x1D11E)
-	_set_default_sight_range_for_clef(_selected_clef)
-	_apply_sight_note_selector_for_current_clef()
+	# Grand Staff doesn't use per-clef note ranges
+	if clef_name != "Grand Staff":
+		_set_default_sight_range_for_clef(_selected_clef)
+		_apply_sight_note_selector_for_current_clef()
 	_refresh_clef_buttons()
 	_refresh_note_chase_clef_buttons()
 	_update_sight_range_ui()
@@ -9941,23 +13423,27 @@ func _set_default_sight_range_for_clef(clef_name: String) -> void:
 	var derived_bounds := _derive_sight_range_steps_from_selected_notes(clef_name, selected_for_clef)
 	_sight_range_min_step = derived_bounds.x
 	_sight_range_max_step = derived_bounds.y
-	if _home_state != null:
-		_home_state.sight_range_min_step = _sight_range_min_step
-		_home_state.sight_range_max_step = _sight_range_max_step
-		_home_state.sight_selected_notes_by_clef = _sight_selected_notes_by_clef.duplicate(true)
+	_sync_home_state_from_runtime()
 
 
 func _on_note_chase_clef_mode_pressed(mode_name: String) -> void:
+	if not _mvp_is_note_chase_clef_enabled(mode_name):
+		_show_mvp_locked_hint()
+		return
 	_note_chase_clef_mode = mode_name
-	if _home_state != null:
-		_home_state.note_chase_clef_mode = mode_name
 	if mode_name == "Treble" or mode_name == "Bass":
 		_selected_clef = mode_name
+	_sync_home_state_from_runtime()
 	_refresh_note_chase_clef_buttons()
 
 
 func _on_sight_mode_button_pressed(mode_name: String) -> void:
+	if _startup_boot_blocking_input():
+		return
 	var next_mode := _normalize_sight_mode(mode_name)
+	if not _mvp_is_sight_mode_enabled(next_mode):
+		_show_mvp_locked_hint()
+		return
 	var can_fast := _selected_mode == MODE_SIGHT and _home_mode_detail_active and not _ear_settings_screen_active and not _sight_settings_screen_active and _home_card != null and _home_card.visible and _home_panel != null and _home_panel.visible
 	if _selected_mode == MODE_SIGHT and _sight_mode == next_mode and not _sight_settings_screen_active:
 		_refresh_sight_key_label()
@@ -9966,11 +13452,13 @@ func _on_sight_mode_button_pressed(mode_name: String) -> void:
 		return
 	_clear_gameplay_transient_visuals()
 	_sight_mode = next_mode
+	if not _mvp_is_sight_key_signature_enabled(_sight_key_signature, next_mode):
+		_sight_key_signature = "C"
+	if not _mvp_is_sight_clef_enabled(_selected_clef, next_mode):
+		_selected_clef = "Grand Staff" if next_mode == "Chords" else "Treble"
 	_selected_mode = MODE_SIGHT
 	_sight_settings_screen_active = false
-	if _home_state != null:
-		_home_state.selected_mode = MODE_SIGHT
-		_home_state.sight_mode = next_mode
+	_sync_home_state_from_runtime()
 	if can_fast:
 		_refresh_sight_submode_ui_fast()
 	else:
@@ -9981,9 +13469,11 @@ func _on_sight_mode_button_pressed(mode_name: String) -> void:
 
 
 func _on_sight_key_sig_button_pressed(sig_name: String) -> void:
+	if not _mvp_is_sight_key_signature_enabled(sig_name, _sight_mode):
+		_show_mvp_locked_hint()
+		return
 	_sight_key_signature = sig_name
-	if _home_state != null:
-		_home_state.sight_key_signature = sig_name
+	_sync_home_state_from_runtime()
 	_refresh_sight_key_sig_buttons()
 	_refresh_sight_note_key_buttons()
 	_layout_staff_key_signature()
@@ -9998,10 +13488,7 @@ func _on_sight_range_adjust(delta: int, adjust_upper: bool) -> void:
 	else:
 		# Lower note is represented by max step index.
 		_sight_range_max_step = clampi(_sight_range_max_step + delta, _sight_range_min_step, bounds.y)
-	if _home_state != null:
-		_home_state.sight_range_min_step = _sight_range_min_step
-		_home_state.sight_range_max_step = _sight_range_max_step
-		_home_state.sight_selected_notes_by_clef = _sight_selected_notes_by_clef.duplicate(true)
+	_sync_home_state_from_runtime()
 	_update_sight_range_ui()
 
 
@@ -10011,10 +13498,7 @@ func _on_sight_note_selector_selection_changed(selected_notes: PackedStringArray
 	var derived := _derive_sight_range_steps_from_selected_notes(_selected_clef, cleaned)
 	_sight_range_min_step = derived.x
 	_sight_range_max_step = derived.y
-	if _home_state != null:
-		_home_state.sight_range_min_step = _sight_range_min_step
-		_home_state.sight_range_max_step = _sight_range_max_step
-		_home_state.sight_selected_notes_by_clef = _sight_selected_notes_by_clef.duplicate(true)
+	_sync_home_state_from_runtime()
 	_update_sight_range_ui()
 
 
@@ -10024,140 +13508,54 @@ func _on_sight_note_selector_selection_rejected(message: String) -> void:
 
 
 func _sight_selector_range_for_clef(clef_name: String) -> Dictionary:
-	if clef_name == "Bass":
-		return {
-			"start_note": "C2",
-			"end_note": "E4"
-		}
-	return {
-		"start_note": "A3",
-		"end_note": "C6"
-	}
+	return _ensure_sight_renderer().selector_range_for_clef(clef_name)
 
 
 func _sight_default_selected_notes_for_clef(clef_name: String) -> PackedStringArray:
-	if clef_name == "Bass":
-		return PackedStringArray(["F3", "G3", "A3", "B3", "C4", "D4", "E4"])
-	return PackedStringArray(["A3", "B3", "C4", "D4", "E4", "F4", "G4"])
+	return _ensure_sight_renderer().default_selected_notes_for_clef(clef_name)
 
 
 func _sight_note_set_for_clef(clef_name: String) -> PackedStringArray:
-	var out := PackedStringArray()
-	if _sight_selected_notes_by_clef.has(clef_name):
-		var existing: Variant = _sight_selected_notes_by_clef[clef_name]
-		if existing is PackedStringArray:
-			out = existing as PackedStringArray
-		elif existing is Array:
-			for item in existing:
-				out.append(str(item))
-	if out.is_empty() and _home_state != null and _home_state.sight_selected_notes_by_clef is Dictionary:
-		var st_map := _home_state.sight_selected_notes_by_clef as Dictionary
-		if st_map.has(clef_name):
-			var state_notes: Variant = st_map[clef_name]
-			if state_notes is PackedStringArray:
-				out = state_notes as PackedStringArray
-			elif state_notes is Array:
-				for item2 in state_notes:
-					out.append(str(item2))
-	return _sanitize_sight_note_set_for_clef(clef_name, out)
+	var fallback_notes: Dictionary = {}
+	if _home_flow_controller != null and _home_flow_controller.state != null and _home_flow_controller.state.sight_selected_notes_by_clef is Dictionary:
+		fallback_notes = _home_flow_controller.state.sight_selected_notes_by_clef as Dictionary
+	return _ensure_sight_renderer().note_set_for_clef(clef_name, _sight_selected_notes_by_clef, fallback_notes)
 
 
 func _sanitize_sight_note_set_for_clef(clef_name: String, notes: Variant) -> PackedStringArray:
-	var raw := PackedStringArray()
-	if notes is PackedStringArray:
-		raw = notes as PackedStringArray
-	elif notes is Array:
-		for item in notes:
-			raw.append(str(item))
-	if raw.is_empty():
-		raw = _sight_default_selected_notes_for_clef(clef_name)
-	var range_cfg := _sight_selector_range_for_clef(clef_name)
-	var start_midi := _note_name_to_midi(str(range_cfg.get("start_note", "C4")))
-	var end_midi := _note_name_to_midi(str(range_cfg.get("end_note", "C5")))
-	if start_midi > end_midi:
-		var swap := start_midi
-		start_midi = end_midi
-		end_midi = swap
-	var midi_set: Dictionary = {}
-	for note_name in raw:
-		var midi_note := _note_name_to_midi(str(note_name))
-		if midi_note < start_midi or midi_note > end_midi:
-			continue
-		if not _is_natural_midi(midi_note):
-			continue
-		midi_set[midi_note] = true
-	var midi_sorted := midi_set.keys()
-	midi_sorted.sort()
-	if midi_sorted.size() < 3:
-		var defaults := _sight_default_selected_notes_for_clef(clef_name)
-		for d in defaults:
-			var dm := _note_name_to_midi(str(d))
-			if dm < start_midi or dm > end_midi:
-				continue
-			if not _is_natural_midi(dm):
-				continue
-			midi_set[dm] = true
-			if midi_set.size() >= 3:
-				break
-		midi_sorted = midi_set.keys()
-		midi_sorted.sort()
-	var out := PackedStringArray()
-	for midi_note_v in midi_sorted:
-		out.append(_midi_to_note_name(int(midi_note_v)))
-	return out
+	return _ensure_sight_renderer().sanitize_note_set_for_clef(clef_name, notes)
 
 
 func _derive_sight_range_steps_from_selected_notes(clef_name: String, selected_notes: PackedStringArray) -> Vector2i:
-	var min_step := 999
-	var max_step := -999
-	for note_name in selected_notes:
-		var step := _sight_step_for_label_in_clef(str(note_name), clef_name)
-		if step == 999:
-			continue
-		min_step = mini(min_step, step)
-		max_step = maxi(max_step, step)
-	if min_step == 999:
-		# Fallback: full clef keyboard bounds.
-		return Vector2i(-4, 12)
-	var bounds := _get_sight_step_bounds()
-	return Vector2i(
-		clampi(min_step, bounds.x, bounds.y),
-		clampi(max_step, min_step, bounds.y)
-	)
+	return _ensure_sight_renderer().derive_range_steps_from_selected_notes(clef_name, selected_notes, _get_sight_step_bounds())
 
 
 func _apply_sight_note_selector_for_current_clef() -> void:
 	if _sight_note_selector == null:
 		return
-	var selected := _sight_note_set_for_clef(_selected_clef)
-	if selected.is_empty():
-		selected = _sight_default_selected_notes_for_clef(_selected_clef)
-	_sight_selected_notes_by_clef[_selected_clef] = selected
-	var range_cfg := _sight_selector_range_for_clef(_selected_clef)
-	var start_note := str(range_cfg.get("start_note", "A3"))
-	var end_note := str(range_cfg.get("end_note", "C6"))
-	var needs_reconfigure := _sight_selector_last_clef != _selected_clef or _sight_selector_last_start_note != start_note or _sight_selector_last_end_note != end_note
-	if needs_reconfigure:
-		_sight_note_selector.configure({
-			"start_note": start_note,
-			"end_note": end_note,
-			"selectable_white_only": true,
-			"default_selected_set": selected,
-			"min_selected_count": 3,
-			"selected_color": Color(0.98, 0.82, 0.40, 1.0)
-		})
-		_sight_selector_last_clef = _selected_clef
-		_sight_selector_last_start_note = start_note
-		_sight_selector_last_end_note = end_note
-	else:
-		_sight_note_selector.set_selection(selected, false)
-	var derived := _derive_sight_range_steps_from_selected_notes(_selected_clef, selected)
-	_sight_range_min_step = derived.x
-	_sight_range_max_step = derived.y
-	if _home_state != null:
-		_home_state.sight_range_min_step = _sight_range_min_step
-		_home_state.sight_range_max_step = _sight_range_max_step
-		_home_state.sight_selected_notes_by_clef = _sight_selected_notes_by_clef.duplicate(true)
+	var fallback_notes: Dictionary = {}
+	if _home_flow_controller != null and _home_flow_controller.state != null and _home_flow_controller.state.sight_selected_notes_by_clef is Dictionary:
+		fallback_notes = _home_flow_controller.state.sight_selected_notes_by_clef as Dictionary
+	var result: Dictionary = _ensure_sight_renderer().apply_note_selector(
+		_sight_note_selector,
+		_selected_clef,
+		_sight_selected_notes_by_clef,
+		fallback_notes,
+		_sight_selector_last_clef,
+		_sight_selector_last_start_note,
+		_sight_selector_last_end_note,
+		Color(0.98, 0.82, 0.40, 1.0),
+		_get_sight_step_bounds()
+	)
+	var selected_notes_any: Variant = result.get("selected_notes_by_clef", _sight_selected_notes_by_clef)
+	if typeof(selected_notes_any) == TYPE_DICTIONARY:
+		_sight_selected_notes_by_clef = (selected_notes_any as Dictionary).duplicate(true)
+	_sight_selector_last_clef = str(result.get("last_clef", _sight_selector_last_clef))
+	_sight_selector_last_start_note = str(result.get("last_start_note", _sight_selector_last_start_note))
+	_sight_selector_last_end_note = str(result.get("last_end_note", _sight_selector_last_end_note))
+	_sight_range_min_step = int(result.get("range_min_step", _sight_range_min_step))
+	_sight_range_max_step = int(result.get("range_max_step", _sight_range_max_step))
+	_sync_home_state_from_runtime()
 
 
 func _on_chord_group_button_pressed(group_id: int) -> void:
@@ -10165,50 +13563,414 @@ func _on_chord_group_button_pressed(group_id: int) -> void:
 	_refresh_chord_group_buttons()
 
 
+func _on_chord_tier_toggle(enabled: bool, chord_name: String) -> void:
+	if enabled:
+		if not _selected_chord_types.has(chord_name):
+			_selected_chord_types.append(chord_name)
+	else:
+		_selected_chord_types.erase(chord_name)
+	# Ensure at least one chord is selected
+	if _selected_chord_types.is_empty():
+		_selected_chord_types = _default_selected_chord_types()
+		for _cn in CHORD_DEFAULT_SELECTED:
+			var _tb: Button = _chord_tier_toggles.get(_cn, null)
+			if _tb != null:
+				_tb.set_pressed_no_signal(true)
+	_current_available_chord_types = []
+	_refresh_chord_tier_ui()
+	_save_ear_settings()
+
+
+func _toggle_chord_tier_collapse(tier_name: String) -> void:
+	var container: Control = _chord_tier_containers.get(tier_name, null)
+	if container == null:
+		return
+	container.visible = not container.visible
+	_refresh_chord_tier_header(tier_name)
+
+
+func _refresh_chord_tier_ui() -> void:
+	for tier_name in CHORD_TIER_ORDER:
+		_refresh_chord_tier_header(tier_name)
+		var tier_chords: Array = CHORD_TIERS[tier_name]
+		for chord_name in tier_chords:
+			var btn: Button = _chord_tier_toggles.get(str(chord_name), null)
+			if btn != null:
+				_set_home_selection_state(btn, btn.button_pressed)
+	_refresh_practice_setup_theme()
+
+
+func _refresh_chord_tier_header(tier_name: String) -> void:
+	var header: Button = _chord_tier_headers.get(tier_name, null)
+	if header == null:
+		return
+	var tier_chords: Array = CHORD_TIERS[tier_name]
+	var tier_count := 0
+	for _cn in tier_chords:
+		if _selected_chord_types.has(str(_cn)):
+			tier_count += 1
+	var container: Control = _chord_tier_containers.get(tier_name, null)
+	var collapsed := container != null and not container.visible
+	var arrow := "▸" if collapsed else "▾"
+	header.text = "%s  %s  (%d/%d)" % [arrow, tier_name, tier_count, tier_chords.size()]
+	var has_any := tier_count > 0
+	_set_home_selection_state(header, has_any)
+
+
+func _set_ear_intro_text_for_mode() -> void:
+	if _ear_intro_body == null and _ear_intro_title == null:
+		return
+	if _selected_mode == MODE_SIGHT:
+		if _ear_intro_title != null:
+			_ear_intro_title.text = "Welcome to Sight Reading!"
+		if _ear_intro_body == null:
+			return
+		if _sight_mode == "Chords":
+			_ear_intro_body.text = "1.  Look at the staff - all notes of the chord are shown in your selected clef\n\n2.  Identify the chord name from the answer buttons\n\n3.  Check chord shape + accidentals: root, quality, and extra tones\n\n4.  Use replay when needed, then answer for score and streak"
+			return
+		_ear_intro_body.text = "1.  Read the note shown on the staff in your selected clef\n\n2.  Match it to the correct note choice\n\n3.  Watch line/space position and key-signature accidentals\n\n4.  Replay if needed, then answer to build streak"
+		return
+	if _ear_intro_title != null:
+		_ear_intro_title.text = "Welcome to Ear Training!"
+	if _ear_intro_body == null:
+		return
+	if _selected_mode == MODE_CHORD:
+		_ear_intro_body.text = "1.  Listen - a chord will play: several notes sounding together\n\n2.  Identify - recognise the chord family from the answer buttons\n    (Major, Minor, Diminished, Augmented, Dominant 7th...)\n\n3.  Practice - right answers build your streak!\n    Wrong answers replay the chord so you can train your ear"
+	else:
+		_ear_intro_body.text = "1.  Listen - two notes will play in sequence (or together for harmonic intervals)\n\n2.  Identify - recognise the interval between the notes from the answer buttons\n\n3.  Practice - right answers build your streak!\n    Wrong answers replay the interval so you can train your ear"
+
+
+func _on_how_to_play_pressed() -> void:
+	var mode_at_open := _selected_mode
+	if _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_SIGHT]:
+		if _ear_intro_overlay != null and _ear_intro_dismiss != null:
+			_set_ear_intro_text_for_mode()
+			_ear_intro_overlay.visible = true
+			await _ear_intro_dismiss.pressed
+			if _ear_intro_overlay != null and mode_at_open == _selected_mode:
+				_ear_intro_overlay.visible = false
+	elif _selected_mode == MODE_NOTE_CHASE:
+		if _note_chase_intro_overlay != null and _note_chase_intro_dismiss != null:
+			_note_chase_intro_overlay.visible = true
+			await _note_chase_intro_dismiss.pressed
+			if _note_chase_intro_overlay != null and mode_at_open == _selected_mode:
+				_note_chase_intro_overlay.visible = false
+	elif _selected_mode == MODE_CADENCE:
+		if _cadence_intro_overlay != null and _cadence_intro_dismiss != null:
+			_cadence_intro_overlay.visible = true
+			await _cadence_intro_dismiss.pressed
+			if _cadence_intro_overlay != null and mode_at_open == _selected_mode:
+				_cadence_intro_overlay.visible = false
+
+
+func _on_quick_practice_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
+	_on_start_quiz_pressed()
+
+
+func _on_home_practice_toggle_pressed() -> void:
+	_practice_mode_enabled = not _practice_mode_enabled
+	if _home_practice_toggle != null:
+		_home_practice_toggle.button_pressed = _practice_mode_enabled
+		_home_practice_toggle.text = "Practice Mode on" if _practice_mode_enabled else "Game Mode on"
+	_save_ear_settings()
+
+
+func _on_mic_toggle_pressed() -> void:
+	_mic_mode_enabled = not _mic_mode_enabled
+	if _mic_toggle_button != null:
+		_mic_toggle_button.button_pressed = _mic_mode_enabled
+		_mic_toggle_button.text = "Mic Mode: On" if _mic_mode_enabled else "Mic Mode: Off"
+	_save_ear_settings()
+
+
 func _on_ear_settings_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	_ear_settings_screen_active = true
 	_home_mode_detail_active = false
 	_sight_settings_screen_active = false
-	if _home_state != null:
-		_home_state.ear_settings_screen_active = true
+	_sync_home_state_from_runtime()
 	_refresh_ear_settings_subscreen()
 	_refresh_sight_settings_subscreen()
 	_on_mode_selected()
 
 
+# Phase 5: write a single-file progress export the user can copy off-device for
+# backup or to share with a teacher. The path is shown in a popup so the user
+# can navigate to it (Godot's user:// resolves to %APPDATA% / ~/.local/share).
+func _on_export_progress_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
+	var ts: Dictionary = Time.get_datetime_dict_from_system()
+	var date_tag: String = "%04d%02d%02d_%02d%02d" % [int(ts["year"]), int(ts["month"]), int(ts["day"]), int(ts["hour"]), int(ts["minute"])]
+	var rel: String = "clefira_progress_export_%s.json" % date_tag
+	var path: String = "user://%s" % rel
+	var bundle: Dictionary = {
+		"schema_version": 1,
+		"exported_at": Time.get_datetime_string_from_system(),
+		"edition": EDITION_LABEL,
+		"app_version": APP_VERSION_LABEL,
+		"profile": {
+			"name": _player_name,
+			"level": _player_level,
+		},
+		"streak": {
+			"count": _streak_count,
+			"last_date": _streak_last_date,
+		},
+		"settings": {
+			"interval_preset": _interval_difficulty_preset,
+			"cadence_preset": _cadence_difficulty_preset,
+			"practice_mode_enabled": _practice_mode_enabled,
+			"selected_chord_types": _selected_chord_types.duplicate(),
+		},
+		"learning_progress": _collect_learning_progress_snapshot(),
+		"lifetime_progress": _collect_lifetime_progress_snapshot(),
+	}
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		_show_export_progress_result(false, path, "Could not write file.")
+		return
+	f.store_string(JSON.stringify(bundle, "\t"))
+	f.close()
+	_show_export_progress_result(true, path, "")
+
+
+# Returns a JSON-safe snapshot of the learning module progress, or {} if the
+# learning subsystem isn't initialised (e.g. LEARNING_MODE_ENABLED == false).
+func _collect_learning_progress_snapshot() -> Dictionary:
+	if _learning_progress == null:
+		return {}
+	if _learning_progress.has_method("export_snapshot"):
+		var snap: Variant = _learning_progress.call("export_snapshot")
+		if typeof(snap) == TYPE_DICTIONARY:
+			return snap
+	# Fallback: read the on-disk file directly so we still export something useful
+	# even when the live object doesn't expose a snapshot method.
+	var path: String = ""
+	if _active_student != null and _active_student.has_active_student():
+		path = str(_active_student.active_learning_progress_path())
+	else:
+		path = "user://learning_progress.json"
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var txt := f.get_as_text()
+	f.close()
+	var parsed: Variant = JSON.parse_string(txt)
+	if typeof(parsed) == TYPE_DICTIONARY:
+		return parsed
+	return {}
+
+
+func _collect_lifetime_progress_snapshot() -> Dictionary:
+	var path: String = _resolve_progress_data_path()
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var txt := f.get_as_text()
+	f.close()
+	var parsed: Variant = JSON.parse_string(txt)
+	if typeof(parsed) == TYPE_DICTIONARY:
+		return parsed
+	return {}
+
+
+func _show_export_progress_result(ok: bool, path: String, err_msg: String) -> void:
+	var abs_path: String = ProjectSettings.globalize_path(path)
+	var dlg := AcceptDialog.new()
+	dlg.title = "Progress Export" if ok else "Export Failed"
+	if ok:
+		dlg.dialog_text = "Saved to:\n%s\n\nCopy this file to back up your progress or send it to a teacher." % abs_path
+	else:
+		dlg.dialog_text = "%s\n\nTried to write:\n%s" % [err_msg, abs_path]
+	add_child(dlg)
+	dlg.close_requested.connect(func() -> void:
+		dlg.queue_free()
+	)
+	dlg.popup_centered(Vector2(640, 260))
+
+
+# Edit Profile entry — re-shows the Phase 5 prompt with current values pre-filled.
+# Student Edition only; the home button is hidden in Teacher Edition.
+func _on_edit_profile_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
+	if IS_TEACHER_EDITION:
+		return
+	_show_profile_prompt(true)
+
+
+# Counterpart to Export Progress — restores a previously-exported bundle.
+# Opens a FileDialog so the user can pick the JSON file, validates the schema,
+# warns before overwriting, then restores profile + lifetime + learning progress.
+func _on_import_progress_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
+	var fd := FileDialog.new()
+	fd.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	fd.access = FileDialog.ACCESS_FILESYSTEM
+	fd.title = "Import Progress Bundle"
+	fd.filters = PackedStringArray(["*.json ; Clefira Progress Export"])
+	fd.use_native_dialog = true
+	# Default to the user:// directory where exports land, so users see their own files.
+	fd.current_dir = ProjectSettings.globalize_path("user://")
+	add_child(fd)
+	fd.file_selected.connect(func(path: String) -> void:
+		_handle_import_file_selected(path)
+		fd.queue_free()
+	)
+	fd.canceled.connect(func() -> void:
+		fd.queue_free()
+	)
+	fd.popup_centered(Vector2(720, 480))
+
+
+func _handle_import_file_selected(path: String) -> void:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		_show_import_result(false, "Could not open file:\n%s" % path)
+		return
+	var txt := f.get_as_text()
+	f.close()
+	var parsed: Variant = JSON.parse_string(txt)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_show_import_result(false, "File is not a valid Clefira export (JSON parse failed).")
+		return
+	var bundle: Dictionary = parsed
+	var schema: int = int(bundle.get("schema_version", 0))
+	if schema < 1 or schema > 1:
+		_show_import_result(false, "Unknown schema version (%d). This file may be from a different Clefira release." % schema)
+		return
+	# Confirm before overwriting — restore is destructive: it replaces the live
+	# learning_progress + lifetime stats and updates the profile/streak fields.
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Replace current progress?"
+	var exported_at: String = str(bundle.get("exported_at", "unknown"))
+	var profile: Dictionary = bundle.get("profile", {})
+	var summary: String = "Importing from:\n%s\n\nExported: %s\nProfile: %s" % [
+		path, exported_at, str(profile.get("name", "(no name)"))
+	]
+	dlg.dialog_text = "%s\n\nThis replaces your current profile, learning progress, and lifetime stats. Continue?" % summary
+	dlg.ok_button_text = "Replace"
+	dlg.get_cancel_button().text = "Cancel"
+	add_child(dlg)
+	dlg.confirmed.connect(func() -> void:
+		_apply_imported_bundle(bundle)
+	)
+	dlg.close_requested.connect(func() -> void:
+		dlg.queue_free()
+	)
+	dlg.popup_centered(Vector2(600, 320))
+
+
+func _apply_imported_bundle(bundle: Dictionary) -> void:
+	# Profile + streak — apply to in-memory state then persist via ear_settings.
+	var profile: Dictionary = bundle.get("profile", {})
+	_player_name = str(profile.get("name", _player_name)).strip_edges().substr(0, 24)
+	_player_level = str(profile.get("level", _player_level))
+	_player_profile_seen = true
+	var streak: Dictionary = bundle.get("streak", {})
+	if streak.has("count"):
+		_streak_count = maxi(0, int(streak.get("count", 0)))
+	if streak.has("last_date"):
+		_streak_last_date = str(streak.get("last_date", ""))
+	_save_ear_settings()
+	# Lifetime progress — full overwrite of the resolved path (handles per-student
+	# routing in Teacher Edition, legacy single-user path in Student Edition).
+	var lifetime: Dictionary = bundle.get("lifetime_progress", {})
+	if not lifetime.is_empty():
+		var lifetime_path: String = _resolve_progress_data_path()
+		var lf := FileAccess.open(lifetime_path, FileAccess.WRITE)
+		if lf != null:
+			lf.store_string(JSON.stringify(lifetime, "\t"))
+			lf.close()
+	# Learning progress — full overwrite + live reload so the next module map
+	# render reflects the imported state.
+	var learning: Dictionary = bundle.get("learning_progress", {})
+	if not learning.is_empty():
+		var learning_path: String = ""
+		if _active_student != null and _active_student.has_active_student():
+			learning_path = str(_active_student.active_learning_progress_path())
+		else:
+			learning_path = "user://learning_progress.json"
+		var lpf := FileAccess.open(learning_path, FileAccess.WRITE)
+		if lpf != null:
+			lpf.store_string(JSON.stringify(learning, "\t"))
+			lpf.close()
+		if _learning_progress != null and _learning_progress.has_method("set_save_path_and_reload"):
+			_learning_progress.call("set_save_path_and_reload", learning_path)
+	# Reload the in-memory progress data so the home/dashboard reflect the import.
+	_load_progress_data()
+	_refresh_game_title()
+	_show_import_result(true, "Imported %d-field bundle." % bundle.size())
+
+
+func _show_import_result(ok: bool, msg: String) -> void:
+	var dlg := AcceptDialog.new()
+	dlg.title = "Import Complete" if ok else "Import Failed"
+	dlg.dialog_text = msg
+	add_child(dlg)
+	dlg.close_requested.connect(func() -> void:
+		dlg.queue_free()
+	)
+	dlg.popup_centered(Vector2(560, 240))
+
+
 func _on_ear_settings_back_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	_ear_settings_screen_active = false
-	if _home_state != null:
-		_home_state.ear_settings_screen_active = false
+	_sync_home_state_from_runtime()
 	_refresh_ear_settings_subscreen()
 	_on_mode_selected()
 
 
 func _on_sight_settings_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	_sight_settings_screen_active = true
 	_refresh_sight_settings_subscreen()
 	_on_mode_selected()
 
 
 func _on_sight_settings_back_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	_sight_settings_screen_active = false
 	_refresh_sight_settings_subscreen()
 	_on_mode_selected()
 
 
+func _on_settings_exit_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
+	_play_ui_click_sfx()
+	_on_home_back_pressed()
+
+
 func _on_home_mode_back_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	if _game_panel != null and _game_panel.visible:
 		_on_game_home_pressed()
 		return
 	_ear_settings_screen_active = false
 	_sight_settings_screen_active = false
 	_home_mode_detail_active = false
-	if _home_state != null:
-		_home_state.ear_settings_screen_active = false
+	_sync_home_state_from_runtime()
 	call_deferred("_on_mode_selected")
 
 
 func _on_home_back_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	if _game_panel != null and _game_panel.visible:
 		_on_end_quiz_pressed()
 		return
@@ -10223,6 +13985,8 @@ func _on_home_back_pressed() -> void:
 
 
 func _on_sight_header_settings_pressed() -> void:
+	if _startup_boot_blocking_input():
+		return
 	_play_ui_click_sfx()
 	if _game_panel == null or not _game_panel.visible:
 		_on_ear_settings_pressed()
@@ -10235,8 +13999,7 @@ func _on_sight_header_settings_pressed() -> void:
 	_home_mode_detail_active = true
 	_ear_settings_screen_active = true
 	_sight_settings_screen_active = true
-	if _home_state != null:
-		_home_state.ear_settings_screen_active = true
+	_sync_home_state_from_runtime()
 	_refresh_ear_settings_subscreen()
 	_refresh_sight_settings_subscreen()
 	_on_mode_selected()
@@ -10250,8 +14013,8 @@ func _update_home_disabled_reason() -> void:
 		_home_disabled_reason_label.text = ""
 		return
 	var reason := ""
-	if _home_state != null:
-		reason = _home_state.disabled_reason_for_mode(_selected_mode, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
+	if _home_flow_controller != null:
+		reason = _home_flow_controller.disabled_reason_for_mode(_selected_mode, MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_SIGHT, MODE_NOTE_CHASE, MODE_READ)
 	_home_disabled_reason_label.text = reason
 	_home_disabled_reason_label.visible = not reason.is_empty()
 	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {"text_error": Color(1.0, 0.35, 0.35)}
@@ -10272,10 +14035,9 @@ func _on_ear_choice_count_selected(index: int) -> void:
 func _on_theme_selected(index: int) -> void:
 	if _ear_theme_select == null:
 		return
-	var theme_id := str(_ear_theme_select.get_item_metadata(index)).strip_edges()
-	if theme_id.is_empty():
+	if index < 0:
 		return
-	_ui_theme_id = theme_id
+	_ui_theme_id = FIXED_MENU_THEME_ID
 	if _home_tokens != null:
 		_home_tokens.set_theme(_ui_theme_id)
 		_ui_theme_id = _home_tokens.theme_id()
@@ -10293,45 +14055,113 @@ func _on_teacher_open_pressed() -> void:
 	_show_home()
 
 
+func _ensure_teacher_store() -> TeacherStore:
+	if _teacher_store == null:
+		_teacher_store = TeacherStoreScript.new()
+	return _teacher_store
+
+
+func _sync_teacher_store_from_runtime() -> TeacherStore:
+	var store := _ensure_teacher_store()
+	store.set_data(_teacher_data)
+	return store
+
+
+func _sync_runtime_from_teacher_store() -> void:
+	_teacher_data = _ensure_teacher_store().get_data()
+
+
 func _load_teacher_data() -> void:
-	if not FileAccess.file_exists(TEACHER_DATA_PATH):
-		_teacher_data = {"students": []}
-		return
-	var f := FileAccess.open(TEACHER_DATA_PATH, FileAccess.READ)
-	if f == null:
-		_teacher_data = {"students": []}
-		return
-	var txt := f.get_as_text()
-	f.close()
-	var parsed: Variant = JSON.parse_string(txt)
-	if typeof(parsed) == TYPE_DICTIONARY:
-		_teacher_data = parsed
-	else:
-		_teacher_data = {"students": []}
-	if not _teacher_data.has("students") or typeof(_teacher_data["students"]) != TYPE_ARRAY:
-		_teacher_data["students"] = []
-	var students: Array = _teacher_data["students"]
-	for i in students.size():
-		var s: Dictionary = students[i]
-		students[i] = _teacher_ensure_student_defaults(s)
-	_teacher_data["students"] = students
+	_teacher_data = _ensure_teacher_store().load_from_path(TEACHER_DATA_PATH, Callable(self, "_teacher_ensure_student_defaults"))
 
 
 func _save_teacher_data() -> void:
-	if not _teacher_data.has("students") or typeof(_teacher_data["students"]) != TYPE_ARRAY:
-		_teacher_data["students"] = []
-	var txt := JSON.stringify(_teacher_data, "\t")
-	var f := FileAccess.open(TEACHER_DATA_PATH, FileAccess.WRITE)
-	if f == null:
-		return
-	f.store_string(txt)
-	f.close()
+	var store := _ensure_teacher_store()
+	store.save_to_path(TEACHER_DATA_PATH)
+	_teacher_data = store.get_data()
+
+
+# Phase 2c: compute practice stats for a SPECIFIC student (not the active one).
+# Loads their learning_progress.json into a fresh ModuleProgress instance so we
+# don't perturb the live `_learning_progress` state. Empty result if the
+# student has no recorded data yet.
+func _compute_practice_stats_for_student(student_id: String) -> Dictionary:
+	var out: Dictionary = {
+		"available": false,
+		"total_correct": 0,
+		"total_study_seconds": 0.0,
+		"completed_modules": 0,
+		"due_reviews": 0,
+		"weakest_family": "",
+		"skill_family_stats": {},
+	}
+	if student_id == "" or _active_student == null:
+		return out
+	# Reserved Practice Mode account is intentionally not surfaced as a real student.
+	if student_id == ActiveStudentScript.RESERVED_ID_PRACTICE:
+		return out
+	var path: String = _active_student.learning_progress_path_for(student_id)
+	if path == "" or not FileAccess.file_exists(path):
+		return out
+	# Use a temp ModuleProgress to avoid touching the live instance's state.
+	var tmp = LearningProgressScript.new()
+	if tmp.has_method("set_save_path_and_reload"):
+		tmp.set_save_path_and_reload(path)
+	out["available"] = true
+	if tmp.has_method("get_total_quizzes_correct"):
+		out["total_correct"] = int(tmp.get_total_quizzes_correct())
+	if tmp.has_method("get_total_study_time"):
+		out["total_study_seconds"] = float(tmp.get_total_study_time())
+	if tmp.has_method("get_completed_count"):
+		out["completed_modules"] = int(tmp.get_completed_count())
+	if tmp.has_method("get_due_review_count"):
+		out["due_reviews"] = int(tmp.get_due_review_count())
+	if tmp.has_method("get_weakest_skill_family"):
+		out["weakest_family"] = str(tmp.get_weakest_skill_family())
+	if tmp.has_method("get_aggregated_skill_family_stats"):
+		out["skill_family_stats"] = tmp.get_aggregated_skill_family_stats()
+	return out
+
+
+# Compose a device-wide module-progress snapshot for the Teacher Dashboard.
+# These stats are NOT per-student (the device doesn't yet attribute sessions to
+# individual students) — the dashboard labels them as device-wide. Per-student
+# attribution is on the roadmap as a bigger refactor.
+func _build_module_progress_snapshot_for_teacher() -> Dictionary:
+	var out: Dictionary = {
+		"available": false,
+		"total_correct": 0,
+		"total_study_seconds": 0.0,
+		"completed_modules": 0,
+		"due_reviews": 0,
+		"weakest_family": "",
+		"skill_family_stats": {},
+	}
+	if _learning_progress == null:
+		return out
+	out["available"] = true
+	if _learning_progress.has_method("get_total_quizzes_correct"):
+		out["total_correct"] = int(_learning_progress.get_total_quizzes_correct())
+	if _learning_progress.has_method("get_total_study_time"):
+		out["total_study_seconds"] = float(_learning_progress.get_total_study_time())
+	if _learning_progress.has_method("get_completed_count"):
+		out["completed_modules"] = int(_learning_progress.get_completed_count())
+	if _learning_progress.has_method("get_due_review_count"):
+		out["due_reviews"] = int(_learning_progress.get_due_review_count())
+	if _learning_progress.has_method("get_weakest_skill_family"):
+		out["weakest_family"] = str(_learning_progress.get_weakest_skill_family())
+	if _learning_progress.has_method("get_aggregated_skill_family_stats"):
+		out["skill_family_stats"] = _learning_progress.get_aggregated_skill_family_stats()
+	return out
 
 
 func _teacher_students_array() -> Array:
-	if not _teacher_data.has("students") or typeof(_teacher_data["students"]) != TYPE_ARRAY:
-		_teacher_data["students"] = []
-	return _teacher_data["students"]
+	var store := _sync_teacher_store_from_runtime()
+	_teacher_data = store.get_data()
+	var students_any: Variant = _teacher_data.get("students", [])
+	if typeof(students_any) == TYPE_ARRAY:
+		return students_any as Array
+	return []
 
 
 func _teacher_parse_csv(text: String) -> Array[String]:
@@ -10571,12 +14401,7 @@ func _teacher_new_student_template() -> Dictionary:
 
 
 func _teacher_find_index_by_id(student_id: String) -> int:
-	var students: Array = _teacher_students_array()
-	for i in students.size():
-		var s: Dictionary = students[i]
-		if str(s.get("id", "")) == student_id:
-			return i
-	return -1
+	return _sync_teacher_store_from_runtime().find_index_by_id(student_id)
 
 
 func _teacher_collect_form_into(student: Dictionary) -> Dictionary:
@@ -10594,63 +14419,7 @@ func _teacher_collect_form_into(student: Dictionary) -> Dictionary:
 
 
 func _teacher_ensure_student_defaults(student: Dictionary) -> Dictionary:
-	if not student.has("book_history"):
-		student["book_history"] = []
-	if not student.has("piece_history"):
-		student["piece_history"] = []
-	if not student.has("tech_history"):
-		student["tech_history"] = []
-	if not student.has("session_history"):
-		student["session_history"] = []
-	if not student.has("assignments"):
-		student["assignments"] = []
-	if not student.has("current_book") or typeof(student["current_book"]) != TYPE_DICTIONARY:
-		student["current_book"] = {"name": "", "part": ""}
-	if not student.has("current_pieces") or typeof(student["current_pieces"]) != TYPE_ARRAY:
-		student["current_pieces"] = []
-	if not student.has("current_technical") or typeof(student["current_technical"]) != TYPE_ARRAY:
-		student["current_technical"] = []
-	if typeof(student["book_history"]) != TYPE_ARRAY:
-		student["book_history"] = []
-	if typeof(student["piece_history"]) != TYPE_ARRAY:
-		student["piece_history"] = []
-	if typeof(student["tech_history"]) != TYPE_ARRAY:
-		student["tech_history"] = []
-	if typeof(student["session_history"]) != TYPE_ARRAY:
-		student["session_history"] = []
-	if typeof(student["assignments"]) != TYPE_ARRAY:
-		student["assignments"] = []
-	if not student.has("metrics"):
-		student["metrics"] = {"ear_accuracy": 0, "sight_accuracy": 0, "modules_completed": 0}
-	if not student.has("training_stats") or typeof(student["training_stats"]) != TYPE_DICTIONARY:
-		student["training_stats"] = {}
-	var metrics: Dictionary = student["metrics"]
-	if not metrics.has("ear_accuracy"):
-		metrics["ear_accuracy"] = 0
-	if not metrics.has("sight_accuracy"):
-		metrics["sight_accuracy"] = 0
-	if not metrics.has("modules_completed"):
-		metrics["modules_completed"] = 0
-	if not metrics.has("ear_sessions"):
-		metrics["ear_sessions"] = 0
-	if not metrics.has("sight_sessions"):
-		metrics["sight_sessions"] = 0
-	student["metrics"] = metrics
-	var stats: Dictionary = student["training_stats"]
-	if not stats.has("ear_accuracy"):
-		stats["ear_accuracy"] = int(metrics.get("ear_accuracy", 0))
-	if not stats.has("sight_accuracy"):
-		stats["sight_accuracy"] = int(metrics.get("sight_accuracy", 0))
-	if not stats.has("modules_completed"):
-		stats["modules_completed"] = int(metrics.get("modules_completed", 0))
-	if not stats.has("ear_sessions"):
-		stats["ear_sessions"] = int(metrics.get("ear_sessions", 0))
-	if not stats.has("sight_sessions"):
-		stats["sight_sessions"] = int(metrics.get("sight_sessions", 0))
-	if not stats.has("last_session"):
-		stats["last_session"] = str(metrics.get("last_session", ""))
-	student["training_stats"] = stats
-	return student
+	return _ensure_teacher_store().ensure_student_defaults(student)
 
 
 func _teacher_clear_form() -> void:
@@ -10761,19 +14530,6 @@ func _teacher_update_dashboard(student: Dictionary) -> void:
 	_teacher_dashboard_text.text = txt
 
 
-func _teacher_update_training_stats_from_metrics(student: Dictionary) -> Dictionary:
-	var metrics: Dictionary = student.get("metrics", {})
-	var stats: Dictionary = student.get("training_stats", {})
-	stats["ear_accuracy"] = int(metrics.get("ear_accuracy", 0))
-	stats["sight_accuracy"] = int(metrics.get("sight_accuracy", 0))
-	stats["modules_completed"] = int(metrics.get("modules_completed", 0))
-	stats["ear_sessions"] = int(metrics.get("ear_sessions", 0))
-	stats["sight_sessions"] = int(metrics.get("sight_sessions", 0))
-	stats["last_session"] = str(metrics.get("last_session", ""))
-	student["training_stats"] = stats
-	return student
-
-
 func _on_teacher_add_piece_row_pressed() -> void:
 	_teacher_add_piece_row("", "")
 
@@ -10821,20 +14577,19 @@ func _on_teacher_piece_delete_confirmed() -> void:
 	if removed == "":
 		_teacher_status_label.text = "Repertoire entry deleted."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
+	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Repertoire entry deleted."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var hist: Array = s.get("piece_history", [])
-	hist.append(removed)
-	s["piece_history"] = hist
-	s["current_pieces"] = _teacher_collect_piece_entries()
-	students[idx] = s
-	_teacher_data["students"] = students
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.move_piece_to_history(_teacher_selected_student_id, removed, _teacher_collect_piece_entries())
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		_teacher_status_label.text = "Repertoire entry deleted."
+		return
 	_save_teacher_data()
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) == TYPE_DICTIONARY:
+		_teacher_update_dashboard(student_any as Dictionary)
 	_teacher_status_label.text = "Moved piece to completed history."
 
 
@@ -10873,15 +14628,12 @@ func _on_teacher_delete_student_pressed() -> void:
 	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Select a student first."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.delete_student(_teacher_selected_student_id)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("deleted", false)):
 		_teacher_status_label.text = "Student not found."
 		return
-	var students: Array = _teacher_students_array()
-	students.remove_at(idx)
-	_teacher_data["students"] = students
-	if str(_teacher_data.get("active_student_id", "")) == _teacher_selected_student_id:
-		_teacher_data["active_student_id"] = ""
 	_save_teacher_data()
 	_teacher_clear_form()
 	_refresh_teacher_students_list()
@@ -10895,28 +14647,29 @@ func _on_teacher_save_student_pressed() -> void:
 	if nm == "":
 		_teacher_status_label.text = "Name is required."
 		return
-	var students: Array = _teacher_students_array()
+	var student_to_save: Dictionary = {}
 	if _teacher_selected_student_id == "":
-		var s := _teacher_new_student_template()
-		s = _teacher_collect_form_into(s)
-		students.append(s)
-		_teacher_selected_student_id = str(s.get("id", ""))
-		_teacher_status_label.text = "Student created."
+		student_to_save = _teacher_collect_form_into(_teacher_new_student_template())
 	else:
 		var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
 		if idx >= 0:
-			var existing: Dictionary = students[idx]
-			existing = _teacher_collect_form_into(existing)
-			students[idx] = existing
-			_teacher_status_label.text = "Student updated."
+			var students: Array = _teacher_students_array()
+			var existing_any: Variant = students[idx]
+			var existing: Dictionary = {}
+			if typeof(existing_any) == TYPE_DICTIONARY:
+				existing = (existing_any as Dictionary).duplicate(true)
+			student_to_save = _teacher_collect_form_into(existing)
 		else:
-			var fallback := _teacher_new_student_template()
-			fallback = _teacher_collect_form_into(fallback)
-			students.append(fallback)
-			_teacher_selected_student_id = str(fallback.get("id", ""))
-			_teacher_status_label.text = "Student created."
-	_teacher_data["students"] = students
+			student_to_save = _teacher_collect_form_into(_teacher_new_student_template())
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.save_student(student_to_save, _teacher_selected_student_id)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("saved", false)):
+		_teacher_status_label.text = "Unable to save student."
+		return
+	_teacher_selected_student_id = str(result.get("student_id", _teacher_selected_student_id))
 	_save_teacher_data()
+	_teacher_status_label.text = "Student created." if bool(result.get("created", false)) else "Student updated."
 	_refresh_teacher_students_list()
 	_teacher_refresh_selected_student_label()
 	var sel_idx := -1
@@ -10939,10 +14692,18 @@ func _on_teacher_student_selected(index: int) -> void:
 	var students: Array = _teacher_students_array()
 	var s: Dictionary = students[real_idx]
 	_teacher_selected_student_id = str(s.get("id", ""))
-	_teacher_data["active_student_id"] = _teacher_selected_student_id
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.set_active_student_id(_teacher_selected_student_id)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		_teacher_status_label.text = "Student not found."
+		return
 	_save_teacher_data()
-	_teacher_fill_form(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) == TYPE_DICTIONARY:
+		var student: Dictionary = student_any as Dictionary
+		_teacher_fill_form(student)
+		_teacher_update_dashboard(student)
 	_teacher_refresh_selected_student_label()
 	_teacher_status_label.text = "Loaded student."
 
@@ -11011,60 +14772,40 @@ func _teacher_update_analytics() -> void:
 
 
 func _teacher_get_active_student_id() -> String:
-	if _teacher_selected_student_id != "":
-		return _teacher_selected_student_id
-	return str(_teacher_data.get("active_student_id", ""))
-
-
-func _teacher_apply_metric_update(student: Dictionary, mode: int, accuracy_pct: int) -> Dictionary:
-	var metrics: Dictionary = student.get("metrics", {})
-	var ear_sessions := int(metrics.get("ear_sessions", 0))
-	var sight_sessions := int(metrics.get("sight_sessions", 0))
-	var ear_accuracy := int(metrics.get("ear_accuracy", 0))
-	var sight_accuracy := int(metrics.get("sight_accuracy", 0))
-	if mode == MODE_INTERVAL or mode == MODE_CHORD:
-		ear_accuracy = int(round((float(ear_accuracy * ear_sessions) + float(accuracy_pct)) / float(ear_sessions + 1)))
-		ear_sessions += 1
-	elif mode == MODE_SIGHT:
-		sight_accuracy = int(round((float(sight_accuracy * sight_sessions) + float(accuracy_pct)) / float(sight_sessions + 1)))
-		sight_sessions += 1
-	metrics["ear_sessions"] = ear_sessions
-	metrics["sight_sessions"] = sight_sessions
-	metrics["ear_accuracy"] = ear_accuracy
-	metrics["sight_accuracy"] = sight_accuracy
-	metrics["last_session"] = Time.get_datetime_string_from_system()
-	student["metrics"] = metrics
-	student = _teacher_update_training_stats_from_metrics(student)
-	return student
+	return _sync_teacher_store_from_runtime().get_active_student_id(_teacher_selected_student_id)
 
 
 func _teacher_record_session_metrics(mode: int, correct_count: int, asked_count: int) -> void:
-	var sid := _teacher_get_active_student_id()
-	if sid == "":
+	# Phase 3: append the just-finished round to the active lesson session, if any.
+	_lesson_session_record_activity_end(correct_count, asked_count)
+	var store := _ensure_teacher_store()
+	var result: Dictionary = store.record_session_metrics(
+		_teacher_selected_student_id,
+		mode,
+		correct_count,
+		asked_count,
+		MODE_INTERVAL,
+		MODE_CHORD,
+		MODE_SIGHT,
+		Time.get_datetime_string_from_system(),
+		_teacher_now_string(),
+		Callable(self, "_teacher_mode_label")
+	)
+	# Record per-item stats for weak area analysis
+	var sid := store.get_active_student_id(_teacher_selected_student_id)
+	if sid != "" and mode == MODE_INTERVAL:
+		store.record_item_stats(sid, _interval_stats_asked, _interval_stats_correct, "interval")
+	elif sid != "" and mode == MODE_CHORD:
+		store.record_item_stats(sid, _chord_stats_asked, _chord_stats_correct, "chord")
+	_teacher_data = store.get_data()
+	if not bool(result.get("updated", false)):
 		return
-	var idx := _teacher_find_index_by_id(sid)
-	if idx < 0:
-		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var acc := int(round((float(correct_count) / float(max(1, asked_count))) * 100.0))
-	s = _teacher_apply_metric_update(s, mode, acc)
-	var sessions: Array = s.get("session_history", [])
-	sessions.append({
-		"date": _teacher_now_string(),
-		"mode": _teacher_mode_label(mode),
-		"correct": correct_count,
-		"asked": asked_count,
-		"accuracy": acc
-	})
-	while sessions.size() > 200:
-		sessions.remove_at(0)
-	s["session_history"] = sessions
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
-	if _teacher_selected_student_id == sid:
-		_teacher_update_dashboard(s)
+	var result_sid := str(result.get("student_id", ""))
+	if _teacher_selected_student_id == result_sid:
+		var student_any: Variant = result.get("student", {})
+		if typeof(student_any) == TYPE_DICTIONARY:
+			_teacher_update_dashboard(student_any as Dictionary)
 	_refresh_teacher_students_list()
 
 
@@ -11072,21 +14813,18 @@ func _teacher_mark_module_completed() -> void:
 	var sid := _teacher_get_active_student_id()
 	if sid == "":
 		return
-	var idx := _teacher_find_index_by_id(sid)
-	if idx < 0:
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.mark_module_completed(_teacher_selected_student_id, Time.get_datetime_string_from_system())
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var metrics: Dictionary = s.get("metrics", {})
-	metrics["modules_completed"] = int(metrics.get("modules_completed", 0)) + 1
-	metrics["last_session"] = Time.get_datetime_string_from_system()
-	s["metrics"] = metrics
-	s = _teacher_update_training_stats_from_metrics(s)
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
+	var student_any: Variant = result.get("student", {})
+	var student: Dictionary = {}
+	if typeof(student_any) == TYPE_DICTIONARY:
+		student = student_any as Dictionary
 	if _teacher_selected_student_id == sid:
-		_teacher_update_dashboard(s)
+		_teacher_update_dashboard(student)
 	_refresh_teacher_students_list()
 
 
@@ -11094,26 +14832,23 @@ func _on_teacher_mark_book_done_pressed() -> void:
 	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Select a student first."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.mark_book_done(_teacher_selected_student_id)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		if str(result.get("reason", "")) == "no_current_book":
+			_teacher_status_label.text = "No current book to mark done."
+		else:
+			_teacher_status_label.text = "Student not found."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var cb: Dictionary = s.get("current_book", {})
-	var book_name := str(cb.get("name", "")).strip_edges()
-	var book_part := str(cb.get("part", "")).strip_edges()
-	if book_name == "":
-		_teacher_status_label.text = "No current book to mark done."
-		return
-	var hist: Array = s.get("book_history", [])
-	hist.append("%s%s" % [book_name, (" (Part %s)" % book_part) if book_part != "" else ""])
-	s["book_history"] = hist
-	s["current_book"] = {"name": "", "part": ""}
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
-	_teacher_fill_form(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) != TYPE_DICTIONARY:
+		_teacher_status_label.text = "Student not found."
+		return
+	var student: Dictionary = student_any as Dictionary
+	_teacher_fill_form(student)
+	_teacher_update_dashboard(student)
 	_teacher_status_label.text = "Book marked done."
 	_refresh_teacher_students_list()
 
@@ -11124,33 +14859,24 @@ func _on_teacher_mark_piece_done_pressed() -> void:
 	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Select a student first."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.mark_piece_done(_teacher_selected_student_id, _teacher_done_piece_edit.text)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		if str(result.get("reason", "")) == "no_current_piece":
+			_teacher_status_label.text = "No piece to mark done."
+		else:
+			_teacher_status_label.text = "Student not found."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var current: Array[Dictionary] = _teacher_piece_entries_from_value_array(s.get("current_pieces", []))
-	var target := _teacher_done_piece_edit.text.strip_edges()
-	if target == "" and not current.is_empty():
-		target = str(current[0].get("title", ""))
-	if target == "":
-		_teacher_status_label.text = "No piece to mark done."
-		return
-	var updated: Array[Dictionary] = []
-	for p in current:
-		var ps := str(p.get("title", ""))
-		if ps != target:
-			updated.append(p)
-	var hist: Array = s.get("piece_history", [])
-	hist.append(target)
-	s["piece_history"] = hist
-	s["current_pieces"] = updated
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
 	_teacher_done_piece_edit.text = ""
-	_teacher_fill_form(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) != TYPE_DICTIONARY:
+		_teacher_status_label.text = "Student not found."
+		return
+	var student: Dictionary = student_any as Dictionary
+	_teacher_fill_form(student)
+	_teacher_update_dashboard(student)
 	_teacher_status_label.text = "Piece marked done."
 	_refresh_teacher_students_list()
 
@@ -11161,33 +14887,24 @@ func _on_teacher_mark_tech_done_pressed() -> void:
 	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Select a student first."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.mark_tech_done(_teacher_selected_student_id, _teacher_done_tech_edit.text)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		if str(result.get("reason", "")) == "no_current_technical":
+			_teacher_status_label.text = "No technical drill to mark done."
+		else:
+			_teacher_status_label.text = "Student not found."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var current: Array = s.get("current_technical", [])
-	var target := _teacher_done_tech_edit.text.strip_edges()
-	if target == "" and not current.is_empty():
-		target = str(current[0])
-	if target == "":
-		_teacher_status_label.text = "No technical drill to mark done."
-		return
-	var updated: Array[String] = []
-	for t in current:
-		var ts := str(t)
-		if ts != target:
-			updated.append(ts)
-	var hist: Array = s.get("tech_history", [])
-	hist.append(target)
-	s["tech_history"] = hist
-	s["current_technical"] = updated
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
 	_teacher_done_tech_edit.text = ""
-	_teacher_fill_form(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) != TYPE_DICTIONARY:
+		_teacher_status_label.text = "Student not found."
+		return
+	var student: Dictionary = student_any as Dictionary
+	_teacher_fill_form(student)
+	_teacher_update_dashboard(student)
 	_teacher_status_label.text = "Technical drill marked done."
 	_refresh_teacher_students_list()
 
@@ -11200,28 +14917,25 @@ func _on_teacher_add_assignment_pressed() -> void:
 	if task == "":
 		_teacher_status_label.text = "Assignment task is required."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.add_assignment(
+		_teacher_selected_student_id,
+		task,
+		_teacher_assignment_due_edit.text.strip_edges(),
+		_teacher_now_string()
+	)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
 		_teacher_status_label.text = "Student not found."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var assignments: Array = s.get("assignments", [])
-	assignments.append({
-		"task": task,
-		"due": _teacher_assignment_due_edit.text.strip_edges(),
-		"done": false,
-		"created_at": _teacher_now_string(),
-		"done_at": ""
-	})
-	s["assignments"] = assignments
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
 	_teacher_assignment_task_edit.text = ""
 	_teacher_assignment_due_edit.text = ""
-	_teacher_refresh_assignments_list(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) == TYPE_DICTIONARY:
+		var student: Dictionary = student_any as Dictionary
+		_teacher_refresh_assignments_list(student)
+		_teacher_update_dashboard(student)
 	_teacher_status_label.text = "Assignment added."
 
 
@@ -11229,30 +14943,25 @@ func _on_teacher_mark_assignment_done_pressed() -> void:
 	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Select a student first."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
-		_teacher_status_label.text = "Student not found."
-		return
 	var assignment_idx := _teacher_get_selected_assignment_index()
 	if assignment_idx < 0:
 		_teacher_status_label.text = "Select an assignment in the list."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var assignments: Array = s.get("assignments", [])
-	if assignment_idx >= assignments.size():
-		_teacher_status_label.text = "Assignment selection out of range."
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.mark_assignment_done(_teacher_selected_student_id, assignment_idx, _teacher_now_string())
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		if str(result.get("reason", "")) == "assignment_out_of_range":
+			_teacher_status_label.text = "Assignment selection out of range."
+		else:
+			_teacher_status_label.text = "Student not found."
 		return
-	var a: Dictionary = assignments[assignment_idx]
-	a["done"] = true
-	a["done_at"] = _teacher_now_string()
-	assignments[assignment_idx] = a
-	s["assignments"] = assignments
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
-	_teacher_refresh_assignments_list(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) == TYPE_DICTIONARY:
+		var student: Dictionary = student_any as Dictionary
+		_teacher_refresh_assignments_list(student)
+		_teacher_update_dashboard(student)
 	_teacher_status_label.text = "Assignment marked done."
 
 
@@ -11260,27 +14969,25 @@ func _on_teacher_remove_assignment_pressed() -> void:
 	if _teacher_selected_student_id == "":
 		_teacher_status_label.text = "Select a student first."
 		return
-	var idx := _teacher_find_index_by_id(_teacher_selected_student_id)
-	if idx < 0:
-		_teacher_status_label.text = "Student not found."
-		return
 	var assignment_idx := _teacher_get_selected_assignment_index()
 	if assignment_idx < 0:
 		_teacher_status_label.text = "Select an assignment in the list."
 		return
-	var students: Array = _teacher_students_array()
-	var s: Dictionary = students[idx]
-	var assignments: Array = s.get("assignments", [])
-	if assignment_idx >= assignments.size():
-		_teacher_status_label.text = "Assignment selection out of range."
+	var store := _sync_teacher_store_from_runtime()
+	var result: Dictionary = store.remove_assignment(_teacher_selected_student_id, assignment_idx)
+	_sync_runtime_from_teacher_store()
+	if not bool(result.get("updated", false)):
+		if str(result.get("reason", "")) == "assignment_out_of_range":
+			_teacher_status_label.text = "Assignment selection out of range."
+		else:
+			_teacher_status_label.text = "Student not found."
 		return
-	assignments.remove_at(assignment_idx)
-	s["assignments"] = assignments
-	students[idx] = s
-	_teacher_data["students"] = students
 	_save_teacher_data()
-	_teacher_refresh_assignments_list(s)
-	_teacher_update_dashboard(s)
+	var student_any: Variant = result.get("student", {})
+	if typeof(student_any) == TYPE_DICTIONARY:
+		var student: Dictionary = student_any as Dictionary
+		_teacher_refresh_assignments_list(student)
+		_teacher_update_dashboard(student)
 	_teacher_status_label.text = "Assignment removed."
 
 
@@ -11446,12 +15153,18 @@ func _refresh_mode_buttons() -> void:
 		if _home_menu_ui != null and not read_btn.has_meta("mode_card_panel"):
 			_home_menu_ui.set_selected_text_marker(read_btn, selected_allowed and _selected_mode == MODE_READ)
 		read_btn.visible = false
+	if _learning_mode_card_button != null and _learning_mode_card_button.has_meta("mode_card_panel"):
+		_set_home_selection_state(_learning_mode_card_button, false)
 
 
 func _refresh_ear_mode_buttons(final_pass: bool = true) -> void:
 	for key in _ear_mode_buttons.keys():
 		var btn: Button = _ear_mode_buttons[key]
-		_set_home_selection_state(btn, int(key) == _selected_mode)
+		var mode_id := int(key)
+		var locked := not _mvp_is_ear_mode_enabled(mode_id)
+		btn.visible = not locked
+		_set_home_selection_state(btn, not locked and mode_id == _selected_mode)
+		_apply_mvp_locked_button_visual(btn, locked)
 	if final_pass:
 		_refresh_practice_setup_theme()
 
@@ -11465,7 +15178,11 @@ func _refresh_read_module_buttons() -> void:
 func _refresh_clef_buttons(final_pass: bool = true) -> void:
 	for clef_name in _clef_buttons.keys():
 		var btn: Button = _clef_buttons[clef_name]
-		_set_home_selection_state(btn, clef_name == _selected_clef)
+		var clef_label := str(clef_name)
+		var locked := not _mvp_is_sight_clef_enabled(clef_label, _sight_mode)
+		btn.visible = not locked
+		_set_home_selection_state(btn, not locked and clef_label == _selected_clef)
+		_apply_mvp_locked_button_visual(btn, locked)
 	if final_pass:
 		_refresh_sight_notes_setup_menu_style()
 		_refresh_practice_setup_theme()
@@ -11474,7 +15191,11 @@ func _refresh_clef_buttons(final_pass: bool = true) -> void:
 func _refresh_note_chase_clef_buttons(final_pass: bool = true) -> void:
 	for clef_name in _note_chase_clef_buttons.keys():
 		var btn: Button = _note_chase_clef_buttons[clef_name]
-		_set_home_selection_state(btn, clef_name == _note_chase_clef_mode)
+		var clef_label := str(clef_name)
+		var locked := not _mvp_is_note_chase_clef_enabled(clef_label)
+		btn.visible = not locked
+		_set_home_selection_state(btn, not locked and clef_label == _note_chase_clef_mode)
+		_apply_mvp_locked_button_visual(btn, locked)
 	if final_pass:
 		_refresh_practice_setup_theme()
 
@@ -11482,9 +15203,14 @@ func _refresh_note_chase_clef_buttons(final_pass: bool = true) -> void:
 func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 	for key in _sight_mode_buttons.keys():
 		var btn: Button = _sight_mode_buttons[key]
-		_set_home_selection_state(btn, _selected_mode == MODE_SIGHT and str(key) == _sight_mode)
+		var mode_name := str(key)
+		var locked := not _mvp_is_sight_mode_enabled(mode_name)
+		btn.visible = not locked
+		_set_home_selection_state(btn, not locked and _selected_mode == MODE_SIGHT and mode_name == _sight_mode)
+		_apply_mvp_locked_button_visual(btn, locked)
 	if _sight_note_chase_button != null:
 		_set_home_selection_state(_sight_note_chase_button, _selected_mode == MODE_NOTE_CHASE)
+		_apply_mvp_locked_button_visual(_sight_note_chase_button, false)
 	var sight_active := _selected_mode == MODE_SIGHT
 	var chord_mode := sight_active and _sight_mode == "Chords"
 	var continuous_mode := sight_active and _sight_mode == "Continuous"
@@ -11492,8 +15218,14 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 	var in_rhythm_menu := rhythm_flow_selected and _home_panel != null and _home_panel.visible
 	if _sight_notes_setup_title_label != null:
 		_sight_notes_setup_title_label.visible = chord_mode or continuous_mode
+	if _sight_clef_row != null:
+		_sight_clef_row.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Continuous" or _sight_mode == "Chords")
 	if _sight_chord_options_title_label != null:
 		_sight_chord_options_title_label.visible = chord_mode
+	if _grand_staff_label != null:
+		_grand_staff_label.visible = false  # always grand staff now, no need to show label
+	if _sight_chord_tier_row != null:
+		_sight_chord_tier_row.visible = chord_mode
 	if _rhythm_setup_group_title_label != null:
 		_rhythm_setup_group_title_label.visible = rhythm_flow_selected
 	if _rhythm_actions_group_title_label != null:
@@ -11502,13 +15234,23 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		_sight_range_container.visible = sight_active and _sight_mode == "Notes"
 		if _sight_range_container.visible:
 			_apply_sight_note_selector_for_current_clef()
+	var midi_visible := sight_active and _sight_mode == "Notes" and _midi_platform_supported()
+	if _sight_midi_card != null:
+		_sight_midi_card.visible = midi_visible
+	elif _sight_midi_group != null:
+		_sight_midi_group.visible = midi_visible
+	if midi_visible:
+		_refresh_midi_settings_ui()
 	if _sight_key_sig_row != null:
 		_sight_key_sig_row.visible = chord_mode or (sight_active and _sight_mode == "Notes")
 	if _sight_accidentals_toggle != null:
-		_sight_accidentals_toggle.visible = chord_mode
-		var sight_acc_row := _sight_accidentals_toggle.get_parent() as Control
+		var show_tier1_accidentals := chord_mode and _sight_tier_allows_accidentals_toggle()
+		_sight_accidentals_toggle.visible = show_tier1_accidentals
+		var sight_acc_row := _sight_accidentals_row as Control
+		if sight_acc_row == null:
+			sight_acc_row = _sight_accidentals_toggle.get_parent() as Control
 		if sight_acc_row != null:
-			sight_acc_row.visible = chord_mode
+			sight_acc_row.visible = show_tier1_accidentals
 	if _rhythm_flow_settings_row != null:
 		_rhythm_flow_settings_row.visible = rhythm_flow_selected
 	if _rhythm_flow_settings_row_2 != null:
@@ -11562,6 +15304,7 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 	_refresh_rhythm_flow_demo_buttons()
 	_ensure_staff_base_lines_visible()
 	_refresh_sight_key_sig_buttons(false)
+	_refresh_sight_chord_tier_buttons(false)
 	_refresh_sight_note_key_buttons()
 	if final_pass:
 		_refresh_home_option_group_visibility(false)
@@ -11569,10 +15312,25 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		_refresh_practice_setup_theme()
 
 
+func _refresh_sight_chord_tier_buttons(final_pass: bool = true) -> void:
+	for key in _sight_chord_tier_buttons.keys():
+		var tier_btn := _sight_chord_tier_buttons[key] as Button
+		if tier_btn == null:
+			continue
+		var tier_id := int(key)
+		_set_home_selection_state(tier_btn, tier_id == _sight_selected_chord_tier)
+	if final_pass:
+		_refresh_practice_setup_theme()
+
+
 func _refresh_sight_key_sig_buttons(final_pass: bool = true) -> void:
 	for key in _sight_key_sig_buttons.keys():
 		var btn: Button = _sight_key_sig_buttons[key]
-		_set_home_selection_state(btn, str(key) == _sight_key_signature)
+		var sig_name := str(key)
+		var locked := not _mvp_is_sight_key_signature_enabled(sig_name, _sight_mode)
+		btn.visible = not locked
+		_set_home_selection_state(btn, not locked and sig_name == _sight_key_signature)
+		_apply_mvp_locked_button_visual(btn, locked)
 	if final_pass:
 		_refresh_sight_notes_setup_menu_style()
 		_refresh_practice_setup_theme()
@@ -11608,13 +15366,7 @@ func _effective_sight_step_bounds() -> Vector2i:
 
 
 func _sight_step_label_for_clef(step: int, clef_name: String) -> String:
-	if clef_name == "Bass":
-		var bass_labels := ["E4", "D4", "C4", "B3", "A3", "G3", "F3", "E3", "D3", "C3", "B2", "A2", "G2", "F2", "E2", "D2", "C2"]
-		var idx := clampi(step + 4, 0, bass_labels.size() - 1)
-		return bass_labels[idx]
-	var treble_labels := ["C6", "B5", "A5", "G5", "F5", "E5", "D5", "C5", "B4", "A4", "G4", "F4", "E4", "D4", "C4", "B3", "A3"]
-	var t_idx := clampi(step + 4, 0, treble_labels.size() - 1)
-	return treble_labels[t_idx]
+	return _ensure_sight_renderer().sight_step_label_for_clef(step, clef_name)
 
 
 func _sight_step_label(step: int) -> String:
@@ -11622,77 +15374,38 @@ func _sight_step_label(step: int) -> String:
 
 
 func _sight_step_for_label_in_clef(note_label: String, clef_name: String) -> int:
-	var target := note_label.strip_edges()
-	var bounds := _get_sight_step_bounds()
-	for step in range(bounds.x, bounds.y + 1):
-		if _sight_step_label_for_clef(step, clef_name) == target:
-			return step
-	return 999
+	return _ensure_sight_renderer().sight_step_for_label_in_clef(note_label, clef_name, _get_sight_step_bounds())
 
 
 func _is_natural_midi(midi_note: int) -> bool:
-	var pc := posmod(midi_note, 12)
-	return pc == 0 or pc == 2 or pc == 4 or pc == 5 or pc == 7 or pc == 9 or pc == 11
+	return _ensure_sight_renderer().is_natural_midi(midi_note)
 
 
 func _midi_to_note_name(midi_note: int) -> String:
-	var names := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-	var pc := posmod(midi_note, 12)
-	var octave := int(floor(float(midi_note) / 12.0)) - 1
-	return "%s%d" % [names[pc], octave]
+	return _ensure_sight_renderer().midi_to_note_name(midi_note)
 
 
 func _note_name_to_midi(note_name: String) -> int:
-	var n := note_name.strip_edges()
-	if n.length() < 2:
-		return -1
-	var pc_map := {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
-	var letter := n.substr(0, 1).to_upper()
-	if not pc_map.has(letter):
-		return -1
-	var idx := 1
-	var accidental := 0
-	if idx < n.length():
-		var c := n.substr(idx, 1)
-		if c == "#":
-			accidental = 1
-			idx += 1
-		elif c == "b" or c == "B":
-			accidental = -1
-			idx += 1
-	if idx >= n.length():
-		return -1
-	var octave := int(n.substr(idx))
-	return ((octave + 1) * 12) + int(pc_map[letter]) + accidental
+	return _ensure_sight_renderer().note_name_to_midi(note_name)
 
 
 func _sight_note_name_with_key_signature(base_name: String, force_natural: bool = false) -> String:
-	if base_name.is_empty():
-		return base_name
-	var letter := base_name.substr(0, 1)
-	var octave := base_name.substr(1)
-	if force_natural:
-		return "%s%s" % [letter, octave]
-	var acc := int(_key_signature_accidental_map().get(letter, 0))
-	if acc > 0:
-		return "%s#%s" % [letter, octave]
-	if acc < 0:
-		return "%sb%s" % [letter, octave]
-	return base_name
+	return _ensure_sight_renderer().sight_note_name_with_key_signature(base_name, _sight_key_signature, force_natural)
 
 
 func _update_sight_range_ui() -> void:
-	if _sight_range_info_label == null:
-		return
-	var low_label := _sight_step_label(_sight_range_max_step)
-	var high_label := _sight_step_label(_sight_range_min_step)
-	var selected_notes := _sight_note_set_for_clef(_selected_clef)
-	_sight_range_info_label.text = "%s to %s | %d notes selected" % [low_label, high_label, selected_notes.size()]
-	_sight_range_info_label.visible = _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
-	if _sight_range_lower_value_label != null:
-		_sight_range_lower_value_label.text = low_label
-	if _sight_range_upper_value_label != null:
-		_sight_range_upper_value_label.text = high_label
+	_ensure_sight_renderer().update_sight_range_ui(
+		_sight_range_info_label,
+		_sight_range_lower_value_label,
+		_sight_range_upper_value_label,
+		_selected_mode,
+		MODE_SIGHT,
+		_sight_mode,
+		_selected_clef,
+		_sight_range_min_step,
+		_sight_range_max_step,
+		_sight_note_set_for_clef(_selected_clef)
+	)
 
 
 func _refresh_degree_buttons() -> void:
@@ -11703,11 +15416,7 @@ func _refresh_degree_buttons() -> void:
 
 
 func _refresh_chord_group_buttons(final_pass: bool = true) -> void:
-	for group_key in _chord_group_buttons.keys():
-		var btn: Button = _chord_group_buttons[group_key]
-		_set_home_selection_state(btn, int(group_key) == _selected_chord_group)
-	if final_pass:
-		_refresh_practice_setup_theme()
+	_refresh_chord_tier_ui()
 
 
 func _refresh_progression_pattern_buttons(final_pass: bool = true) -> void:
@@ -11784,20 +15493,24 @@ func _current_gap_duration() -> float:
 
 
 func _current_post_answer_delay() -> float:
-	if _qa_enabled:
-		return 0.05
-	return 1.25 if _slow_toggle != null and _slow_toggle.button_pressed else 0.85
+	return _ensure_session_controller().current_post_answer_delay(_qa_enabled, _slow_toggle != null and _slow_toggle.button_pressed)
 
 
 func _refresh_meta_ui() -> void:
 	if _selected_mode == MODE_NOTE_CHASE:
-		_set_note_chase_top_text_only(true)
+		_set_note_chase_top_text_only(false)
+		_style_sight_hud_box_neon(_hud_left_box, Color(0.34, 0.88, 1.0, 0.96))
+		_style_sight_hud_box_neon(_hud_center_box, Color(0.95, 0.78, 0.35, 0.96))
+		_style_sight_hud_box_neon(_hud_right_box, Color(0.95, 0.82, 0.50, 0.90))
 		if _sight_lives_panel != null:
 			_sight_lives_panel.visible = false
 		if _sight_streak_panel != null:
 			_sight_streak_panel.visible = false
 		if _lives_label != null:
-			_lives_label.text = "Focus Hearts: %d / 5" % _lives
+			_lives_label.text = _build_sight_hearts_text(_lives, 5)
+			_lives_label.visible = true
+		if _score_label != null:
+			_score_label.visible = true
 		var target_text := "Targets: %s" % ", ".join(_note_chase_selected_notes)
 		var speed_text := "Speed: %.1fx" % _note_chase_speed_multiplier()
 		var combo_text := "Combo: x%d" % maxi(1, _note_chase_combo_mult)
@@ -11824,6 +15537,7 @@ func _refresh_meta_ui() -> void:
 		_set_note_chase_bottom_metric(_note_chase_bottom_shield_label, "🛡", shield_text)
 		if _note_chase_level_label != null:
 			_note_chase_level_label.text = "Level %d" % (_note_chase_speed_stage + 1)
+			_note_chase_level_label.visible = true
 		if _streak_label != null:
 			_streak_label.visible = false
 		if _xp_label != null:
@@ -11842,30 +15556,32 @@ func _refresh_meta_ui() -> void:
 			_note_chase_bottom_row.visible = true
 		if _note_chase_bottom_spacer != null:
 			_note_chase_bottom_spacer.visible = true
+			_note_chase_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			_note_chase_bottom_spacer.custom_minimum_size = Vector2(0, 8)
 		_set_note_chase_metric_highlight(_note_chase_bottom_shield_box, _note_chase_shield_timer > 0.0)
 		_refresh_sight_question_progress_ui(false)
 		return
 	_set_note_chase_top_text_only(false)
-	var sight_card_mode := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+	var sight_card_mode := _is_sight_notes_style_mode()
 	if _lives_label != null:
-		if _is_rhythm_flow_mode():
-			_lives_label.text = ""
+		if sight_card_mode:
 			_lives_label.visible = false
-			if _sight_lives_panel != null:
-				_sight_lives_panel.visible = false
-			if _sight_streak_panel != null:
-				_sight_streak_panel.visible = false
+			_refresh_sight_lives_feed_shield_ui()
+			_refresh_sight_streak_panel_ui()
+		elif _is_ear_training_mode():
+			# Ear training: hide text label, show hearts panel instead
+			_lives_label.visible = false
+			_refresh_sight_lives_feed_shield_ui()
 		else:
-			if sight_card_mode:
-				_lives_label.visible = false
-				_refresh_sight_lives_feed_shield_ui()
-				_refresh_sight_streak_panel_ui()
+			if _practice_mode_enabled:
+				_lives_label.text = "%s Practice  |  Streak: %d  |  Score: %d" % [char(0x1F3B5), _streak, _xp]
+				_lives_label.visible = true
 			else:
 				var shield_readout := "Shield Ready" if _chicken_combo_shields > 0 else "Shield --"
 				_lives_label.text = "Lives: %d | Feed: %d/%d | %s" % [_lives, _chicken_combo_charge, CHICKEN_COMBO_TARGET, shield_readout]
 				_lives_label.visible = true
-				if _sight_lives_panel != null:
-					_sight_lives_panel.visible = false
+			if _sight_lives_panel != null:
+				_sight_lives_panel.visible = false
 	if sight_card_mode:
 		if _streak_label != null:
 			_streak_label.visible = false
@@ -11913,270 +15629,201 @@ func _refresh_meta_ui() -> void:
 		_note_chase_bottom_spacer.visible = false
 	_refresh_sight_question_progress_ui(false)
 	_refresh_sight_key_label()
+	_refresh_practice_hud_style()
 
 
 func _init_session_stats() -> void:
-	_interval_stats_asked.clear()
-	_interval_stats_correct.clear()
-	_chord_stats_asked.clear()
-	_chord_stats_correct.clear()
-	_sight_stats_asked.clear()
-	_sight_stats_correct.clear()
-	if _selected_mode == MODE_INTERVAL:
-		for interval in _active_intervals:
-			_interval_stats_asked[interval] = 0
-			_interval_stats_correct[interval] = 0
-	else:
-		if _selected_mode == MODE_CHORD or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE:
-			var keys: Array = CHORD_INTERVALS.keys()
-			if _selected_mode == MODE_CHORD:
-				keys.sort()
-				for key in keys:
-					_chord_stats_asked[key] = 0
-					_chord_stats_correct[key] = 0
-			else:
-				for choice_name in _selected_ear_mode_choices():
-					_chord_stats_asked[choice_name] = 0
-					_chord_stats_correct[choice_name] = 0
-		else:
-			if _sight_mode == "Chords":
-				var include_acc := _sight_accidentals_toggle != null and _sight_accidentals_toggle.button_pressed
-				for triad in _sight_chord_candidates(include_acc):
-					var chord_name := str(triad.get("name", ""))
-					if chord_name == "":
-						continue
-					_sight_stats_asked[chord_name] = 0
-					_sight_stats_correct[chord_name] = 0
-			else:
-				for n in ["C", "D", "E", "F", "G", "A", "B"]:
-					_sight_stats_asked[n] = 0
-					_sight_stats_correct[n] = 0
+	_ensure_session_controller().init_session_stats(
+		self,
+		MODE_INTERVAL,
+		MODE_CHORD,
+		MODE_PROGRESSION,
+		MODE_SCALE_MODE,
+		MODE_CADENCE,
+		CHORD_INTERVALS,
+		Callable(self, "_selected_ear_mode_choices"),
+		Callable(self, "_sight_include_accidental_variants"),
+		Callable(self, "_sight_chord_candidates")
+	)
 
 
 func _get_available_chord_types() -> Array[String]:
-	match _selected_chord_group:
-		1:
-			return _copy_chord_group(CHORD_GROUP_1)
-		2:
-			return _copy_chord_group(CHORD_GROUP_2)
-		3:
-			return _copy_chord_group(CHORD_GROUP_3)
-		4:
-			# "All" mode is adaptive by design.
-			if _streak >= 6:
-				return _copy_chord_group(CHORD_GROUP_4)
-			if _streak >= 3:
-				return _merge_chord_groups([CHORD_GROUP_1, CHORD_GROUP_2])
-			return _copy_chord_group(CHORD_GROUP_1)
-		_:
-			return _copy_chord_group(CHORD_GROUP_1)
-
-
-func _copy_chord_group(source: Array) -> Array[String]:
 	var out: Array[String] = []
-	for item in source:
-		out.append(str(item))
-	return out
-
-
-func _merge_chord_groups(groups: Array) -> Array[String]:
-	var out: Array[String] = []
-	for group in groups:
-		for item in group:
-			var chord_name := str(item)
-			if not out.has(chord_name):
-				out.append(chord_name)
+	for chord_name in _selected_chord_types:
+		if CHORD_INTERVALS.has(chord_name) and not out.has(chord_name):
+			out.append(chord_name)
+	if out.is_empty():
+		for chord_name in CHORD_DEFAULT_SELECTED:
+			out.append(chord_name)
 	return out
 
 
 func _record_question_asked() -> void:
-	if _selected_mode == MODE_INTERVAL:
-		_interval_stats_asked[_current_interval_id] = int(_interval_stats_asked.get(_current_interval_id, 0)) + 1
-	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE:
-		var ear_key := _current_chord_quality if _selected_mode == MODE_CHORD else _current_ear_text_answer
-		_chord_stats_asked[ear_key] = int(_chord_stats_asked.get(ear_key, 0)) + 1
-	else:
-		var key := _current_sight_chord_name if _sight_mode == "Chords" else _current_sight_note
-		_sight_stats_asked[key] = int(_sight_stats_asked.get(key, 0)) + 1
+	_ensure_session_controller().record_question_asked(
+		self,
+		MODE_INTERVAL,
+		MODE_CHORD,
+		MODE_PROGRESSION,
+		MODE_SCALE_MODE,
+		MODE_CADENCE
+	)
 
 
 func _record_question_correct() -> void:
-	if _selected_mode == MODE_INTERVAL:
-		_interval_stats_correct[_current_interval_id] = int(_interval_stats_correct.get(_current_interval_id, 0)) + 1
-	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE:
-		var ear_key := _current_chord_quality if _selected_mode == MODE_CHORD else _current_ear_text_answer
-		_chord_stats_correct[ear_key] = int(_chord_stats_correct.get(ear_key, 0)) + 1
-	else:
-		var key := _current_sight_chord_name if _sight_mode == "Chords" else _current_sight_note
-		_sight_stats_correct[key] = int(_sight_stats_correct.get(key, 0)) + 1
+	_ensure_session_controller().record_question_correct(
+		self,
+		MODE_INTERVAL,
+		MODE_CHORD,
+		MODE_PROGRESSION,
+		MODE_SCALE_MODE,
+		MODE_CADENCE
+	)
 
 
-func _session_performance_summary() -> String:
-	var parts: Array[String] = []
-	if _selected_mode == MODE_INTERVAL:
-		var keys: Array = _interval_stats_asked.keys()
-		keys.sort()
-		for key in keys:
-			var asked := int(_interval_stats_asked[key])
-			if asked <= 0:
-				continue
-			var correct := int(_interval_stats_correct.get(key, 0))
-			var acc := int(round((float(correct) / float(asked)) * 100.0))
-			parts.append("%s:%d%%" % [_interval_display_name(str(key)), acc])
-	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE:
-		var ckeys: Array = _chord_stats_asked.keys()
-		ckeys.sort()
-		for key in ckeys:
-			var asked_c := int(_chord_stats_asked[key])
-			if asked_c <= 0:
-				continue
-			var correct_c := int(_chord_stats_correct.get(key, 0))
-			var acc_c := int(round((float(correct_c) / float(asked_c)) * 100.0))
-			parts.append("%s:%d%%" % [str(key), acc_c])
-	else:
-		var nkeys: Array = _sight_stats_asked.keys()
-		nkeys.sort()
-		for key in nkeys:
-			var asked_n := int(_sight_stats_asked[key])
-			if asked_n <= 0:
-				continue
-			var correct_n := int(_sight_stats_correct.get(key, 0))
-			var acc_n := int(round((float(correct_n) / float(asked_n)) * 100.0))
-			parts.append("%s:%d%%" % [str(key), acc_n])
-	if _selected_mode == MODE_SIGHT:
-		if parts.is_empty():
-			return "Performance:\nN/A"
-		return "Performance:\n" + "\n".join(parts)
-	return "Performance: " + (" | ".join(parts) if not parts.is_empty() else "N/A")
+func _progress_dots_text(current: int, total: int) -> String:
+	return _ensure_session_controller().progress_dots_text(current, total)
 
 
-func _performance_detail_only(perf_text: String) -> String:
-	var p := perf_text.strip_edges()
-	if p.begins_with("Performance:\n"):
-		return p.substr("Performance:\n".length()).strip_edges()
-	if p.begins_with("Performance:"):
-		return p.substr("Performance:".length()).strip_edges()
-	return p
+func _session_elapsed_text() -> String:
+	return _ensure_session_controller().session_elapsed_text(_quiz_start_time)
+
+
+func _accuracy_motivational_message(total_correct: int, total_questions: int) -> String:
+	return _ensure_session_controller().accuracy_motivational_message(total_correct, total_questions)
 
 
 func _final_quiz_result_text(total_correct: int, total_questions: int, final_score: int) -> String:
-	var perf := _performance_detail_only(_session_performance_summary())
-	return "Total correct: %d/%d | Final score: %d\nPerformance: %s" % [total_correct, total_questions, final_score, perf]
+	return _ensure_session_controller().final_quiz_result_text(
+		self,
+		total_correct,
+		total_questions,
+		final_score,
+		MODE_INTERVAL,
+		MODE_CHORD,
+		MODE_PROGRESSION,
+		MODE_SCALE_MODE,
+		MODE_CADENCE,
+		MODE_SIGHT,
+		MODE_NOTE_CHASE,
+		Callable(self, "_interval_display_name")
+	)
+
+
+func _reset_game_hud_for_pre_round() -> void:
+	# Prevent stale previous-session stats from showing before Start Round.
+	if _score_label != null:
+		if _selected_mode == MODE_NOTE_CHASE or _is_continuous_flow_sight_mode():
+			_score_label.text = "Score: 0"
+		else:
+			_score_label.text = "Correct: 0 / 0"
+	if _progress_label != null:
+		_progress_label.text = ""
+	if _sight_progress_track != null:
+		_sight_progress_track.visible = false
+		_set_sight_progress_ratio(0.0, false)
+	if _compare_bar != null:
+		_compare_bar.visible = false
+	if _cadence_roman_label != null:
+		_cadence_roman_label.visible = false
+
+
+func _append_first_run_assessment_steps(note_names: Array, desired_count: int, out_steps: Array[int]) -> void:
+	var labels: Array[String] = []
+	for n in note_names:
+		labels.append(str(n))
+	labels.shuffle()
+	for label in labels:
+		if desired_count <= 0:
+			return
+		var step := _sight_step_for_label_in_clef(label, "Treble")
+		if step == 999:
+			continue
+		out_steps.append(step)
+		desired_count -= 1
+
+
+func _build_first_run_assessment_steps() -> Array[int]:
+	var steps: Array[int] = []
+	_append_first_run_assessment_steps(FIRST_RUN_ASSESSMENT_EASY_NOTES, 3, steps)
+	_append_first_run_assessment_steps(FIRST_RUN_ASSESSMENT_CHALLENGE_NOTES, 2, steps)
+	while steps.size() < FIRST_RUN_ASSESSMENT_TOTAL_QUESTIONS:
+		var fallback_pool: Array = FIRST_RUN_ASSESSMENT_EASY_NOTES if steps.size() < 3 else FIRST_RUN_ASSESSMENT_CHALLENGE_NOTES
+		var fallback_label := str(fallback_pool[_rng.randi_range(0, fallback_pool.size() - 1)])
+		var fallback_step := _sight_step_for_label_in_clef(fallback_label, "Treble")
+		if fallback_step == 999:
+			break
+		steps.append(fallback_step)
+	return steps
+
+
+func _first_run_assessment_step_for_question(question_number: int) -> int:
+	if not _first_run_assessment_active:
+		return 999
+	var idx := question_number - 1
+	if idx < 0 or idx >= _first_run_assessment_steps.size():
+		return 999
+	return _first_run_assessment_steps[idx]
+
+
+func _begin_first_run_sight_assessment() -> void:
+	_selected_mode = MODE_SIGHT
+	_sight_mode = "Notes"
+	_selected_clef = "Treble"
+	_sight_key_signature = "C"
+	_home_mode_detail_active = true
+	_ear_settings_screen_active = false
+	_sight_settings_screen_active = false
+	_focus_missed_ids.clear()
+	_sight_selected_notes_by_clef["Treble"] = _sanitize_sight_note_set_for_clef("Treble", PackedStringArray([
+		"C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"
+	]))
+	var c4_step := _sight_step_for_label_in_clef("C4", "Treble")
+	var c5_step := _sight_step_for_label_in_clef("C5", "Treble")
+	if c4_step != 999 and c5_step != 999:
+		_sight_range_min_step = mini(c4_step, c5_step)
+		_sight_range_max_step = maxi(c4_step, c5_step)
+	_first_run_assessment_steps = _build_first_run_assessment_steps()
+	_first_run_assessment_active = not _first_run_assessment_steps.is_empty()
+	_first_run_assessment_pending = false
+	_first_run_onboarding_done = true
+	if _sight_question_spin != null:
+		_sight_question_spin.value = FIRST_RUN_ASSESSMENT_TOTAL_QUESTIONS
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_start_quiz_pressed() -> void:
-	_clear_gameplay_transient_visuals()
-	_awaiting_round_start = false
-	if _round_start_button != null:
-		_round_start_button.visible = false
-		_round_start_button.disabled = true
-	if _selected_mode == MODE_READ:
-		_home_info_label.text = ""
-		_show_game()
-		await _start_read_module()
+	if _startup_boot_blocking_input():
 		return
-	if _is_continuous_flow_sight_mode():
-		_home_info_label.text = ""
-		_bump_quiz_run_token()
-		_score = 0
-		_question_index = 0
-		_total_questions = 0
-		_lives = 5
-		_streak = 0
-		_xp = 0
-		_quiz_active = true
-		_accepting_answer = true
-		_awaiting_round_start = false
-		_show_game()
-		var reuse_current_rhythm := _is_rhythm_flow_mode() and (not _rhythm_flow_patterns.is_empty() or not _rhythm_flow_generated_bars.is_empty())
-		_start_continuous_sight_reading(false, reuse_current_rhythm)
-		_start_chicken_turn_hint_cycle()
+	# Teacher Edition gate: require an active student before any session begins.
+	# Student Edition skips this check (single-user product).
+	if not _ensure_active_student_for_practice():
 		return
-
-	if _selected_mode == MODE_INTERVAL:
-		_active_intervals = _build_interval_pool_for_settings()
-		if _active_intervals.size() < _ear_choice_count:
-			_home_info_label.text = "Need at least %d interval options." % _ear_choice_count
-			return
-	elif _selected_mode == MODE_PROGRESSION:
-		if _selected_progression_ids().size() < 2:
-			_home_info_label.text = "Pick at least 2 progression patterns."
-			return
-	elif _selected_mode == MODE_SCALE_MODE:
-		if _selected_scale_mode_ids().size() < 2:
-			_home_info_label.text = "Pick at least 2 scale/mode options."
-			return
-	elif _selected_mode == MODE_CADENCE:
-		if _selected_cadence_ids().size() < 2:
-			_home_info_label.text = "Pick at least 2 cadence types."
-			return
-	elif _selected_mode == MODE_NOTE_CHASE:
-		if _note_chase_selected_notes.is_empty():
-			_home_info_label.text = "Pick at least one target note for Note Chase."
-			return
-	else:
-		_active_intervals = []
-
-	_home_info_label.text = ""
-	_bump_quiz_run_token()
-	if _selected_mode == MODE_SIGHT and _sight_question_spin != null:
-		_total_questions = int(_sight_question_spin.value)
-	else:
-		_total_questions = int(_question_spin.value)
-	if _is_new_theory_mode() and _advanced_session != null:
-		_advanced_session.start(_total_questions)
-	_apply_answer_mode()
-	_score = 0
-	_question_index = 0
-	_lives = 5 if (_selected_mode == MODE_NOTE_CHASE or _is_continuous_flow_sight_mode()) else 3
-	_streak = 0
-	_chicken_combo_charge = 0
-	_chicken_combo_shields = 0
-	_xp = 0
-	_last_interval_signature = ""
-	_last_chord_signature = ""
-	_last_sight_signature = ""
-	_quiz_active = true
-	_accepting_answer = false
-	_init_session_stats()
-	if _is_new_theory_mode() and _advanced_session != null:
-		_advanced_session.start(_total_questions)
-	_refresh_meta_ui()
-	_result_box_hide()
-	_show_game()
-	if _is_ear_training_mode() or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE:
-		_awaiting_round_start = true
-		if _round_start_button != null:
-			_round_start_button.visible = _selected_mode == MODE_SIGHT
-			_round_start_button.disabled = false
-		_apply_answer_mode()
-		_replay_button.disabled = true
-		if _selected_mode == MODE_NOTE_CHASE:
-			_status_label.text = ""
-		else:
-			_status_label.text = "Tap Start Round when you're ready."
-		return
-	await _begin_next_question(_quiz_run_token)
+	if _first_run_assessment_pending:
+		_begin_first_run_sight_assessment()
+	_lesson_session_record_activity_start()
+	await _ensure_session_controller().start_quiz_from_home(self)
+	if _mic_mode_enabled and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
+		_start_mic_listening()
+	if _midi_enabled and _midi_supported_for_mode() and _midi_platform_supported():
+		_start_midi_listening()
 
 
 func _on_end_quiz_pressed() -> void:
+	if _first_run_assessment_active:
+		_first_run_assessment_active = false
+		_first_run_assessment_steps.clear()
 	_clear_gameplay_transient_visuals()
 	_invalidate_audio_sequence_schedule()
-	_continuous_sight_active = false
-	_continuous_sight_waiting_start = false
+	_ensure_session_controller().apply_end_state(self)
 	_clear_continuous_sight_notes()
 	_set_continuous_rest_symbol_visible(false)
 	if _continuous_sight_play_line != null:
 		_continuous_sight_play_line.visible = false
-	_in_tutorial = false
-	_quiz_active = false
-	_accepting_answer = false
 	_cancel_chicken_turn_hint_cycle(true)
+	_stop_mic_listening()
+	_stop_midi_listening()
 	_set_answer_buttons_enabled(false)
-	_awaiting_round_start = false
-	_note_chase_running = false
-	_note_chase_fever_active = false
-	_note_chase_boss_active = false
 	_stop_note_chase_music()
 	_set_note_chase_overlay("", false)
 	_clear_note_chase_visual_notes()
@@ -12193,8 +15840,7 @@ func _on_game_home_pressed() -> void:
 	_ear_settings_screen_active = false
 	_sight_settings_screen_active = false
 	_home_mode_detail_active = false
-	if _home_state != null:
-		_home_state.ear_settings_screen_active = false
+	_sync_home_state_from_runtime()
 	# Home from gameplay must fully end any active run (especially Note Flow/Rhythm Flow),
 	# otherwise continuous sessions can keep updating behind menus on some devices.
 	if (_game_panel != null and _game_panel.visible) or _quiz_active or _continuous_sight_active or _note_chase_running:
@@ -12206,63 +15852,7 @@ func _on_game_home_pressed() -> void:
 func _on_restart_quiz_pressed() -> void:
 	if _is_prompt_playing:
 		return
-	_clear_gameplay_transient_visuals()
-	_bump_quiz_run_token()
-	_invalidate_audio_sequence_schedule()
-	if _selected_mode == MODE_READ:
-		await _start_read_module()
-		return
-	_quiz_active = false
-	_accepting_answer = false
-	_cancel_chicken_turn_hint_cycle(true)
-	_note_chase_running = false
-	_note_chase_fever_active = false
-	_note_chase_boss_active = false
-	_stop_note_chase_music()
-	_set_note_chase_overlay("", false)
-	_clear_note_chase_visual_notes()
-	_set_note_chase_staff_scrolling(false)
-	_set_answer_buttons_enabled(false)
-	_awaiting_round_start = false
-	if _round_start_button != null:
-		_round_start_button.visible = false
-		_round_start_button.disabled = true
-	_replay_button.disabled = true
-	_status_label.text = "Restarting..."
-	_score = 0
-	_question_index = 0
-	_lives = 5 if (_selected_mode == MODE_NOTE_CHASE or _is_continuous_flow_sight_mode()) else 3
-	_streak = 0
-	_chicken_combo_charge = 0
-	_chicken_combo_shields = 0
-	_xp = 0
-	_last_interval_signature = ""
-	_last_chord_signature = ""
-	_last_sight_signature = ""
-	_init_session_stats()
-	_refresh_meta_ui()
-	_result_box_hide()
-	_quiz_active = true
-	if _is_continuous_flow_sight_mode():
-		_accepting_answer = true
-		_awaiting_round_start = false
-		_show_game()
-		var reuse_current_rhythm := _is_rhythm_flow_mode() and (not _rhythm_flow_patterns.is_empty() or not _rhythm_flow_generated_bars.is_empty())
-		_start_continuous_sight_reading(false, reuse_current_rhythm)
-		_start_chicken_turn_hint_cycle()
-		return
-	if _is_ear_training_mode() or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE:
-		_awaiting_round_start = true
-		if _round_start_button != null:
-			_round_start_button.visible = _selected_mode == MODE_SIGHT
-			_round_start_button.disabled = false
-		_apply_answer_mode()
-		if _selected_mode == MODE_NOTE_CHASE:
-			_status_label.text = ""
-		else:
-			_status_label.text = "Tap Start Round when you're ready."
-		return
-	await _begin_next_question(_quiz_run_token)
+	await _ensure_session_controller().restart_quiz(self)
 
 
 func _build_interval_pool_for_settings() -> Array[String]:
@@ -12287,29 +15877,75 @@ func _build_interval_pool_for_settings() -> Array[String]:
 
 
 func _build_interval_choices(correct_id: String, pool: Array[String]) -> Array[String]:
+	var correct_st: int = int(INTERVAL_DATA.get(correct_id, {"semitones": [0]})["semitones"][0])
 	var distractors: Array[String] = []
 	for id in pool:
 		var iid := str(id)
 		if iid != correct_id:
 			distractors.append(iid)
-	distractors.shuffle()
+	# Sort distractors by semitone proximity — closest intervals are the hardest distractors
+	distractors.sort_custom(func(a: String, b: String) -> bool:
+		var a_st: int = int(INTERVAL_DATA.get(a, {"semitones": [0]})["semitones"][0])
+		var b_st: int = int(INTERVAL_DATA.get(b, {"semitones": [0]})["semitones"][0])
+		return abs(a_st - correct_st) < abs(b_st - correct_st)
+	)
 	var choices: Array[String] = [correct_id]
-	var max_distractors := maxi(1, _ear_choice_count - 1)
-	choices.append_array(distractors.slice(0, max_distractors))
+	var pick_count := mini(maxi(1, _ear_choice_count - 1), distractors.size())
+	for di in range(pick_count):
+		choices.append(distractors[di])
 	choices.shuffle()
 	return choices
 
 
+func _get_similar_chord_names(chord_name: String) -> Array:
+	# Returns chords that are commonly confused with the given chord
+	var similar_map := {
+		"Major": ["Maj7", "Dom7", "Sus4", "Power"],
+		"Minor": ["Min7", "Diminished", "mMaj7", "Sus2"],
+		"Dom7": ["Maj7", "Major", "Min7", "7sus4"],
+		"Maj7": ["Dom7", "Major", "Maj6", "AugMaj7"],
+		"Min7": ["Minor", "Dom7", "Half-dim", "mMaj7"],
+		"Diminished": ["Minor", "Half-dim", "Dim7"],
+		"Augmented": ["Major", "AugMaj7", "Aug7"],
+		"Sus2": ["Minor", "Sus4", "Add9"],
+		"Sus4": ["Major", "Sus2", "7sus4"],
+		"Dim7": ["Diminished", "Half-dim", "Min7"],
+		"Half-dim": ["Min7", "Dim7", "Diminished"],
+		"mMaj7": ["Minor", "Min7", "Maj7"],
+		"Aug7": ["Dom7", "Augmented", "AugMaj7"],
+		"AugMaj7": ["Maj7", "Augmented", "Aug7"],
+		"7sus4": ["Dom7", "Sus4", "Maj7"],
+		"Maj6": ["Major", "Maj7", "Min6"],
+		"Min6": ["Minor", "Maj6", "Min7"],
+		"6/9": ["Maj6", "Add9", "Maj9"],
+		"Dom9": ["Dom7", "Maj9", "Min9"],
+		"Maj9": ["Maj7", "Dom9", "Add9"],
+		"Min9": ["Min7", "Dom9", "Maj9"],
+		"Add9": ["Major", "Maj9", "Sus2"],
+		"Power": ["Major", "Sus4", "Minor"],
+	}
+	return similar_map.get(chord_name, [])
+
+
 func _build_chord_choices(correct_name: String, pool: Array[String]) -> Array[String]:
+	var choices: Array[String] = [correct_name]
+	# First pick: a similar-sounding chord from the pool
+	var similar := _get_similar_chord_names(correct_name)
+	for s in similar:
+		var sv := str(s)
+		if pool.has(sv) and sv != correct_name and not choices.has(sv):
+			choices.append(sv)
+			break
+	# Fill remaining slots with random distractors
 	var distractors: Array[String] = []
-	for name in pool:
-		var n: String = str(name)
-		if n != correct_name:
+	for chord_name in pool:
+		var n: String = str(chord_name)
+		if n != correct_name and not choices.has(n):
 			distractors.append(n)
 	distractors.shuffle()
-	var choices: Array[String] = [correct_name]
-	var max_distractors: int = maxi(0, mini(_ear_choice_count - 1, distractors.size()))
-	choices.append_array(distractors.slice(0, max_distractors))
+	var max_distractors: int = maxi(0, mini(_ear_choice_count - choices.size(), distractors.size()))
+	for di in range(max_distractors):
+		choices.append(distractors[di])
 	choices.shuffle()
 	return choices
 
@@ -12347,6 +15983,26 @@ func _selected_cadence_ids() -> Array[String]:
 	return out
 
 
+func _selected_cadence_ids_for_current_round() -> Array[String]:
+	var selected := _selected_cadence_ids()
+	if _focus_missed_ids.is_empty():
+		return selected
+	var focused: Array[String] = []
+	for miss_any in _focus_missed_ids:
+		var miss := str(miss_any)
+		for key_any in CADENCE_DEFS.keys():
+			var key := str(key_any)
+			var def: Dictionary = CADENCE_DEFS.get(key, {})
+			var label := str(def.get("label", key))
+			if miss != key and miss != label:
+				continue
+			if not focused.has(key):
+				focused.append(key)
+	if focused.is_empty():
+		return selected
+	return focused
+
+
 func _selected_ear_mode_choices() -> Array[String]:
 	if _selected_mode == MODE_PROGRESSION:
 		var labels: Array[String] = []
@@ -12357,7 +16013,7 @@ func _selected_ear_mode_choices() -> Array[String]:
 		return _selected_scale_mode_ids()
 	if _selected_mode == MODE_CADENCE:
 		var out: Array[String] = []
-		for key in _selected_cadence_ids():
+		for key in _selected_cadence_ids_for_current_round():
 			out.append(str(CADENCE_DEFS[key]["label"]))
 		return out
 	return []
@@ -12404,7 +16060,7 @@ func _build_theory_question_payload() -> Dictionary:
 			"scale_notes": scale_notes
 		}
 	if _selected_mode == MODE_CADENCE:
-		var selected_cadences := _selected_cadence_ids()
+		var selected_cadences := _selected_cadence_ids_for_current_round()
 		var queue3 = _review_queue_for_mode(MODE_CADENCE)
 		var cadence_id := str(queue3.pick_next(selected_cadences)) if queue3 != null else ""
 		if cadence_id == "":
@@ -12413,8 +16069,10 @@ func _build_theory_question_payload() -> Dictionary:
 		var correct_cadence := str(cadence_def.get("label", cadence_id))
 		var cadence_notes: Array = []
 		var cadence_steps: Array = cadence_def.get("steps", [4, 0])
+		# Rotate key each question so players hear patterns, not just C-major chord shapes
+		_cadence_play_root = CADENCE_KEY_ROOTS[_rng.randi_range(0, CADENCE_KEY_ROOTS.size() - 1)]
 		for step in cadence_steps:
-			cadence_notes.append(_diatonic_triad_notes(int(step), 48))
+			cadence_notes.append(_diatonic_triad_notes(int(step), _cadence_play_root))
 		var cadence_labels: Array[String] = []
 		for key in selected_cadences:
 			cadence_labels.append(str(CADENCE_DEFS[key]["label"]))
@@ -12476,7 +16134,8 @@ func _build_text_choices(correct_name: String, pool: Array[String], count: int =
 			if distractors.size() >= picks:
 				break
 	var choices: Array[String] = [correct_name]
-	choices.append_array(distractors.slice(0, picks))
+	for di in range(mini(picks, distractors.size())):
+		choices.append(distractors[di])
 	choices.shuffle()
 	return choices
 
@@ -12550,7 +16209,8 @@ func _build_progression_label_choices(correct_progression_id: String, progressio
 			if distractors.size() >= distractor_count:
 				break
 	var choices: Array[String] = [correct_label]
-	choices.append_array(distractors.slice(0, distractor_count))
+	for di in range(mini(distractor_count, distractors.size())):
+		choices.append(distractors[di])
 	choices.shuffle()
 	return choices
 
@@ -12597,10 +16257,80 @@ func _play_chord_for_pattern(notes: Array[int], duration: float, broken: bool) -
 func _play_block_chord_only(notes: Array[int], duration: float) -> void:
 	await _play_chord_block(notes, duration)
 
+func _is_sight_chords_grand_staff_mode() -> bool:
+	return _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and _grand_staff_active
+
+
+func _current_sight_grand_staff_chord_midis() -> Array[int]:
+	var out: Array[int] = []
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
+		return out
+	# Prefer the MIDI values bound to currently visible noteheads.
+	# This guarantees playback matches what the player sees.
+	var note_panels: Array[Panel] = []
+	if _staff_note != null:
+		note_panels.append(_staff_note)
+	note_panels.append_array(_staff_chord_notes)
+	for p in note_panels:
+		if p == null or not p.visible:
+			continue
+		if not p.has_meta("sight_note_midi"):
+			continue
+		var midi_v := int(p.get_meta("sight_note_midi", -1))
+		if midi_v >= 0:
+			out.append(midi_v)
+	if not out.is_empty():
+		return out
+
+	if not _is_sight_chords_grand_staff_mode():
+		return out
+
+	# Fallback to generated voicing data when panels are not yet populated.
+	var voicing_v: Variant = _current_sight_chord_def.get("grand_staff_voicing", {})
+	if not (voicing_v is Dictionary):
+		return out
+	var all_notes_v: Variant = (voicing_v as Dictionary).get("all_notes", [])
+	if not (all_notes_v is Array):
+		return out
+	for nv in (all_notes_v as Array):
+		if not (nv is Dictionary):
+			continue
+		out.append(int((nv as Dictionary).get("midi", 60)))
+	return out
+
+
+func _sight_step_to_midi(step: int, clef_name: String, accidental: int = 0) -> int:
+	return _ensure_sight_renderer().sight_step_to_midi(
+		step,
+		clef_name,
+		NOTE_NAME_ORDER,
+		accidental,
+		Callable(self, "_note_letter_pitch_class")
+	)
+
+
+func _current_sight_note_prompt_midi() -> int:
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
+		return -1
+	var step: int = _current_sight_display_step
+	var base_letter := _staff_step_name_for_clef(step, _selected_clef)
+	if base_letter.is_empty():
+		return -1
+	var accidental := 0
+	if _current_sight_note_explicit_accidental == char(0x266E):
+		accidental = 0
+	else:
+		accidental = int(_key_signature_accidental_map().get(base_letter, 0))
+	return _sight_step_to_midi(step, _selected_clef, accidental)
+
+
 func _apply_answer_mode() -> void:
 	var gate_choices_for_round_start := _awaiting_round_start and (_is_ear_training_mode() or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
 	var is_ear_mode := _is_ear_training_mode()
 	var vp := get_viewport_rect().size
+	var ear_chord_raise_pct := 0.40
+	var ear_chord_bottom_lift_px := clampf(vp.y * 0.04, 20.0, 56.0) if _selected_mode == MODE_CHORD else 0.0
+	var ear_chord_sky_h := clampf(140.0 * (1.0 - ear_chord_raise_pct), 72.0, 132.0)
 	var compact_height_layout := vp.y < 930.0
 	var very_compact_height_layout := vp.y < 860.0
 	var ultra_compact_height_layout := vp.y < 780.0
@@ -12609,6 +16339,7 @@ func _apply_answer_mode() -> void:
 	var continuous_ultra_compact_layout := vp.y < 900.0
 	var anchor_sight_bottom_controls := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous")
 	var compact_sight_bottom_controls := _selected_mode == MODE_SIGHT and continuous_compact_layout and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous")
+	var show_grand_staff_chord_replay := _is_sight_chords_grand_staff_mode() and not _awaiting_round_start and _quiz_active
 
 	if _selected_mode == MODE_INTERVAL:
 		_prompt_label.text = "Choose the interval:"
@@ -12637,16 +16368,33 @@ func _apply_answer_mode() -> void:
 			_prompt_label.text = "Click the matching key:"
 
 	if _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE:
-		_replay_button.visible = false
+		if show_grand_staff_chord_replay and _sight_answer_overlay != null:
+			if _replay_button.get_parent() != _sight_answer_overlay:
+				if _replay_button.get_parent() != null:
+					_replay_button.get_parent().remove_child(_replay_button)
+				_sight_answer_overlay.add_child(_replay_button)
+			_replay_button.text = "Replay Chord"
+			_replay_button.custom_minimum_size = Vector2(168, 42)
+			_style_sight_grand_staff_replay_button(_replay_button)
+			_replay_button.visible = true
+		else:
+			_replay_button.visible = false
 		if _round_start_button != null:
-			_round_start_button.visible = _selected_mode == MODE_SIGHT and _awaiting_round_start
+			# Keep the in-flow button HIDDEN — the floating overlay replaces it in sight mode.
+			_round_start_button.visible = false
 		_slow_toggle.visible = false
 		_sight_side_controls.visible = false
-		_control_row.visible = _selected_mode == MODE_SIGHT and _awaiting_round_start
+		# The original _control_row pushed the staff/menu down when shown. The floating
+		# overlay (_sight_round_start_card) replaces it during sight rounds.
+		_control_row.visible = false
+		_refresh_sight_round_start_overlay()
+		_refresh_sight_big_piano_visibility()
 		_prompt_label.visible = ((_selected_mode == MODE_SIGHT and _sight_mode == "Placement") or _selected_mode == MODE_NOTE_CHASE) and not gate_choices_for_round_start
 		_status_label.visible = (_selected_mode == MODE_SIGHT and (_awaiting_round_start or _is_continuous_flow_sight_mode()))
 		_game_panel.add_theme_constant_override("separation", 2)
-		_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP if (_selected_mode == MODE_SIGHT and _sight_mode == "Placement") or _in_tutorial else Control.MOUSE_FILTER_IGNORE
+		_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP if (_selected_mode == MODE_SIGHT and (_sight_mode == "Placement" or _sight_mode == "Chords")) or _in_tutorial else Control.MOUSE_FILTER_IGNORE
+		if _selected_mode != MODE_SIGHT or _sight_mode != "Chords" or _awaiting_round_start:
+			_hide_sight_chord_note_chip()
 		if _sight_container != null:
 			var begin_align := _selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or anchor_sight_bottom_controls))
 			if begin_align:
@@ -12662,6 +16410,9 @@ func _apply_answer_mode() -> void:
 			if _slow_toggle.get_parent() != null:
 				_slow_toggle.get_parent().remove_child(_slow_toggle)
 			_control_row.add_child(_slow_toggle)
+		_replay_button.text = "Replay"
+		_replay_button.custom_minimum_size = Vector2(130, 44)
+		_style_button(_replay_button)
 		_replay_button.visible = true
 		if _round_start_button != null:
 			var needs_start := _is_ear_training_mode() or _selected_mode == MODE_SIGHT
@@ -12672,10 +16423,19 @@ func _apply_answer_mode() -> void:
 		_prompt_label.visible = true
 		_status_label.visible = true
 		_game_panel.add_theme_constant_override("separation", 10)
+		# Broken chord toggle — prominent in session UI for cadence and progression
+		if _session_broken_btn != null:
+			var show_broken := _selected_mode == MODE_CADENCE or _selected_mode == MODE_PROGRESSION
+			_session_broken_btn.visible = show_broken
+			if show_broken:
+				var broken_state := _cadence_broken if _selected_mode == MODE_CADENCE else _progression_broken
+				_session_broken_btn.button_pressed = broken_state
+				_session_broken_btn.text = "Broken  %s" % (char(0x2713) if broken_state else char(0x25CB))
 	if _interval_center_top_spacer != null:
 		_interval_center_top_spacer.visible = is_ear_mode
 	if _interval_center_bottom_spacer != null:
 		_interval_center_bottom_spacer.visible = is_ear_mode
+		_interval_center_bottom_spacer.custom_minimum_size = Vector2(0, ear_chord_bottom_lift_px if _selected_mode == MODE_CHORD else 0)
 	if _interval_prompt_top_spacer != null:
 		_interval_prompt_top_spacer.visible = is_ear_mode
 	if _interval_choices_top_spacer != null:
@@ -12714,12 +16474,17 @@ func _apply_answer_mode() -> void:
 		btn.visible = is_active
 		btn.disabled = not is_active
 
+	var visible_chord_count := 0
 	for chord_name in CHORD_INTERVALS.keys():
 		if _chord_buttons.has(chord_name):
 			var chord_btn: Button = _chord_buttons[chord_name]
 			var show := _selected_mode == MODE_CHORD and _current_chord_choices.has(chord_name) and not gate_choices_for_round_start
 			chord_btn.visible = show
 			chord_btn.disabled = not show
+			if show:
+				visible_chord_count += 1
+	if _chord_grid != null and visible_chord_count > 0:
+		_chord_grid.columns = mini(4, maxi(2, ceili(float(visible_chord_count) / 2.0)))
 
 	for note_name in _sight_key_buttons.keys():
 		var k_btn: Button = _sight_key_buttons[note_name]
@@ -12886,6 +16651,9 @@ func _apply_answer_mode() -> void:
 	if _sky_block != null:
 		if _selected_mode == MODE_READ:
 			_sky_block.custom_minimum_size = Vector2(0, 118)
+		elif _selected_mode == MODE_CHORD:
+			# Ear Chord quiz: keep options higher on screen by reducing top spacer.
+			_sky_block.custom_minimum_size = Vector2(0, ear_chord_sky_h)
 		elif _selected_mode == MODE_SIGHT:
 			var sight_sky_h := 16.0
 			if compact_height_layout:
@@ -12906,7 +16674,7 @@ func _apply_answer_mode() -> void:
 			_sky_block.custom_minimum_size = Vector2(0, chase_sky_h)
 		else:
 			_sky_block.custom_minimum_size = Vector2(0, 140)
-		var compact_bottom_sky := (_selected_mode == MODE_NOTE_CHASE) or (_selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))
+		var compact_bottom_sky := (_selected_mode == MODE_CHORD) or (_selected_mode == MODE_NOTE_CHASE) or (_selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))
 		_sky_block.size_flags_vertical = Control.SIZE_SHRINK_END if compact_bottom_sky else Control.SIZE_EXPAND_FILL
 	if _staff_area != null:
 		var is_large := vp.y >= 720.0 or vp.x >= 1100.0
@@ -12914,13 +16682,13 @@ func _apply_answer_mode() -> void:
 		if _selected_mode == MODE_READ:
 			_staff_area.custom_minimum_size = Vector2(920, 560) if is_large else Vector2(700, 430)
 		elif _selected_mode == MODE_NOTE_CHASE:
-			var note_chase_staff_h := 640.0 if is_large else 470.0
+			var note_chase_staff_h := 760.0 if is_large else 580.0
 			if compact_rhythm_layout:
-				var note_chase_ratio := 0.50 if is_large else 0.46
-				var note_chase_max_h := 520.0 if is_large else 430.0
+				var note_chase_ratio := 0.62 if is_large else 0.58
+				var note_chase_max_h := 650.0 if is_large else 560.0
 				if very_compact_height_layout:
-					note_chase_max_h = 470.0 if is_large else 400.0
-				note_chase_staff_h = clampf(vp.y * note_chase_ratio, 380.0, note_chase_max_h)
+					note_chase_max_h = 600.0 if is_large else 520.0
+				note_chase_staff_h = clampf(vp.y * note_chase_ratio, 440.0, note_chase_max_h)
 			_staff_area.custom_minimum_size = Vector2(1120, note_chase_staff_h) if is_large else Vector2(760, note_chase_staff_h)
 		elif _selected_mode == MODE_SIGHT:
 			if _sight_mode == "Rhythm Flow":
@@ -12937,6 +16705,12 @@ func _apply_answer_mode() -> void:
 				if touch_runtime:
 					rhythm_staff_h = minf(rhythm_staff_h, 380.0 if is_large else 340.0)
 				_staff_area.custom_minimum_size = Vector2(980, rhythm_staff_h) if is_large else Vector2(760, rhythm_staff_h)
+			elif _sight_mode == "Chords" and _grand_staff_active:
+				# 20% larger bounding area for grand staff chords
+				var grand_staff_h := 744.0 if is_large else 600.0
+				if compact_rhythm_layout:
+					grand_staff_h = clampf(vp.y * 0.67, 528.0, 696.0) if is_large else clampf(vp.y * 0.60, 456.0, 576.0)
+				_staff_area.custom_minimum_size = Vector2(980, grand_staff_h) if is_large else Vector2(760, grand_staff_h)
 			else:
 				var sight_staff_h := 460.0 if is_large else 360.0
 				if compact_rhythm_layout:
@@ -12991,8 +16765,6 @@ func _apply_answer_mode() -> void:
 		_sight_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL if anchor_sight_bottom_controls else Control.SIZE_SHRINK_BEGIN
 	if _bird_sprite != null:
 		var hide_chicken := _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))
-		if compact_sight_bottom_controls and (_sight_mode == "Notes" or _sight_mode == "Chords"):
-			hide_chicken = true
 		_bird_sprite.visible = not hide_chicken
 		if hide_chicken:
 			_hide_chicken_bubble()
@@ -13083,41 +16855,79 @@ func _show_home() -> void:
 	_chicken_combo_shields = 0
 	_current_ear_text_answer = ""
 	_current_theory_item_id = ""
-	_home_card.visible = true
-	_home_panel.visible = true
-	_game_card.visible = false
-	_game_panel.visible = false
+	if not _home_card.visible:
+		_home_card.visible = true
+	if not _home_panel.visible:
+		_home_panel.visible = true
+	if _game_card != null:
+		_game_card.visible = false
+	if _game_panel != null:
+		_game_panel.visible = false
+	# Reset header card to transparent home style — gameplay may have applied
+	# a dark background (sight chords, note chase, etc.) that persists otherwise.
+	if _header_card != null:
+		_header_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if _header_gradient_bg != null:
+		_header_gradient_bg.visible = false
+	# Hide the ear settings screen explicitly in case visibility state leaked
+	if _ear_settings_screen != null:
+		_ear_settings_screen.visible = false
 	_refresh_background_scene_emphasis()
 	if _sight_answer_overlay != null:
-		_sight_answer_overlay.visible = false
-	_end_button.visible = false
-	_restart_button.visible = false
-	if _game_home_button != null:
+		if _sight_answer_overlay.visible:
+			_sight_answer_overlay.visible = false
+	if _end_button != null and _end_button.visible:
+		_end_button.visible = false
+	if _restart_button != null and _restart_button.visible:
+		_restart_button.visible = false
+	if _game_home_button != null and _game_home_button.visible:
 		_game_home_button.visible = false
 	_refresh_gameplay_nav_overlay()
-	_hud_left_box.visible = false
-	_hud_right_box.visible = false
-	_hud_center_box.visible = false
-	if _tutorial_panel != null:
+	if _hud_left_box != null and _hud_left_box.visible:
+		_hud_left_box.visible = false
+	if _hud_right_box != null and _hud_right_box.visible:
+		_hud_right_box.visible = false
+	if _hud_center_box != null and _hud_center_box.visible:
+		_hud_center_box.visible = false
+	if _ear_intro_overlay != null and _ear_intro_overlay.visible:
+		_ear_intro_overlay.visible = false
+	if _note_chase_intro_overlay != null and _note_chase_intro_overlay.visible:
+		_note_chase_intro_overlay.visible = false
+	if _home_practice_toggle != null:
+		_home_practice_toggle.button_pressed = _practice_mode_enabled
+		_home_practice_toggle.text = "Practice Mode on" if _practice_mode_enabled else "Game Mode on"
+	if _tutorial_panel != null and _tutorial_panel.visible:
 		_tutorial_panel.visible = false
 	if _tutorial_bubble != null:
-		_tutorial_bubble.visible = false
+		if _tutorial_bubble.visible:
+			_tutorial_bubble.visible = false
 	if _tutorial_bubble_tail != null:
-		_tutorial_bubble_tail.visible = false
-	if _tutorial_panel != null:
-		_tutorial_panel.visible = false
+		if _tutorial_bubble_tail.visible:
+			_tutorial_bubble_tail.visible = false
 	if _tutorial_button_row != null:
-		_tutorial_button_row.visible = false
+		if _tutorial_button_row.visible:
+			_tutorial_button_row.visible = false
 	if _tutorial_end_button_col != null:
-		_tutorial_end_button_col.visible = false
+		if _tutorial_end_button_col.visible:
+			_tutorial_end_button_col.visible = false
 	if _tutorial_chicken != null:
-		_tutorial_chicken.visible = false
+		if _tutorial_chicken.visible:
+			_tutorial_chicken.visible = false
+	if _food_token != null and _food_token.visible:
+		_food_token.visible = false
+	if _cadence_intro_overlay != null and _cadence_intro_overlay.visible:
+		_cadence_intro_overlay.visible = false
+	if _streak_toast_label != null and _streak_toast_label.visible:
+		_streak_toast_label.visible = false
+	if _rhythm_flow_slot_dialog != null and _rhythm_flow_slot_dialog.visible:
+		_rhythm_flow_slot_dialog.visible = false
 	if _bird_sprite != null:
 		# Re-anchor on every home return so the bird cannot stay off-screen
 		# after gameplay/tweens or viewport/layout changes.
 		_bird_home_global_position = _compute_bird_home_global_position()
 		_bird_home_ready = true
-		_bird_sprite.visible = true
+		if not _bird_sprite.visible:
+			_bird_sprite.visible = true
 		_reset_bird_position()
 		_start_bird_idle_anim()
 	_result_box_hide()
@@ -13125,23 +16935,31 @@ func _show_home() -> void:
 	if _title_label != null:
 		_title_label.text = "Home"
 		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_title_label.visible = true
+		if not _title_label.visible:
+			_title_label.visible = true
 	if _home_wordmark_row != null:
-		_home_wordmark_row.visible = true
+		if not _home_wordmark_row.visible:
+			_home_wordmark_row.visible = true
 	if _header_mode_label != null:
-		_header_mode_label.visible = false
+		if _header_mode_label.visible:
+			_header_mode_label.visible = false
 	if _header_accent_line != null:
-		_header_accent_line.visible = false
+		if _header_accent_line.visible:
+			_header_accent_line.visible = false
 	if _header_version_label != null:
-		_header_version_label.visible = false
+		if _header_version_label.visible:
+			_header_version_label.visible = false
 	if _home_footer_bar != null:
-		_home_footer_bar.visible = true
+		if not _home_footer_bar.visible:
+			_home_footer_bar.visible = true
 	if _home_title_label != null:
-		_home_title_label.visible = true
+		if not _home_title_label.visible:
+			_home_title_label.visible = true
 		if _home_title_label.has_meta("home_title_separator"):
 			var sep := _home_title_label.get_meta("home_title_separator") as ColorRect
 			if sep != null and is_instance_valid(sep):
-				sep.visible = true
+				if not sep.visible:
+					sep.visible = true
 	_refresh_home_subtitle()
 	_refresh_meta_ui()
 	_refresh_game_title()
@@ -13149,6 +16967,12 @@ func _show_home() -> void:
 	if _home_scroll != null:
 		_home_scroll.scroll_vertical = 0
 	_on_mode_selected()
+	# _on_mode_selected() can restyle the header for setup/game contexts.
+	# Re-assert home title/header visuals so no gameplay top panel remains on Home.
+	_refresh_game_title()
+	_force_home_top_ui_state()
+	call_deferred("_refresh_game_title")
+	call_deferred("_force_home_top_ui_state")
 	call_deferred("_setup_home_focus_navigation")
 	set_process(false)
 	_last_responsive_vp = Vector2.ZERO
@@ -13163,62 +16987,87 @@ func _show_game() -> void:
 		_refresh_bird_perch_from_layout(true)
 		call_deferred("_refresh_bird_perch_from_layout", true)
 	_result_box_hide()
-	_home_card.visible = false
-	_home_panel.visible = false
-	_game_card.visible = true
-	_game_panel.visible = true
+	if _home_card.visible:
+		_home_card.visible = false
+	if _home_panel.visible:
+		_home_panel.visible = false
+	if not _game_card.visible:
+		_game_card.visible = true
+	if not _game_panel.visible:
+		_game_panel.visible = true
 	_refresh_background_scene_emphasis()
 	if _sight_answer_overlay != null:
-		_sight_answer_overlay.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+		var show_sight_overlay := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+		if _sight_answer_overlay.visible != show_sight_overlay:
+			_sight_answer_overlay.visible = show_sight_overlay
 	if _home_title_label != null:
-		_home_title_label.visible = false
+		if _home_title_label.visible:
+			_home_title_label.visible = false
 		if _home_title_label.has_meta("home_title_separator"):
 			var sep2 := _home_title_label.get_meta("home_title_separator") as ColorRect
 			if sep2 != null and is_instance_valid(sep2):
-				sep2.visible = false
+				if sep2.visible:
+					sep2.visible = false
 	if _home_wordmark_row != null:
-		_home_wordmark_row.visible = true
+		if not _home_wordmark_row.visible:
+			_home_wordmark_row.visible = true
 	if _title_label != null:
-		_title_label.visible = true
+		if not _title_label.visible:
+			_title_label.visible = true
 	if _header_version_label != null:
-		_header_version_label.visible = false
+		if _header_version_label.visible:
+			_header_version_label.visible = false
 	if _home_footer_bar != null:
-		_home_footer_bar.visible = false
+		if _home_footer_bar.visible:
+			_home_footer_bar.visible = false
 	if _home_mode_back_button != null:
-		_home_mode_back_button.visible = true
+		if not _home_mode_back_button.visible:
+			_home_mode_back_button.visible = true
 		_home_mode_back_button.disabled = false
 	if _home_mode_home_button != null:
-		_home_mode_home_button.visible = true
+		if not _home_mode_home_button.visible:
+			_home_mode_home_button.visible = true
 		_home_mode_home_button.disabled = false
 	_apply_top_hud_nav_button_skin()
-	_end_button.visible = true
-	_restart_button.visible = true
+	if not _end_button.visible:
+		_end_button.visible = true
+	if not _restart_button.visible:
+		_restart_button.visible = true
 	if _game_home_button != null:
-		_game_home_button.visible = (_selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
-	_hud_left_box.visible = true
-	_hud_right_box.visible = true
-	_hud_center_box.visible = true
+		var show_game_home := _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE
+		if _game_home_button.visible != show_game_home:
+			_game_home_button.visible = show_game_home
+	if not _hud_left_box.visible:
+		_hud_left_box.visible = true
+	if not _hud_right_box.visible:
+		_hud_right_box.visible = true
+	if not _hud_center_box.visible:
+		_hud_center_box.visible = true
 	# Clear any stale note/chord visuals from the previous mode before the next round starts.
 	# Also clear any lingering Note Flow / Rhythm Flow spawned glyph panels if switching modes mid-session.
 	_clear_continuous_sight_notes()
 	_hide_continuous_visual_aids()
 	_set_continuous_rest_symbol_visible(false)
 	if _staff_note != null:
-		_staff_note.visible = false
+		if _staff_note.visible:
+			_staff_note.visible = false
 		_staff_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_staff_note.modulate = Color(1, 1, 1, 1)
 	for n in _staff_chord_notes:
 		if n != null:
-			n.visible = false
+			if n.visible:
+				n.visible = false
 			n.modulate = Color(1, 1, 1, 1)
 	for lbl in _staff_chord_accidental_labels:
 		if lbl != null:
-			lbl.visible = false
+			if lbl.visible:
+				lbl.visible = false
 	_hide_preview_ledger()
 	_clear_staff_ledger_lines()
 	for pl in _staff_preview_ledgers:
 		if pl != null:
-			pl.visible = false
+			if pl.visible:
+				pl.visible = false
 	for line in _continuous_empty_bar_lines:
 		if line != null and is_instance_valid(line):
 			line.queue_free()
@@ -13239,45 +17088,57 @@ func _show_game() -> void:
 		_hud_center_box.custom_minimum_size = Vector2(360, 74)
 	_set_sight_result_background_hidden(false)
 	if _selected_mode == MODE_READ:
-		_hud_left_box.visible = false
-		_hud_right_box.visible = false
-		_hud_center_box.visible = false
-	elif _is_rhythm_flow_mode():
-		# In Rhythm Flow, remove the left HUD box from layout so Score/Streak shift left.
-		if _hud_left_box != null:
+		if _hud_left_box.visible:
 			_hud_left_box.visible = false
+		if _hud_right_box.visible:
+			_hud_right_box.visible = false
+		if _hud_center_box.visible:
+			_hud_center_box.visible = false
+	elif _is_rhythm_flow_mode():
+		# Keep full three-card HUD in Rhythm Flow for consistency with other gameplay screens.
+		if _hud_left_box != null:
+			_hud_left_box.visible = true
 			_hud_left_box.modulate = Color(1, 1, 1, 1.0)
-			_hud_left_box.custom_minimum_size = Vector2(0, 0)
+			_hud_left_box.custom_minimum_size = Vector2(230, 60)
 			for child in _hud_left_box.get_children():
 				if child is CanvasItem:
-					(child as CanvasItem).visible = false
+					(child as CanvasItem).visible = true
 		if _hud_center_box != null:
-			_hud_center_box.custom_minimum_size = Vector2(430, 74)
+			_hud_center_box.custom_minimum_size = Vector2(360, 74)
 	if _tutorial_button_row != null:
-		_tutorial_button_row.visible = _selected_mode == MODE_READ
+		var show_tutorial_btn_row := _selected_mode == MODE_READ
+		if _tutorial_button_row.visible != show_tutorial_btn_row:
+			_tutorial_button_row.visible = show_tutorial_btn_row
 		if _selected_mode == MODE_READ:
 			call_deferred("_position_tutorial_button_row")
 	if _tutorial_end_button_col != null:
-		_tutorial_end_button_col.visible = false
+		if _tutorial_end_button_col.visible:
+			_tutorial_end_button_col.visible = false
 	if _tutorial_panel != null and _selected_mode == MODE_READ:
 		call_deferred("_position_tutorial_title")
 		call_deferred("_position_tutorial_end_buttons")
 	_end_button.move_to_front()
 	_restart_button.move_to_front()
 	if _game_home_button != null:
-		_game_home_button.visible = (_selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
+		var show_game_home_final := _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE
+		if _game_home_button.visible != show_game_home_final:
+			_game_home_button.visible = show_game_home_final
 	_refresh_gameplay_nav_overlay()
 	_refresh_game_title()
 	_refresh_sight_notes_chords_skin()
 	_refresh_sight_key_label()
 	if _bird_sprite != null and (_selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))):
-		_bird_sprite.visible = false
+		if _bird_sprite.visible:
+			_bird_sprite.visible = false
 		_hide_chicken_bubble()
 	if _is_rhythm_flow_mode() and _tutorial_chicken != null:
-		_tutorial_chicken.visible = false
+		if _tutorial_chicken.visible:
+			_tutorial_chicken.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _startup_boot_blocking_input():
+		return
 	var gameplay_input_active := _game_panel != null and _game_panel.visible and _quiz_active
 	if event is InputEventScreenTouch:
 		var st_any := event as InputEventScreenTouch
@@ -13337,6 +17198,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _is_note_dragging:
 		return
+	if _learning_mode_active:
+		if _learning_lesson_player != null and is_instance_valid(_learning_lesson_player):
+			_on_learning_lesson_back_to_map()
+		else:
+			_on_learning_back_to_home()
+		get_viewport().set_input_as_handled()
+		return
 	if _game_panel != null and _game_panel.visible:
 		_on_end_quiz_pressed()
 		get_viewport().set_input_as_handled()
@@ -13373,12 +17241,45 @@ func _set_sight_result_background_hidden(hidden: bool) -> void:
 		_note_chase_staff_frame.visible = false
 
 
+func _force_home_top_ui_state() -> void:
+	if _startup_boot_active and not _startup_boot_completed:
+		return
+	if not _is_home_ui_active():
+		return
+	if _startup_loading_overlay != null:
+		_startup_loading_overlay.visible = false
+		_startup_loading_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for overlay in [_result_overlay, _ear_intro_overlay, _note_chase_intro_overlay, _cadence_intro_overlay]:
+		if overlay != null:
+			overlay.visible = false
+			overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _header_card != null:
+		_header_card.mouse_filter = Control.MOUSE_FILTER_PASS
+		_header_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if _header_gradient_bg != null:
+		_header_gradient_bg.visible = false
+		_header_gradient_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _sight_settings_button != null:
+		_sight_settings_button.disabled = false
+		_sight_settings_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		_sight_settings_button.z_as_relative = false
+		_sight_settings_button.z_index = 1200
+		_sight_settings_button.move_to_front()
+
+
 func _refresh_game_title() -> void:
 	if _title_label == null:
 		return
-	var home_visible := _home_card != null and _home_card.visible and (_game_card == null or not _game_card.visible)
+	var home_visible := _is_home_ui_active()
 	var title_text := "Clefira"
 	var subtitle_text := "Music Learning that actually sticks"
+	if not IS_TEACHER_EDITION:
+		subtitle_text = "Music Learning that actually sticks  •  Student Edition"
+	# Phase 5: personalise the subtitle when the player has set a name. Falls back
+	# to the marketing line for guests and for the Teacher Edition (which is a
+	# multi-student device — a single greeting would be misleading).
+	if home_visible and _player_name != "" and not IS_TEACHER_EDITION:
+		subtitle_text = "Welcome back, %s  •  let's play" % _player_name
 	if not home_visible:
 		match _selected_mode:
 			MODE_INTERVAL:
@@ -13411,6 +17312,7 @@ func _refresh_game_title() -> void:
 				title_text = "Learn"
 				subtitle_text = "Step-by-step music lessons"
 	if _header_gradient_bg != null:
+		_header_gradient_bg.visible = not home_visible
 		_header_gradient_bg.modulate = Color(1, 1, 1, 0.0 if home_visible else 1.0)
 	if home_visible and _header_card != null:
 		_header_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
@@ -14410,12 +18312,39 @@ func _note_chase_capture_targets_with_rainbow(skip_node: Panel) -> int:
 
 
 func _note_chase_apply_theme() -> void:
+	if _game_card != null:
+		if _sight_game_card_style_cache == null:
+			_sight_game_card_style_cache = StyleBoxFlat.new()
+			_sight_game_card_style_cache.bg_color = Color(0.03, 0.12, 0.23, 0.62)
+			_sight_game_card_style_cache.corner_radius_top_left = 18
+			_sight_game_card_style_cache.corner_radius_top_right = 18
+			_sight_game_card_style_cache.corner_radius_bottom_left = 18
+			_sight_game_card_style_cache.corner_radius_bottom_right = 18
+			_sight_game_card_style_cache.border_color = Color(0.26, 0.80, 0.98, 0.34)
+			_sight_game_card_style_cache.border_width_left = 2
+			_sight_game_card_style_cache.border_width_top = 2
+			_sight_game_card_style_cache.border_width_right = 2
+			_sight_game_card_style_cache.border_width_bottom = 2
+			_sight_game_card_style_cache.shadow_color = Color(0.02, 0.07, 0.16, 0.45)
+			_sight_game_card_style_cache.shadow_size = 10
+			_sight_game_card_style_cache.content_margin_left = 20
+			_sight_game_card_style_cache.content_margin_top = 16
+			_sight_game_card_style_cache.content_margin_right = 20
+			_sight_game_card_style_cache.content_margin_bottom = 16
 	if _sky_area != null:
 		if _selected_mode == MODE_NOTE_CHASE:
-			var tint: Color = NOTE_CHASE_THEME_TINTS[_note_chase_speed_stage % NOTE_CHASE_THEME_TINTS.size()]
-			_sky_area.modulate = tint
+			# Keep Note Chase background in the same dark-blue gameplay family as Sight Reading.
+			if _game_card != null:
+				_game_card.add_theme_stylebox_override("panel", _sight_game_card_style_cache)
+			_style_header_card(_header_card, Color(0.02, 0.08, 0.18, 0.30))
+			_sky_area.modulate = Color(1, 1, 1, 1)
+			if _note_chase_overlay != null:
+				_note_chase_overlay.color = Color(0.05, 0.10, 0.20, 0.32)
 		else:
 			_sky_area.modulate = Color(1, 1, 1, 1)
+			if _note_chase_overlay != null:
+				_note_chase_overlay.color = Color(0.03, 0.05, 0.04, 0.28)
+	_refresh_background_scene_emphasis()
 
 
 func _play_note_chase_stage_motif(stage: int) -> void:
@@ -14560,13 +18489,13 @@ func _note_chase_step_pool() -> Array[int]:
 
 func _note_chase_safe_y_top() -> float:
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
-		return _note_chase_staff_frame.position.y + 72.0
+		return _note_chase_staff_frame.position.y + 46.0
 	return _active_staff_top_y() - (_active_staff_step_y() * 1.2)
 
 
 func _note_chase_safe_y_bottom() -> float:
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
-		return (_note_chase_staff_frame.position.y + _note_chase_staff_frame.size.y) - 88.0
+		return (_note_chase_staff_frame.position.y + _note_chase_staff_frame.size.y) - 64.0
 	return (_active_staff_top_y() + (_active_staff_line_gap_y() * 4.0)) + (_active_staff_step_y() * 1.6)
 
 
@@ -14926,7 +18855,8 @@ func _on_note_chase_note_gui_input(event: InputEvent, note_panel: Panel) -> void
 				_status_label.text = "Shield blocked wrong"
 			else:
 				_score -= 6
-				_lives = maxi(0, _lives - 1)
+				if not _practice_mode_enabled:
+					_lives = maxi(0, _lives - 1)
 				_note_chase_wrongs += 1
 				_note_chase_combo_mult = maxi(1, _note_chase_combo_mult - 1)
 				_status_label.text = "Wrong note."
@@ -15034,7 +18964,8 @@ func _update_note_chase(delta: float) -> void:
 							_status_label.text = "Shield blocked miss"
 						else:
 							_score -= 3
-							_lives = maxi(0, _lives - 1)
+							if not _practice_mode_enabled:
+								_lives = maxi(0, _lives - 1)
 							_note_chase_correct_streak = 0
 							_note_chase_fever_active = false
 							_note_chase_fever_timer = 0.0
@@ -15080,9 +19011,9 @@ func _update_note_chase(delta: float) -> void:
 		_status_label.text = ""
 		var fail_perf := "Score: %d | Focus Hearts: 0/5 | Misses: %d" % [_score, _note_chase_wrongs]
 		_progress_label.text = fail_perf
-		_home_info_label.text = fail_perf
+		_home_info_label.text = ""
 		await _play_gameover_fail_sfx()
-		_result_box_show("Game Over", fail_perf)
+		_result_box_show("Keep Practicing!", fail_perf)
 		_stop_note_chase_music()
 		_set_note_chase_staff_scrolling(false)
 		return
@@ -15097,7 +19028,7 @@ func _update_note_chase(delta: float) -> void:
 		_status_label.text = "Complete!"
 		var perf := "Final Score: %d | Reached max level speed" % _score
 		_progress_label.text = perf
-		_home_info_label.text = perf
+		_home_info_label.text = ""
 		_result_box_show("Complete", perf)
 		_stop_note_chase_music()
 		await _play_win_fanfare_sfx()
@@ -15165,6 +19096,8 @@ func _set_note_chase_staff_scrolling(enabled: bool) -> void:
 			var clef_x := _note_chase_end_x() + 10.0 if enabled and _selected_mode == MODE_NOTE_CHASE else 16.0
 			if _selected_mode == MODE_SIGHT:
 				clef_x = line_x - 36.0
+				if _sight_mode == "Chords" and _grand_staff_active:
+					clef_x = line_x - clampf(gap_y * 0.92, 12.0, 20.0)
 			_align_staff_clef_to_five_lines(clef_x)
 			_layout_staff_key_signature()
 			_staff_clef_label.modulate = Color(1, 1, 1, 1)
@@ -15180,17 +19113,30 @@ func _set_note_chase_staff_scrolling(enabled: bool) -> void:
 		_note_chase_spawn_line.position.x = _note_chase_spawn_x()
 		_note_chase_spawn_line.position.y = top_y - 12.0
 		_note_chase_spawn_line.size.y = (gap_y * 4.0) + 26.0
+	# --- Grand staff bass lines (Sight Chords only) ---
+	_layout_grand_staff_bass(line_x, segment, top_y, gap_y)
+
 	_note_chase_realign_staff_frame()
 	if _note_chase_clef_clone != null:
 		# In Note Chase we only show clef once at round start.
 		_note_chase_clef_clone.visible = false
 
 
+func _grand_staff_bass_top_y(treble_top_y: float, gap_y: float) -> float:
+	return _ensure_sight_renderer().grand_staff_bass_top_y(treble_top_y, gap_y)
+
+func _layout_grand_staff_bass(line_x: float, segment: float, treble_top_y: float, gap_y: float) -> void:
+	_ensure_sight_renderer().layout_grand_staff_bass(self, line_x, segment, treble_top_y, gap_y, _sight_renderer_config())
+
+func _layout_grand_staff_bass_key_signature(bass_top_y: float, gap_y: float, line_x: float) -> void:
+	_ensure_sight_renderer().layout_grand_staff_bass_key_signature(self, bass_top_y, gap_y, line_x, _sight_renderer_config())
+
 func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 	if _staff_clef_label == null:
 		return
 	var gap := _active_staff_line_gap_y()
 	var top_y := _active_staff_top_y()
+	var effective_anchor_x: float = anchor_x
 	var span := gap * 4.0
 	var size_factor := 1.18
 	var y_factor := 0.62
@@ -15204,17 +19150,22 @@ func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 		clef_y = top_y - (gap * y_factor)
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous"):
 		# Lock sight clef placement to staff geometry so future layout tweaks don't drift it.
-		if _selected_clef == "Bass":
+		if _sight_mode == "Chords" and _grand_staff_active:
+			# Grand staff: smaller treble clef to fit the reduced line gap
+			size_factor = 1.02
+			effective_anchor_x += clampf(gap * 0.55, 8.0, 14.0) + GRAND_STAFF_CLEF_RIGHT_NUDGE + GRAND_STAFF_TREBLE_CLEF_EXTRA_RIGHT
+			clef_y = top_y - (gap * 1.10) - 14.0 + (gap * GRAND_STAFF_CLEF_DOWN_SPACES)
+		elif _selected_clef == "Bass":
 			clef_y = top_y - (gap * SIGHT_CLEF_ANCHOR_FACTOR_BASS) - SIGHT_CLEF_EXTRA_RAISE_BASS
 		else:
 			clef_y = top_y - (gap * SIGHT_CLEF_ANCHOR_FACTOR_TREBLE) - SIGHT_CLEF_EXTRA_RAISE_TREBLE
-	var font_sz := int(round(clampf(span * size_factor, 86.0, 172.0)))
+	var font_sz := int(round(clampf(span * size_factor, 60.0, 172.0)))
 	_staff_clef_label.add_theme_font_size_override("font_size", font_sz)
 	_staff_clef_label.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
 	_staff_clef_label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.02, 0.75))
 	_staff_clef_label.add_theme_constant_override("outline_size", 3)
 	_staff_clef_label.scale = Vector2.ONE
-	_staff_clef_label.position = Vector2(anchor_x, clef_y)
+	_staff_clef_label.position = Vector2(effective_anchor_x, clef_y)
 	if _note_chase_clef_clone != null:
 		_note_chase_clef_clone.add_theme_font_size_override("font_size", font_sz)
 		_note_chase_clef_clone.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
@@ -15224,119 +19175,32 @@ func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 
 
 func _key_sig_letter_steps() -> Array:
-	var sharp_sym := char(0x266F)
-	var flat_sym := char(0x266D)
-	if _sight_key_signature == "1#":
-		return [["F", sharp_sym]]
-	if _sight_key_signature == "2#":
-		return [["F", sharp_sym], ["C", sharp_sym]]
-	if _sight_key_signature == "3#":
-		return [["F", sharp_sym], ["C", sharp_sym], ["G", sharp_sym]]
-	if _sight_key_signature == "1b":
-		return [["B", flat_sym]]
-	if _sight_key_signature == "2b":
-		return [["B", flat_sym], ["E", flat_sym]]
-	if _sight_key_signature == "3b":
-		return [["B", flat_sym], ["E", flat_sym], ["A", flat_sym]]
-	return []
+	return _ensure_sight_renderer().key_sig_letter_steps(_sight_key_signature)
 
 
 func _key_signature_step_for_letter(letter: String, clef_name: String) -> int:
-	# Explicit key-signature placement for standard notation positions.
-	if clef_name == "Treble":
-		match letter:
-			"F":
-				return 0  # top line
-			"C":
-				return 3  # 2nd space from top
-			"G":
-				return 1  # top space
-			"B":
-				return 4  # middle line
-			"E":
-				return 1  # top space
-			"A":
-				return 7  # 4th space from top
-	if clef_name == "Bass":
-		match letter:
-			"F":
-				return 2  # 2nd line from top
-			"C":
-				return 5  # 3rd space from top
-			"G":
-				return 1  # top space
-			"B":
-				return 6  # 4th line from top
-			"E":
-				return 3  # 2nd space from top
-			"A":
-				return 0  # top line
-	var best_step := 4
-	var best_dist := 999999
-	for s in range(STAFF_TOP_LINE_STEP, STAFF_BOTTOM_LINE_STEP + 1):
-		if _staff_step_name_for_clef(s, clef_name) != letter:
-			continue
-		var d: int = absi(s - 4)
-		if d < best_dist:
-			best_dist = d
-			best_step = s
-	return best_step
+	return _ensure_sight_renderer().key_signature_step_for_letter(letter, clef_name)
 func _layout_staff_key_signature() -> void:
-	if _staff_key_sig_labels.is_empty():
-		return
-	var show_sig := _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes")
-	var defs: Array = _key_sig_letter_steps()
-	var sharp_sym := char(0x266F)
-	var flat_sym := char(0x266D)
-	for i in range(_staff_key_sig_labels.size()):
-		var lbl := _staff_key_sig_labels[i]
-		if lbl == null:
-			continue
-		if not show_sig or i >= defs.size():
-			lbl.visible = false
-			continue
-		var def: Array = defs[i]
-		var letter := str(def[0])
-		var symbol := str(def[1])
-		var step := _key_signature_step_for_letter(letter, _selected_clef)
-		var y := _staff_center_y_for_step(step)
-		# Keep accidental signs aligned on their staff slots.
-		if symbol == sharp_sym:
-			y -= 8.0
-		elif symbol == flat_sym:
-			y -= 18.0
-		# Treble needed a small correction; in bass this offsets the 3rd accidental incorrectly.
-		if _selected_clef == "Treble" and i == 2 and (_sight_key_signature == "3#" or _sight_key_signature == "3b"):
-			y -= (_active_staff_step_y() * 2.0)
-		lbl.text = symbol
-		lbl.visible = true
-		# Use the actual clef label width so key signatures don't overlap on tablet scaling.
-		var clef_size := _staff_clef_label.size
-		if clef_size.x <= 1.0:
-			clef_size = _staff_clef_label.get_combined_minimum_size()
-		var base_x := _staff_clef_label.position.x + clef_size.x + 18.0
-		# Small left nudge so key signatures sit closer to the clef without overlapping it.
-		base_x -= 8.0
-		var spacing := 20.0
-		if _selected_clef == "Bass":
-			base_x += 20.0
-			spacing = 26.0
-		elif symbol == flat_sym:
-			base_x += 8.0
-		lbl.position = Vector2(base_x + float(i) * spacing, y - 35.0)
+	_ensure_sight_renderer().layout_key_signature_labels(
+		_staff_key_sig_labels,
+		_key_sig_letter_steps(),
+		_selected_mode,
+		MODE_SIGHT,
+		_sight_mode,
+		_selected_clef,
+		_grand_staff_active,
+		_sight_key_signature,
+		_staff_clef_label,
+		SIGHT_ACCIDENTAL_RAISE_Y,
+		_active_staff_step_y(),
+		_active_staff_line_gap_y(),
+		Callable(self, "_staff_center_y_for_step"),
+		Callable(self, "_key_signature_step_for_letter")
+	)
 
 
 func _sight_visual_staff_geometry() -> Dictionary:
-	var left := STAFF_LEFT_X
-	var width := STAFF_LINE_WIDTH
-	if _staff_area != null and _selected_mode == MODE_SIGHT:
-		if _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow":
-			width = maxf(720.0, _staff_area.size.x - 44.0)
-			left = 22.0
-		else:
-			width = minf(STAFF_LINE_WIDTH, maxf(560.0, _staff_area.size.x * 0.56))
-			left = clampf((_staff_area.size.x - width) * 0.5 + 18.0, 18.0, _staff_area.size.x - width - 10.0)
-	return {"left": left, "width": width}
+	return _ensure_sight_renderer().visual_staff_geometry(_staff_area, _selected_mode, MODE_SIGHT, _sight_mode, STAFF_LEFT_X, STAFF_LINE_WIDTH)
 
 
 func _position_sight_floating_answer_rows() -> void:
@@ -15344,6 +19208,7 @@ func _position_sight_floating_answer_rows() -> void:
 		return
 	var show_notes := _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and _game_panel != null and _game_panel.visible
 	var show_chords := _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and _game_panel != null and _game_panel.visible
+	var show_grand_staff_replay := show_chords and _is_sight_chords_grand_staff_mode() and _replay_button != null and _replay_button.visible and _replay_button.get_parent() == _sight_answer_overlay
 	_sight_answer_overlay.visible = show_notes or show_chords
 	if _sight_keyboard_row != null:
 		_sight_keyboard_row.visible = show_notes
@@ -15387,6 +19252,15 @@ func _position_sight_floating_answer_rows() -> void:
 		var chords_y := anchor_rect.position.y + ((anchor_rect.size.y - chords_size.y) * 0.5)
 		chords_y = clampf(chords_y, edge_margin, vp.y - chords_size.y - edge_margin)
 		_sight_chord_choice_row.global_position = Vector2(chords_x, chords_y)
+		if show_grand_staff_replay:
+			var replay_size := _replay_button.get_combined_minimum_size()
+			if replay_size.x <= 1.0 or replay_size.y <= 1.0:
+				replay_size = _replay_button.size
+			var replay_x := chords_x + chords_size.x - replay_size.x
+			replay_x = clampf(replay_x, edge_margin, vp.x - replay_size.x - edge_margin)
+			var replay_y := chords_y - replay_size.y - SIGHT_GRAND_STAFF_REPLAY_VERTICAL_GAP
+			replay_y = maxf(edge_margin, replay_y)
+			_replay_button.global_position = Vector2(replay_x, replay_y)
 	_sight_answer_overlay.move_to_front()
 
 
@@ -15428,7 +19302,7 @@ func _note_chase_realign_staff_frame() -> void:
 			if _sight_mode == "Notes":
 				sight_note_center_offset_y = SIGHT_NOTE_CENTER_OFFSET_Y
 			elif _sight_mode == "Chords":
-				sight_note_center_offset_y = SIGHT_CHORD_NOTE_CENTER_OFFSET_Y
+				sight_note_center_offset_y = 0.0 if _grand_staff_active else SIGHT_CHORD_NOTE_CENTER_OFFSET_Y
 			top_visual_center_y += sight_note_center_offset_y
 			bottom_visual_center_y += sight_note_center_offset_y
 			var top_scale_y := _note_scale_for_y(top_visual_center_y).y
@@ -15441,6 +19315,15 @@ func _note_chase_realign_staff_frame() -> void:
 			bottom_target = maxf(bottom_target, _continuous_note_center_y_for_step(bottom_step) + (cont_note_h * 0.5) + 14.0)
 		var staff_line_top_y := _staff_center_y_for_step(STAFF_TOP_LINE_STEP)
 		var staff_line_bottom_y := _staff_center_y_for_step(STAFF_BOTTOM_LINE_STEP)
+		# Grand staff: extend frame with generous padding for ledger notes above and below
+		if _sight_mode == "Chords" and _grand_staff_active:
+			var bass_top_frame := _grand_staff_bass_top_y(top_staff, gap_staff)
+			var bass_bottom_frame := bass_top_frame + gap_staff * 4.0
+			staff_line_bottom_y = bass_bottom_frame
+			# Large padding for ledger notes (at least 3 ledger lines worth)
+			var ledger_pad := gap_staff * 3.5
+			top_target = minf(top_target, staff_line_top_y - ledger_pad)
+			bottom_target = maxf(bottom_target, bass_bottom_frame + ledger_pad)
 		var equal_staff_pad := 24.0
 		var need_above_staff := maxf(0.0, staff_line_top_y - top_target)
 		var need_below_staff := maxf(0.0, bottom_target - staff_line_bottom_y)
@@ -15454,10 +19337,10 @@ func _note_chase_realign_staff_frame() -> void:
 			right_x_s = minf(_staff_area.size.x - 8.0, sight_left + sight_width + 18.0)
 		var bottom_frame_margin := 8.0
 		if _sight_mode == "Notes" or _sight_mode == "Chords":
-			bottom_frame_margin = 6.0
+			bottom_frame_margin = 4.0
 		elif _sight_mode == "Continuous":
 			bottom_frame_margin = 4.0
-		top_y = clampf(top_y, 8.0, _staff_area.size.y - 120.0)
+		top_y = clampf(top_y, 4.0, _staff_area.size.y - 120.0)
 		bottom_y = clampf(bottom_y, top_y + 220.0, _staff_area.size.y - bottom_frame_margin)
 		_note_chase_staff_frame.position = Vector2(left_x_s, top_y)
 		_note_chase_staff_frame.size = Vector2(maxf(360.0, right_x_s - left_x_s), maxf(220.0, bottom_y - top_y))
@@ -15498,8 +19381,8 @@ func _note_chase_realign_staff_frame() -> void:
 			_current_sight_note = _sight_note_name_with_key_signature(base_note, force_natural)
 		_position_sight_floating_answer_rows()
 		return
-	var left_x := 12.0
-	var right_x := _staff_area.size.x - 12.0
+	var left_x := 6.0
+	var right_x := _staff_area.size.x - 6.0
 	var top_pad := 2.0
 	var bottom_pad := 2.0
 	var frame_h := maxf(360.0, _staff_area.size.y - top_pad - bottom_pad)
@@ -15527,111 +19410,64 @@ func _update_note_chase_staff_scroll(delta: float) -> void:
 
 
 func _begin_next_question(expected_token: int = -1) -> void:
-	if expected_token != -1 and expected_token != _quiz_run_token:
-		return
-	if not _quiz_active:
-		return
-	if _awaiting_round_start:
-		return
-
-	if _question_index >= _total_questions:
-		_finish_quiz()
-		return
-
-	_question_index += 1
-	_score_label.text = "Correct: %d / %d" % [_score, _question_index - 1]
-	_progress_label.text = "Question %d of %d" % [_question_index, _total_questions]
-	_status_label.text = "Listen..."
-	_refresh_meta_ui()
-	if _is_sight_notes_chords_game_mode():
-		_refresh_sight_question_progress_ui(true)
-
-	_set_answer_buttons_enabled(false)
-	_accepting_answer = false
-	_replay_button.disabled = true
-	_restart_button.disabled = true
-	_reset_bird_position()
-	if _selected_mode == MODE_CHORD:
-		_current_available_chord_types = _get_available_chord_types()
-		_current_chord_choices = []
-	elif _selected_mode == MODE_SIGHT:
-		_current_available_chord_types = []
-		_current_chord_choices = []
-	else:
-		_current_available_chord_types = []
-		_current_chord_choices = []
-	_apply_answer_mode()
-	_generate_round()
-	_start_chicken_turn_hint_cycle()
-	_apply_answer_mode()
-	if expected_token != -1 and expected_token != _quiz_run_token:
-		return
-	await _play_new_question_cue()
-	if expected_token != -1 and expected_token != _quiz_run_token:
-		return
-	_record_question_asked()
-	var prompt_question_index := _question_index
-	var allow_answer_during_prompt := _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_INTERVAL
-	if allow_answer_during_prompt:
-		_status_label.text = "Pick the correct nest."
-		_set_answer_buttons_enabled(true)
-		_accepting_answer = true
-		_start_chicken_turn_hint_cycle()
-		_replay_button.disabled = true
-		_restart_button.disabled = false
-	_is_prompt_playing = true
-	await _play_current_prompt()
-	_is_prompt_playing = false
-	if expected_token != -1 and expected_token != _quiz_run_token:
-		return
-	if _question_index != prompt_question_index:
-		return
-	if not _quiz_active:
-		return
-
-	if not allow_answer_during_prompt:
-		_status_label.text = "Pick the correct nest."
-		_set_answer_buttons_enabled(true)
-		_accepting_answer = true
-		_start_chicken_turn_hint_cycle()
-	_replay_button.disabled = false
-	_restart_button.disabled = false
+	if _midi_active and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
+		_midi_piano_viz_clear_all()
+	await _ensure_session_controller().begin_next_question(self, expected_token)
 
 
 func _finish_quiz() -> void:
-	_quiz_active = false
-	_accepting_answer = false
-	_cancel_chicken_turn_hint_cycle(true)
-	_set_answer_buttons_enabled(false)
-	_replay_button.disabled = true
-	_restart_button.disabled = false
-	_status_label.text = ""
-	var result_text := _final_quiz_result_text(_score, _total_questions, _xp)
-	_progress_label.text = result_text
-	if _sight_progress_track != null:
-		_sight_progress_track.visible = false
-		_set_sight_progress_ratio(0.0, false)
-	_teacher_record_session_metrics(_selected_mode, _score, _total_questions)
-	_home_info_label.text = result_text
-	if _selected_mode == MODE_SIGHT:
-		_set_sight_result_background_hidden(true)
-	_update_daily_streak(true)
-	_result_box_show("Complete", result_text)
-	await _play_win_fanfare_sfx()
-	var score_pct := (float(_score) / float(maxi(1, _total_questions))) * 100.0
-	_play_completion_reaction(score_pct)
+	await _ensure_session_controller().finish_quiz(self, MODE_SIGHT)
 
 
 func _generate_round() -> void:
 	if _selected_mode == MODE_INTERVAL:
 		if _active_intervals.is_empty():
 			_active_intervals = _build_interval_pool_for_settings()
+		# When focus-missed mode is active, restrict question pool to missed intervals
+		var _ask_pool: Array[String] = _focus_missed_ids if not _focus_missed_ids.is_empty() else _active_intervals
+		# First question: pick the most recognizable interval for an immediate win
+		# (only in normal mode — in focus mode, every interval needs practice)
+		if _question_index == 1 and _focus_missed_ids.is_empty():
+			var easy_order := ["P8", "P5", "P4", "M3", "P1"]
+			for easy in easy_order:
+				if easy in _active_intervals:
+					_current_interval_id = easy
+					var semitone_options: Array = INTERVAL_DATA[_current_interval_id]["semitones"]
+					var semitones: int = int(semitone_options[0])
+					_current_root_midi = 60  # Middle C — a familiar reference
+					_current_second_midi = _current_root_midi + semitones
+					_last_interval_signature = "%s:%d:%d" % [_current_interval_id, _current_root_midi, _current_second_midi]
+					_current_interval_choices = _build_interval_choices(_current_interval_id, _active_intervals)
+					_current_ear_text_answer = _current_interval_id
+					_apply_interval_choice_texts(_current_interval_choices, true)
+					return
+		# Difficulty ramp: early questions favour easier intervals
+		var q_ratio := float(_question_index) / float(maxi(1, _total_questions))
+		if _focus_missed_ids.is_empty() and _ask_pool.size() > 2:
+			var max_rank := 3 if q_ratio < 0.25 else (7 if q_ratio < 0.55 else 99)
+			var ramped: Array[String] = []
+			for rid in _ask_pool:
+				if INTERVAL_DIFFICULTY_RANK.get(rid, 99) <= max_rank:
+					ramped.append(rid)
+			if not ramped.is_empty():
+				_ask_pool = ramped
+		# Spaced repetition: weight towards previously missed intervals
+		var rq_int = _review_queue_for_mode(MODE_INTERVAL)
+		var weighted_pick: String = ""
+		if rq_int != null and not _ask_pool.is_empty():
+			weighted_pick = str(rq_int.pick_next(_ask_pool))
+		# Dynamic root range: narrow early (comfortable), wide late (challenging)
+		var root_min := 58 if q_ratio < 0.30 else (53 if q_ratio < 0.65 else 48)
+		var root_max := 62 if q_ratio < 0.30 else (67 if q_ratio < 0.65 else 72)
 		var interval_sig := ""
 		for attempt in range(16):
-			_current_interval_id = _active_intervals[_rng.randi_range(0, _active_intervals.size() - 1)]
+			if weighted_pick != "" and attempt == 0:
+				_current_interval_id = weighted_pick
+			else:
+				_current_interval_id = _ask_pool[_rng.randi_range(0, _ask_pool.size() - 1)]
 			var semitone_options: Array = INTERVAL_DATA[_current_interval_id]["semitones"]
 			var semitones: int = int(semitone_options[_rng.randi_range(0, semitone_options.size() - 1)])
-			_current_root_midi = _rng.randi_range(52, 64)
+			_current_root_midi = _rng.randi_range(root_min, root_max)
 			_current_second_midi = _current_root_midi + semitones
 			_current_interval_id = _interval_id_for_semitones(_current_second_midi - _current_root_midi)
 			interval_sig = "%s:%d:%d" % [_current_interval_id, _current_root_midi, _current_second_midi]
@@ -15644,13 +19480,42 @@ func _generate_round() -> void:
 	elif _selected_mode == MODE_CHORD:
 		if _current_available_chord_types.is_empty():
 			_current_available_chord_types = _get_available_chord_types()
+		# When focus-missed mode is active, restrict chord pool to missed chord types
+		var _chord_ask_pool: Array[String] = _focus_missed_ids if not _focus_missed_ids.is_empty() else _current_available_chord_types
+		if _chord_ask_pool.is_empty():
+			_chord_ask_pool = _current_available_chord_types
+		# First question: start with the most recognisable chord for an easy opening win
+		if _question_index == 1 and _focus_missed_ids.is_empty():
+			var easy_chord_order := ["Major", "Minor", "Dom7", "Maj7", "Min7", "Dim"]
+			for easy_chord in easy_chord_order:
+				if easy_chord in _chord_ask_pool:
+					_current_chord_quality = easy_chord
+					_current_root_midi = 60  # Middle C — a familiar reference
+					_current_chord_inversion = 0
+					_current_chord_notes = _build_chord_notes(_current_root_midi, _current_chord_quality, 0)
+					_last_chord_signature = "%s:%d:%d" % [_current_chord_quality, _current_root_midi, _current_chord_inversion]
+					_current_chord_choices = _build_chord_choices(_current_chord_quality, _current_available_chord_types)
+					return
+		# Spaced repetition: weight towards previously missed chord qualities
+		var rq_chord = _review_queue_for_mode(MODE_CHORD)
+		var chord_weighted_pick := ""
+		if rq_chord != null and not _chord_ask_pool.is_empty():
+			chord_weighted_pick = str(rq_chord.pick_next(_chord_ask_pool))
 		var chord_sig := ""
 		for attempt in range(16):
-			_current_chord_quality = _current_available_chord_types[_rng.randi_range(0, _current_available_chord_types.size() - 1)]
+			if attempt == 0 and not chord_weighted_pick.is_empty():
+				_current_chord_quality = chord_weighted_pick
+			else:
+				_current_chord_quality = _chord_ask_pool[_rng.randi_range(0, _chord_ask_pool.size() - 1)]
 			_current_root_midi = _rng.randi_range(50, 60)
 			_current_chord_inversion = 0
-			# Keep Maj/Min group in root position so quality is unambiguous.
-			var allow_inversions := _selected_chord_group != 1
+			# Only allow inversions when user has chords beyond basic Foundations tier.
+			var _has_non_foundation := false
+			for _scn in _selected_chord_types:
+				if not CHORD_TIER_TRIADS.has(_scn):
+					_has_non_foundation = true
+					break
+			var allow_inversions := _has_non_foundation
 			if allow_inversions and _inversion_toggle != null and _inversion_toggle.button_pressed:
 				var max_inversion := mini(2, CHORD_INTERVALS[_current_chord_quality].size() - 1)
 				if max_inversion > 0:
@@ -15754,6 +19619,18 @@ func _play_current_prompt() -> void:
 		await _play_chord_sequence(cadence_chords, _cadence_tempo, "broken" if _cadence_broken else "block")
 		return
 	if _selected_mode == MODE_SIGHT:
+		if _sight_mode == "Chords":
+			var chord_notes := _current_sight_grand_staff_chord_midis()
+			if not chord_notes.is_empty():
+				await _play_chord_block_with_fade(chord_notes, SIGHT_GRAND_STAFF_REPLAY_DURATION, SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS)
+				return
+		elif _sight_mode == "Notes":
+			var sight_note_midi := _current_sight_note_prompt_midi()
+			if sight_note_midi >= 0:
+				var sight_note_len := clampf(_current_note_duration(), 0.18, 0.55)
+				await _play_note(sight_note_midi, sight_note_len)
+				await _push_silence(0.05)
+				return
 		await get_tree().create_timer(0.05).timeout
 		return
 
@@ -15806,22 +19683,42 @@ func _on_replay_pressed() -> void:
 
 
 func _on_round_start_pressed() -> void:
-	if not _quiz_active or _is_prompt_playing or not _awaiting_round_start:
-		return
-	_awaiting_round_start = false
-	_set_note_chase_overlay("", false)
-	if _round_start_button != null:
-		_round_start_button.visible = false
-		_round_start_button.disabled = true
-	if _selected_mode == MODE_NOTE_CHASE:
-		await _start_note_chase_round()
-		return
-	await _begin_next_question(_quiz_run_token)
+	await _ensure_session_controller().handle_round_start_pressed(self)
 
 
 func _maybe_play_powerup_on_streak() -> void:
 	if _streak > 0 and _streak % 3 == 0:
 		_play_powerup_sfx()
+	# Milestone celebrations: chicken reacts visually at key streaks
+	if _streak == 5:
+		_play_reaction_jump()
+		_show_streak_toast("%s  5 Streak!" % char(0x1F525))
+	elif _streak == 10:
+		_play_reaction_roll()
+		_show_streak_toast("%s%s  10 Streak!  Amazing!" % [char(0x1F525), char(0x1F525)])
+	elif _streak == 20:
+		_play_reaction_roll()
+		_speak_phrase("Bawk wow!")
+		_show_streak_toast("%s%s%s  20 STREAK!  LEGENDARY!" % [char(0x1F525), char(0x1F525), char(0x1F525)])
+	elif _streak > 20 and _streak % 10 == 0:
+		_show_streak_toast("%s  %d Streak!  Unstoppable!" % [char(0x1F525), _streak])
+
+
+func _show_streak_toast(msg: String) -> void:
+	if _streak_toast_label == null:
+		return
+	if _streak_toast_tween != null and is_instance_valid(_streak_toast_tween):
+		_streak_toast_tween.kill()
+	_streak_toast_label.text = msg
+	_streak_toast_label.visible = true
+	_streak_toast_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_streak_toast_label.scale = Vector2(0.7, 0.7)
+	_streak_toast_tween = create_tween()
+	_streak_toast_tween.set_parallel(true)
+	_streak_toast_tween.tween_property(_streak_toast_label, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_streak_toast_tween.tween_property(_streak_toast_label, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_streak_toast_tween.chain().tween_interval(1.4)
+	_streak_toast_tween.chain().tween_property(_streak_toast_label, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 
 
 func _on_chicken_combo_correct() -> bool:
@@ -15925,6 +19822,52 @@ func _play_chord_block(notes: Array[int], duration: float) -> void:
 	for p in _chord_players:
 		p.stop()
 	await _push_silence(0.14)
+
+
+func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_seconds: float) -> void:
+	if notes.is_empty():
+		return
+	var sample_map := _sample_map_for_current_mode()
+	if sample_map.is_empty() or _chord_players.size() < notes.size():
+		if _chord_players.size() < notes.size() and not _logged_chord_player_shortage:
+			push_warning("Chord player pool smaller than chord size; using fallback chord rendering.")
+			_logged_chord_player_shortage = true
+		for midi_note in notes:
+			await _play_note(midi_note, 0.08)
+		await get_tree().create_timer(maxf(0.04, duration)).timeout
+		await _push_silence(0.10)
+		return
+	var used_players: Array[AudioStreamPlayer] = []
+	# Piano-like dynamics: bass notes slightly louder, upper voices softer.
+	# Slight roll (stagger) between notes for a natural feel.
+	var base_vol_db := -6.0  # softer baseline than raw 0 dB
+	var roll_gap := 0.025  # 25ms stagger between notes for gentle rolled feel
+	for i in notes.size():
+		var midi_note := notes[i]
+		var nearest := _nearest_sample_cached(midi_note, sample_map)
+		var stream: AudioStream = sample_map[nearest]
+		var player: AudioStreamPlayer = _chord_players[i]
+		player.stop()
+		player.stream = stream
+		player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+		# Dynamic curve: bass (low MIDI) slightly louder, treble notes softer
+		var voice_ratio := float(i) / maxf(1.0, float(notes.size() - 1))
+		player.volume_db = base_vol_db - (voice_ratio * 3.5)  # top voice ~3.5 dB quieter
+		player.play()
+		used_players.append(player)
+		if i < notes.size() - 1:
+			await get_tree().create_timer(roll_gap).timeout
+	var fade := clampf(fade_seconds, 0.06, maxf(0.06, duration - 0.02))
+	var hold := maxf(0.02, duration - fade)
+	await get_tree().create_timer(hold).timeout
+	var fade_tween := create_tween()
+	for p in used_players:
+		fade_tween.parallel().tween_property(p, "volume_db", -42.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await fade_tween.finished
+	for p in used_players:
+		p.stop()
+		p.volume_db = 0.0
+	await _push_silence(0.10)
 
 
 func _play_chord_broken(notes: Array[int], duration: float) -> void:
@@ -16057,6 +20000,11 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 		var rq = _review_queue_for_mode(_selected_mode)
 		if rq != null:
 			rq.record_result(_current_theory_item_id, is_correct)
+	# Interval: record result in spaced-repetition queue
+	if _selected_mode == MODE_INTERVAL:
+		var rq_i = _review_queue_for_mode(MODE_INTERVAL)
+		if rq_i != null:
+			rq_i.record_result(_current_interval_id, is_correct)
 	var chosen_btn: Button = choice_btn
 	var correct_btn: Button = _get_button_for_interval(expected_choice)
 	if is_correct:
@@ -16064,7 +20012,10 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			_score += 1
 		_streak += 1
 		_maybe_play_powerup_on_streak()
-		_xp += 10 + mini(_streak, 10)
+		var xp_gain := 10 + mini(_streak, 10)
+		if _chicken_hint_used_this_turn:
+			xp_gain = maxi(1, xp_gain / 2)
+		_xp += xp_gain
 		_record_question_correct()
 		var granted_shield := _on_chicken_combo_correct()
 		var correct_text := _interval_display_name(expected_choice) if _selected_mode == MODE_INTERVAL else expected_choice
@@ -16077,7 +20028,8 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 		var shielded := _consume_chicken_shield_on_wrong()
 		if not shielded:
 			_streak = 0
-			_lives = maxi(0, _lives - 1)
+			if not _practice_mode_enabled:
+				_lives = maxi(0, _lives - 1)
 			_xp = maxi(0, _xp - 2)
 			var wrong_text := _interval_display_name(expected_choice) if _selected_mode == MODE_INTERVAL else expected_choice
 			_status_label.text = "Not quite. Correct answer: %s." % wrong_text
@@ -16090,37 +20042,62 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 
 	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
 	_refresh_meta_ui()
+	# Cadence Roman numeral display — shown after answer reveal
+	if _selected_mode == MODE_CADENCE and _cadence_roman_label != null and not _current_theory_item_id.is_empty():
+		var cdef: Dictionary = CADENCE_DEFS.get(_current_theory_item_id, {})
+		if not cdef.is_empty():
+			_cadence_roman_label.text = str(cdef.get("label", _current_theory_item_id))
+			_cadence_roman_label.visible = true
 
 	if is_correct and correct_btn != null:
 		await _feed_chicken_at_target(correct_btn)
 		await get_tree().create_timer(0.12).timeout
 		await _fly_bird_to_start()
 	else:
+		# Auto-show a teaching hint on wrong answer
+		var _auto_hint := ""
+		if _selected_mode == MODE_INTERVAL:
+			var _hint_topic := "interval:%s:subtle" % _current_interval_id
+			_auto_hint = _pick_topic_hint_line(_hint_topic, _interval_hint_lines(_current_interval_id, false))
+		elif _selected_mode in [MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE]:
+			pass  # theory modes — no auto-hint yet
+		if not _auto_hint.is_empty():
+			_status_label.text = "%s  %s" % [char(0x1F4A1), _auto_hint]
+			await get_tree().create_timer(2.0).timeout
+		_status_label.text = "%s  Listen again..." % char(0x1F3B5)
+		await get_tree().create_timer(0.35).timeout
+		var replay_name := _interval_display_name(expected_choice) if _selected_mode == MODE_INTERVAL else expected_choice
+		var _r_note := _midi_pitch_class_name(_current_root_midi) + str(_current_root_midi / 12 - 1)
+		var _t_note := _midi_pitch_class_name(_current_second_midi) + str(_current_second_midi / 12 - 1)
+		_status_label.text = "Correct: %s  (%s  \u2192  %s)" % [replay_name, _r_note, _t_note]
+		await _play_current_prompt()
+		await get_tree().create_timer(0.15).timeout
 		await _play_hungry_reaction()
+		# A/B compare bar — lets player replay their choice vs the correct interval
+		if _selected_mode == MODE_INTERVAL and not _qa_enabled:
+			var chosen_semitones: int = int(INTERVAL_DATA.get(choice_id, {"semitones": [0]})["semitones"][0])
+			_compare_chosen_root = _current_root_midi
+			_compare_chosen_second = _current_root_midi + chosen_semitones
+			if _compare_your_btn != null:
+				_compare_your_btn.text = "%s  Your answer: %s" % [char(0x25B6), _interval_display_name(choice_id)]
+			if _compare_correct_play_btn != null:
+				_compare_correct_play_btn.text = "%s  Correct: %s" % [char(0x2713), _interval_display_name(expected_choice)]
+			if _compare_bar != null:
+				_compare_bar.visible = true
 
-	if _lives <= 0:
-		_quiz_active = false
-		_accepting_answer = false
-		await _fly_bird_away_sad()
-		_set_answer_buttons_enabled(false)
-		_replay_button.disabled = true
-		_restart_button.disabled = false
-		_status_label.text = ""
-		_progress_label.text = _final_quiz_result_text(_score, _question_index, _xp)
-		if _sight_progress_track != null:
-			_sight_progress_track.visible = false
-			_set_sight_progress_ratio(0.0, false)
-		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
-		_home_info_label.text = _session_performance_summary()
-		await _play_gameover_fail_sfx()
-		if _selected_mode == MODE_SIGHT:
-			_set_sight_result_background_hidden(true)
-		_result_box_show("Game Over", "No lives left. Restart or Back.")
-		return
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
-	await get_tree().create_timer(_current_post_answer_delay()).timeout
-	if _should_advance_after_delay(quiz_token):
-		await _begin_next_question(quiz_token)
+
+func _on_compare_your_pressed() -> void:
+	var d := _current_note_duration()
+	var g := _current_gap_duration()
+	await _play_note(_compare_chosen_root, d)
+	await _push_silence(g)
+	await _play_note(_compare_chosen_second, d)
+
+
+func _on_compare_correct_pressed() -> void:
+	await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
 
 
 func _on_chord_chosen(choice_quality: String) -> void:
@@ -16138,23 +20115,38 @@ func _on_chord_chosen(choice_quality: String) -> void:
 	var is_correct := choice_quality == _current_chord_quality
 	var chosen_btn: Button = _chord_buttons.get(choice_quality, null)
 	var correct_btn: Button = _chord_buttons.get(_current_chord_quality, null)
+	# Spaced repetition: record result for this chord quality
+	var rq_c = _review_queue_for_mode(MODE_CHORD)
+	if rq_c != null:
+		rq_c.record_result(_current_chord_quality, is_correct)
+	# Rolling accuracy window for adaptive chord difficulty
+	_chord_recent_results.append(is_correct)
+	if _chord_recent_results.size() > 5:
+		_chord_recent_results.pop_front()
 	if is_correct:
 		_score += 1
 		_streak += 1
 		_maybe_play_powerup_on_streak()
-		_xp += 10 + mini(_streak, 10)
+		var xp_gain_c := 10 + mini(_streak, 10)
+		if _chicken_hint_used_this_turn:
+			xp_gain_c = maxi(1, xp_gain_c / 2)
+		_xp += xp_gain_c
 		_record_question_correct()
 		var granted_shield := _on_chicken_combo_correct()
-		_status_label.text = "Correct! It was %s." % _current_chord_quality
+		var inv_suffix := ""
+		if _current_chord_inversion > 0:
+			inv_suffix = "  \u2014 %s" % _inversion_name(_current_chord_inversion)
+		_status_label.text = "Correct! %s%s" % [_current_chord_quality, inv_suffix]
 		if granted_shield:
-			_status_label.text += " Chicken shield ready!"
+			_status_label.text += "  Chicken shield ready!"
 		await _blink_answer_feedback(null, correct_btn, 3)
 		await _play_success_sfx()
 	else:
 		var shielded := _consume_chicken_shield_on_wrong()
 		if not shielded:
 			_streak = 0
-			_lives = maxi(0, _lives - 1)
+			if not _practice_mode_enabled:
+				_lives = maxi(0, _lives - 1)
 			_xp = maxi(0, _xp - 2)
 			_status_label.text = "Not quite. Correct answer: %s." % _current_chord_quality
 		else:
@@ -16171,31 +20163,3470 @@ func _on_chord_chosen(choice_quality: String) -> void:
 		await get_tree().create_timer(0.12).timeout
 		await _fly_bird_to_start()
 	else:
+		# Auto-show a teaching hint on wrong chord answer
+		var _chord_auto_hint := _pick_topic_hint_line(
+			"ear_chord:%s:subtle" % _chord_family_id_from_name(_current_chord_quality),
+			_chord_hint_lines(_current_chord_quality, false))
+		if not _chord_auto_hint.is_empty():
+			_status_label.text = "%s  %s" % [char(0x1F4A1), _chord_auto_hint]
+			await get_tree().create_timer(2.0).timeout
+		_status_label.text = "%s  Listen again..." % char(0x1F3B5)
+		await get_tree().create_timer(0.35).timeout
+		var _cr_note := _midi_pitch_class_name(_current_root_midi) + str(_current_root_midi / 12 - 1)
+		_status_label.text = "Correct: %s  (root: %s)" % [_current_chord_quality, _cr_note]
+		await _play_current_prompt()
+		await get_tree().create_timer(0.15).timeout
 		await _play_hungry_reaction()
 
-	if _lives <= 0:
-		_quiz_active = false
-		_accepting_answer = false
-		await _fly_bird_away_sad()
-		_set_answer_buttons_enabled(false)
-		_replay_button.disabled = true
-		_restart_button.disabled = false
-		_status_label.text = ""
-		_progress_label.text = _final_quiz_result_text(_score, _question_index, _xp)
-		if _sight_progress_track != null:
-			_sight_progress_track.visible = false
-			_set_sight_progress_ratio(0.0, false)
-		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
-		_home_info_label.text = _session_performance_summary()
-		await _play_gameover_fail_sfx()
-		if _selected_mode == MODE_SIGHT:
-			_set_sight_result_background_hidden(true)
-		_result_box_show("Game Over", "No lives left. Restart or Back.")
-		return
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
-	await get_tree().create_timer(_current_post_answer_delay()).timeout
-	if _should_advance_after_delay(quiz_token):
-		await _begin_next_question(quiz_token)
+
+func _start_mic_listening() -> void:
+	if _pitch_detector == null and not _qa_enabled:
+		_pitch_detector = PitchDetectorScript.new()
+		_pitch_detector.setup(self)
+	if _pitch_detector == null or not _mic_mode_enabled:
+		return
+	_pitch_detector.start_listening()
+	_mic_listening = true
+	if _mic_status_label != null:
+		_mic_status_label.visible = true
+		_mic_status_label.text = "Mic: listening..."
+
+
+func _midi_platform_supported() -> bool:
+	return OS.get_name() in ["Windows", "Linux", "macOS", "Android"]
+
+
+func _score_font_name_to_index(name: String) -> int:
+	match name:
+		"Bravura": return 0
+		"Leland": return 1
+		"Petaluma": return 2
+	return 0
+
+
+func _score_font_index_to_name(idx: int) -> String:
+	match idx:
+		0: return "Bravura"
+		1: return "Leland"
+		2: return "Petaluma"
+	return "Bravura"
+
+
+func _on_score_font_changed(idx: int) -> void:
+	var name := _score_font_index_to_name(idx)
+	if name == _score_font_name:
+		return
+	_score_font_name = name
+	SMuFLFontScript.set_active_font(_score_font_name)
+	_save_ear_settings()
+	# Keep all instances of the dropdown in sync (we surface it in both Ear and Sight settings).
+	for opt in _score_font_options:
+		if opt != null and is_instance_valid(opt) and opt.selected != idx:
+			opt.set_block_signals(true)
+			opt.selected = idx
+			opt.set_block_signals(false)
+
+
+func _build_score_font_picker(parent: Control) -> void:
+	# Reusable music-notation-font dropdown. Add to any settings panel where it should appear.
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	parent.add_child(row)
+	var lbl := Label.new()
+	lbl.text = "Music Notation Font:"
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", Color(0.78, 0.92, 1.0, 0.92))
+	row.add_child(lbl)
+	var opt := OptionButton.new()
+	opt.add_item("Bravura  --  classic engraved", 0)
+	opt.add_item("Leland  --  modern clean (MuseScore 4)", 1)
+	opt.add_item("Petaluma  --  hand-drawn / jazz", 2)
+	opt.custom_minimum_size = Vector2(280, 36)
+	opt.selected = _score_font_name_to_index(_score_font_name)
+	opt.item_selected.connect(_on_score_font_changed)
+	row.add_child(opt)
+	_score_font_options.append(opt)
+
+
+func _on_midi_toggle_pressed(pressed: bool) -> void:
+	_midi_enabled = pressed
+	_save_ear_settings()
+	if _midi_enabled:
+		_open_midi_inputs_for_detection()
+	_refresh_midi_settings_ui()
+
+
+func _on_midi_any_octave_toggled(pressed: bool) -> void:
+	_midi_any_octave = pressed
+	_save_ear_settings()
+	_refresh_midi_settings_ui()
+
+
+func _open_midi_inputs_for_detection() -> void:
+	if _midi_inputs_open:
+		return
+	OS.open_midi_inputs()
+	_midi_inputs_open = true
+
+
+func _close_midi_inputs() -> void:
+	if not _midi_inputs_open:
+		return
+	OS.close_midi_inputs()
+	_midi_inputs_open = false
+	_midi_active = false
+
+
+func _midi_connected_device_summary() -> String:
+	var devices: PackedStringArray = OS.get_connected_midi_inputs()
+	if devices.is_empty():
+		return ""
+	var first := str(devices[0])
+	if devices.size() == 1:
+		return first
+	return "%s (+%d more)" % [first, devices.size() - 1]
+
+
+func _refresh_midi_settings_ui() -> void:
+	if _midi_toggle_button != null:
+		_midi_toggle_button.set_pressed_no_signal(_midi_enabled)
+	if _midi_any_octave_button != null:
+		_midi_any_octave_button.set_pressed_no_signal(_midi_any_octave)
+		_midi_any_octave_button.disabled = not _midi_enabled
+	if _midi_status_label == null:
+		return
+	if not _midi_enabled:
+		_midi_status_label.text = "MIDI input is off."
+		return
+	var was_open := _midi_inputs_open
+	if not was_open:
+		OS.open_midi_inputs()
+	var summary := _midi_connected_device_summary()
+	if not was_open:
+		OS.close_midi_inputs()
+	if summary.is_empty():
+		_midi_status_label.text = "No MIDI device detected — connect a USB MIDI keyboard."
+	else:
+		_midi_status_label.text = "MIDI Keyboard Connected: %s" % summary
+
+
+func _midi_supported_for_mode() -> bool:
+	if _chord_explorer_active:
+		return true
+	if _learning_lesson_player != null and is_instance_valid(_learning_lesson_player) and _learning_lesson_player.visible:
+		return true
+	if _selected_mode == MODE_SIGHT:
+		return _sight_mode == "Notes" or _sight_mode == "Chords"
+	if _selected_mode == MODE_NOTE_CHASE:
+		return true
+	return false
+
+
+func _start_midi_listening() -> void:
+	if not _midi_enabled:
+		return
+	if not _midi_supported_for_mode():
+		return
+	_open_midi_inputs_for_detection()
+	_midi_active = true
+	if _midi_piano_viz != null:
+		_midi_piano_viz_clear_all()
+		# Show the small read-only viz ONLY in Sight Chords mode. In other modes
+		# (Sight Notes uses the big piano; Note Chase / Lesson Player have no
+		# piano viz) it stays hidden.
+		_midi_piano_viz.visible = (_selected_mode == MODE_SIGHT and _sight_mode == "Chords")
+	if _midi_status_label != null and _midi_status_label.is_inside_tree():
+		var summary := _midi_connected_device_summary()
+		if summary.is_empty():
+			_midi_status_label.text = "MIDI on — no device detected."
+		else:
+			_midi_status_label.text = "MIDI listening: %s" % summary
+
+
+func _stop_midi_listening() -> void:
+	_midi_active = false
+	_close_midi_inputs()
+	_midi_chord_buffer.clear()
+	_midi_chord_window_start = -1.0
+	if _midi_piano_viz != null:
+		_midi_piano_viz.visible = false
+		_midi_piano_viz_clear_all()
+	if _midi_status_label != null and _midi_status_label.is_inside_tree():
+		_refresh_midi_settings_ui()
+
+
+func _midi_pitch_to_note_name(pitch: int) -> String:
+	# Returns sharp-form letter+accidental (e.g. "C", "F#"). No octave.
+	var sharps := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+	var pc := ((pitch % 12) + 12) % 12
+	return sharps[pc]
+
+
+const MIDI_PIANO_VIZ_LOW := 48   # C3
+const MIDI_PIANO_VIZ_HIGH := 83  # B5
+const MIDI_PIANO_VIZ_WHITE_W := 30.0
+const MIDI_PIANO_VIZ_WHITE_H := 92.0
+const MIDI_PIANO_VIZ_BLACK_W := 19.0
+const MIDI_PIANO_VIZ_BLACK_H := 58.0
+const MIDI_PIANO_VIZ_FRAME_PAD := 10.0
+const MIDI_PIANO_VIZ_BOTTOM_MARGIN := 14.0
+const MIDI_PIANO_VIZ_MAX_HOLD_SEC := 1.2  # auto-release if no note-off arrives
+
+
+func _midi_pitch_is_black(pitch: int) -> bool:
+	var pc := ((pitch % 12) + 12) % 12
+	return pc in [1, 3, 6, 8, 10]
+
+
+func _midi_pitch_white_index_within_octave(pitch: int) -> int:
+	# Returns 0..6 for C,D,E,F,G,A,B; -1 for black keys.
+	var pc := ((pitch % 12) + 12) % 12
+	match pc:
+		0: return 0
+		2: return 1
+		4: return 2
+		5: return 3
+		7: return 4
+		9: return 5
+		11: return 6
+		_: return -1
+
+
+func _build_midi_piano_viz() -> void:
+	_midi_piano_viz = Control.new()
+	_midi_piano_viz.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_midi_piano_viz.visible = false
+	_midi_piano_viz.z_as_relative = false
+	_midi_piano_viz.z_index = 270
+	add_child(_midi_piano_viz)
+
+	var num_octaves := int((MIDI_PIANO_VIZ_HIGH - MIDI_PIANO_VIZ_LOW + 1) / 12)
+	var total_whites := num_octaves * 7
+	var keys_w := total_whites * MIDI_PIANO_VIZ_WHITE_W
+	var keys_h := MIDI_PIANO_VIZ_WHITE_H
+	var frame_w := keys_w + MIDI_PIANO_VIZ_FRAME_PAD * 2.0
+	var frame_h := keys_h + MIDI_PIANO_VIZ_FRAME_PAD * 2.0 + 6.0  # extra for top reveal strip
+
+	# Anchor bottom-center, sitting at the very bottom with a small margin so it stays clear of the staff/question area.
+	_midi_piano_viz.anchor_left = 0.5
+	_midi_piano_viz.anchor_right = 0.5
+	_midi_piano_viz.anchor_top = 1.0
+	_midi_piano_viz.anchor_bottom = 1.0
+	_midi_piano_viz.offset_left = -frame_w * 0.5
+	_midi_piano_viz.offset_right = frame_w * 0.5
+	_midi_piano_viz.offset_top = -frame_h - MIDI_PIANO_VIZ_BOTTOM_MARGIN
+	_midi_piano_viz.offset_bottom = -MIDI_PIANO_VIZ_BOTTOM_MARGIN
+	_midi_piano_viz.custom_minimum_size = Vector2(frame_w, frame_h)
+
+	# Wood-grain style frame around the keys.
+	var frame_panel := Panel.new()
+	frame_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0.12, 0.10, 0.09, 0.96)
+	frame_style.border_width_left = 2
+	frame_style.border_width_right = 2
+	frame_style.border_width_top = 2
+	frame_style.border_width_bottom = 2
+	frame_style.border_color = Color(0.32, 0.22, 0.16, 1.0)
+	frame_style.corner_radius_top_left = 10
+	frame_style.corner_radius_top_right = 10
+	frame_style.corner_radius_bottom_left = 10
+	frame_style.corner_radius_bottom_right = 10
+	frame_style.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	frame_style.shadow_size = 8
+	frame_style.shadow_offset = Vector2(0, 4)
+	frame_panel.add_theme_stylebox_override("panel", frame_style)
+	frame_panel.position = Vector2.ZERO
+	frame_panel.size = Vector2(frame_w, frame_h)
+	_midi_piano_viz.add_child(frame_panel)
+
+	# Felt strip just above the keys (the red felt of a real piano).
+	var felt := Panel.new()
+	felt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var felt_style := StyleBoxFlat.new()
+	felt_style.bg_color = Color(0.55, 0.10, 0.12, 1.0)
+	felt_style.border_width_top = 0
+	felt_style.border_width_bottom = 0
+	felt.add_theme_stylebox_override("panel", felt_style)
+	felt.position = Vector2(MIDI_PIANO_VIZ_FRAME_PAD, MIDI_PIANO_VIZ_FRAME_PAD)
+	felt.size = Vector2(keys_w, 4)
+	_midi_piano_viz.add_child(felt)
+
+	# Container that holds the actual keys, positioned inside the frame.
+	var keys_root := Control.new()
+	keys_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	keys_root.position = Vector2(MIDI_PIANO_VIZ_FRAME_PAD, MIDI_PIANO_VIZ_FRAME_PAD + 6)
+	keys_root.size = Vector2(keys_w, keys_h)
+	_midi_piano_viz.add_child(keys_root)
+
+	var white_style := StyleBoxFlat.new()
+	white_style.bg_color = Color(0.985, 0.985, 0.975, 1.0)
+	white_style.border_width_left = 1
+	white_style.border_width_right = 1
+	white_style.border_width_top = 0
+	white_style.border_width_bottom = 2
+	white_style.border_color = Color(0.62, 0.60, 0.58, 1.0)
+	white_style.corner_radius_bottom_left = 5
+	white_style.corner_radius_bottom_right = 5
+	white_style.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
+	white_style.shadow_size = 2
+	white_style.shadow_offset = Vector2(0, 2)
+
+	var black_style := StyleBoxFlat.new()
+	black_style.bg_color = Color(0.08, 0.09, 0.11, 1.0)
+	black_style.border_width_left = 1
+	black_style.border_width_right = 1
+	black_style.border_width_top = 1
+	black_style.border_width_bottom = 3
+	black_style.border_color = Color(0.02, 0.02, 0.04, 1.0)
+	black_style.corner_radius_bottom_left = 4
+	black_style.corner_radius_bottom_right = 4
+	black_style.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
+	black_style.shadow_size = 3
+	black_style.shadow_offset = Vector2(0, 2)
+
+	var white_x := 0.0
+	var white_positions: Dictionary = {}
+	for pitch in range(MIDI_PIANO_VIZ_LOW, MIDI_PIANO_VIZ_HIGH + 1):
+		if _midi_pitch_is_black(pitch):
+			continue
+		var w_key := Panel.new()
+		w_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		w_key.add_theme_stylebox_override("panel", white_style)
+		w_key.position = Vector2(white_x, 0)
+		w_key.size = Vector2(MIDI_PIANO_VIZ_WHITE_W, MIDI_PIANO_VIZ_WHITE_H)
+		w_key.set_meta("base_pos", w_key.position)
+		w_key.set_meta("is_black", false)
+		keys_root.add_child(w_key)
+		_midi_piano_viz_keys[pitch] = w_key
+		white_positions[pitch] = white_x
+		var pc := ((pitch % 12) + 12) % 12
+		if pc == 0:
+			var lbl := Label.new()
+			lbl.text = "C%d" % int(pitch / 12 - 1)
+			lbl.add_theme_font_size_override("font_size", 11)
+			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.38, 0.92))
+			lbl.position = Vector2(3, MIDI_PIANO_VIZ_WHITE_H - 18)
+			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			w_key.add_child(lbl)
+		white_x += MIDI_PIANO_VIZ_WHITE_W
+
+	for pitch in range(MIDI_PIANO_VIZ_LOW, MIDI_PIANO_VIZ_HIGH + 1):
+		if not _midi_pitch_is_black(pitch):
+			continue
+		var prev_white := pitch - 1
+		if not white_positions.has(prev_white):
+			continue
+		var b_key := Panel.new()
+		b_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b_key.add_theme_stylebox_override("panel", black_style)
+		var bx: float = float(white_positions[prev_white]) + MIDI_PIANO_VIZ_WHITE_W - MIDI_PIANO_VIZ_BLACK_W * 0.5
+		b_key.position = Vector2(bx, 0)
+		b_key.size = Vector2(MIDI_PIANO_VIZ_BLACK_W, MIDI_PIANO_VIZ_BLACK_H)
+		b_key.set_meta("base_pos", b_key.position)
+		b_key.set_meta("is_black", true)
+		keys_root.add_child(b_key)
+		_midi_piano_viz_keys[pitch] = b_key
+
+
+func _midi_piano_viz_lit_color(pitch: int) -> Color:
+	if _midi_pitch_is_black(pitch):
+		return Color(0.32, 0.78, 1.0, 1.0)
+	return Color(0.55, 0.88, 1.0, 1.0)
+
+
+func _midi_piano_viz_apply_press_offset(panel: Panel, pressed: bool) -> void:
+	var base: Vector2 = panel.get_meta("base_pos", panel.position)
+	if pressed:
+		panel.position = base + Vector2(0, 2)
+	else:
+		panel.position = base
+
+
+# ============================================================================
+# Phase 1: Student picker overlay + practice lockout
+# ============================================================================
+
+func _build_student_picker_overlay() -> void:
+	_student_picker_overlay = PanelContainer.new()
+	_student_picker_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_student_picker_overlay.visible = false
+	_student_picker_overlay.z_as_relative = false
+	_student_picker_overlay.z_index = 600
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.04, 0.08, 0.14, 0.92)
+	_student_picker_overlay.add_theme_stylebox_override("panel", bg)
+	add_child(_student_picker_overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	_student_picker_overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(520, 0)
+	var card_sb := StyleBoxFlat.new()
+	card_sb.bg_color = Color(0.10, 0.16, 0.26, 0.98)
+	card_sb.border_color = MENU_PRIMARY_ACCENT
+	card_sb.border_width_left = 2
+	card_sb.border_width_right = 2
+	card_sb.border_width_top = 2
+	card_sb.border_width_bottom = 2
+	card_sb.corner_radius_top_left = 14
+	card_sb.corner_radius_top_right = 14
+	card_sb.corner_radius_bottom_left = 14
+	card_sb.corner_radius_bottom_right = 14
+	card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	card_sb.shadow_size = 14
+	card.add_theme_stylebox_override("panel", card_sb)
+	center.add_child(card)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	card.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Pick a student to begin"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_title_font != null:
+		title.add_theme_font_override("font", _ui_title_font)
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	vbox.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "Scores from this session will be attributed to the student you pick.\nUse Practice Mode for demos you don't want recorded."
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if _ui_font != null:
+		hint.add_theme_font_override("font", _ui_font)
+	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_color_override("font_color", Color(0.74, 0.86, 0.98, 0.82))
+	vbox.add_child(hint)
+
+	# Scrollable roster list
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 280)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+	_student_picker_list_vbox = VBoxContainer.new()
+	_student_picker_list_vbox.add_theme_constant_override("separation", 6)
+	_student_picker_list_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_student_picker_list_vbox)
+
+	# Bottom action row — Cancel only when there's already an active student
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 10)
+	vbox.add_child(actions)
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.custom_minimum_size = Vector2(120, 36)
+	cancel_btn.pressed.connect(_on_student_picker_cancel)
+	actions.add_child(cancel_btn)
+
+
+func _show_student_picker(after_select: Callable = Callable()) -> void:
+	if _student_picker_overlay == null:
+		return
+	_student_picker_after_select = after_select
+	_populate_student_picker_list()
+	_student_picker_overlay.visible = true
+	_student_picker_overlay.move_to_front()
+
+
+func _hide_student_picker() -> void:
+	if _student_picker_overlay != null:
+		_student_picker_overlay.visible = false
+	_student_picker_after_select = Callable()
+
+
+func _populate_student_picker_list() -> void:
+	if _student_picker_list_vbox == null:
+		return
+	for child in _student_picker_list_vbox.get_children():
+		child.queue_free()
+	var store := _ensure_teacher_store()
+	var students: Array = store.get_data().get("students", [])
+	# Sort: reserved (Teacher, Practice) first, then alphabetical by name
+	students.sort_custom(func(a, b):
+		var ra := bool((a as Dictionary).get("reserved", false))
+		var rb := bool((b as Dictionary).get("reserved", false))
+		if ra != rb:
+			return ra
+		return str((a as Dictionary).get("name", "")).to_lower() < str((b as Dictionary).get("name", "")).to_lower()
+	)
+	var current_id: String = _active_student.get_active_id() if _active_student != null else ""
+	for s_any in students:
+		if typeof(s_any) != TYPE_DICTIONARY:
+			continue
+		var s: Dictionary = s_any
+		var sid: String = str(s.get("id", ""))
+		if sid == "":
+			continue
+		var btn := Button.new()
+		var marker: String = " ✓" if sid == current_id else ""
+		var label_extra: String = ""
+		if sid == ActiveStudentScript.RESERVED_ID_PRACTICE:
+			label_extra = "    (no data recorded)"
+		elif sid == ActiveStudentScript.RESERVED_ID_TEACHER:
+			label_extra = "    (demo / test)"
+		btn.text = "%s%s%s" % [str(s.get("name", sid)), label_extra, marker]
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.custom_minimum_size = Vector2(0, 44)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if _ui_font != null:
+			btn.add_theme_font_override("font", _ui_font)
+		btn.add_theme_font_size_override("font_size", 16)
+		var captured_id: String = sid
+		btn.pressed.connect(func(): _on_student_picker_select(captured_id))
+		_student_picker_list_vbox.add_child(btn)
+
+
+func _on_student_picker_select(student_id: String) -> void:
+	if _active_student == null:
+		_active_student = ActiveStudentScript.new()
+	# Persist progress for the OUTGOING student before switching.
+	if _active_student.has_active_student():
+		_save_progress_data()
+	_active_student.set_active_id(student_id)
+	# Reload progress for the INCOMING student so the dashboard/practice screens
+	# reflect their data.
+	_load_progress_data()
+	_route_learning_progress_to_active_student()  # Phase 2b
+	_refresh_active_student_chip()
+	_hide_student_picker()
+	if _student_picker_after_select.is_valid():
+		var cb := _student_picker_after_select
+		_student_picker_after_select = Callable()
+		cb.call()
+
+
+func _on_student_picker_cancel() -> void:
+	# Always allow Cancel — user goes back to home without starting a session.
+	# Next time they tap Start Round, they'll be prompted again.
+	_hide_student_picker()
+
+
+# Persistent chip showing active student, with tap-to-switch.
+func _build_active_student_chip() -> void:
+	if not IS_TEACHER_EDITION:
+		return  # Student Edition has no concept of active student
+	_active_student_chip = PanelContainer.new()
+	_active_student_chip.anchor_left = 1.0
+	_active_student_chip.anchor_right = 1.0
+	_active_student_chip.anchor_top = 0.0
+	_active_student_chip.anchor_bottom = 0.0
+	_active_student_chip.offset_left = -240
+	_active_student_chip.offset_right = -16
+	# Sit BELOW the 96-px header card so we don't collide with the right-side nav
+	# cluster (back/home/gear). Top-right of the game area is empty space across
+	# every in-game mode, so the chip lives there cleanly without overlap.
+	_active_student_chip.offset_top = 104
+	_active_student_chip.offset_bottom = 144
+	_active_student_chip.z_as_relative = false
+	_active_student_chip.z_index = 350  # above most UI, below modal picker (z=600)
+	_active_student_chip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_active_student_chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_active_student_chip.visible = false
+	add_child(_active_student_chip)
+
+	# Click overlay covering the whole chip
+	var click_btn := Button.new()
+	click_btn.set_anchors_preset(PRESET_FULL_RECT)
+	click_btn.flat = true
+	click_btn.modulate = Color(1, 1, 1, 0)
+	click_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	click_btn.pressed.connect(func(): _show_student_picker())
+	_active_student_chip.add_child(click_btn)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	_active_student_chip.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(row)
+
+	var icon := Label.new()
+	icon.text = "👤"
+	icon.add_theme_font_size_override("font_size", 18)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+
+	_active_student_chip_label = Label.new()
+	_active_student_chip_label.text = "—"
+	if _ui_title_font != null:
+		_active_student_chip_label.add_theme_font_override("font", _ui_title_font)
+	_active_student_chip_label.add_theme_font_size_override("font_size", 14)
+	_active_student_chip_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	_active_student_chip_label.clip_text = true
+	_active_student_chip_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_active_student_chip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_active_student_chip_label)
+
+	var switch_icon := Label.new()
+	switch_icon.text = "▾"
+	switch_icon.add_theme_font_size_override("font_size", 12)
+	switch_icon.add_theme_color_override("font_color", Color(0.78, 0.88, 0.96, 0.78))
+	switch_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(switch_icon)
+
+	# Lesson Session row — sits BELOW the chip, anchored to the same right edge.
+	_lesson_session_button = Button.new()
+	_lesson_session_button.text = "▶ Start Lesson"
+	_lesson_session_button.anchor_left = 1.0
+	_lesson_session_button.anchor_right = 1.0
+	_lesson_session_button.anchor_top = 0.0
+	_lesson_session_button.anchor_bottom = 0.0
+	_lesson_session_button.offset_left = -240
+	_lesson_session_button.offset_right = -16
+	_lesson_session_button.offset_top = 150
+	_lesson_session_button.offset_bottom = 180
+	_lesson_session_button.z_as_relative = false
+	_lesson_session_button.z_index = 350
+	_lesson_session_button.visible = false
+	_lesson_session_button.pressed.connect(_on_lesson_session_button_pressed)
+	add_child(_lesson_session_button)
+
+	_lesson_session_elapsed_label = Label.new()
+	_lesson_session_elapsed_label.text = ""
+	_lesson_session_elapsed_label.anchor_left = 1.0
+	_lesson_session_elapsed_label.anchor_right = 1.0
+	_lesson_session_elapsed_label.anchor_top = 0.0
+	_lesson_session_elapsed_label.anchor_bottom = 0.0
+	_lesson_session_elapsed_label.offset_left = -240
+	_lesson_session_elapsed_label.offset_right = -16
+	_lesson_session_elapsed_label.offset_top = 184
+	_lesson_session_elapsed_label.offset_bottom = 204
+	_lesson_session_elapsed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_lesson_session_elapsed_label.z_as_relative = false
+	_lesson_session_elapsed_label.z_index = 350
+	_lesson_session_elapsed_label.add_theme_font_size_override("font_size", 11)
+	_lesson_session_elapsed_label.add_theme_color_override("font_color", Color(0.78, 0.88, 0.96, 0.85))
+	_lesson_session_elapsed_label.visible = false
+	add_child(_lesson_session_elapsed_label)
+
+	_lesson_session_elapsed_timer = Timer.new()
+	_lesson_session_elapsed_timer.wait_time = 1.0
+	_lesson_session_elapsed_timer.one_shot = false
+	_lesson_session_elapsed_timer.timeout.connect(_refresh_lesson_elapsed)
+	add_child(_lesson_session_elapsed_timer)
+
+	_refresh_active_student_chip()
+
+
+# Updates the chip's label + color based on current active student. Call any
+# time the active-student state changes (set/switch) or visibility state changes.
+func _refresh_active_student_chip() -> void:
+	if _active_student_chip == null or _active_student_chip_label == null:
+		return
+	if not IS_TEACHER_EDITION:
+		_active_student_chip.visible = false
+		return
+	# Hide while the teacher dashboard is open (it has its own student management).
+	if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
+		_active_student_chip.visible = false
+		return
+	_active_student_chip.visible = true
+	var name_text: String = "(pick a student)"
+	var color: Color = MENU_TITLE_TEXT
+	var bg: Color = Color(0.10, 0.16, 0.26, 0.92)
+	var border: Color = MENU_PRIMARY_ACCENT
+	if _active_student != null and _active_student.has_active_student():
+		var sid: String = _active_student.get_active_id()
+		var sname: String = _student_display_name_by_id(sid)
+		name_text = sname
+		if sid == ActiveStudentScript.RESERVED_ID_PRACTICE:
+			name_text = "%s (Practice Mode)" % sname
+			bg = Color(0.32, 0.18, 0.08, 0.92)
+			border = Color(0.96, 0.78, 0.42, 1.0)
+			color = Color(1.0, 0.92, 0.74, 1.0)
+		elif sid == ActiveStudentScript.RESERVED_ID_TEACHER:
+			border = Color(0.62, 0.86, 0.96, 1.0)
+	_active_student_chip_label.text = name_text
+	_active_student_chip_label.add_theme_color_override("font_color", color)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 10
+	sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10
+	sb.corner_radius_bottom_right = 10
+	sb.shadow_color = Color(0, 0, 0, 0.35)
+	sb.shadow_size = 4
+	sb.shadow_offset = Vector2(0, 2)
+	_active_student_chip.add_theme_stylebox_override("panel", sb)
+	_refresh_lesson_session_button()
+
+
+# Updates the Start/End Lesson button visibility + label based on whether a
+# session is currently active. Hidden in: Practice Mode (no attribution), no
+# active student, dashboard open, or Student Edition.
+func _refresh_lesson_session_button() -> void:
+	if _lesson_session_button == null:
+		return
+	if not IS_TEACHER_EDITION:
+		_lesson_session_button.visible = false
+		_lesson_session_elapsed_label.visible = false
+		return
+	var dashboard_open: bool = _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible
+	if dashboard_open:
+		_lesson_session_button.visible = false
+		_lesson_session_elapsed_label.visible = false
+		return
+	if _active_student == null or not _active_student.has_active_student():
+		_lesson_session_button.visible = false
+		_lesson_session_elapsed_label.visible = false
+		return
+	if _active_student.is_practice_mode():
+		# Practice Mode is the no-attribution sandbox — lesson recording is meaningless here.
+		_lesson_session_button.visible = false
+		_lesson_session_elapsed_label.visible = false
+		return
+	var active: bool = _lesson_session != null and _lesson_session.is_session_active()
+	_lesson_session_button.visible = true
+	if active:
+		_lesson_session_button.text = "■ End Lesson"
+		_lesson_session_button.add_theme_color_override("font_color", Color(1.0, 0.78, 0.32, 1.0))
+		_lesson_session_elapsed_label.visible = true
+		_refresh_lesson_elapsed()
+		if _lesson_session_elapsed_timer != null and _lesson_session_elapsed_timer.is_stopped():
+			_lesson_session_elapsed_timer.start()
+	else:
+		_lesson_session_button.text = "▶ Start Lesson"
+		_lesson_session_button.add_theme_color_override("font_color", Color(0.62, 0.86, 0.96, 1.0))
+		_lesson_session_elapsed_label.visible = false
+		if _lesson_session_elapsed_timer != null and not _lesson_session_elapsed_timer.is_stopped():
+			_lesson_session_elapsed_timer.stop()
+
+
+func _refresh_lesson_elapsed() -> void:
+	if _lesson_session == null or not _lesson_session.is_session_active():
+		return
+	if _lesson_session_elapsed_label == null:
+		return
+	var secs: int = _lesson_session.get_elapsed_seconds()
+	var mm: int = int(secs / 60)
+	var ss: int = secs % 60
+	var n_act: int = _lesson_session.get_current_activity_count()
+	_lesson_session_elapsed_label.text = "%d:%02d  •  %d round%s recorded" % [mm, ss, n_act, "" if n_act == 1 else "s"]
+
+
+func _on_lesson_session_button_pressed() -> void:
+	if _active_student == null or not _active_student.has_active_student():
+		return
+	if _lesson_session == null:
+		_lesson_session = LessonSessionScript.new()
+	if _lesson_session.is_session_active():
+		# End-of-lesson flow — auto-prompt to create a lesson log entry.
+		var finished: Dictionary = _lesson_session.end_session()
+		_refresh_lesson_session_button()
+		_show_end_of_lesson_dialog(finished)
+	else:
+		_lesson_session.start_session(_active_student.get_active_id())
+		_refresh_lesson_session_button()
+
+
+# True when a lesson session is currently being recorded against the active
+# student. Practice Mode never records — its very purpose is no-attribution.
+func _is_lesson_session_recording() -> bool:
+	if not IS_TEACHER_EDITION:
+		return false
+	if _lesson_session == null or not _lesson_session.is_session_active():
+		return false
+	if _active_student != null and _active_student.is_practice_mode():
+		return false
+	return true
+
+
+# Begin recording one activity on the currently-active lesson session. Safe to
+# call from every quiz entry point — no-op when no session is active or when
+# Practice Mode is on.
+func _lesson_session_record_activity_start() -> void:
+	if not _is_lesson_session_recording():
+		return
+	var sub: String = ""
+	if _selected_mode == MODE_SIGHT:
+		sub = _sight_mode
+	_lesson_session.begin_activity(_teacher_mode_label(_selected_mode), sub)
+	_refresh_lesson_elapsed()
+
+
+# Finalise the current activity with score + total. Safe no-op when no session
+# or activity is open. Called from both win and loss end paths.
+func _lesson_session_record_activity_end(score: int, total: int) -> void:
+	if _lesson_session == null or not _lesson_session.is_session_active():
+		return
+	_lesson_session.end_activity(score, total)
+	_refresh_lesson_elapsed()
+
+
+# Shown after End Lesson is pressed. Pre-fills a lesson-log entry from the
+# session's recorded activities so the teacher can confirm with one click.
+func _show_end_of_lesson_dialog(finished: Dictionary) -> void:
+	if finished.is_empty():
+		return
+	var sid: String = str(finished.get("student_id", ""))
+	if sid == "":
+		return
+	var activities: Array = finished.get("activities", [])
+	var duration_sec: int = int(finished.get("duration_sec", 0))
+	var mm: int = duration_sec / 60
+	var ss: int = duration_sec % 60
+	var summary_line: String = LessonSessionScript.summarize_activities(finished)
+	var auto_summary: String = ""
+	if activities.is_empty():
+		auto_summary = "Lesson session %d:%02d — no rounds recorded." % [mm, ss]
+	else:
+		auto_summary = "Lesson session %d:%02d  •  %d activit%s\n%s" % [
+			mm, ss, activities.size(), "y" if activities.size() == 1 else "ies", summary_line
+		]
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "End of Lesson — %s" % _student_display_name_by_id(sid)
+	dlg.dialog_text = "Save a lesson log entry from this session?\n\n" + auto_summary
+	dlg.ok_button_text = "Save log entry"
+	dlg.get_cancel_button().text = "Skip"
+	# Third action — printable summary the teacher can email parents. Browser
+	# prints to PDF, so we avoid bundling a PDF engine in the Godot build.
+	dlg.add_button("Save Printable Summary", true, "print_summary")
+	add_child(dlg)
+	# Build entry on confirm; keep the session JSON regardless of choice.
+	var session_date: String = str(finished.get("started_at", "")).substr(0, 10)
+	if session_date == "":
+		session_date = Time.get_date_string_from_system()
+	var entry := {
+		"date": session_date,
+		"summary": auto_summary,
+		"practice_note": "",
+		"next_focus": "",
+		"auto_from_session": true,
+		"session_id": str(finished.get("id", "")),
+	}
+	dlg.confirmed.connect(func() -> void:
+		var store := _ensure_teacher_store()
+		var result: Dictionary = store.add_lesson_log_entry(sid, entry)
+		if bool(result.get("updated", false)):
+			_teacher_data = store.get_data()
+			_save_teacher_data()
+			if _teacher_selected_student_id == sid:
+				var student_any: Variant = result.get("student", {})
+				if typeof(student_any) == TYPE_DICTIONARY:
+					_teacher_update_dashboard(student_any as Dictionary)
+			_refresh_teacher_students_list()
+	)
+	dlg.canceled.connect(func() -> void:
+		pass
+	)
+	dlg.custom_action.connect(func(action: String) -> void:
+		if action == "print_summary":
+			_save_printable_lesson_summary(sid, finished)
+	)
+	dlg.close_requested.connect(func() -> void:
+		dlg.queue_free()
+	)
+	dlg.popup_centered(Vector2(560, 300))
+
+
+# Write a self-contained HTML lesson summary the teacher can open in any browser
+# and Print → Save as PDF. Inline CSS only (no external assets) so the file
+# travels cleanly via email.
+func _save_printable_lesson_summary(sid: String, finished: Dictionary) -> void:
+	var student_name: String = _student_display_name_by_id(sid)
+	var safe_name: String = student_name.replace(" ", "_").replace("/", "_")
+	var ts: Dictionary = Time.get_datetime_dict_from_system()
+	var date_tag: String = "%04d%02d%02d_%02d%02d" % [int(ts["year"]), int(ts["month"]), int(ts["day"]), int(ts["hour"]), int(ts["minute"])]
+	var rel: String = "clefira_lesson_%s_%s.html" % [safe_name, date_tag]
+	var path: String = "user://%s" % rel
+	var html: String = _build_lesson_summary_html(student_name, finished)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		_show_import_result(false, "Could not write the summary file:\n%s" % ProjectSettings.globalize_path(path))
+		return
+	f.store_string(html)
+	f.close()
+	var abs_path: String = ProjectSettings.globalize_path(path)
+	var dlg := AcceptDialog.new()
+	dlg.title = "Printable Summary Saved"
+	dlg.dialog_text = "Saved to:\n%s\n\nOpen this file in any browser, then Print → Save as PDF to email parents." % abs_path
+	add_child(dlg)
+	dlg.close_requested.connect(func() -> void:
+		dlg.queue_free()
+	)
+	dlg.popup_centered(Vector2(640, 240))
+
+
+func _build_lesson_summary_html(student_name: String, finished: Dictionary) -> String:
+	var activities: Array = finished.get("activities", [])
+	var duration_sec: int = int(finished.get("duration_sec", 0))
+	var mm: int = duration_sec / 60
+	var ss: int = duration_sec % 60
+	var started_at: String = str(finished.get("started_at", ""))
+	var lines: Array[String] = []
+	lines.append("<!DOCTYPE html>")
+	lines.append("<html lang=\"en\"><head><meta charset=\"utf-8\">")
+	lines.append("<title>Clefira Lesson Summary — %s</title>" % _html_escape(student_name))
+	lines.append("<style>")
+	lines.append("body{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1d2733;margin:32px;line-height:1.45;}")
+	lines.append("h1{font-size:24px;margin:0 0 4px;color:#2a4566;}")
+	lines.append("h2{font-size:16px;margin:24px 0 8px;color:#2a4566;border-bottom:1px solid #cfd9e6;padding-bottom:4px;}")
+	lines.append(".meta{color:#566778;font-size:13px;margin-bottom:18px;}")
+	lines.append(".pill{display:inline-block;background:#eaf3ff;color:#1a4e8a;border-radius:999px;padding:3px 10px;font-size:12px;margin-right:6px;}")
+	lines.append("table{border-collapse:collapse;width:100%;margin-top:6px;}")
+	lines.append("th,td{text-align:left;border-bottom:1px solid #e4ebf3;padding:6px 8px;font-size:13px;}")
+	lines.append("th{background:#f4f7fb;color:#3d5775;font-weight:600;}")
+	lines.append("footer{margin-top:32px;color:#8896a8;font-size:11px;text-align:center;}")
+	lines.append("@media print{body{margin:18mm;} h1{font-size:20px;} h2{font-size:14px;}}")
+	lines.append("</style></head><body>")
+	lines.append("<h1>Clefira Lesson Summary</h1>")
+	lines.append("<div class=\"meta\">")
+	lines.append("<span class=\"pill\">Student: %s</span>" % _html_escape(student_name))
+	lines.append("<span class=\"pill\">Date: %s</span>" % _html_escape(started_at))
+	lines.append("<span class=\"pill\">Duration: %d:%02d</span>" % [mm, ss])
+	lines.append("<span class=\"pill\">Rounds: %d</span>" % activities.size())
+	lines.append("</div>")
+	lines.append("<h2>Activities</h2>")
+	if activities.is_empty():
+		lines.append("<p>No rounds were recorded during this session.</p>")
+	else:
+		lines.append("<table><thead><tr><th>#</th><th>Mode</th><th>Sub-mode</th><th>Score</th><th>Duration</th></tr></thead><tbody>")
+		for i in range(activities.size()):
+			var act_any: Variant = activities[i]
+			if typeof(act_any) != TYPE_DICTIONARY:
+				continue
+			var act: Dictionary = act_any
+			var mode: String = str(act.get("mode", ""))
+			var sub: String = str(act.get("sub_mode", ""))
+			var score: int = int(act.get("score", 0))
+			var total: int = int(act.get("total", 0))
+			var dsec: int = int(act.get("duration_sec", 0))
+			var dmm: int = dsec / 60
+			var dss: int = dsec % 60
+			var score_text: String = "%d / %d" % [score, total] if total > 0 else "—"
+			lines.append("<tr><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%d:%02d</td></tr>" % [
+				i + 1, _html_escape(mode), _html_escape(sub), _html_escape(score_text), dmm, dss
+			])
+		lines.append("</tbody></table>")
+	# Optional teacher notes line — pulled from the session dict if set later.
+	var notes: String = str(finished.get("notes", "")).strip_edges()
+	if not notes.is_empty():
+		lines.append("<h2>Teacher Notes</h2>")
+		lines.append("<p>%s</p>" % _html_escape(notes))
+	lines.append("<footer>Generated by Clefira %s — %s</footer>" % [
+		APP_VERSION_LABEL, _html_escape(Time.get_datetime_string_from_system())
+	])
+	lines.append("</body></html>")
+	return "\n".join(lines)
+
+
+func _html_escape(s: String) -> String:
+	return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
+
+
+# Phase 5: one-time profile prompt (Student Edition). Also reusable as an
+# "Edit Profile" entry from Settings — passing edit_mode=true forces a fresh
+# build with current values pre-filled and bypasses the first-run gate.
+func _show_profile_prompt(edit_mode: bool = false) -> void:
+	if not edit_mode and _player_profile_seen:
+		return
+	# Edit mode always rebuilds so pre-filled values stay in sync with the latest
+	# saved profile (e.g. user opened Edit, cancelled, saved different name elsewhere,
+	# then re-opened — we don't want stale captured-by-value lambda inputs).
+	if edit_mode and _profile_prompt_overlay != null and is_instance_valid(_profile_prompt_overlay):
+		_profile_prompt_overlay.queue_free()
+		_profile_prompt_overlay = null
+	if _profile_prompt_overlay == null:
+		_build_profile_prompt_overlay(edit_mode)
+	if _profile_prompt_overlay == null:
+		return
+	_profile_prompt_overlay.visible = true
+	_profile_prompt_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+
+
+func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
+	_profile_prompt_overlay = ColorRect.new()
+	_profile_prompt_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_profile_prompt_overlay.color = Color(0.0, 0.0, 0.0, 0.62)
+	_profile_prompt_overlay.visible = false
+	_profile_prompt_overlay.z_as_relative = false
+	_profile_prompt_overlay.z_index = 680
+	add_child(_profile_prompt_overlay)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	_profile_prompt_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(520, 0)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.12, 0.20, 0.97)
+	sb.border_color = Color(0.42, 0.78, 1.0, 0.85)
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 4
+	sb.corner_radius_top_left = 18
+	sb.corner_radius_top_right = 18
+	sb.corner_radius_bottom_left = 18
+	sb.corner_radius_bottom_right = 18
+	sb.shadow_color = Color(0, 0, 0, 0.55)
+	sb.shadow_size = 16
+	sb.content_margin_left = 28
+	sb.content_margin_right = 28
+	sb.content_margin_top = 22
+	sb.content_margin_bottom = 22
+	panel.add_theme_stylebox_override("panel", sb)
+	center.add_child(panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	panel.add_child(col)
+	var title := Label.new()
+	title.text = "Edit Your Profile" if edit_mode else "Welcome to Clefira!"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
+	if _ui_title_font != null:
+		title.add_theme_font_override("font", _ui_title_font)
+	col.add_child(title)
+	var body := Label.new()
+	if edit_mode:
+		body.text = "Update your name or level. Changes apply right away."
+	else:
+		body.text = "Tell us a bit about you so we can personalise the home screen.\nYou can skip this and set it later in Settings."
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_theme_font_size_override("font_size", 14)
+	body.add_theme_color_override("font_color", Color(0.86, 0.92, 0.99, 0.92))
+	if _ui_font != null:
+		body.add_theme_font_override("font", _ui_font)
+	col.add_child(body)
+	# Name row
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 10)
+	col.add_child(name_row)
+	var name_label := Label.new()
+	name_label.text = "Your name"
+	name_label.custom_minimum_size = Vector2(96, 0)
+	name_label.add_theme_color_override("font_color", Color(0.82, 0.90, 0.98, 1.0))
+	name_row.add_child(name_label)
+	var name_input := LineEdit.new()
+	name_input.placeholder_text = "e.g. Maya"
+	name_input.max_length = 24
+	name_input.custom_minimum_size = Vector2(280, 36)
+	name_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_input.text = _player_name  # empty on first run; current name in edit mode
+	name_row.add_child(name_input)
+	# Level row — three radio-style buttons in a group
+	var level_row := HBoxContainer.new()
+	level_row.add_theme_constant_override("separation", 10)
+	col.add_child(level_row)
+	var level_label := Label.new()
+	level_label.text = "Level"
+	level_label.custom_minimum_size = Vector2(96, 0)
+	level_label.add_theme_color_override("font_color", Color(0.82, 0.90, 0.98, 1.0))
+	level_row.add_child(level_label)
+	var level_group := ButtonGroup.new()
+	var chosen_level: Array = [_player_level]  # pre-fills with current value if any
+	for lvl in ["Beginner", "Intermediate", "Advanced"]:
+		var b := Button.new()
+		b.text = lvl
+		b.toggle_mode = true
+		b.button_group = level_group
+		b.custom_minimum_size = Vector2(112, 36)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style_button(b)
+		if lvl == _player_level:
+			b.button_pressed = true
+		b.toggled.connect(func(pressed: bool) -> void:
+			if pressed:
+				chosen_level[0] = b.text
+		)
+		level_row.add_child(b)
+	# Action row
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_END
+	actions.add_theme_constant_override("separation", 12)
+	col.add_child(actions)
+	var skip_btn := Button.new()
+	skip_btn.text = "Cancel" if edit_mode else "Skip"
+	skip_btn.custom_minimum_size = Vector2(120, 44)
+	_style_button(skip_btn)
+	actions.add_child(skip_btn)
+	var save_btn := Button.new()
+	save_btn.text = "Save" if edit_mode else "Save & Start"
+	save_btn.custom_minimum_size = Vector2(180, 44)
+	_style_button(save_btn)
+	actions.add_child(save_btn)
+	skip_btn.pressed.connect(func() -> void:
+		_player_profile_seen = true
+		_save_ear_settings()
+		_profile_prompt_overlay.visible = false
+		_profile_prompt_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	)
+	save_btn.pressed.connect(func() -> void:
+		_player_name = name_input.text.strip_edges().substr(0, 24)
+		_player_level = str(chosen_level[0])
+		_player_profile_seen = true
+		_save_ear_settings()
+		_profile_prompt_overlay.visible = false
+		_profile_prompt_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_refresh_game_title()
+	)
+
+
+func _student_display_name_by_id(student_id: String) -> String:
+	if _teacher_store == null:
+		return student_id
+	for s in _teacher_store.get_data().get("students", []):
+		if typeof(s) != TYPE_DICTIONARY:
+			continue
+		if str((s as Dictionary).get("id", "")) == student_id:
+			return str((s as Dictionary).get("name", student_id))
+	return student_id
+
+
+# Practice-lockout check. Called before entering any practice/exercise mode.
+# Returns true if practice may proceed; false if we showed the picker instead.
+func _ensure_active_student_for_practice() -> bool:
+	if not IS_TEACHER_EDITION:
+		return true  # Student Edition has no concept of active-student gating
+	if _active_student == null:
+		_active_student = ActiveStudentScript.new()
+	if _active_student.has_active_student():
+		return true
+	# No active student — show picker. Caller's pending action is lost (user
+	# explicitly chose a student then can re-tap whatever they wanted).
+	_show_student_picker()
+	return false
+
+
+func _build_sight_round_start_card() -> void:
+	# Floating "Tap Start Round when you're ready" prompt — sits above the staff/menu
+	# layer so it doesn't shift those down when it appears between rounds.
+	_sight_round_start_card = PanelContainer.new()
+	_sight_round_start_card.anchor_left = 0.5
+	_sight_round_start_card.anchor_right = 0.5
+	_sight_round_start_card.anchor_top = 0.5
+	_sight_round_start_card.anchor_bottom = 0.5
+	_sight_round_start_card.offset_left = -180
+	_sight_round_start_card.offset_right = 180
+	_sight_round_start_card.offset_top = -70
+	_sight_round_start_card.offset_bottom = 70
+	_sight_round_start_card.visible = false
+	_sight_round_start_card.z_as_relative = false
+	_sight_round_start_card.z_index = 320  # above sight_answer_overlay (260) and piano viz (270)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.10, 0.16, 0.26, 0.97)
+	sb.border_color = MENU_PRIMARY_ACCENT
+	sb.border_width_left = 2
+	sb.border_width_right = 2
+	sb.border_width_top = 2
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 14
+	sb.corner_radius_top_right = 14
+	sb.corner_radius_bottom_left = 14
+	sb.corner_radius_bottom_right = 14
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	sb.shadow_size = 12
+	sb.shadow_offset = Vector2(0, 4)
+	_sight_round_start_card.add_theme_stylebox_override("panel", sb)
+	add_child(_sight_round_start_card)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 16)
+	_sight_round_start_card.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	_sight_round_start_label = Label.new()
+	_sight_round_start_label.text = "Tap Start Round when you're ready"
+	_sight_round_start_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_title_font != null:
+		_sight_round_start_label.add_theme_font_override("font", _ui_title_font)
+	_sight_round_start_label.add_theme_font_size_override("font_size", 18)
+	_sight_round_start_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	vbox.add_child(_sight_round_start_label)
+
+	_sight_round_start_overlay_button = Button.new()
+	_sight_round_start_overlay_button.text = "▶ Start Round"
+	_sight_round_start_overlay_button.custom_minimum_size = Vector2(180, 48)
+	if _ui_title_font != null:
+		_sight_round_start_overlay_button.add_theme_font_override("font", _ui_title_font)
+	_sight_round_start_overlay_button.add_theme_font_size_override("font_size", 18)
+	_sight_round_start_overlay_button.add_theme_color_override("font_color", Color(0.10, 0.12, 0.16, 1.0))
+	var btn_sb := StyleBoxFlat.new()
+	btn_sb.bg_color = MENU_PRIMARY_ACCENT
+	btn_sb.border_color = Color(MENU_PRIMARY_ACCENT.r * 0.65, MENU_PRIMARY_ACCENT.g * 0.65, MENU_PRIMARY_ACCENT.b * 0.65, 1.0)
+	btn_sb.border_width_bottom = 3
+	btn_sb.corner_radius_top_left = 10
+	btn_sb.corner_radius_top_right = 10
+	btn_sb.corner_radius_bottom_left = 10
+	btn_sb.corner_radius_bottom_right = 10
+	_sight_round_start_overlay_button.add_theme_stylebox_override("normal", btn_sb)
+	var hover_sb := btn_sb.duplicate()
+	(hover_sb as StyleBoxFlat).bg_color = MENU_PRIMARY_ACCENT.lightened(0.08)
+	_sight_round_start_overlay_button.add_theme_stylebox_override("hover", hover_sb)
+	_sight_round_start_overlay_button.pressed.connect(_on_round_start_pressed)
+	vbox.add_child(_sight_round_start_overlay_button)
+
+
+func _refresh_sight_round_start_overlay() -> void:
+	if _sight_round_start_card == null:
+		return
+	var show: bool = _selected_mode == MODE_SIGHT and _awaiting_round_start
+	_sight_round_start_card.visible = show
+
+
+const SIGHT_BIG_PIANO_LOW := 48   # C3
+const SIGHT_BIG_PIANO_HIGH := 83  # B5
+const SIGHT_BIG_PIANO_WHITE_H := 138.0  # fixed height (user request: don't change height)
+const SIGHT_BIG_PIANO_BLACK_H := 86.0   # fixed height
+const SIGHT_BIG_PIANO_FRAME_PAD := 10.0
+const SIGHT_BIG_PIANO_WIDTH_PCT := 0.90  # piano takes 90% of viewport width
+const SIGHT_BIG_PIANO_BLACK_RATIO := 0.65  # black key width as fraction of white key width
+
+
+func _build_sight_big_piano() -> void:
+	# Big interactive piano for Sight Reading. Click any key → answers that pitch's
+	# note name (routes through the existing _on_sight_key_chosen handler). Lives in
+	# _sight_answer_overlay (z=260) so it's overlaid on top of the staff area without
+	# affecting layout. Width adapts to 90% of viewport on layout/resize.
+	if _sight_answer_overlay == null:
+		return
+	_sight_big_piano = Control.new()
+	_sight_big_piano.mouse_filter = Control.MOUSE_FILTER_PASS
+	_sight_big_piano.visible = false
+	_sight_big_piano.anchor_left = 0.5
+	_sight_big_piano.anchor_right = 0.5
+	_sight_big_piano.anchor_top = 1.0
+	_sight_big_piano.anchor_bottom = 1.0
+	_sight_answer_overlay.add_child(_sight_big_piano)
+
+	# Build structural pieces — sizes set in _layout_sight_big_piano().
+	_sight_big_piano_frame = Panel.new()
+	_sight_big_piano_frame.mouse_filter = Control.MOUSE_FILTER_PASS
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0.10, 0.08, 0.07, 0.96)
+	frame_style.border_color = Color(0.30, 0.20, 0.14, 1.0)
+	frame_style.border_width_left = 2
+	frame_style.border_width_right = 2
+	frame_style.border_width_top = 2
+	frame_style.border_width_bottom = 2
+	frame_style.corner_radius_top_left = 12
+	frame_style.corner_radius_top_right = 12
+	frame_style.corner_radius_bottom_left = 12
+	frame_style.corner_radius_bottom_right = 12
+	frame_style.shadow_color = Color(0.0, 0.0, 0.0, 0.50)
+	frame_style.shadow_size = 8
+	frame_style.shadow_offset = Vector2(0, 4)
+	_sight_big_piano_frame.add_theme_stylebox_override("panel", frame_style)
+	_sight_big_piano.add_child(_sight_big_piano_frame)
+
+	_sight_big_piano_felt = Panel.new()
+	_sight_big_piano_felt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var felt_style := StyleBoxFlat.new()
+	felt_style.bg_color = Color(0.55, 0.10, 0.12, 1.0)
+	_sight_big_piano_felt.add_theme_stylebox_override("panel", felt_style)
+	_sight_big_piano_frame.add_child(_sight_big_piano_felt)
+
+	_sight_big_piano_keys_root = Control.new()
+	_sight_big_piano_keys_root.mouse_filter = Control.MOUSE_FILTER_PASS
+	_sight_big_piano_frame.add_child(_sight_big_piano_keys_root)
+
+	# Create one Button per pitch — positions/sizes filled in by layout function.
+	for pitch in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
+		var btn := Button.new()
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.text = ""
+		var captured := pitch
+		btn.pressed.connect(func(): _on_sight_big_piano_key_pressed(captured))
+		var is_black: bool = _ce_pitch_is_black(pitch)
+		if is_black:
+			btn.z_index = 1
+			_chord_explorer_apply_black_style(btn, Color.WHITE)
+		else:
+			_chord_explorer_apply_white_style(btn, Color.WHITE)
+		_sight_big_piano_keys_root.add_child(btn)
+		_sight_big_piano_keys[pitch] = btn
+		# C-octave label — positioned later, but added now as a child of the white-C buttons.
+		var pc := ((pitch % 12) + 12) % 12
+		if pc == 0 and not is_black:
+			var lbl := Label.new()
+			lbl.text = "C%d" % int(pitch / 12 - 1)
+			lbl.add_theme_font_size_override("font_size", 12)
+			if _ui_font != null:
+				lbl.add_theme_font_override("font", _ui_font)
+			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.40, 0.92))
+			lbl.position = Vector2(3, SIGHT_BIG_PIANO_WHITE_H - 20)
+			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			btn.add_child(lbl)
+
+	_layout_sight_big_piano()
+
+	# Auto-relayout on viewport size changes (window resize on desktop, rotation on tablet/phone).
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_layout_sight_big_piano):
+		vp.size_changed.connect(_layout_sight_big_piano)
+
+
+# Recomputes piano width = 90% of viewport, then repositions all keys.
+# Heights stay fixed (user request). Black-key width scales with white-key width.
+func _layout_sight_big_piano() -> void:
+	if _sight_big_piano == null or _sight_big_piano_frame == null:
+		return
+	var vp := get_viewport()
+	var screen_w: float = vp.get_visible_rect().size.x if vp != null else 1366.0
+	var target_total_w: float = screen_w * SIGHT_BIG_PIANO_WIDTH_PCT
+	# Count white keys to derive per-key width
+	var num_whites: int = 0
+	for p in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
+		if not _ce_pitch_is_black(p):
+			num_whites += 1
+	if num_whites <= 0:
+		return
+	var pad: float = SIGHT_BIG_PIANO_FRAME_PAD
+	var keys_w_avail: float = maxf(num_whites * 8.0, target_total_w - pad * 2.0)
+	var white_w: float = keys_w_avail / float(num_whites)
+	var black_w: float = white_w * SIGHT_BIG_PIANO_BLACK_RATIO
+	var white_h: float = SIGHT_BIG_PIANO_WHITE_H
+	var black_h: float = SIGHT_BIG_PIANO_BLACK_H
+	var keys_w: float = float(num_whites) * white_w
+	var frame_w: float = keys_w + pad * 2.0
+	var frame_h: float = white_h + pad * 2.0 + 6.0
+
+	# Outer piano control: centered + sized to frame
+	_sight_big_piano.offset_left = -frame_w * 0.5
+	_sight_big_piano.offset_right = frame_w * 0.5
+	_sight_big_piano.offset_top = -frame_h - 4.0
+	_sight_big_piano.offset_bottom = -4.0
+	_sight_big_piano.custom_minimum_size = Vector2(frame_w, frame_h)
+
+	# Frame + felt + keys_root sizes/positions
+	_sight_big_piano_frame.position = Vector2.ZERO
+	_sight_big_piano_frame.size = Vector2(frame_w, frame_h)
+	if _sight_big_piano_felt != null:
+		_sight_big_piano_felt.position = Vector2(pad, pad)
+		_sight_big_piano_felt.size = Vector2(keys_w, 4)
+	_sight_big_piano_keys_root.position = Vector2(pad, pad + 6)
+	_sight_big_piano_keys_root.size = Vector2(keys_w, white_h)
+
+	# White keys first (need their positions to anchor black keys)
+	var white_x: float = 0.0
+	var white_positions: Dictionary = {}
+	for pitch in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
+		if _ce_pitch_is_black(pitch):
+			continue
+		var btn = _sight_big_piano_keys.get(pitch)
+		if btn != null:
+			btn.position = Vector2(white_x, 0)
+			btn.size = Vector2(white_w, white_h)
+		white_positions[pitch] = white_x
+		white_x += white_w
+
+	# Black keys positioned between adjacent whites
+	for pitch in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
+		if not _ce_pitch_is_black(pitch):
+			continue
+		var prev_white := pitch - 1
+		if not white_positions.has(prev_white):
+			continue
+		var btn = _sight_big_piano_keys.get(pitch)
+		if btn != null:
+			var bx: float = float(white_positions[prev_white]) + white_w - black_w * 0.5
+			btn.position = Vector2(bx, 0)
+			btn.size = Vector2(black_w, black_h)
+
+
+func _on_sight_big_piano_key_pressed(pitch: int) -> void:
+	# Route the click through the same path MIDI input uses — keeps Any Octave /
+	# Exact Octave + enharmonic handling all in one place.
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
+		return
+	if not _quiz_active or not _accepting_answer:
+		return
+	var note_name: String = _midi_pitch_to_note_name(pitch)
+	if note_name.is_empty():
+		return
+	var routed: String = _match_mic_note_to_sight(note_name)
+	if routed.is_empty():
+		return
+	_on_sight_key_chosen(routed)
+
+
+func _sight_big_piano_light(pitch: int, on: bool) -> void:
+	# Mirror the old _midi_piano_viz lighting on the new big piano so MIDI key
+	# presses give visual feedback (gold tint + slight downward shift like a
+	# real piano key being pressed).
+	if _sight_big_piano == null:
+		return
+	var btn = _sight_big_piano_keys.get(pitch)
+	if btn == null:
+		return
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	if on:
+		btn.modulate = Color(1.0, 0.82, 0.32, 1.0)  # warm gold tint
+		_sight_big_piano_lit_until[pitch] = -1.0  # held until note-off or auto-release
+		_sight_big_piano_pressed_at[pitch] = now
+	else:
+		# Schedule a short fade-out window so quick releases still feel intentional.
+		_sight_big_piano_lit_until[pitch] = now + 0.18
+		_sight_big_piano_pressed_at.erase(pitch)
+
+
+func _sight_big_piano_tick(_delta: float) -> void:
+	# Per-frame auto-release: handles fade-out + "stuck on" safety when virtual MIDI
+	# sources fail to send note-off (common with browser-based MIDI like muted.io).
+	if _sight_big_piano == null or _sight_big_piano_lit_until.is_empty():
+		return
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	var to_clear: Array[int] = []
+	for pitch_key in _sight_big_piano_lit_until.keys():
+		var pitch: int = int(pitch_key)
+		var until: float = float(_sight_big_piano_lit_until[pitch])
+		var btn = _sight_big_piano_keys.get(pitch)
+		if btn == null:
+			to_clear.append(pitch)
+			continue
+		if until < 0.0:
+			# Held — force release if pressed too long ago without a note-off.
+			var pressed_at: float = float(_sight_big_piano_pressed_at.get(pitch, now))
+			if now - pressed_at >= SIGHT_BIG_PIANO_MAX_HOLD_SEC:
+				_sight_big_piano_lit_until[pitch] = now + 0.18
+				_sight_big_piano_pressed_at.erase(pitch)
+			continue
+		if now >= until:
+			btn.modulate = Color.WHITE
+			to_clear.append(pitch)
+	for p in to_clear:
+		_sight_big_piano_lit_until.erase(p)
+
+
+func _refresh_sight_big_piano_visibility() -> void:
+	if _sight_big_piano == null:
+		return
+	# Show during Sight Notes rounds (gameplay phase, not awaiting-round-start).
+	var show: bool = (
+		_selected_mode == MODE_SIGHT
+		and _sight_mode == "Notes"
+		and _quiz_active
+		and not _awaiting_round_start
+		and _game_panel != null and _game_panel.visible
+	)
+	_sight_big_piano.visible = show
+
+
+func _midi_piano_viz_light(pitch: int, on: bool) -> void:
+	if _midi_piano_viz == null:
+		return
+	var panel: Panel = _midi_piano_viz_keys.get(pitch, null) as Panel
+	if panel == null:
+		return
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if on:
+		panel.modulate = _midi_piano_viz_lit_color(pitch)
+		_midi_piano_viz_apply_press_offset(panel, true)
+		_midi_piano_viz_lit_until[pitch] = -1.0  # held until note-off or auto-release
+		_midi_piano_viz_pressed_at[pitch] = now
+	else:
+		_midi_piano_viz_lit_until[pitch] = now + 0.35
+		_midi_piano_viz_pressed_at.erase(pitch)
+
+
+func _midi_piano_viz_tick(_delta: float) -> void:
+	if _midi_piano_viz == null or _midi_piano_viz_lit_until.is_empty():
+		return
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	var to_clear: Array[int] = []
+	for pitch_key in _midi_piano_viz_lit_until.keys():
+		var pitch := int(pitch_key)
+		var until: float = float(_midi_piano_viz_lit_until[pitch])
+		var panel: Panel = _midi_piano_viz_keys.get(pitch, null) as Panel
+		if panel == null:
+			to_clear.append(pitch)
+			continue
+		if until < 0.0:
+			# Held — force release if note-off never arrived.
+			var pressed_at: float = float(_midi_piano_viz_pressed_at.get(pitch, now))
+			if now - pressed_at >= MIDI_PIANO_VIZ_MAX_HOLD_SEC:
+				_midi_piano_viz_lit_until[pitch] = now + 0.35
+				_midi_piano_viz_pressed_at.erase(pitch)
+			continue
+		if now >= until:
+			panel.modulate = Color.WHITE
+			_midi_piano_viz_apply_press_offset(panel, false)
+			to_clear.append(pitch)
+		else:
+			var t := clampf((until - now) / 0.35, 0.0, 1.0)
+			panel.modulate = Color.WHITE.lerp(_midi_piano_viz_lit_color(pitch), t)
+			_midi_piano_viz_apply_press_offset(panel, t > 0.5)
+	for p in to_clear:
+		_midi_piano_viz_lit_until.erase(p)
+
+
+func _midi_piano_viz_clear_all() -> void:
+	if _midi_piano_viz == null:
+		return
+	for k in _midi_piano_viz_keys.keys():
+		var panel: Panel = _midi_piano_viz_keys[k] as Panel
+		if panel != null:
+			panel.modulate = Color.WHITE
+			_midi_piano_viz_apply_press_offset(panel, false)
+	_midi_piano_viz_lit_until.clear()
+	_midi_piano_viz_pressed_at.clear()
+
+
+# ============================================================================
+# Chord Explorer
+# ============================================================================
+
+const CHORD_EXPLORER_KEY_OPTIONS := [
+	["C", 0], ["G", 7], ["D", 2], ["A", 9], ["E", 4], ["B", 11], ["F#", 6],
+	["F", 5], ["Bb", 10], ["Eb", 3], ["Ab", 8], ["Db", 1], ["Gb", 6],
+]
+
+
+func _build_chord_explorer_panel() -> void:
+	_chord_explorer_panel = PanelContainer.new()
+	_chord_explorer_panel.set_anchors_preset(PRESET_FULL_RECT)
+	_chord_explorer_panel.visible = false
+	_chord_explorer_panel.z_as_relative = false
+	_chord_explorer_panel.z_index = 200
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.06, 0.11, 0.19, 1.0)
+	_chord_explorer_panel.add_theme_stylebox_override("panel", panel_style)
+	add_child(_chord_explorer_panel)
+
+	var root_vbox := VBoxContainer.new()
+	root_vbox.add_theme_constant_override("separation", 18)
+	var root_margin := MarginContainer.new()
+	root_margin.add_theme_constant_override("margin_left", 22)
+	root_margin.add_theme_constant_override("margin_right", 22)
+	root_margin.add_theme_constant_override("margin_top", 22)
+	root_margin.add_theme_constant_override("margin_bottom", 18)
+	_chord_explorer_panel.add_child(root_margin)
+	root_margin.add_child(root_vbox)
+
+	# Top bar: Back | Title | Key selector
+	var top_bar := HBoxContainer.new()
+	top_bar.add_theme_constant_override("separation", 16)
+	root_vbox.add_child(top_bar)
+
+	_chord_explorer_back_button = Button.new()
+	_chord_explorer_back_button.text = "← Home"
+	_chord_explorer_back_button.custom_minimum_size = Vector2(120, 42)
+	if _ui_title_font != null:
+		_chord_explorer_back_button.add_theme_font_override("font", _ui_title_font)
+	_chord_explorer_back_button.add_theme_font_size_override("font_size", 16)
+	_chord_explorer_back_button.pressed.connect(_on_chord_explorer_close)
+	top_bar.add_child(_chord_explorer_back_button)
+
+	var title_label := Label.new()
+	title_label.text = "Chord Explorer"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if _ui_title_font != null:
+		title_label.add_theme_font_override("font", _ui_title_font)
+	title_label.add_theme_font_size_override("font_size", 28)
+	title_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	top_bar.add_child(title_label)
+
+	var key_row := HBoxContainer.new()
+	key_row.add_theme_constant_override("separation", 8)
+	top_bar.add_child(key_row)
+
+	var key_label := Label.new()
+	key_label.text = "Key:"
+	if _ui_font != null:
+		key_label.add_theme_font_override("font", _ui_font)
+	key_label.add_theme_font_size_override("font_size", 16)
+	key_label.add_theme_color_override("font_color", Color(0.72, 0.84, 0.96, 0.92))
+	key_row.add_child(key_label)
+
+	_chord_explorer_key_option = OptionButton.new()
+	_chord_explorer_key_option.custom_minimum_size = Vector2(96, 38)
+	for opt in CHORD_EXPLORER_KEY_OPTIONS:
+		_chord_explorer_key_option.add_item(str(opt[0]))
+	_chord_explorer_key_option.selected = 0
+	_chord_explorer_key_option.item_selected.connect(_on_chord_explorer_key_changed)
+	key_row.add_child(_chord_explorer_key_option)
+
+	_chord_explorer_minor_check = CheckButton.new()
+	_chord_explorer_minor_check.text = "Minor"
+	_chord_explorer_minor_check.toggled.connect(_on_chord_explorer_minor_toggled)
+	key_row.add_child(_chord_explorer_minor_check)
+	# Music Notation Font picker — global setting, surfaced here next to the key controls.
+	_build_score_font_picker(key_row)
+	# Clear button now lives next to the keyboard for quicker access — see _build_chord_explorer_keyboard.
+
+	# Hint line
+	_chord_explorer_help_label = Label.new()
+	_chord_explorer_help_label.text = "Play notes together OR one at a time as an arpeggio — the system will collect them into a chord. The bar shows how long until the next note starts a fresh chord."
+	_chord_explorer_help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_chord_explorer_help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if _ui_font != null:
+		_chord_explorer_help_label.add_theme_font_override("font", _ui_font)
+	_chord_explorer_help_label.add_theme_font_size_override("font_size", 13)
+	_chord_explorer_help_label.add_theme_color_override("font_color", Color(0.74, 0.86, 0.98, 0.78))
+	root_vbox.add_child(_chord_explorer_help_label)
+
+	# Staff area (centered)
+	var staff_wrap := PanelContainer.new()
+	staff_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	staff_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var staff_wrap_style := StyleBoxFlat.new()
+	staff_wrap_style.bg_color = Color(0.99, 0.98, 0.95, 0.96)
+	staff_wrap_style.corner_radius_top_left = 14
+	staff_wrap_style.corner_radius_top_right = 14
+	staff_wrap_style.corner_radius_bottom_left = 14
+	staff_wrap_style.corner_radius_bottom_right = 14
+	staff_wrap_style.shadow_color = Color(0.0, 0.0, 0.0, 0.32)
+	staff_wrap_style.shadow_size = 8
+	staff_wrap.add_theme_stylebox_override("panel", staff_wrap_style)
+	root_vbox.add_child(staff_wrap)
+
+	_chord_explorer_staff_area = StaffRendererScript.new()
+	_chord_explorer_staff_area.custom_minimum_size = Vector2(720, 240)
+	_chord_explorer_staff_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_chord_explorer_staff_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_chord_explorer_staff_area.set("draw_paper", true)
+	_chord_explorer_staff_area.set("cluster_mode", true)
+	_chord_explorer_staff_area.set("inter_staff_gap_spaces", 5.0)
+	staff_wrap.add_child(_chord_explorer_staff_area)
+
+	# Chord display (the main visual reward) — wrapped in an HBox so it stays centered and capped in width.
+	var name_wrap := HBoxContainer.new()
+	name_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	name_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	root_vbox.add_child(name_wrap)
+	var name_panel := PanelContainer.new()
+	name_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	name_panel.custom_minimum_size = Vector2(560, 0)
+	var name_panel_style := StyleBoxFlat.new()
+	name_panel_style.bg_color = Color(0.10, 0.16, 0.26, 0.96)
+	name_panel_style.border_color = MENU_PRIMARY_ACCENT
+	name_panel_style.border_width_left = 2
+	name_panel_style.border_width_right = 2
+	name_panel_style.border_width_top = 2
+	name_panel_style.border_width_bottom = 2
+	name_panel_style.corner_radius_top_left = 12
+	name_panel_style.corner_radius_top_right = 12
+	name_panel_style.corner_radius_bottom_left = 12
+	name_panel_style.corner_radius_bottom_right = 12
+	name_panel.add_theme_stylebox_override("panel", name_panel_style)
+	name_wrap.add_child(name_panel)
+
+	var name_inner := VBoxContainer.new()
+	name_inner.alignment = BoxContainer.ALIGNMENT_CENTER
+	name_inner.add_theme_constant_override("separation", 4)
+	var name_margin := MarginContainer.new()
+	name_margin.add_theme_constant_override("margin_left", 18)
+	name_margin.add_theme_constant_override("margin_right", 18)
+	name_margin.add_theme_constant_override("margin_top", 14)
+	name_margin.add_theme_constant_override("margin_bottom", 14)
+	name_panel.add_child(name_margin)
+	name_margin.add_child(name_inner)
+
+	_chord_explorer_window_bar = ProgressBar.new()
+	_chord_explorer_window_bar.show_percentage = false
+	_chord_explorer_window_bar.min_value = 0.0
+	_chord_explorer_window_bar.max_value = 1.0
+	_chord_explorer_window_bar.value = 0.0
+	_chord_explorer_window_bar.custom_minimum_size = Vector2(180, 4)
+	_chord_explorer_window_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_chord_explorer_window_bar.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(1.0, 1.0, 1.0, 0.10)
+	bar_bg.corner_radius_top_left = 2
+	bar_bg.corner_radius_top_right = 2
+	bar_bg.corner_radius_bottom_left = 2
+	bar_bg.corner_radius_bottom_right = 2
+	var bar_fg := StyleBoxFlat.new()
+	bar_fg.bg_color = MENU_PRIMARY_ACCENT
+	bar_fg.corner_radius_top_left = 2
+	bar_fg.corner_radius_top_right = 2
+	bar_fg.corner_radius_bottom_left = 2
+	bar_fg.corner_radius_bottom_right = 2
+	_chord_explorer_window_bar.add_theme_stylebox_override("background", bar_bg)
+	_chord_explorer_window_bar.add_theme_stylebox_override("fill", bar_fg)
+	name_inner.add_child(_chord_explorer_window_bar)
+
+	_chord_explorer_chord_name_label = Label.new()
+	_chord_explorer_chord_name_label.text = "Play a chord..."
+	_chord_explorer_chord_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_title_font != null:
+		_chord_explorer_chord_name_label.add_theme_font_override("font", _ui_title_font)
+	_chord_explorer_chord_name_label.add_theme_font_size_override("font_size", 44)
+	_chord_explorer_chord_name_label.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	name_inner.add_child(_chord_explorer_chord_name_label)
+
+	_chord_explorer_full_name_label = Label.new()
+	_chord_explorer_full_name_label.text = ""
+	_chord_explorer_full_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_font != null:
+		_chord_explorer_full_name_label.add_theme_font_override("font", _ui_font)
+	_chord_explorer_full_name_label.add_theme_font_size_override("font_size", 18)
+	_chord_explorer_full_name_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	name_inner.add_child(_chord_explorer_full_name_label)
+
+	# Sub-info row: Roman | Inversion | Diatonic | Intervals
+	var info_row := HBoxContainer.new()
+	info_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	info_row.add_theme_constant_override("separation", 22)
+	name_inner.add_child(info_row)
+
+	_chord_explorer_roman_label = _build_chord_explorer_chip(info_row, "—", Color(0.62, 0.86, 0.96, 1.0))
+	_chord_explorer_inversion_label = _build_chord_explorer_chip(info_row, "", Color(0.96, 0.78, 0.42, 1.0))
+	_chord_explorer_diatonic_label = _build_chord_explorer_chip(info_row, "", Color(0.45, 0.92, 0.62, 1.0))
+	_chord_explorer_intervals_label = _build_chord_explorer_chip(info_row, "", Color(0.84, 0.84, 0.92, 1.0))
+
+	_build_chord_explorer_keyboard(root_vbox)
+
+
+func _build_chord_explorer_chip(parent: Control, initial_text: String, accent: Color) -> Label:
+	var chip_panel := PanelContainer.new()
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = Color(accent.r, accent.g, accent.b, 0.16)
+	chip_style.border_color = Color(accent.r, accent.g, accent.b, 0.65)
+	chip_style.border_width_left = 1
+	chip_style.border_width_right = 1
+	chip_style.border_width_top = 1
+	chip_style.border_width_bottom = 1
+	chip_style.corner_radius_top_left = 8
+	chip_style.corner_radius_top_right = 8
+	chip_style.corner_radius_bottom_left = 8
+	chip_style.corner_radius_bottom_right = 8
+	chip_style.content_margin_left = 10
+	chip_style.content_margin_right = 10
+	chip_style.content_margin_top = 4
+	chip_style.content_margin_bottom = 4
+	chip_panel.add_theme_stylebox_override("panel", chip_style)
+	parent.add_child(chip_panel)
+	var lbl := Label.new()
+	lbl.text = initial_text
+	if _ui_font != null:
+		lbl.add_theme_font_override("font", _ui_font)
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", accent)
+	chip_panel.add_child(lbl)
+	chip_panel.set_meta("chip_label", lbl)
+	chip_panel.visible = not initial_text.is_empty()
+	return lbl
+
+
+func _on_chord_explorer_open() -> void:
+	if _chord_explorer_panel == null:
+		return
+	_chord_explorer_active = true
+	_chord_explorer_recent_notes.clear()
+	_chord_explorer_window_expires_at = -1.0
+	if _home_panel != null:
+		_home_panel.visible = false
+	_chord_explorer_panel.visible = true
+	_chord_explorer_refresh_display()
+	if _midi_enabled and _midi_platform_supported():
+		_open_midi_inputs_for_detection()
+		_midi_active = true
+	# The big interactive keyboard replaces the small viz while in Chord Explorer.
+	if _midi_piano_viz != null:
+		_midi_piano_viz_clear_all()
+		_midi_piano_viz.visible = false
+
+
+func _on_chord_explorer_close() -> void:
+	_chord_explorer_active = false
+	_chord_explorer_recent_notes.clear()
+	_chord_explorer_window_expires_at = -1.0
+	if _chord_explorer_panel != null:
+		_chord_explorer_panel.visible = false
+	if _midi_active:
+		_stop_midi_listening()
+	_show_home()
+
+
+func _on_chord_explorer_clear_pressed() -> void:
+	_chord_explorer_recent_notes.clear()
+	_chord_explorer_window_expires_at = -1.0
+	if _midi_piano_viz != null:
+		_midi_piano_viz_clear_all()
+	_chord_explorer_refresh_display()
+
+
+func _on_chord_explorer_play_pressed() -> void:
+	if _chord_explorer_recent_notes.is_empty():
+		return
+	var sample_map: Dictionary = _sample_map_for_current_mode()
+	if sample_map.is_empty():
+		return
+	var pitches := _chord_explorer_active_pitches()
+	# Brief visual cue: dim the play button while sounding.
+	if _chord_explorer_play_button != null:
+		_chord_explorer_play_button.modulate = Color(0.78, 0.78, 0.78, 1.0)
+	# 25 ms stagger between note onsets gives a soft "brushed" feel rather than a hard block hit.
+	for i in range(pitches.size()):
+		_ce_play_note_soft(int(pitches[i]), sample_map)
+		if i < pitches.size() - 1:
+			await get_tree().create_timer(0.025).timeout
+	# Restore button modulate after the chord rings out a bit.
+	await get_tree().create_timer(0.25).timeout
+	if _chord_explorer_play_button != null:
+		_chord_explorer_play_button.modulate = Color.WHITE
+
+
+func _ce_play_note_soft(pitch: int, sample_map: Dictionary) -> void:
+	var nearest := _nearest_sample_midi_from_map(pitch, sample_map)
+	if not sample_map.has(nearest):
+		return
+	var stream: AudioStream = sample_map[nearest]
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.pitch_scale = pow(2.0, float(pitch - nearest) / 12.0)
+	player.volume_db = -12.0  # pianissimo — about half loudness vs the default playback
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
+
+
+func _on_chord_explorer_key_changed(idx: int) -> void:
+	if idx < 0 or idx >= CHORD_EXPLORER_KEY_OPTIONS.size():
+		return
+	_chord_explorer_key_pc = int(CHORD_EXPLORER_KEY_OPTIONS[idx][1])
+	_chord_explorer_refresh_display()
+
+
+func _on_chord_explorer_minor_toggled(pressed: bool) -> void:
+	_chord_explorer_key_is_minor = pressed
+	_chord_explorer_refresh_display()
+
+
+func _handle_midi_note_on_for_chord_explorer(pitch: int, click_source: bool = false) -> void:
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	var window_sec := CHORD_EXPLORER_CLICK_WINDOW_SEC if click_source else CHORD_EXPLORER_ARPEGGIO_WINDOW_SEC
+	# If the previous chord's window has expired, wipe before adding the new note.
+	if _chord_explorer_window_expires_at > 0.0 and now > _chord_explorer_window_expires_at and not _chord_explorer_recent_notes.is_empty():
+		_chord_explorer_recent_notes.clear()
+		if _midi_piano_viz != null:
+			_midi_piano_viz_clear_all()
+		_midi_piano_viz_light(pitch, true)
+	_chord_explorer_recent_notes[pitch] = now
+	_chord_explorer_window_expires_at = now + window_sec
+	if has_method("_play_note"):
+		_play_note(pitch, 0.45)
+	_chord_explorer_refresh_display()
+
+
+func _handle_midi_note_off_for_chord_explorer(_pitch: int) -> void:
+	# Intentional no-op: arpeggio mode lets recent notes accumulate; the window timer is the only thing that clears them.
+	pass
+
+
+func _chord_explorer_tick() -> void:
+	if not _chord_explorer_active or _chord_explorer_window_bar == null:
+		return
+	if _chord_explorer_recent_notes.is_empty():
+		_chord_explorer_window_bar.modulate.a = 0.0
+		return
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	var remaining := _chord_explorer_window_expires_at - now
+	if remaining <= 0.0:
+		_chord_explorer_window_bar.value = 0.0
+		_chord_explorer_window_bar.modulate.a = 0.55
+		return
+	var progress := clampf(remaining / CHORD_EXPLORER_ARPEGGIO_WINDOW_SEC, 0.0, 1.0)
+	_chord_explorer_window_bar.value = progress
+	# Fade the bar in when fresh, fade slightly as it shrinks.
+	_chord_explorer_window_bar.modulate.a = lerpf(0.55, 1.0, progress)
+
+
+func _chord_explorer_active_pitches() -> Array[int]:
+	var arr: Array[int] = []
+	for k in _chord_explorer_recent_notes.keys():
+		arr.append(int(k))
+	arr.sort()
+	return arr
+
+
+func _chord_explorer_push_notes_to_renderer(pitches: Array[int]) -> void:
+	if _chord_explorer_staff_area == null or not _chord_explorer_staff_area.has_method("set_score"):
+		return
+	# Build a flat list of notes — all at beat 0 with duration 4 (whole) so cluster_mode draws them as stacked noteheads.
+	var flat_notes: Array = []
+	for p in pitches:
+		flat_notes.append({
+			"midi": int(p),
+			"duration_beats": 4.0,
+			"beat_offset": 0.0,
+			"rest": false,
+		})
+	# Pick fifths from current key (major/minor doesn't change fifths for our recognizer use).
+	var fifths: int = _chord_explorer_key_pc_to_fifths(_chord_explorer_key_pc, _chord_explorer_key_is_minor)
+	var score_dict: Dictionary = ScoreModelScript.from_flat_notes_grand_staff(
+		flat_notes, 4, 4, fifths, _chord_explorer_key_is_minor, 80, "", 60
+	)
+	_chord_explorer_staff_area.set_score(score_dict)
+
+
+func _chord_explorer_key_pc_to_fifths(pc: int, is_minor: bool) -> int:
+	if is_minor:
+		var minor_map := {9: 0, 4: 1, 11: 2, 6: 3, 1: 4, 8: 5, 3: 6, 2: -1, 7: -2, 0: -3, 5: -4, 10: -5}
+		if minor_map.has(pc):
+			return int(minor_map[pc])
+		return 0
+	var sharp_map := {0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6}
+	var flat_map := {5: -1, 10: -2, 3: -3, 8: -4, 1: -5}
+	if sharp_map.has(pc):
+		return int(sharp_map[pc])
+	if flat_map.has(pc):
+		return int(flat_map[pc])
+	return 0
+
+
+# Compute per-pitch x-offset (in notehead widths) following standard notation:
+# notes a 2nd or closer apart alternate between two columns so noteheads don't collide.
+func _chord_explorer_notation_offsets(pitches: Array[int]) -> Dictionary:
+	var offsets: Dictionary = {}
+	if pitches.is_empty():
+		return offsets
+	var prev_letter_idx := -999
+	var current_col := 0
+	for p in pitches:
+		var letter_idx := _chord_explorer_natural_letter_index(int(p))
+		if prev_letter_idx == -999:
+			current_col = 0
+		elif (letter_idx - prev_letter_idx) <= 1:
+			current_col = 1 - current_col
+		else:
+			current_col = 0
+		offsets[int(p)] = current_col
+		prev_letter_idx = letter_idx
+	return offsets
+
+
+func _chord_explorer_refresh_display() -> void:
+	if _chord_explorer_staff_area == null:
+		return
+	if _chord_explorer_chord_name_label == null:
+		return
+	var pitches: Array[int] = _chord_explorer_active_pitches()
+	# Push the played notes into the StaffRenderer as a grand-staff cluster.
+	_chord_explorer_push_notes_to_renderer(pitches)
+	if pitches.is_empty():
+		_chord_explorer_chord_name_label.text = "Play a chord..."
+		_chord_explorer_chord_name_label.add_theme_color_override("font_color", Color(0.62, 0.86, 0.96, 0.62))
+		_chord_explorer_full_name_label.text = ""
+		_chord_explorer_set_chip(_chord_explorer_roman_label, "")
+		_chord_explorer_set_chip(_chord_explorer_inversion_label, "")
+		_chord_explorer_set_chip(_chord_explorer_diatonic_label, "")
+		_chord_explorer_set_chip(_chord_explorer_intervals_label, "")
+		if _chord_explorer_window_bar != null:
+			_chord_explorer_window_bar.modulate.a = 0.0
+		_chord_explorer_last_info = {}
+		_chord_explorer_refresh_keyboard_lighting()
+		return
+	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _chord_explorer_key_pc, _chord_explorer_key_is_minor)
+	_chord_explorer_last_info = info
+	_chord_explorer_refresh_keyboard_lighting()
+	_chord_explorer_chord_name_label.text = str(info.get("short_name", ""))
+	_chord_explorer_chord_name_label.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	_chord_explorer_full_name_label.text = str(info.get("full_name", ""))
+	var roman := str(info.get("roman", ""))
+	_chord_explorer_set_chip(_chord_explorer_roman_label, roman if not roman.is_empty() else "")
+	var inv := str(info.get("inversion_label", ""))
+	_chord_explorer_set_chip(_chord_explorer_inversion_label, inv if not inv.is_empty() else "")
+	if str(info.get("quality", "")) != "" and str(info.get("quality", "")) != "single" and str(info.get("quality", "")) != "interval" and str(info.get("quality", "")) != "cluster":
+		var dia: bool = bool(info.get("is_diatonic", false))
+		_chord_explorer_set_chip(_chord_explorer_diatonic_label, "In key" if dia else "Borrowed")
+	else:
+		_chord_explorer_set_chip(_chord_explorer_diatonic_label, "")
+	var intervals: Array = info.get("intervals_from_root", [])
+	if intervals.size() >= 2:
+		var iv_strs: Array[String] = []
+		for iv in intervals:
+			iv_strs.append("%d" % int(iv))
+		_chord_explorer_set_chip(_chord_explorer_intervals_label, "[%s]" % " ".join(iv_strs))
+	else:
+		_chord_explorer_set_chip(_chord_explorer_intervals_label, "")
+
+
+func _chord_explorer_set_chip(label: Label, text: String) -> void:
+	if label == null:
+		return
+	var chip_panel := label.get_parent() as PanelContainer
+	if text.is_empty():
+		if chip_panel != null:
+			chip_panel.visible = false
+		return
+	if chip_panel != null:
+		chip_panel.visible = true
+	label.text = text
+
+
+func _on_chord_explorer_staff_draw() -> void:
+	if _chord_explorer_staff_area == null:
+		return
+	var area := _chord_explorer_staff_area
+	var w := area.size.x
+	var h := area.size.y
+	var line_color := Color(0.18, 0.22, 0.30, 1.0)
+	var ledger_color := Color(0.30, 0.34, 0.42, 0.85)
+	var gap := 11.0
+	var staff_x := 90.0
+	var staff_w := w - staff_x - 40.0
+	var treble_top := h * 0.18
+	var bass_top := treble_top + gap * 4.0 + gap * 4.0  # 4 line gaps for treble + 4 for inter-staff
+	# Treble staff lines (5)
+	for i in range(5):
+		var y := treble_top + i * gap
+		area.draw_line(Vector2(staff_x, y), Vector2(staff_x + staff_w, y), line_color, 1.6)
+	# Bass staff lines (5)
+	for i in range(5):
+		var y2 := bass_top + i * gap
+		area.draw_line(Vector2(staff_x, y2), Vector2(staff_x + staff_w, y2), line_color, 1.6)
+	# Brace (simple vertical bar + arc fakes via two arcs)
+	area.draw_line(Vector2(staff_x - 6, treble_top - 1), Vector2(staff_x - 6, bass_top + gap * 4 + 1), line_color, 3.0)
+	# Clef glyphs (text labels — simple, readable)
+	var treble_label := "𝄞"
+	var bass_label := "𝄢"
+	var clef_font := _ui_title_font if _ui_title_font != null else ThemeDB.fallback_font
+	var clef_size := 36
+	area.draw_string(clef_font, Vector2(staff_x - 50, treble_top + gap * 3.5), treble_label, HORIZONTAL_ALIGNMENT_LEFT, -1, clef_size, line_color)
+	area.draw_string(clef_font, Vector2(staff_x - 46, bass_top + gap * 2.0), bass_label, HORIZONTAL_ALIGNMENT_LEFT, -1, clef_size - 2, line_color)
+	# Key signature (just a count; future polish: actual sharp/flat glyphs)
+	var key_letter: String = NOTE_NAMES_SHARP_GLOBAL[((_chord_explorer_key_pc % 12) + 12) % 12]
+	var key_text := "%s %s" % [key_letter, "minor" if _chord_explorer_key_is_minor else "major"]
+	area.draw_string(clef_font, Vector2(staff_x + 8, treble_top - 8), key_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.36, 0.42, 0.55, 0.95))
+	# Notes — compute per-pitch column offsets for proper notation of seconds/clusters.
+	var pitches := _chord_explorer_active_pitches()
+	var offsets := _chord_explorer_notation_offsets(pitches)
+	for pitch in pitches:
+		var col := int(offsets.get(int(pitch), 0))
+		_chord_explorer_draw_note(area, int(pitch), col, staff_x, treble_top, bass_top, gap, staff_w, ledger_color, line_color)
+
+
+func _chord_explorer_draw_note(area: Control, pitch: int, column: int, staff_x: float, treble_top: float, bass_top: float, gap: float, staff_w: float, ledger_color: Color, line_color: Color) -> void:
+	# Treble top line = F5 (MIDI 77); Bass top line = A3 (MIDI 57). Each line/space = half-gap.
+	var on_treble := pitch >= 60
+	var anchor_y := treble_top if on_treble else bass_top
+	var ref_pitch := 77 if on_treble else 57
+	var diatonic_steps := _chord_explorer_diatonic_steps_between(pitch, ref_pitch)
+	var note_y := anchor_y + diatonic_steps * (gap * 0.5)
+	# Column 0 = stem-side; column 1 = offset notehead-width to the RIGHT (per Gould "Behind Bars" — second-interval placement).
+	var notehead_rx := 8.5  # horizontal radius — wider
+	var notehead_ry := 6.2  # vertical radius — slightly shorter
+	var notehead_w := notehead_rx * 2.0  # column step matches notehead width so seconds touch edge-to-edge
+	var base_x := staff_x + staff_w * 0.55
+	var note_x := base_x + column * notehead_w
+	_chord_explorer_draw_ledgers_for_note(area, note_x, note_y, anchor_y, gap, ledger_color, on_treble)
+	var note_color := _chord_explorer_note_color_for_pitch(pitch)
+	_draw_oval_notehead(area, Vector2(note_x, note_y), notehead_rx, notehead_ry, note_color, line_color)
+	# Sharp/flat indicator if pitch is accidental
+	var pc := ((pitch % 12) + 12) % 12
+	if pc in [1, 3, 6, 8, 10]:
+		var use_flat := false
+		var key_letter: String = NOTE_NAMES_SHARP_GLOBAL[((_chord_explorer_key_pc % 12) + 12) % 12]
+		if not (key_letter in ["C", "G", "D", "A", "E", "B", "F#"]):
+			use_flat = true
+		var glyph := "♭" if use_flat else "♯"
+		var fnt := _ui_title_font if _ui_title_font != null else ThemeDB.fallback_font
+		area.draw_string(fnt, Vector2(note_x - 18, note_y + 5), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, line_color)
+
+
+func _chord_explorer_pitch_to_step_y_only(pitch: int, treble_top: float, bass_top: float, gap: float) -> float:
+	var on_treble := pitch >= 60
+	var anchor_y := treble_top if on_treble else bass_top
+	var ref_pitch := 77 if on_treble else 57
+	var diatonic_steps := _chord_explorer_diatonic_steps_between(pitch, ref_pitch)
+	return anchor_y + diatonic_steps * (gap * 0.5)
+
+
+func _chord_explorer_pitch_to_step_y(pitch: int) -> float:
+	# Used for the duplicate detection helper; just returns a synthesized number.
+	return float(pitch)
+
+
+func _chord_explorer_diatonic_steps_between(pitch: int, ref_pitch: int) -> int:
+	# Returns the diatonic step distance (lines+spaces, half-gap each) from ref down to pitch.
+	# We use natural-letter index regardless of accidentals.
+	var pitch_letter_idx := _chord_explorer_natural_letter_index(pitch)
+	var ref_letter_idx := _chord_explorer_natural_letter_index(ref_pitch)
+	return ref_letter_idx - pitch_letter_idx
+
+
+func _chord_explorer_natural_letter_index(pitch: int) -> int:
+	# Maps every MIDI pitch to a "diatonic letter index" — counting natural letters only
+	# (so C4=23, D4=24, E4=25, F4=26, G4=27, A4=28, B4=29, C5=30, ...).
+	# Sharps/flats round to their natural letter (C#4 → C4 letter index = 23).
+	var letter_per_pc := {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5, 10: 5, 11: 6}
+	var pc := ((pitch % 12) + 12) % 12
+	var octave := int(floor(pitch / 12.0)) - 1  # MIDI 60 = C4 → octave 4
+	return octave * 7 + int(letter_per_pc[pc])
+
+
+func _draw_oval_notehead(area: Control, center: Vector2, rx: float, ry: float, fill: Color, outline: Color) -> void:
+	var num_segs := 28
+	var pts := PackedVector2Array()
+	pts.resize(num_segs)
+	for i in range(num_segs):
+		var a := float(i) * TAU / float(num_segs)
+		pts[i] = center + Vector2(cos(a) * rx, sin(a) * ry)
+	var fill_colors := PackedColorArray()
+	fill_colors.resize(num_segs)
+	for i in range(num_segs):
+		fill_colors[i] = fill
+	area.draw_polygon(pts, fill_colors)
+	# Outline
+	for i in range(num_segs):
+		var p1: Vector2 = pts[i]
+		var p2: Vector2 = pts[(i + 1) % num_segs]
+		area.draw_line(p1, p2, outline, 1.3)
+
+
+func _chord_explorer_draw_ledgers_for_note(area: Control, note_x: float, note_y: float, anchor_y: float, gap: float, ledger_color: Color, on_treble: bool) -> void:
+	# Draw ledger lines at every gap step from the staff edge to the note position.
+	var staff_top_y := anchor_y
+	var staff_bottom_y := anchor_y + gap * 4
+	var ledger_w := 16.0
+	if note_y < staff_top_y - gap * 0.5:
+		var y := staff_top_y - gap
+		while y >= note_y - gap * 0.5:
+			area.draw_line(Vector2(note_x - ledger_w * 0.5, y), Vector2(note_x + ledger_w * 0.5, y), ledger_color, 1.4)
+			y -= gap
+	elif note_y > staff_bottom_y + gap * 0.5:
+		var y2 := staff_bottom_y + gap
+		while y2 <= note_y + gap * 0.5:
+			area.draw_line(Vector2(note_x - ledger_w * 0.5, y2), Vector2(note_x + ledger_w * 0.5, y2), ledger_color, 1.4)
+			y2 += gap
+
+
+const NOTE_NAMES_SHARP_GLOBAL := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+# --- Interactive keyboard ---
+
+func _ce_pitch_is_black(pitch: int) -> bool:
+	var pc := ((int(pitch) % 12) + 12) % 12
+	return pc in [1, 3, 6, 8, 10]
+
+
+func _build_chord_explorer_keyboard(parent_vbox: VBoxContainer) -> void:
+	var hbox := HBoxContainer.new()
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hbox.add_theme_constant_override("separation", 16)
+	hbox.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent_vbox.add_child(hbox)
+	_chord_explorer_keyboard = hbox
+
+	var num_octaves := 4
+	var num_whites := num_octaves * 7
+	var keys_w := num_whites * CHORD_EXPLORER_WHITE_W
+	var keys_h := CHORD_EXPLORER_WHITE_H
+	var frame_pad := 12.0
+	var frame_w := keys_w + frame_pad * 2.0
+	var frame_h := keys_h + frame_pad * 2.0 + 8.0  # extra for top felt strip
+
+	# Frame (wood-grain cabinet around the keys) — fixed-size Panel inside HBox so layout is reliable.
+	var frame := Panel.new()
+	frame.mouse_filter = Control.MOUSE_FILTER_PASS
+	frame.custom_minimum_size = Vector2(frame_w, frame_h)
+	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var frame_style := StyleBoxFlat.new()
+	frame_style.bg_color = Color(0.10, 0.08, 0.07, 0.98)
+	frame_style.border_color = Color(0.30, 0.20, 0.14, 1.0)
+	frame_style.border_width_left = 2
+	frame_style.border_width_right = 2
+	frame_style.border_width_top = 2
+	frame_style.border_width_bottom = 2
+	frame_style.corner_radius_top_left = 14
+	frame_style.corner_radius_top_right = 14
+	frame_style.corner_radius_bottom_left = 14
+	frame_style.corner_radius_bottom_right = 14
+	frame_style.shadow_color = Color(0.0, 0.0, 0.0, 0.60)
+	frame_style.shadow_size = 10
+	frame_style.shadow_offset = Vector2(0, 6)
+	frame.add_theme_stylebox_override("panel", frame_style)
+	hbox.add_child(frame)
+
+	# Felt strip above keys (the red felt of a real piano).
+	var felt := Panel.new()
+	felt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var felt_style := StyleBoxFlat.new()
+	felt_style.bg_color = Color(0.55, 0.10, 0.12, 1.0)
+	felt.add_theme_stylebox_override("panel", felt_style)
+	felt.position = Vector2(frame_pad, frame_pad)
+	felt.size = Vector2(keys_w, 6)
+	frame.add_child(felt)
+
+	# Container for actual keys (positioned inside the frame, below the felt).
+	var keys_root := Control.new()
+	keys_root.mouse_filter = Control.MOUSE_FILTER_PASS
+	keys_root.position = Vector2(frame_pad, frame_pad + 8)
+	keys_root.size = Vector2(keys_w, keys_h)
+	frame.add_child(keys_root)
+
+	# White keys first
+	var white_x := 0.0
+	var white_positions: Dictionary = {}
+	for pitch in range(CHORD_EXPLORER_KEYBOARD_LOW, CHORD_EXPLORER_KEYBOARD_HIGH + 1):
+		if _ce_pitch_is_black(pitch):
+			continue
+		var btn := Button.new()
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn.position = Vector2(white_x, 0)
+		btn.size = Vector2(CHORD_EXPLORER_WHITE_W, CHORD_EXPLORER_WHITE_H)
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.text = ""
+		var captured_pitch := pitch
+		btn.pressed.connect(func(): _on_chord_explorer_key_pressed(captured_pitch))
+		_chord_explorer_apply_white_style(btn, Color.WHITE)
+		keys_root.add_child(btn)
+		_chord_explorer_keyboard_keys[pitch] = btn
+		white_positions[pitch] = white_x
+		# Label C-notes for orientation
+		var pc := ((pitch % 12) + 12) % 12
+		if pc == 0:
+			var lbl := Label.new()
+			lbl.text = "C%d" % int(pitch / 12 - 1)
+			lbl.add_theme_font_size_override("font_size", 13)
+			if _ui_font != null:
+				lbl.add_theme_font_override("font", _ui_font)
+			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.40, 0.92))
+			lbl.position = Vector2(4, CHORD_EXPLORER_WHITE_H - 24)
+			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			btn.add_child(lbl)
+		white_x += CHORD_EXPLORER_WHITE_W
+
+	# Black keys overlaid on top
+	for pitch in range(CHORD_EXPLORER_KEYBOARD_LOW, CHORD_EXPLORER_KEYBOARD_HIGH + 1):
+		if not _ce_pitch_is_black(pitch):
+			continue
+		var prev_white := pitch - 1
+		if not white_positions.has(prev_white):
+			continue
+		var btn := Button.new()
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		var bx: float = float(white_positions[prev_white]) + CHORD_EXPLORER_WHITE_W - CHORD_EXPLORER_BLACK_W * 0.5
+		btn.position = Vector2(bx, 0)
+		btn.size = Vector2(CHORD_EXPLORER_BLACK_W, CHORD_EXPLORER_BLACK_H)
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.text = ""
+		btn.z_index = 1
+		var captured_pitch_b := pitch
+		btn.pressed.connect(func(): _on_chord_explorer_key_pressed(captured_pitch_b))
+		_chord_explorer_apply_black_style(btn, Color.WHITE)
+		keys_root.add_child(btn)
+		_chord_explorer_keyboard_keys[pitch] = btn
+
+	# Side control column: Clear (top) + Play (below) — placed right next to the keyboard for quick access.
+	var side_col := VBoxContainer.new()
+	side_col.alignment = BoxContainer.ALIGNMENT_BEGIN
+	side_col.add_theme_constant_override("separation", 12)
+	side_col.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	hbox.add_child(side_col)
+
+	_chord_explorer_clear_button = _build_chord_explorer_side_button(
+		side_col, "Clear", Color(0.92, 0.46, 0.42, 1.0), _on_chord_explorer_clear_pressed
+	)
+	_chord_explorer_play_button = _build_chord_explorer_side_button(
+		side_col, "♪ Play", MENU_PRIMARY_ACCENT, _on_chord_explorer_play_pressed
+	)
+
+
+func _build_chord_explorer_side_button(parent: Control, text: String, accent: Color, callback: Callable) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(96, 56)
+	btn.focus_mode = Control.FOCUS_NONE
+	if _ui_title_font != null:
+		btn.add_theme_font_override("font", _ui_title_font)
+	btn.add_theme_font_size_override("font_size", 16)
+	btn.add_theme_color_override("font_color", Color(0.10, 0.12, 0.16, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color(0.05, 0.07, 0.10, 1.0))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.92)
+	sb.border_color = Color(accent.r * 0.65, accent.g * 0.65, accent.b * 0.65, 1.0)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 3
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
+	sb.shadow_size = 4
+	sb.shadow_offset = Vector2(0, 2)
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate()
+	(hover as StyleBoxFlat).bg_color = (sb.bg_color as Color).lightened(0.08)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed_sb := sb.duplicate()
+	(pressed_sb as StyleBoxFlat).bg_color = (sb.bg_color as Color).darkened(0.10)
+	(pressed_sb as StyleBoxFlat).shadow_size = 1
+	(pressed_sb as StyleBoxFlat).shadow_offset = Vector2(0, 1)
+	btn.add_theme_stylebox_override("pressed", pressed_sb)
+	btn.pressed.connect(callback)
+	parent.add_child(btn)
+	return btn
+
+
+func _chord_explorer_apply_white_style(btn: Button, tint: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.985, 0.985, 0.975, 1.0).blend(Color(tint.r, tint.g, tint.b, 0.55) if tint != Color.WHITE else Color(0, 0, 0, 0))
+	if tint == Color.WHITE:
+		sb.bg_color = Color(0.985, 0.985, 0.975, 1.0)
+	sb.border_color = Color(0.62, 0.60, 0.58, 1.0)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 2
+	sb.corner_radius_bottom_left = 5
+	sb.corner_radius_bottom_right = 5
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.16)
+	sb.shadow_size = 2
+	sb.shadow_offset = Vector2(0, 2)
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate()
+	(hover as StyleBoxFlat).bg_color = (sb.bg_color as Color).lightened(0.04)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed_sb := sb.duplicate()
+	(pressed_sb as StyleBoxFlat).bg_color = (sb.bg_color as Color).darkened(0.06)
+	btn.add_theme_stylebox_override("pressed", pressed_sb)
+
+
+func _chord_explorer_apply_black_style(btn: Button, tint: Color) -> void:
+	var sb := StyleBoxFlat.new()
+	if tint == Color.WHITE:
+		sb.bg_color = Color(0.08, 0.09, 0.11, 1.0)
+	else:
+		sb.bg_color = Color(tint.r * 0.55, tint.g * 0.55, tint.b * 0.55, 1.0)
+	sb.border_color = Color(0.02, 0.02, 0.04, 1.0)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 3
+	sb.corner_radius_bottom_left = 4
+	sb.corner_radius_bottom_right = 4
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.50)
+	sb.shadow_size = 3
+	sb.shadow_offset = Vector2(0, 2)
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate()
+	(hover as StyleBoxFlat).bg_color = (sb.bg_color as Color).lightened(0.05)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed_sb := sb.duplicate()
+	(pressed_sb as StyleBoxFlat).bg_color = (sb.bg_color as Color).lightened(0.10)
+	btn.add_theme_stylebox_override("pressed", pressed_sb)
+
+
+func _on_chord_explorer_key_pressed(pitch: int) -> void:
+	if not _chord_explorer_active:
+		return
+	var p := int(pitch)
+	# If the key is already in the chord, clicking again toggles it OFF.
+	if _chord_explorer_recent_notes.has(p):
+		_chord_explorer_recent_notes.erase(p)
+		_chord_explorer_refresh_display()
+		return
+	# Otherwise, treat as a click-source note-on (longer window than MIDI).
+	_handle_midi_note_on_for_chord_explorer(p, true)
+
+
+func _chord_explorer_refresh_keyboard_lighting() -> void:
+	if _chord_explorer_keyboard_keys.is_empty():
+		return
+	var held: Dictionary = {}
+	for k in _chord_explorer_recent_notes.keys():
+		held[int(k)] = true
+	for pitch_key in _chord_explorer_keyboard_keys.keys():
+		var pitch := int(pitch_key)
+		var btn: Button = _chord_explorer_keyboard_keys[pitch_key] as Button
+		if btn == null:
+			continue
+		var is_black := _ce_pitch_is_black(pitch)
+		if held.has(pitch):
+			var color := _chord_explorer_note_color_for_pitch(pitch)
+			if is_black:
+				_chord_explorer_apply_black_style(btn, color)
+			else:
+				_chord_explorer_apply_white_style(btn, color)
+		else:
+			if is_black:
+				_chord_explorer_apply_black_style(btn, Color.WHITE)
+			else:
+				_chord_explorer_apply_white_style(btn, Color.WHITE)
+
+
+func _chord_explorer_note_color_for_pitch(pitch: int) -> Color:
+	if _chord_explorer_last_info.is_empty():
+		return MENU_PRIMARY_ACCENT
+	var root_pc_v = _chord_explorer_last_info.get("root_pc", -1)
+	if int(root_pc_v) < 0:
+		return MENU_PRIMARY_ACCENT
+	var pc := ((int(pitch) % 12) + 12) % 12
+	var degree := ((pc - int(root_pc_v)) + 12) % 12
+	match degree:
+		0: return CHORD_FN_ROOT
+		3, 4: return CHORD_FN_THIRD
+		6, 7, 8: return CHORD_FN_FIFTH
+		10, 11: return CHORD_FN_SEVENTH
+		2, 5, 9: return CHORD_FN_EXTENSION
+		_: return CHORD_FN_OTHER
+
+
+# ============================================================================
+# Practice Drills (technical exercises generator + MusicXML export)
+# ============================================================================
+
+func _build_practice_drills_panel() -> void:
+	_practice_drills_panel = PanelContainer.new()
+	_practice_drills_panel.set_anchors_preset(PRESET_FULL_RECT)
+	_practice_drills_panel.visible = false
+	_practice_drills_panel.z_as_relative = false
+	_practice_drills_panel.z_index = 200
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.06, 0.11, 0.19, 1.0)
+	_practice_drills_panel.add_theme_stylebox_override("panel", bg_style)
+	add_child(_practice_drills_panel)
+
+	var root_margin := MarginContainer.new()
+	root_margin.add_theme_constant_override("margin_left", 28)
+	root_margin.add_theme_constant_override("margin_right", 28)
+	root_margin.add_theme_constant_override("margin_top", 22)
+	root_margin.add_theme_constant_override("margin_bottom", 24)
+	_practice_drills_panel.add_child(root_margin)
+
+	var root_vbox := VBoxContainer.new()
+	root_vbox.add_theme_constant_override("separation", 16)
+	root_margin.add_child(root_vbox)
+
+	# Top bar
+	var top_bar := HBoxContainer.new()
+	top_bar.add_theme_constant_override("separation", 14)
+	root_vbox.add_child(top_bar)
+	_practice_back_button = Button.new()
+	_practice_back_button.text = "← Home"
+	_practice_back_button.custom_minimum_size = Vector2(120, 42)
+	if _ui_title_font != null:
+		_practice_back_button.add_theme_font_override("font", _ui_title_font)
+	_practice_back_button.add_theme_font_size_override("font_size", 16)
+	_practice_back_button.pressed.connect(_on_practice_drills_close)
+	top_bar.add_child(_practice_back_button)
+
+	var heading := Label.new()
+	heading.text = "Practice Drills"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if _ui_title_font != null:
+		heading.add_theme_font_override("font", _ui_title_font)
+	heading.add_theme_font_size_override("font_size", 28)
+	heading.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	top_bar.add_child(heading)
+
+	_practice_tempo_label = Label.new()
+	_practice_tempo_label.text = "♩ = 60"
+	if _ui_font != null:
+		_practice_tempo_label.add_theme_font_override("font", _ui_font)
+	_practice_tempo_label.add_theme_font_size_override("font_size", 16)
+	_practice_tempo_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.96, 0.92))
+	_practice_tempo_label.custom_minimum_size = Vector2(110, 0)
+	_practice_tempo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	top_bar.add_child(_practice_tempo_label)
+
+	# Music Notation Font picker — global setting, surfaced here next to the title bar.
+	var font_row := HBoxContainer.new()
+	font_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	font_row.add_theme_constant_override("separation", 14)
+	root_vbox.add_child(font_row)
+	_build_score_font_picker(font_row)
+
+	# Controls row
+	var controls := HBoxContainer.new()
+	controls.alignment = BoxContainer.ALIGNMENT_CENTER
+	controls.add_theme_constant_override("separation", 14)
+	root_vbox.add_child(controls)
+
+	# Focus selector (skill filter) — populates the type dropdown to its right.
+	_practice_skill_option = OptionButton.new()
+	for pair in ExerciseLibraryScript.skill_options():
+		var idx: int = _practice_skill_option.item_count
+		_practice_skill_option.add_item("Focus: %s" % str(pair[1]), idx)
+		_practice_skill_option.set_item_metadata(idx, str(pair[0]))
+	_practice_skill_option.selected = 0  # "all"
+	_practice_skill_option.custom_minimum_size = Vector2(240, 38)
+	_practice_skill_option.item_selected.connect(_on_practice_skill_changed)
+	controls.add_child(_practice_skill_option)
+
+	# Type dropdown — populated dynamically based on current skill filter.
+	_practice_type_option = OptionButton.new()
+	_practice_type_option.custom_minimum_size = Vector2(260, 38)
+	controls.add_child(_practice_type_option)
+	_practice_refresh_type_dropdown()
+
+	_practice_key_option = OptionButton.new()
+	for opt in PRACTICE_KEY_OPTIONS:
+		_practice_key_option.add_item(str(opt[0]))
+	_practice_key_option.selected = 0
+	_practice_key_option.custom_minimum_size = Vector2(96, 38)
+	controls.add_child(_practice_key_option)
+
+	_practice_minor_check = CheckButton.new()
+	_practice_minor_check.text = "Minor"
+	controls.add_child(_practice_minor_check)
+
+	var staff_label := Label.new()
+	staff_label.text = "Staff:"
+	if _ui_font != null:
+		staff_label.add_theme_font_override("font", _ui_font)
+	staff_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.96, 0.92))
+	controls.add_child(staff_label)
+	_practice_staff_option = OptionButton.new()
+	_practice_staff_option.add_item("Grand", 0)
+	_practice_staff_option.add_item("Treble", 1)
+	_practice_staff_option.add_item("Bass", 2)
+	_practice_staff_option.selected = 0
+	_practice_staff_option.custom_minimum_size = Vector2(108, 38)
+	_practice_staff_option.item_selected.connect(func(_idx: int) -> void:
+		if _practice_current_exercise.is_empty():
+			_practice_refresh_score_renderer()
+		else:
+			_on_practice_generate_pressed()
+	)
+	controls.add_child(_practice_staff_option)
+
+	var oct_label := Label.new()
+	oct_label.text = "Octaves:"
+	if _ui_font != null:
+		oct_label.add_theme_font_override("font", _ui_font)
+	oct_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.96, 0.92))
+	controls.add_child(oct_label)
+	_practice_octaves_spin = SpinBox.new()
+	_practice_octaves_spin.min_value = 1
+	_practice_octaves_spin.max_value = 3
+	_practice_octaves_spin.step = 1
+	_practice_octaves_spin.value = 1
+	_practice_octaves_spin.custom_minimum_size = Vector2(80, 36)
+	controls.add_child(_practice_octaves_spin)
+
+	var lvl_label := Label.new()
+	lvl_label.text = "Level:"
+	if _ui_font != null:
+		lvl_label.add_theme_font_override("font", _ui_font)
+	lvl_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.96, 0.92))
+	controls.add_child(lvl_label)
+	_practice_level_spin = SpinBox.new()
+	_practice_level_spin.min_value = 1
+	_practice_level_spin.max_value = 10
+	_practice_level_spin.step = 1
+	_practice_level_spin.value = 1
+	_practice_level_spin.custom_minimum_size = Vector2(80, 36)
+	controls.add_child(_practice_level_spin)
+
+	_practice_generate_button = _build_practice_action_button(controls, "Generate", MENU_PRIMARY_ACCENT, _on_practice_generate_pressed)
+
+	# Title row (selected exercise)
+	_practice_title_label = Label.new()
+	_practice_title_label.text = "Pick options and press Generate to build a practice exercise."
+	_practice_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_font != null:
+		_practice_title_label.add_theme_font_override("font", _ui_font)
+	_practice_title_label.add_theme_font_size_override("font_size", 16)
+	_practice_title_label.add_theme_color_override("font_color", Color(0.84, 0.92, 1.0, 0.92))
+	root_vbox.add_child(_practice_title_label)
+
+	# Staff card
+	var staff_wrap := PanelContainer.new()
+	staff_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	staff_wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var staff_style := StyleBoxFlat.new()
+	staff_style.bg_color = Color(0.99, 0.98, 0.95, 0.96)
+	staff_style.corner_radius_top_left = 14
+	staff_style.corner_radius_top_right = 14
+	staff_style.corner_radius_bottom_left = 14
+	staff_style.corner_radius_bottom_right = 14
+	staff_style.shadow_color = Color(0.0, 0.0, 0.0, 0.32)
+	staff_style.shadow_size = 8
+	staff_wrap.add_theme_stylebox_override("panel", staff_style)
+	root_vbox.add_child(staff_wrap)
+
+	_practice_staff_area = StaffRendererScript.new()
+	_practice_staff_area.custom_minimum_size = Vector2(900, 220)
+	_practice_staff_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_practice_staff_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_practice_staff_area.set("draw_paper", true)
+	staff_wrap.add_child(_practice_staff_area)
+
+	# Bottom action row
+	var bottom_row := HBoxContainer.new()
+	bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	bottom_row.add_theme_constant_override("separation", 14)
+	root_vbox.add_child(bottom_row)
+
+	_practice_play_button = _build_practice_action_button(bottom_row, "♪ Play", Color(0.45, 0.92, 0.62, 1.0), _on_practice_play_pressed)
+	_practice_stop_button = _build_practice_action_button(bottom_row, "■ Stop", Color(0.92, 0.46, 0.42, 1.0), _on_practice_stop_pressed)
+	_practice_export_button = _build_practice_action_button(bottom_row, "📄 Export MusicXML", Color(0.62, 0.86, 0.96, 1.0), _on_practice_export_pressed)
+	_build_practice_action_button(bottom_row, "🎯 Daily Warmup", Color(0.96, 0.78, 0.42, 1.0), _on_practice_daily_warmup_pressed)
+
+	_practice_status_label = Label.new()
+	_practice_status_label.text = ""
+	_practice_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_practice_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if _ui_font != null:
+		_practice_status_label.add_theme_font_override("font", _ui_font)
+	_practice_status_label.add_theme_font_size_override("font_size", 13)
+	_practice_status_label.add_theme_color_override("font_color", Color(0.78, 0.92, 1.0, 0.78))
+	root_vbox.add_child(_practice_status_label)
+
+
+func _build_practice_action_button(parent: Control, text: String, accent: Color, callback: Callable) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(140, 50)
+	btn.focus_mode = Control.FOCUS_NONE
+	if _ui_title_font != null:
+		btn.add_theme_font_override("font", _ui_title_font)
+	btn.add_theme_font_size_override("font_size", 16)
+	btn.add_theme_color_override("font_color", Color(0.10, 0.12, 0.16, 1.0))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.94)
+	sb.border_color = Color(accent.r * 0.65, accent.g * 0.65, accent.b * 0.65, 1.0)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 3
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
+	sb.shadow_size = 4
+	sb.shadow_offset = Vector2(0, 2)
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate()
+	(hover as StyleBoxFlat).bg_color = (sb.bg_color as Color).lightened(0.08)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed_sb := sb.duplicate()
+	(pressed_sb as StyleBoxFlat).bg_color = (sb.bg_color as Color).darkened(0.10)
+	btn.add_theme_stylebox_override("pressed", pressed_sb)
+	btn.pressed.connect(callback)
+	parent.add_child(btn)
+	return btn
+
+
+func _on_practice_drills_open() -> void:
+	if _practice_drills_panel == null:
+		return
+	_practice_drills_active = true
+	if _home_panel != null:
+		_home_panel.visible = false
+	_practice_drills_panel.visible = true
+	if _practice_status_label != null:
+		_practice_status_label.text = ""
+	_practice_refresh_score_renderer()
+
+
+func _on_practice_drills_close() -> void:
+	_practice_drills_active = false
+	_practice_playback_active = false
+	_practice_playback_token += 1  # cancel any in-flight playback awaits
+	if _practice_drills_panel != null:
+		_practice_drills_panel.visible = false
+	_show_home()
+
+
+func _practice_staff_mode() -> String:
+	if _practice_staff_option == null:
+		return "grand"
+	match _practice_staff_option.selected:
+		1:
+			return "treble"
+		2:
+			return "bass"
+		_:
+			return "grand"
+
+
+func _practice_hand_for_staff_mode(mode: String) -> String:
+	match mode:
+		"bass":
+			return "left"
+		"treble":
+			return "right"
+		_:
+			return "both"
+
+
+func _practice_notes_for_staff(notes: Array, staff_number: int, voice_number: int) -> Array:
+	var out: Array = []
+	for note_any in notes:
+		var note: Dictionary = note_any
+		var copy := note.duplicate(true)
+		copy["staff"] = staff_number
+		copy["voice"] = voice_number
+		out.append(copy)
+	return out
+
+
+func _practice_sort_notes_by_time_and_staff(a: Dictionary, b: Dictionary) -> bool:
+	var beat_a := float(a.get("beat_offset", 0.0))
+	var beat_b := float(b.get("beat_offset", 0.0))
+	if absf(beat_a - beat_b) > 0.001:
+		return beat_a < beat_b
+	var staff_a := int(a.get("staff", 1))
+	var staff_b := int(b.get("staff", 1))
+	if staff_a != staff_b:
+		return staff_a < staff_b
+	return int(a.get("midi", -1)) < int(b.get("midi", -1))
+
+
+func _practice_build_exercise_for_staff_mode(type_str: String, key_pc: int, key_minor: bool, level: int, octaves: int, mode: String) -> Dictionary:
+	if mode != "grand":
+		var hand := _practice_hand_for_staff_mode(mode)
+		var exercise: Dictionary = TechnicalExerciseGeneratorScript.generate(type_str, key_pc, key_minor, level, hand, octaves)
+		exercise["staff_mode"] = mode
+		exercise["hand"] = hand
+		return exercise
+	var right: Dictionary = TechnicalExerciseGeneratorScript.generate(type_str, key_pc, key_minor, level, "right", octaves)
+	var left: Dictionary = TechnicalExerciseGeneratorScript.generate(type_str, key_pc, key_minor, level, "left", octaves)
+	var combined_notes: Array = []
+	combined_notes.append_array(_practice_notes_for_staff(right.get("notes", []), 1, 1))
+	combined_notes.append_array(_practice_notes_for_staff(left.get("notes", []), 2, 2))
+	combined_notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return _practice_sort_notes_by_time_and_staff(a, b)
+	)
+	var exercise := right.duplicate(true)
+	exercise["hand"] = "both"
+	exercise["staff_mode"] = "grand"
+	exercise["title"] = "%s (Grand Staff)" % str(right.get("title", "Practice Exercise"))
+	exercise["notes"] = combined_notes
+	exercise["total_beats"] = maxf(float(right.get("total_beats", 0.0)), float(left.get("total_beats", 0.0)))
+	exercise["right_hand_notes"] = right.get("notes", [])
+	exercise["left_hand_notes"] = left.get("notes", [])
+	return exercise
+
+
+func _practice_refresh_score_renderer() -> void:
+	if _practice_staff_area == null or not _practice_staff_area.has_method("set_score"):
+		return
+	var mode := _practice_staff_mode()
+	if _practice_current_exercise.is_empty():
+		var placeholder := ScoreModelScript.new_score("")
+		placeholder["time_sig_num"] = 4
+		placeholder["time_sig_den"] = 4
+		if mode == "grand":
+			var treble_staff := ScoreModelScript.new_staff("treble")
+			(treble_staff["measures"] as Array).append(ScoreModelScript.new_measure())
+			var bass_staff := ScoreModelScript.new_staff("bass")
+			(bass_staff["measures"] as Array).append(ScoreModelScript.new_measure())
+			(placeholder["staves"] as Array).append(treble_staff)
+			(placeholder["staves"] as Array).append(bass_staff)
+		else:
+			var staff := ScoreModelScript.new_staff(mode)
+			(staff["measures"] as Array).append(ScoreModelScript.new_measure())
+			(placeholder["staves"] as Array).append(staff)
+		_practice_staff_area.set_score(placeholder)
+		return
+	var notes: Array = _practice_current_exercise.get("notes", [])
+	var time_num: int = int(_practice_current_exercise.get("time_sig_num", 4))
+	var time_den: int = int(_practice_current_exercise.get("time_sig_den", 4))
+	var fifths: int = int(_practice_current_exercise.get("fifths", 0))
+	var key_is_minor: bool = bool(_practice_current_exercise.get("key_is_minor", false))
+	var tempo: int = int(_practice_current_exercise.get("tempo_bpm", 80))
+	var title: String = str(_practice_current_exercise.get("title", ""))
+	var score_dict: Dictionary
+	if mode == "grand":
+		score_dict = ScoreModelScript.from_flat_notes_grand_staff(notes, time_num, time_den, fifths, key_is_minor, tempo, title, 60)
+	else:
+		score_dict = ScoreModelScript.from_flat_notes(notes, mode, time_num, time_den, fifths, key_is_minor, tempo, title)
+	_practice_staff_area.set_score(score_dict)
+
+
+func _on_practice_generate_pressed() -> void:
+	if _practice_type_option == null:
+		return
+	var type_idx := _practice_type_option.selected
+	var type_str := "scale"
+	if type_idx >= 0 and type_idx < _practice_type_option.item_count:
+		var meta = _practice_type_option.get_item_metadata(type_idx)
+		if meta != null:
+			type_str = str(meta)
+	var key_idx := _practice_key_option.selected
+	var key_pc := int(PRACTICE_KEY_OPTIONS[key_idx][1])
+	var key_minor := _practice_minor_check.button_pressed
+	var staff_mode := _practice_staff_mode()
+	var octaves := int(_practice_octaves_spin.value)
+	var level := int(_practice_level_spin.value)
+	_practice_current_exercise = _practice_build_exercise_for_staff_mode(type_str, key_pc, key_minor, level, octaves, staff_mode)
+	if _practice_title_label != null:
+		_practice_title_label.text = str(_practice_current_exercise.get("title", ""))
+	if _practice_tempo_label != null:
+		_practice_tempo_label.text = "♩ = %d" % int(_practice_current_exercise.get("tempo_bpm", 60))
+	if _practice_status_label != null:
+		var playable_notes := 0
+		for note_any in _practice_current_exercise.get("notes", []):
+			var note: Dictionary = note_any
+			if int(note.get("midi", -1)) >= 0 and not bool(note.get("rest", false)):
+				playable_notes += 1
+		_practice_status_label.text = "%d notes ready. Press Play to hear, or Export to save as MusicXML." % playable_notes
+	_practice_refresh_score_renderer()
+
+
+func _practice_sort_notes_by_time(a: Dictionary, b: Dictionary) -> bool:
+	var beat_a := float(a.get("beat_offset", 0.0))
+	var beat_b := float(b.get("beat_offset", 0.0))
+	if absf(beat_a - beat_b) > 0.001:
+		return beat_a < beat_b
+	return int(a.get("midi", -1)) < int(b.get("midi", -1))
+
+
+func _practice_collect_playback_events(notes: Array) -> Array:
+	var sorted_notes := notes.duplicate(true)
+	sorted_notes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return _practice_sort_notes_by_time(a, b)
+	)
+	var events: Array = []
+	var current: Dictionary = {}
+	for note_any in sorted_notes:
+		var note: Dictionary = note_any
+		var beat := float(note.get("beat_offset", 0.0))
+		if current.is_empty() or absf(float(current.get("beat_offset", 0.0)) - beat) > 0.001:
+			current = {
+				"beat_offset": beat,
+				"duration_beats": float(note.get("duration_beats", 0.5)),
+				"midis": [],
+				"note_durations": [],  # per-note duration (preserves per-voice sustain)
+			}
+			events.append(current)
+		current["duration_beats"] = maxf(float(current.get("duration_beats", 0.5)), float(note.get("duration_beats", 0.5)))
+		var midi := int(note.get("midi", -1))
+		var is_rest := bool(note.get("rest", false)) or midi < 0
+		if not is_rest:
+			(current["midis"] as Array).append(midi)
+			(current["note_durations"] as Array).append(float(note.get("duration_beats", 0.5)))
+	return events
+
+
+func _spawn_practice_note(midi: int, duration_sec: float, sample_map: Dictionary) -> void:
+	# Fire-and-forget single-note player. Each note gets its own AudioStreamPlayer
+	# so it can ring for its full duration without being stopped when the next event
+	# starts (which is what was happening with the shared _chord_players pool).
+	# Auto-frees via a Timer callback after the sound duration elapses.
+	if midi < 0:
+		return
+	if sample_map.is_empty():
+		# No sample bank — fall back to sine wave (also non-blocking via _push_sine awaits internally;
+		# but we don't await here, so the sine playback runs concurrently anyway).
+		_push_sine(_midi_to_freq(midi), duration_sec)
+		return
+	var nearest := _nearest_sample_cached(midi, sample_map)
+	if not sample_map.has(nearest):
+		return
+	var stream: AudioStream = sample_map[nearest]
+	var player := AudioStreamPlayer.new()
+	player.stream = stream
+	player.pitch_scale = pow(2.0, float(midi - nearest) / 12.0)
+	add_child(player)
+	player.play()
+	var stop_at := get_tree().create_timer(duration_sec)
+	stop_at.timeout.connect(func() -> void:
+		if is_instance_valid(player):
+			player.stop()
+			player.queue_free()
+	)
+
+
+func _practice_play_note_group(midis: Array, duration: float) -> void:
+	if midis.is_empty():
+		await get_tree().create_timer(duration).timeout
+		return
+	if midis.size() == 1:
+		await _play_note(int(midis[0]), duration)
+		return
+	var sample_map := _sample_map_for_current_mode()
+	if sample_map.is_empty() or _chord_players.size() < midis.size():
+		await _play_chord_block(midis, duration)
+		return
+	var used_players: Array[AudioStreamPlayer] = []
+	for i in range(midis.size()):
+		var midi_note := int(midis[i])
+		var nearest := _nearest_sample_cached(midi_note, sample_map)
+		var stream: AudioStream = sample_map[nearest]
+		var player: AudioStreamPlayer = _chord_players[i]
+		player.stop()
+		player.stream = stream
+		player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+		player.play()
+		used_players.append(player)
+	await get_tree().create_timer(duration).timeout
+	for player in used_players:
+		if player != null:
+			player.stop()
+
+
+func _on_practice_play_pressed() -> void:
+	if _practice_current_exercise.is_empty():
+		if _practice_status_label != null:
+			_practice_status_label.text = "Generate an exercise first."
+		return
+	if _practice_playback_active:
+		return
+	_practice_playback_active = true
+	_practice_playback_token += 1
+	var token := _practice_playback_token
+	var events: Array = _practice_collect_playback_events(_practice_current_exercise.get("notes", []))
+	var bpm: float = float(_practice_current_exercise.get("tempo_bpm", 80))
+	var seconds_per_beat: float = 60.0 / maxf(40.0, bpm)
+	var sample_map: Dictionary = _sample_map_for_current_mode()
+	for i in range(events.size()):
+		if token != _practice_playback_token or not _practice_playback_active:
+			break
+		_practice_playback_index = i
+		var event: Dictionary = events[i]
+		var midis: Array = event.get("midis", [])
+		var note_durs: Array = event.get("note_durations", [])
+		var dur_beats: float = float(event.get("duration_beats", 0.5))
+		# IOI = gap to the next event's onset (correct timing for interleaved voices).
+		var wait_beats: float = dur_beats
+		if i < events.size() - 1:
+			var cur_beat: float = float(event.get("beat_offset", 0.0))
+			var next_beat: float = float(events[i + 1].get("beat_offset", 0.0))
+			wait_beats = next_beat - cur_beat
+		var wait_sec: float = wait_beats * seconds_per_beat
+		if _practice_staff_area != null:
+			if _practice_staff_area.has_method("set_highlight_beat"):
+				_practice_staff_area.set_highlight_beat(float(event.get("beat_offset", 0.0)))
+			elif _practice_staff_area.has_method("set_highlight_index"):
+				_practice_staff_area.set_highlight_index(i)
+		# Per-voice sustain: spawn each note independently so a held LH quarter rings
+		# its full duration while RH eighths play above it. Each spawn is non-blocking
+		# (auto-frees via a Timer-bound callback).
+		for ni in range(midis.size()):
+			var note_dur_beats: float = float(note_durs[ni]) if ni < note_durs.size() else dur_beats
+			var note_sound_sec: float = note_dur_beats * seconds_per_beat
+			_spawn_practice_note(int(midis[ni]), maxf(0.05, note_sound_sec * 0.97), sample_map)
+		await get_tree().create_timer(wait_sec).timeout
+	_practice_playback_active = false
+	_practice_playback_index = -1
+	if _practice_staff_area != null:
+		if _practice_staff_area.has_method("set_highlight_beat"):
+			_practice_staff_area.set_highlight_beat(-1.0)
+		elif _practice_staff_area.has_method("set_highlight_index"):
+			_practice_staff_area.set_highlight_index(-1)
+
+
+func _practice_refresh_type_dropdown() -> void:
+	if _practice_type_option == null:
+		return
+	# Preserve the currently-selected exercise ID across rebuilds when possible.
+	var prev_id: String = ""
+	if _practice_type_option.item_count > 0:
+		var prev_meta = _practice_type_option.get_item_metadata(_practice_type_option.selected)
+		if prev_meta != null:
+			prev_id = str(prev_meta)
+	_practice_type_option.clear()
+	var ids: Array = ExerciseLibraryScript.ids_for_skill(_practice_current_skill_filter)
+	if ids.is_empty():
+		# Defensive — should never happen, but if a skill has no matching exercises, fall back to all.
+		ids = ExerciseLibraryScript.ids_for_skill("all")
+	var restore_idx: int = 0
+	for i in range(ids.size()):
+		var id: String = ids[i]
+		_practice_type_option.add_item(ExerciseLibraryScript.display_name(id), i)
+		_practice_type_option.set_item_metadata(i, id)
+		if id == prev_id:
+			restore_idx = i
+	_practice_type_option.selected = restore_idx
+
+
+func _on_practice_skill_changed(idx: int) -> void:
+	if _practice_skill_option == null:
+		return
+	if idx < 0 or idx >= _practice_skill_option.item_count:
+		return
+	var meta = _practice_skill_option.get_item_metadata(idx)
+	if meta == null:
+		return
+	_practice_current_skill_filter = str(meta)
+	_practice_refresh_type_dropdown()
+
+
+func _on_practice_daily_warmup_pressed() -> void:
+	# Pick a level-appropriate exercise honoring the current focus filter, then
+	# apply it to the dropdowns and immediately generate. The user can still tweak
+	# octaves / staff mode after the auto-fill if they want.
+	var level: int = int(_practice_level_spin.value) if _practice_level_spin != null else 3
+	var focus: String = _practice_current_skill_filter
+	# Smart-pick: when focus is "all", consult the learning-module progress to find
+	# the user's weakest skill family and translate it into an exercise focus.
+	# This means Daily Warmup actually targets where the user needs the most help.
+	var inferred_from_weakness: String = ""
+	if focus == "all" and _learning_progress != null and _learning_progress.has_method("get_weakest_skill_family"):
+		var weakest_family: String = str(_learning_progress.get_weakest_skill_family())
+		if not weakest_family.is_empty():
+			inferred_from_weakness = CurriculumScript.focus_for_module_family(weakest_family)
+			if inferred_from_weakness != "all":
+				focus = inferred_from_weakness
+	var pick: Dictionary = CurriculumScript.daily_warmup_pick(level, focus, -1)
+	var ex_id: String = str(pick.get("exercise_id", "scale"))
+	var key_pc: int = int(pick.get("key_pc", 0))
+	var key_minor: bool = bool(pick.get("key_is_minor", false))
+	# Find the dropdown index whose metadata matches ex_id (refresh dropdown if filter excludes it).
+	var found_idx: int = -1
+	for i in range(_practice_type_option.item_count):
+		var meta = _practice_type_option.get_item_metadata(i)
+		if meta != null and str(meta) == ex_id:
+			found_idx = i
+			break
+	if found_idx < 0:
+		# The picked exercise isn't currently visible — clear focus filter and re-search.
+		_practice_current_skill_filter = "all"
+		if _practice_skill_option != null:
+			_practice_skill_option.set_block_signals(true)
+			_practice_skill_option.selected = 0
+			_practice_skill_option.set_block_signals(false)
+		_practice_refresh_type_dropdown()
+		for i in range(_practice_type_option.item_count):
+			var meta2 = _practice_type_option.get_item_metadata(i)
+			if meta2 != null and str(meta2) == ex_id:
+				found_idx = i
+				break
+	if found_idx >= 0:
+		_practice_type_option.selected = found_idx
+	# Apply key + minor selections.
+	if _practice_key_option != null:
+		for i in range(PRACTICE_KEY_OPTIONS.size()):
+			if int(PRACTICE_KEY_OPTIONS[i][1]) == key_pc:
+				_practice_key_option.selected = i
+				break
+	if _practice_minor_check != null:
+		_practice_minor_check.button_pressed = key_minor
+	if _practice_status_label != null:
+		var suffix: String = ""
+		if not inferred_from_weakness.is_empty() and inferred_from_weakness != "all":
+			suffix = "  ←  auto-focused on your weakest area"
+		_practice_status_label.text = "Daily Warmup: %s in %s %s%s" % [
+			ExerciseLibraryScript.display_name(ex_id),
+			_chord_explorer_key_pc_to_letter(key_pc),
+			"minor" if key_minor else "major",
+			suffix,
+		]
+	_on_practice_generate_pressed()
+
+
+func _chord_explorer_key_pc_to_letter(pc: int) -> String:
+	var sharps := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+	var pc_clamped := ((int(pc) % 12) + 12) % 12
+	return sharps[pc_clamped]
+
+
+func _on_practice_stop_pressed() -> void:
+	_practice_playback_active = false
+	_practice_playback_token += 1
+	_practice_playback_index = -1
+	if _practice_staff_area != null and _practice_staff_area.has_method("set_highlight_index"):
+		_practice_staff_area.set_highlight_index(-1)
+
+
+func _on_practice_export_pressed() -> void:
+	if _practice_current_exercise.is_empty():
+		if _practice_status_label != null:
+			_practice_status_label.text = "Generate an exercise first."
+		return
+	var path := MusicXMLEncoderScript.save_to_file(_practice_current_exercise)
+	if path.is_empty():
+		_practice_status_label.text = "Export failed — could not write file."
+		return
+	var abs_path := ProjectSettings.globalize_path(path)
+	_practice_status_label.text = "Saved: %s" % abs_path
+
+
+# --- Staff drawing for the practice exercise ---
+
+func _on_practice_staff_draw() -> void:
+	if _practice_staff_area == null:
+		return
+	var area := _practice_staff_area
+	var w := area.size.x
+	var h := area.size.y
+	if _practice_current_exercise.is_empty():
+		# Draw an empty 5-line staff as a placeholder.
+		_practice_draw_empty_staff(area, w, h)
+		return
+	var notes: Array = _practice_current_exercise.get("notes", [])
+	var time_num: int = int(_practice_current_exercise.get("time_sig_num", 4))
+	var beats_per_bar: float = float(time_num)
+	var total_beats: float = float(_practice_current_exercise.get("total_beats", 0.0))
+	var num_bars: int = max(1, int(ceil(total_beats / beats_per_bar)))
+	var hand: String = str(_practice_current_exercise.get("hand", "right"))
+	var on_bass := hand == "left"
+	# Layout
+	var line_color := Color(0.18, 0.22, 0.30, 1.0)
+	var ledger_color := Color(0.30, 0.34, 0.42, 0.85)
+	var gap := 11.0
+	var staff_x := 80.0
+	var staff_w := w - staff_x - 24.0
+	var staff_top := h * 0.35
+	# Pre-attribute width for clef/key/time before notes start
+	var pre_w := 64.0
+	var notes_x_start := staff_x + pre_w
+	var notes_w := staff_w - pre_w
+	var bar_w := notes_w / float(num_bars)
+	# Staff lines
+	for i in range(5):
+		var y := staff_top + i * gap
+		area.draw_line(Vector2(staff_x, y), Vector2(staff_x + staff_w, y), line_color, 1.6)
+	# Bar lines
+	for b in range(num_bars + 1):
+		var bx := notes_x_start + b * bar_w
+		var thickness := 2.6 if b == num_bars else 1.4
+		area.draw_line(Vector2(bx, staff_top), Vector2(bx, staff_top + gap * 4), line_color, thickness)
+	# Clef glyph
+	var clef_font := _ui_title_font if _ui_title_font != null else ThemeDB.fallback_font
+	if on_bass:
+		area.draw_string(clef_font, Vector2(staff_x - 8, staff_top + gap * 2.3), "𝄢", HORIZONTAL_ALIGNMENT_LEFT, -1, 36, line_color)
+	else:
+		area.draw_string(clef_font, Vector2(staff_x - 8, staff_top + gap * 3.6), "𝄞", HORIZONTAL_ALIGNMENT_LEFT, -1, 38, line_color)
+	# Key signature label (count of #/b)
+	var fifths: int = int(_practice_current_exercise.get("fifths", 0))
+	if fifths != 0:
+		var ks_text := "%d♯" % fifths if fifths > 0 else "%d♭" % absi(fifths)
+		area.draw_string(clef_font, Vector2(staff_x + 26, staff_top - 4), ks_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.36, 0.42, 0.55, 0.95))
+	# Time signature
+	area.draw_string(clef_font, Vector2(staff_x + 50, staff_top + gap * 1.5), "%d" % int(_practice_current_exercise.get("time_sig_num", 4)), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, line_color)
+	area.draw_string(clef_font, Vector2(staff_x + 50, staff_top + gap * 3.4), "%d" % int(_practice_current_exercise.get("time_sig_den", 4)), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, line_color)
+	# Notes
+	var note_color := Color(0.16, 0.20, 0.28, 1.0)
+	var prefer_flats := fifths < 0
+	for i in range(notes.size()):
+		var n: Dictionary = notes[i]
+		if bool(n.get("rest", false)) or int(n.get("midi", -1)) < 0:
+			continue
+		var beat: float = float(n.get("beat_offset", 0.0))
+		var bar_idx: float = beat / beats_per_bar
+		var note_x := notes_x_start + bar_idx * bar_w + 8.0
+		var midi: int = int(n["midi"])
+		var note_y := _practice_pitch_to_y(midi, staff_top, gap, on_bass)
+		# Active-note highlight during playback
+		var is_active := _practice_playback_active and i == _practice_playback_index
+		var head_color := MENU_PRIMARY_ACCENT if is_active else note_color
+		# Ledger lines
+		_practice_draw_ledgers(area, note_x, note_y, staff_top, gap, ledger_color)
+		# Notehead (oval)
+		_draw_oval_notehead(area, Vector2(note_x, note_y), 7.0, 5.2, head_color, line_color)
+		# Stem (simplified — straight line, no flag)
+		var stem_up := note_y > staff_top + gap * 2  # below middle line: stem up
+		var stem_x := note_x + (6.5 if stem_up else -6.5)
+		var stem_y_end := note_y - 30.0 if stem_up else note_y + 30.0
+		area.draw_line(Vector2(stem_x, note_y), Vector2(stem_x, stem_y_end), note_color, 1.4)
+		# Accidental glyph for sharps/flats
+		var pc := ((midi % 12) + 12) % 12
+		if pc in [1, 3, 6, 8, 10]:
+			var glyph := "♭" if prefer_flats else "♯"
+			area.draw_string(clef_font, Vector2(note_x - 18, note_y + 5), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, note_color)
+
+
+func _practice_draw_empty_staff(area: Control, w: float, h: float) -> void:
+	var line_color := Color(0.18, 0.22, 0.30, 1.0)
+	var gap := 11.0
+	var staff_top := h * 0.45
+	var staff_x := 80.0
+	var staff_w := w - staff_x - 24.0
+	for i in range(5):
+		var y := staff_top + i * gap
+		area.draw_line(Vector2(staff_x, y), Vector2(staff_x + staff_w, y), line_color, 1.6)
+
+
+func _practice_pitch_to_y(midi: int, staff_top: float, gap: float, on_bass: bool) -> float:
+	# Treble: top line F5 (MIDI 77 -> letter idx 38). Each diatonic step = half-gap.
+	# Bass: top line A3 (MIDI 57 -> letter idx 28).
+	var ref_letter: int = 28 if on_bass else 38  # A3 or F5
+	var pitch_letter := _practice_natural_letter_index(midi)
+	var diatonic_steps := ref_letter - pitch_letter
+	return staff_top + diatonic_steps * (gap * 0.5)
+
+
+func _practice_natural_letter_index(pitch: int) -> int:
+	var letter_per_pc := {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5, 10: 5, 11: 6}
+	var pc := ((pitch % 12) + 12) % 12
+	var octave := int(floor(pitch / 12.0)) - 1  # MIDI 60 = C4 -> octave 4
+	return octave * 7 + int(letter_per_pc[pc])
+
+
+func _practice_draw_ledgers(area: Control, note_x: float, note_y: float, staff_top: float, gap: float, ledger_color: Color) -> void:
+	var staff_top_y := staff_top
+	var staff_bottom_y := staff_top + gap * 4
+	var ledger_w := 16.0
+	if note_y < staff_top_y - gap * 0.5:
+		var y := staff_top_y - gap
+		while y >= note_y - gap * 0.5:
+			area.draw_line(Vector2(note_x - ledger_w * 0.5, y), Vector2(note_x + ledger_w * 0.5, y), ledger_color, 1.4)
+			y -= gap
+	elif note_y > staff_bottom_y + gap * 0.5:
+		var y2 := staff_bottom_y + gap
+		while y2 <= note_y + gap * 0.5:
+			area.draw_line(Vector2(note_x - ledger_w * 0.5, y2), Vector2(note_x + ledger_w * 0.5, y2), ledger_color, 1.4)
+			y2 += gap
+
+
+func _handle_midi_note_on(pitch: int) -> void:
+	if not _midi_active:
+		return
+	_midi_piano_viz_light(pitch, true)         # safe no-op when small viz not built
+	_sight_big_piano_light(pitch, true)        # new: light the big sight piano on MIDI press
+	if _chord_explorer_active:
+		_handle_midi_note_on_for_chord_explorer(pitch)
+		return
+	if _is_prompt_playing or _awaiting_round_start:
+		return
+	if _learning_lesson_player != null and _learning_lesson_player.visible:
+		if _learning_lesson_player.has_method("try_midi_note"):
+			_learning_lesson_player.try_midi_note(pitch, _midi_any_octave)
+		return
+	if not _quiz_active or not _accepting_answer:
+		return
+	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
+		_handle_midi_note_on_for_sight_notes(pitch)
+	elif _selected_mode == MODE_SIGHT and _sight_mode == "Chords":
+		_handle_midi_note_on_for_sight_chords(pitch)
+	elif _selected_mode == MODE_NOTE_CHASE:
+		_handle_midi_note_on_for_note_chase(pitch)
+
+
+func _handle_midi_note_on_for_sight_notes(pitch: int) -> void:
+	var note_name := _midi_pitch_to_note_name(pitch)
+	if note_name.is_empty():
+		return
+	var routed := _match_mic_note_to_sight(note_name)
+	if routed.is_empty():
+		return
+	var matched_btn: Button = _sight_key_buttons.get(routed, null) as Button
+	if matched_btn != null:
+		_pop_sight_button(matched_btn)
+	if not _midi_any_octave:
+		var target_midi := _current_sight_note_prompt_midi()
+		if target_midi >= 0 and pitch != target_midi:
+			if _midi_status_label != null and _midi_status_label.is_inside_tree():
+				_midi_status_label.text = "Wrong octave — try again (target near MIDI %d)." % target_midi
+			return
+	_on_sight_key_chosen(routed)
+
+
+func _handle_midi_note_on_for_note_chase(pitch: int) -> void:
+	var note_name := _midi_pitch_to_note_name(pitch)
+	if note_name.is_empty():
+		return
+	var enharmonics := {"C#": "Db", "D#": "Eb", "F#": "Gb", "G#": "Ab", "A#": "Bb"}
+	var alt: String = enharmonics.get(note_name, "")
+	# Find the best matching in-flight note: prefer current target, then any note matching the letter.
+	var matched_idx := -1
+	var matched_target := false
+	for i in range(_note_chase_active_notes.size()):
+		var n: Dictionary = _note_chase_active_notes[i]
+		if str(n.get("kind", "note")) != "note":
+			continue
+		if bool(n.get("hit", false)):
+			continue
+		var n_note := str(n.get("note", ""))
+		if n_note != note_name and n_note != alt:
+			continue
+		var is_target := bool(n.get("target", false))
+		if is_target and not matched_target:
+			matched_idx = i
+			matched_target = true
+			break
+		if matched_idx < 0:
+			matched_idx = i
+	if matched_idx < 0:
+		return
+	var matched_node: Panel = _note_chase_active_notes[matched_idx].get("node", null) as Panel
+	if matched_node == null:
+		return
+	var fake := InputEventMouseButton.new()
+	fake.button_index = MOUSE_BUTTON_LEFT
+	fake.pressed = true
+	_on_note_chase_note_gui_input(fake, matched_node)
+
+
+func _handle_midi_note_on_for_sight_chords(pitch: int) -> void:
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if _midi_chord_window_start < 0.0:
+		_midi_chord_buffer.clear()
+		_midi_chord_window_start = now
+	if not _midi_chord_buffer.has(pitch):
+		_midi_chord_buffer.append(pitch)
+
+
+func _midi_chord_buffer_tick() -> void:
+	if _midi_chord_window_start < 0.0:
+		return
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
+		_midi_chord_buffer.clear()
+		_midi_chord_window_start = -1.0
+		return
+	if not _quiz_active or not _accepting_answer:
+		_midi_chord_buffer.clear()
+		_midi_chord_window_start = -1.0
+		return
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if now - _midi_chord_window_start < MIDI_CHORD_WINDOW_SEC:
+		return
+	var played: Array[int] = _midi_chord_buffer.duplicate()
+	_midi_chord_buffer.clear()
+	_midi_chord_window_start = -1.0
+	_midi_evaluate_played_chord(played)
+
+
+func _midi_evaluate_played_chord(played_pitches: Array[int]) -> void:
+	if played_pitches.is_empty():
+		return
+	if _current_sight_chord_def.is_empty():
+		return
+	var correct_idx := _current_sight_chord_choices.find(_current_sight_chord_name)
+	if correct_idx < 0:
+		return
+	var recognized: Dictionary = ChordRecognizerScript.recognize(played_pitches)
+	var played_quality := str(recognized.get("quality", ""))
+	var played_choice_name: String = RECOGNIZER_QUALITY_TO_CHOICE.get(played_quality, "")
+	if played_choice_name == _current_sight_chord_name:
+		_on_sight_chord_choice_index(correct_idx)
+		return
+	if not played_choice_name.is_empty():
+		var matched_idx := _current_sight_chord_choices.find(played_choice_name)
+		if matched_idx >= 0:
+			_on_sight_chord_choice_index(matched_idx)
+			return
+	# Recognizer returned a chord type that's not in the current choices, OR a cluster.
+	var fallback_idx := (correct_idx + 1) % _current_sight_chord_choices.size()
+	_on_sight_chord_choice_index(fallback_idx)
+
+
+func _handle_midi_note_off(pitch: int) -> void:
+	if not _midi_active:
+		return
+	_midi_piano_viz_light(pitch, false)        # safe no-op when small viz not built
+	_sight_big_piano_light(pitch, false)       # new: release the big sight piano key on MIDI release
+	if _chord_explorer_active:
+		_handle_midi_note_off_for_chord_explorer(pitch)
+
+
+func _handle_midi_sustain_pressed() -> void:
+	if not _midi_active:
+		return
+	if _replay_button == null or _replay_button.disabled or not _replay_button.visible:
+		return
+	if _is_prompt_playing or not _quiz_active:
+		return
+	_on_replay_pressed()
+
+
+func _pop_sight_button(btn: Button) -> void:
+	if btn == null or not btn.is_inside_tree():
+		return
+	var existing: Tween = _midi_button_pop_tweens.get(btn, null) as Tween
+	if existing != null and existing.is_valid():
+		existing.kill()
+	btn.pivot_offset = btn.size * 0.5
+	btn.scale = Vector2.ONE
+	var t := create_tween()
+	t.set_trans(Tween.TRANS_BACK)
+	t.set_ease(Tween.EASE_OUT)
+	t.tween_property(btn, "scale", Vector2(1.12, 1.12), 0.08)
+	t.tween_property(btn, "scale", Vector2.ONE, 0.16)
+	_midi_button_pop_tweens[btn] = t
+
+
+func _stop_mic_listening() -> void:
+	if _pitch_detector != null:
+		_pitch_detector.stop_listening()
+	_mic_listening = false
+	if _mic_status_label != null:
+		_mic_status_label.visible = false
+
+
+func _poll_mic_pitch() -> void:
+	if _pitch_detector == null or not _mic_listening:
+		return
+	if _awaiting_round_start or _is_prompt_playing:
+		return
+	var result: Dictionary = _pitch_detector.poll()
+	if not result.get("detected", false):
+		if _mic_status_label != null:
+			_mic_status_label.text = "Mic: listening..."
+		return
+	var detected_name: String = str(result.get("note_name", ""))
+	if detected_name.is_empty():
+		return
+	# Show what we detected
+	if _mic_status_label != null:
+		_mic_status_label.text = "Heard: %s" % str(result.get("full_name", detected_name))
+	# Map to sight note and submit answer
+	var matched := _match_mic_note_to_sight(detected_name)
+	if matched.is_empty():
+		return
+	_on_sight_key_chosen(matched)
+
+
+func _match_mic_note_to_sight(detected: String) -> String:
+	if _sight_key_buttons.has(detected):
+		return detected
+	var enharmonics := {"C#": "Db", "Db": "C#", "D#": "Eb", "Eb": "D#", "F#": "Gb", "Gb": "F#", "G#": "Ab", "Ab": "G#", "A#": "Bb", "Bb": "A#"}
+	var alt: String = enharmonics.get(detected, "")
+	if not alt.is_empty() and _sight_key_buttons.has(alt):
+		return alt
+	return detected
+
+
+func _show_sight_note_name_label(is_correct: bool) -> void:
+	# Float the correct note's letter directly above the notehead so the user
+	# sees the answer the instant they commit. No await, no extra delay — the
+	# label persists until the next round's note replaces it.
+	if _sight_note_name_label == null or _staff_note == null:
+		return
+	if not _staff_note.visible:
+		return
+	_sight_note_name_label.text = _current_sight_note
+	# Green when right, soft red when wrong. Outline keeps the text legible
+	# against both the white note head and any ledger lines that pass nearby.
+	if is_correct:
+		_sight_note_name_label.add_theme_color_override("font_color", Color(0.32, 1.0, 0.46, 1.0))
+	else:
+		_sight_note_name_label.add_theme_color_override("font_color", Color(1.0, 0.46, 0.42, 1.0))
+	# Size the label to a reasonable width, then centre it above the notehead.
+	var label_w := 90.0
+	var label_h := 28.0
+	_sight_note_name_label.size = Vector2(label_w, label_h)
+	var note_center_x: float = _staff_note.position.x + (_staff_note.size.x * 0.5)
+	var top_y: float = _staff_note.position.y - label_h - 6.0  # 6px gap above the notehead
+	_sight_note_name_label.position = Vector2(note_center_x - (label_w * 0.5), top_y)
+	_sight_note_name_label.visible = true
+
+
+func _hide_sight_note_name_label() -> void:
+	if _sight_note_name_label != null:
+		_sight_note_name_label.visible = false
 
 
 func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null) -> void:
@@ -16231,6 +23662,10 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 	var prev_streak := _streak
 	var prev_xp := _xp
 	var is_correct := note_name == _current_sight_note
+	# Immediately float the correct note name above the note head — no wait. The
+	# label stays visible through the feedback animation and is cleared the
+	# moment the next round repositions the staff note.
+	_show_sight_note_name_label(is_correct)
 	var correct_btn: Button = _sight_key_buttons.get(_current_sight_note, null) as Button
 	if chosen_btn_override != null and note_name == _current_sight_note:
 		correct_btn = chosen_btn_override
@@ -16248,28 +23683,33 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 		_status_label.text = "Correct! That note is %s." % _current_sight_note
 		if granted_shield:
 			_status_label.text += " Chicken shield ready!"
+		# Fast-path right-answer feedback (~0.22s green flash). Bounce + SFX fire
+		# concurrently so they don't delay the next question.
+		_play_sight_note_correct_bounce_once()
+		_play_success_sfx()
 		await _blink_sight_feedback(null, correct_btn, 3)
-		await _play_sight_note_correct_bounce_once()
-		await _play_success_sfx()
 	else:
 		if is_almost_right:
 			_streak = 0
 			_xp = maxi(0, _xp - 1)
 			_status_label.text = "Almost right. In this key, %s is correct (not %s)." % [_current_sight_note, note_name]
+			# Fire SFX immediately (no await) so the wrong-press sound lands the
+			# instant the user clicks, not after the blink animation finishes.
+			_play_fail_sfx()
 			await _blink_sight_feedback(chosen_btn, correct_btn, 3, char(0x26A0), Color(1.0, 0.82, 0.28, 1.0))
-			await _play_fail_sfx()
 		else:
 			var shielded := _consume_chicken_shield_on_wrong()
 			if not shielded:
 				_streak = 0
-				_lives = maxi(0, _lives - 1)
+				if not _practice_mode_enabled:
+					_lives = maxi(0, _lives - 1)
 				_xp = maxi(0, _xp - 2)
 				_status_label.text = "Not quite. Correct note: %s." % _current_sight_note
 			else:
 				_xp = maxi(0, _xp - 1)
 				_status_label.text = "Shield blocked the miss. Correct note: %s." % _current_sight_note
+			_play_fail_sfx()
 			await _blink_sight_feedback(chosen_btn, correct_btn, 3)
-			await _play_fail_sfx()
 
 	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
 	_refresh_meta_ui()
@@ -16282,29 +23722,7 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 	else:
 		await _play_hungry_reaction()
 
-	if _lives <= 0:
-		_quiz_active = false
-		_accepting_answer = false
-		await _fly_bird_away_sad()
-		_set_answer_buttons_enabled(false)
-		_replay_button.disabled = true
-		_restart_button.disabled = false
-		_status_label.text = ""
-		_progress_label.text = _final_quiz_result_text(_score, _question_index, _xp)
-		if _sight_progress_track != null:
-			_sight_progress_track.visible = false
-			_set_sight_progress_ratio(0.0, false)
-		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
-		_home_info_label.text = _session_performance_summary()
-		await _play_gameover_fail_sfx()
-		if _selected_mode == MODE_SIGHT:
-			_set_sight_result_background_hidden(true)
-		_result_box_show("Game Over", "No lives left. Restart or Back.")
-		return
-
-	await get_tree().create_timer(_current_post_answer_delay()).timeout
-	if _should_advance_after_delay(quiz_token):
-		await _begin_next_question(quiz_token)
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
 
 func _on_continuous_virtual_key_button_down(note_name: String) -> void:
@@ -16837,7 +24255,7 @@ func _update_continuous_visual_aids() -> void:
 		_hide_continuous_visual_aids()
 		return
 	var beginner_aids_active := _continuous_sight_level <= 2 or _continuous_assist_level > 0
-	if not _continuous_sight_active or _continuous_sight_waiting_start or _continuous_rest_bar_active or not _continuous_note_flow_aids_enabled or not beginner_aids_active:
+	if not _continuous_sight_active or _continuous_sight_waiting_start or not _continuous_note_flow_aids_enabled or not beginner_aids_active:
 		_hide_continuous_visual_aids()
 		return
 	_ensure_continuous_aid_nodes()
@@ -16918,14 +24336,14 @@ func _continuous_register_miss(play_sfx: bool = true, custom_status: String = "M
 	_continuous_sight_combo = 0
 	_streak = 0
 	_continuous_append_miss_log(reason, note_name, step)
-	if not _continuous_testing_no_life_loss:
+	if not _continuous_testing_no_life_loss and not _practice_mode_enabled:
 		_lives = maxi(0, _lives - 1)
 	_status_label.text = custom_status if custom_status != "Miss" else str(reason)
 	if play_sfx:
 		call_deferred("_play_fail_sfx")
 	_refresh_meta_ui()
-	if not _continuous_testing_no_life_loss and _lives <= 0:
-		_finish_continuous_sight_reading("Game Over")
+	if not _continuous_testing_no_life_loss and not _practice_mode_enabled and _lives <= 0:
+		_finish_continuous_sight_reading("Keep Practicing!")
 
 
 func _continuous_register_click_miss(custom_status: String = "Miss", reason: String = "Wrong Pitch", note_name: String = "", step: int = 0) -> void:
@@ -17060,17 +24478,18 @@ func _spawn_continuous_empty_bar_visual() -> void:
 
 
 func _start_continuous_rest_bar() -> void:
-	_continuous_rest_bar_active = true
-	_continuous_rest_bar_timer = (60.0 / float(maxi(1, _continuous_sight_bpm))) * 4.0
-	# Phrase rest: stop spawning for one bar, but keep current notes flowing out.
+	# Rest-bar insertion was removed from Note Flow; keep this as a safety no-op.
+	_continuous_rest_bar_active = false
+	_continuous_rest_bar_timer = 0.0
 	_set_continuous_rest_symbol_visible(false)
-	_spawn_continuous_empty_bar_visual()
-	_status_label.text = "Empty bar"
-	_apply_answer_mode()
+	_clear_continuous_empty_bar_visual()
 
 
-func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: float = NAN, count_toward_rest: bool = true) -> void:
+func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: float = NAN, _count_toward_rest: bool = true) -> void:
 	if _staff_area == null:
+		return
+	# Runtime Note Flow spawning must respect gap constraints to avoid occasional overlap/double-note artifacts.
+	if is_nan(center_x_override) and not _continuous_can_spawn_note():
 		return
 	var bounds := _continuous_sight_level_bounds if _continuous_sight_active else _effective_sight_step_bounds()
 	var note_spec := _continuous_take_next_note_spec(bounds)
@@ -17141,11 +24560,6 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 		"ledgers": ledgers
 	})
 	_continuous_spawn_seq += 1
-	if count_toward_rest and _continuous_sight_active and not _continuous_rest_bar_active:
-		_continuous_notes_until_rest -= 1
-		if _continuous_notes_until_rest <= 0:
-			_continuous_notes_until_rest = 16
-			_start_continuous_rest_bar()
 
 
 func _seed_continuous_stream_near_line(seed_count: int = 17) -> void:
@@ -17323,9 +24737,7 @@ func _continuous_next_note_index() -> int:
 	return best_idx
 
 
-func _continuous_can_spawn_note() -> bool:
-	if _continuous_sight_notes.is_empty():
-		return true
+func _continuous_rightmost_note_center_x() -> float:
 	var rightmost_center_x := -INF
 	for n in _continuous_sight_notes:
 		var p_v: Variant = n.get("panel", null)
@@ -17338,12 +24750,24 @@ func _continuous_can_spawn_note() -> bool:
 		if not is_finite(center_x):
 			continue
 		rightmost_center_x = maxf(rightmost_center_x, center_x)
+	return rightmost_center_x
+
+
+func _continuous_can_spawn_note() -> bool:
+	if _continuous_sight_notes.is_empty():
+		return true
+	var rightmost_center_x := _continuous_rightmost_note_center_x()
 	if rightmost_center_x == -INF:
 		return true
-	if (_continuous_spawn_x() - rightmost_center_x) >= _continuous_sight_min_gap:
+	var spawn_x := _continuous_spawn_x()
+	var gap := spawn_x - rightmost_center_x
+	if gap >= _continuous_sight_min_gap:
 		return true
-	# Safety fallback for low-FPS/mobile edge cases where spacing gate can stall.
-	return (_continuous_sight_elapsed - _continuous_last_spawn_elapsed) >= 1.6
+	# Fallback for low-FPS edge cases, but never when the newest note is still at/after spawn X.
+	# This avoids accidental near-overlap/double-note stacks when the game hitches.
+	if rightmost_center_x > (spawn_x + 2.0):
+		return false
+	return gap >= 24.0 and (_continuous_sight_elapsed - _continuous_last_spawn_elapsed) >= 1.6
 
 
 func _rhythm_flow_pattern_library() -> Array[Array]:
@@ -18968,6 +26392,10 @@ func _rhythm_flow_update_count_in_and_spawns() -> void:
 
 func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhythm_pattern: bool = false) -> void:
 	_continuous_sight_active = true
+	# Phase 3 lesson session: continuous flows don't enter through the standard
+	# quiz path, so record the activity start here.
+	if not demo_mode:
+		_lesson_session_record_activity_start()
 	_continuous_touch_suppress_note = ""
 	_continuous_touch_suppress_until_sec = 0.0
 	_continuous_touch_suppress_any_until_sec = 0.0
@@ -19065,70 +26493,13 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 
 
 func _finish_continuous_sight_reading(result_title: String = "Complete") -> void:
-	var was_rhythm_demo := _is_rhythm_flow_mode() and _rhythm_flow_session_mode == RHYTHM_FLOW_SESSION_DEMO
-	_continuous_sight_active = false
-	_continuous_sight_waiting_start = false
-	_quiz_active = false
-	_accepting_answer = false
-	_rhythm_flow_paused = false
-	_set_answer_buttons_enabled(false)
-	_refresh_rhythm_flow_play_pause_button()
-	if _continuous_sight_play_line != null:
-		_continuous_sight_play_line.visible = false
-	_set_rhythm_triplet_guides_visible(false)
-	_rhythm_triplet_guide_last_tick_idx = -1
-	_rhythm_triplet_guide_flash_dot = -1
-	_rhythm_triplet_guide_flash_until_sec = -1.0
-	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
-	var avg_rt_ms := 0.0
-	if _continuous_sight_reaction_count > 0:
-		avg_rt_ms = (_continuous_sight_reaction_sum / float(_continuous_sight_reaction_count)) * 1000.0
-	var summary := ""
-	if _is_rhythm_flow_mode():
-		if was_rhythm_demo:
-			summary = "Listening and learning run finished | BPM %d\nScoring was paused." % [_rhythm_flow_bpm]
-		else:
-			var perfect_pct := int(round((float(_continuous_sight_perfect_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
-			summary = "Rhythm Flow | BPM %d | Score %d | Accuracy %d%% | Perfect %d%%\nPerfect %d  Good %d  OK %d  Miss %d | Longest Streak %d" % [_rhythm_flow_bpm, _score, acc, perfect_pct, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_ok_hits, _continuous_sight_miss_hits, _continuous_sight_best_combo]
-	else:
-		summary = "Level %d | Score %d | Accuracy %d%% | Avg RT %.0fms\nPerfect %d  Good %d  Miss %d | Best Combo %d" % [_continuous_sight_level, _score, acc, avg_rt_ms, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _continuous_sight_miss_hits, _continuous_sight_best_combo]
-		var problem_summary := _continuous_problem_area_summary()
-		if not problem_summary.is_empty():
-			summary += "\n" + problem_summary
-	_progress_label.text = "Session Ended"
-	_status_label.text = summary
-	_home_info_label.text = summary
-	if not was_rhythm_demo:
-		_update_daily_streak(true)
-	if was_rhythm_demo:
-		var demo_title := "Listening and Learning Complete"
-		if result_title == "Demo Stopped":
-			demo_title = "Listening and Learning Stopped"
-		_result_box_show(demo_title, summary)
-		if OS.is_debug_build():
-			print("Rhythm Flow listening/learning run finished")
-	else:
-		_result_box_show(result_title, summary)
-	if _is_rhythm_flow_mode() and _result_action_row != null:
-		_result_action_row.visible = true
-		if _result_action_primary_button != null:
-			_result_action_primary_button.text = "Restart Rhythm"
-			_result_action_primary_button.disabled = false
-		if _result_action_secondary_button != null:
-			_result_action_secondary_button.text = "Back"
-			_result_action_secondary_button.disabled = false
-	_clear_continuous_sight_notes()
-	_hide_continuous_visual_aids()
-	_set_continuous_rest_symbol_visible(false)
-	_rhythm_flow_session_mode = RHYTHM_FLOW_SESSION_PLAYING
-	_rhythm_flow_scoring_enabled = true
-	_rhythm_flow_input_enabled = true
-	_rhythm_is_practice = was_rhythm_demo
-	_rhythm_flow_demo_next_event_idx = 0
-	_refresh_rhythm_flow_demo_buttons()
-	if was_rhythm_demo:
-		_rhythm_flow_paused = true
-		_refresh_rhythm_flow_practice_scrub_overlay()
+	# Phase 3 lesson session: capture rhythm/continuous totals before the controller
+	# tears down state. _continuous_sight_correct_hits / _total_hits live for the
+	# lifetime of the run.
+	var c_score: int = int(_continuous_sight_correct_hits)
+	var c_total: int = int(_continuous_sight_total_hits)
+	_lesson_session_record_activity_end(c_score, c_total)
+	_ensure_session_controller().finish_continuous_sight_reading(self, result_title)
 
 
 func _on_continuous_sight_key_pressed(note_name: String) -> void:
@@ -19320,10 +26691,24 @@ func _update_rhythm_flow(delta: float) -> void:
 		return
 	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
 	if _rhythm_flow_session_mode == RHYTHM_FLOW_SESSION_DEMO:
-		_progress_label.text = "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_bpm]
+		var demo_text := "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_bpm]
+		if _progress_label.text != demo_text:
+			_progress_label.text = demo_text
 	else:
-		_progress_label.text = "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+		var rhythm_text := "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+		if _progress_label.text != rhythm_text:
+			_progress_label.text = rhythm_text
 	_score_label.text = "Score: %d" % _score
+	if _continuous_sight_skin_active:
+		if _sight_lives_hearts_label != null and _hud_combo_displayed != _continuous_sight_combo:
+			_hud_combo_displayed = _continuous_sight_combo
+			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+		if _sight_streak_value_label != null and _hud_level_displayed != _rhythm_flow_bpm:
+			_hud_level_displayed = _rhythm_flow_bpm
+			_sight_streak_value_label.text = str(_rhythm_flow_bpm)
+		if _sight_streak_score_label != null and _hud_acc_displayed != acc:
+			_hud_acc_displayed = acc
+			_sight_streak_score_label.text = "ACC %d%%" % acc
 
 
 func _update_continuous_sight(delta: float) -> void:
@@ -19342,54 +26727,17 @@ func _update_continuous_sight(delta: float) -> void:
 		_update_rhythm_flow(0.0 if rhythm_paused else delta)
 		return
 	_update_continuous_visual_aids()
-	if _continuous_rest_bar_active:
-		_continuous_rest_bar_timer = maxf(0.0, _continuous_rest_bar_timer - delta)
-		if _continuous_rest_bar_timer <= 0.0:
-			_continuous_rest_bar_active = false
-			_set_continuous_rest_symbol_visible(false)
-			_continuous_last_spawn_elapsed = _continuous_sight_elapsed
-			_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
-			_status_label.text = "Level %d" % _continuous_sight_level
-			_apply_answer_mode()
-	# During a rest bar, existing notes keep moving but no new notes spawn.
-	if _continuous_rest_bar_active:
-		pass
-	else:
-		_continuous_sight_spawn_timer -= delta
-		if _continuous_sight_spawn_timer <= 0.0 and _continuous_can_spawn_note():
-			_spawn_continuous_sight_note()
-			_continuous_last_spawn_elapsed = _continuous_sight_elapsed
-			_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
+	_continuous_sight_spawn_timer -= delta
+	if _continuous_sight_spawn_timer <= 0.0 and _continuous_can_spawn_note():
+		_spawn_continuous_sight_note()
+		_continuous_last_spawn_elapsed = _continuous_sight_elapsed
+		_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
 	var line_x := _continuous_play_line_x()
 	var remove_x := -40.0
 	var zone_bounds := _continuous_zone_bounds()
 	var focus_idx := _continuous_next_note_index()
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
 		remove_x = _note_chase_staff_frame.position.x - 40.0
-	var _surviving_bar_lines: Array[ColorRect] = []
-	for line in _continuous_empty_bar_lines:
-		if line == null or not is_instance_valid(line):
-			continue
-		line.position.x -= _continuous_sight_speed * delta
-		if line.position.x < line_x - 6.0:
-			line.modulate = Color(1, 1, 1, clampf(line.modulate.a - (delta * 1.8), 0.0, 1.0))
-		if line.position.x < remove_x or line.modulate.a <= 0.02:
-			line.queue_free()
-		else:
-			_surviving_bar_lines.append(line)
-	_continuous_empty_bar_lines = _surviving_bar_lines
-	var _surviving_bar_rests: Array[Label] = []
-	for rest_lbl in _continuous_empty_bar_rests:
-		if rest_lbl == null or not is_instance_valid(rest_lbl):
-			continue
-		rest_lbl.position.x -= _continuous_sight_speed * delta
-		if rest_lbl.position.x < line_x - 12.0:
-			rest_lbl.modulate = Color(1, 1, 1, clampf(rest_lbl.modulate.a - (delta * 1.8), 0.0, 1.0))
-		if rest_lbl.position.x < remove_x or rest_lbl.modulate.a <= 0.02:
-			rest_lbl.queue_free()
-		else:
-			_surviving_bar_rests.append(rest_lbl)
-	_continuous_empty_bar_rests = _surviving_bar_rests
 	var _surviving_notes: Array[Dictionary] = []
 	for i in range(_continuous_sight_notes.size()):
 		var n := _continuous_sight_notes[i]
@@ -19470,8 +26818,20 @@ func _update_continuous_sight(delta: float) -> void:
 					if not _continuous_sight_active:
 						return
 	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
-	_progress_label.text = "LV:%d  ACC:%d%%  P:%d G:%d M:%d  COMBO:%d" % [_continuous_sight_level, acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+	var new_progress_text := "LV:%d  ACC:%d%%  P:%d G:%d M:%d  COMBO:%d" % [_continuous_sight_level, acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+	if _progress_label.text != new_progress_text:
+		_progress_label.text = new_progress_text
 	_score_label.text = "Score: %d" % _score
+	if _continuous_sight_skin_active:
+		if _sight_lives_hearts_label != null and _hud_combo_displayed != _lives:
+			_hud_combo_displayed = _lives
+			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
+		if _sight_streak_value_label != null and _hud_level_displayed != _continuous_sight_combo:
+			_hud_level_displayed = _continuous_sight_combo
+			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_combo]
+		if _sight_streak_score_label != null and _hud_acc_displayed != _score:
+			_hud_acc_displayed = _score
+			_sight_streak_score_label.text = "Score: %d" % _score
 
 
 func _on_sight_chord_choice_index(choice_idx: int) -> void:
@@ -19516,14 +26876,16 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 		var shielded := _consume_chicken_shield_on_wrong()
 		if not shielded:
 			_streak = 0
-			_lives = maxi(0, _lives - 1)
+			if not _practice_mode_enabled:
+				_lives = maxi(0, _lives - 1)
 			_xp = maxi(0, _xp - 2)
 			_status_label.text = "Not quite. Correct chord: %s." % _current_sight_chord_name
 		else:
 			_xp = maxi(0, _xp - 1)
 			_status_label.text = "Shield blocked the miss. Correct chord: %s." % _current_sight_chord_name
+		# Fire SFX immediately (no await) so wrong-press feedback lands on the click.
+		_play_fail_sfx()
 		await _blink_answer_feedback(chosen_btn, correct_btn, 3)
-		await _play_fail_sfx()
 
 	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
 	_refresh_meta_ui()
@@ -19536,29 +26898,7 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 	else:
 		await _play_hungry_reaction()
 
-	if _lives <= 0:
-		_quiz_active = false
-		_accepting_answer = false
-		await _fly_bird_away_sad()
-		_set_answer_buttons_enabled(false)
-		_replay_button.disabled = true
-		_restart_button.disabled = false
-		_status_label.text = ""
-		_progress_label.text = _final_quiz_result_text(_score, _question_index, _xp)
-		if _sight_progress_track != null:
-			_sight_progress_track.visible = false
-			_set_sight_progress_ratio(0.0, false)
-		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
-		_home_info_label.text = _session_performance_summary()
-		await _play_gameover_fail_sfx()
-		if _selected_mode == MODE_SIGHT:
-			_set_sight_result_background_hidden(true)
-		_result_box_show("Game Over", "No lives left. Restart or Back.")
-		return
-
-	await get_tree().create_timer(_current_post_answer_delay()).timeout
-	if _should_advance_after_delay(quiz_token):
-		await _begin_next_question(quiz_token)
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
 
 func _set_answer_buttons_enabled(enabled: bool) -> void:
@@ -19726,6 +27066,15 @@ func _finish_note_drag_drop(drop_local_pos: Vector2 = Vector2(-1, -1)) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMIDI and _midi_active:
+		var midi_evt := event as InputEventMIDI
+		if midi_evt.message == MIDI_MESSAGE_NOTE_ON and midi_evt.velocity > 0:
+			_handle_midi_note_on(int(midi_evt.pitch))
+		elif midi_evt.message == MIDI_MESSAGE_NOTE_OFF or (midi_evt.message == MIDI_MESSAGE_NOTE_ON and midi_evt.velocity == 0):
+			_handle_midi_note_off(int(midi_evt.pitch))
+		elif midi_evt.message == MIDI_MESSAGE_CONTROL_CHANGE and int(midi_evt.controller_number) == 64 and int(midi_evt.controller_value) >= 64:
+			_handle_midi_sustain_pressed()
+		return
 	if not _is_note_dragging:
 		return
 	if not _is_placement_drag_context_active():
@@ -19743,6 +27092,16 @@ func _input(event: InputEvent) -> void:
 
 
 func _on_staff_note_gui_input(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		if st.pressed and _try_show_sight_chord_note_name_from_panel(_staff_note):
+			accept_event()
+			return
+	if event is InputEventMouseButton:
+		var mb_click := event as InputEventMouseButton
+		if mb_click.button_index == MOUSE_BUTTON_LEFT and mb_click.pressed and _try_show_sight_chord_note_name_from_panel(_staff_note):
+			accept_event()
+			return
 	if not _is_placement_drag_context_active():
 		return
 
@@ -19763,6 +27122,160 @@ func _on_staff_note_gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
+func _sight_note_name_with_accidental(letter: String, accidental: int, octave: int = -100) -> String:
+	return _ensure_sight_renderer().sight_note_name_with_accidental(letter, accidental, octave)
+
+
+func _sight_chord_note_panel_by_index(note_index: int) -> Panel:
+	if note_index <= 0:
+		return _staff_note
+	if note_index - 1 >= 0 and note_index - 1 < _staff_chord_notes.size():
+		return _staff_chord_notes[note_index - 1]
+	return null
+
+
+func _position_sight_chord_note_chip_near_panel(panel: Panel) -> void:
+	if _staff_area == null or _sight_note_chip == null or panel == null:
+		return
+	var center_x := panel.position.x + (panel.size.x * panel.scale.x * 0.5)
+	var center_y := panel.position.y + (panel.size.y * panel.scale.y * 0.5)
+	var panel_w := panel.size.x * panel.scale.x
+	var chip_size := _sight_note_chip.size
+	var x := center_x + (panel_w * 0.52) + 10.0
+	var y := center_y - chip_size.y - 8.0
+	if x + chip_size.x > _staff_area.size.x - 6.0:
+		x = center_x - chip_size.x - (panel_w * 0.52) - 10.0
+	if y < 6.0:
+		y = center_y + 10.0
+	x = clampf(x, 6.0, _staff_area.size.x - chip_size.x - 6.0)
+	y = clampf(y, 6.0, _staff_area.size.y - chip_size.y - 6.0)
+	_sight_note_chip.position = Vector2(x, y)
+
+
+func _hide_sight_chord_note_chip() -> void:
+	_sight_note_chip_hover_index = -1
+	if _sight_note_chip != null:
+		_sight_note_chip.visible = false
+
+
+func _show_sight_chord_note_chip_for_panel(panel: Panel, note_name: String, pin_seconds: float = 0.0) -> void:
+	if _sight_note_chip == null or _sight_note_chip_label == null or panel == null:
+		return
+	_sight_note_chip_nonce += 1
+	var nonce := _sight_note_chip_nonce
+	_sight_note_chip_label.text = note_name
+	var label_size := _sight_note_chip_label.get_combined_minimum_size()
+	_sight_note_chip.size = Vector2(maxf(58.0, label_size.x + 22.0), maxf(32.0, label_size.y + 10.0))
+	_position_sight_chord_note_chip_near_panel(panel)
+	if _sight_note_chip_tween != null and is_instance_valid(_sight_note_chip_tween):
+		_sight_note_chip_tween.kill()
+	_sight_note_chip.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_sight_note_chip.visible = true
+	_sight_note_chip_tween = create_tween()
+	_sight_note_chip_tween.tween_property(_sight_note_chip, "modulate:a", 1.0, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if pin_seconds <= 0.0:
+		return
+	await get_tree().create_timer(pin_seconds).timeout
+	if nonce != _sight_note_chip_nonce:
+		return
+	if _sight_note_chip_hover_index < 0:
+		_hide_sight_chord_note_chip()
+
+
+func _try_show_sight_chord_note_name_from_panel(panel: Panel) -> bool:
+	if panel == null or not panel.visible:
+		return false
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords" or _awaiting_round_start:
+		return false
+	if not panel.has_meta("sight_note_name"):
+		return false
+	var note_name := str(panel.get_meta("sight_note_name", "")).strip_edges()
+	if note_name == "":
+		return false
+	_show_sight_chord_note_chip_for_panel(panel, note_name, SIGHT_CHORD_NOTE_TAP_PROMPT_SECONDS)
+	return true
+
+
+func _try_play_sight_chord_note_from_panel(panel: Panel) -> bool:
+	if panel == null or not panel.visible:
+		return false
+	if not _is_sight_chords_grand_staff_mode() or _awaiting_round_start or _is_prompt_playing or not _quiz_active or not _accepting_answer:
+		return false
+	if not panel.has_meta("sight_note_midi"):
+		return false
+	var midi_note := int(panel.get_meta("sight_note_midi", -1))
+	if midi_note < 0:
+		return false
+	_play_sight_chord_note_preview(midi_note)
+	return true
+
+
+func _play_sight_chord_note_preview(midi_note: int) -> void:
+	var sample_map := _sample_map_for_current_mode()
+	if sample_map.is_empty():
+		return
+	var nearest := _nearest_sample_midi_from_map(midi_note, sample_map)
+	if not sample_map.has(nearest):
+		return
+	var stream := sample_map[nearest] as AudioStream
+	if stream == null or _piano_player == null:
+		return
+	_piano_player.stop()
+	_piano_player.stream = stream
+	_piano_player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+	_piano_player.play()
+	_sight_note_preview_nonce += 1
+	var preview_nonce := _sight_note_preview_nonce
+	get_tree().create_timer(SIGHT_CHORD_NOTE_PREVIEW_DURATION).timeout.connect(func() -> void:
+		if preview_nonce != _sight_note_preview_nonce:
+			return
+		if _piano_player != null:
+			_piano_player.stop()
+	)
+
+
+func _on_sight_chord_note_gui_input(event: InputEvent, note_index: int) -> void:
+	var panel := _sight_chord_note_panel_by_index(note_index)
+	if panel == null:
+		return
+	if event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		if st.pressed:
+			var shown := _try_show_sight_chord_note_name_from_panel(panel)
+			var played := _try_play_sight_chord_note_from_panel(panel)
+			if shown or played:
+				accept_event()
+				return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+			var shown_click := _try_show_sight_chord_note_name_from_panel(panel)
+			var played_click := _try_play_sight_chord_note_from_panel(panel)
+			if shown_click or played_click:
+				accept_event()
+				return
+
+
+func _on_sight_chord_note_mouse_entered(note_index: int) -> void:
+	var panel := _sight_chord_note_panel_by_index(note_index)
+	if panel == null:
+		return
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords" or _awaiting_round_start:
+		return
+	var note_name := str(panel.get_meta("sight_note_name", "")).strip_edges()
+	if note_name == "":
+		return
+	_sight_note_chip_hover_index = note_index
+	_show_sight_chord_note_chip_for_panel(panel, note_name)
+
+
+func _on_sight_chord_note_mouse_exited(note_index: int) -> void:
+	if _sight_note_chip_hover_index != note_index:
+		return
+	_sight_note_chip_hover_index = -1
+	_hide_sight_chord_note_chip()
+
+
 func _nearest_staff_step_from_center_y(center_y: float) -> int:
 	var step := int(round((center_y - _active_staff_top_y()) / _active_staff_step_y()))
 	var bounds := _effective_sight_step_bounds()
@@ -19771,12 +27284,18 @@ func _nearest_staff_step_from_center_y(center_y: float) -> int:
 
 func _active_staff_top_y() -> float:
 	if _selected_mode == MODE_NOTE_CHASE and _staff_area != null:
-		var top_y_chase := clampf(_staff_area.size.y * 0.30, 120.0, 220.0)
-		if _selected_clef == "Treble":
-			top_y_chase = maxf(106.0, top_y_chase - clampf(_staff_area.size.y * 0.035, 14.0, 26.0))
+		# Keep Note Chase staff centered with extra ledger headroom on both top and bottom.
+		var top_y_chase := clampf(_staff_area.size.y * 0.30, 132.0, 220.0)
 		return top_y_chase
 	if _selected_mode == MODE_SIGHT and _staff_area != null:
 		var sight_h := _staff_area.size.y
+		# Grand staff chord mode: center both staves in the bounding area
+		if _sight_mode == "Chords" and _grand_staff_active:
+			var gap := _active_staff_line_gap_y()
+			# Total height: treble(4*gap) + inter-staff(4*gap) + bass(4*gap) = 12*gap
+			var total_h := gap * 12.0
+			var top := maxf(12.0, (sight_h - total_h) * 0.5)
+			return top
 		var ledger_heavy_sight := _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous"
 		if ledger_heavy_sight:
 			var gap := _active_staff_line_gap_y()
@@ -19790,9 +27309,20 @@ func _active_staff_top_y() -> float:
 
 func _active_staff_line_gap_y() -> float:
 	if _selected_mode == MODE_NOTE_CHASE and _staff_area != null:
-		return clampf(_staff_area.size.y * 0.13, 50.0, 70.0)
+		var chase_h: float = _staff_area.size.y
+		var base_gap: float = clampf(chase_h * 0.11, 44.0, 62.0)
+		var top_y: float = _active_staff_top_y()
+		var bottom_note_margin: float = 24.0
+		var max_fit_gap: float = ((chase_h - bottom_note_margin - top_y + 2.0) / 12.0) * 2.0
+		return clampf(minf(base_gap, max_fit_gap), 40.0, 62.0)
 	if _selected_mode == MODE_SIGHT and _staff_area != null:
 		var sight_h := _staff_area.size.y
+		# Grand staff chord mode: tighter gap to fit two staves
+		if _sight_mode == "Chords" and _grand_staff_active:
+			# Need: treble(4*gap) + inter(4*gap) + bass(4*gap) + margins = sight_h
+			# Compact spacing for grand staff chords
+			var grand_gap := clampf((sight_h - 40.0) / 12.0, 14.0, 22.0)
+			return grand_gap
 		var min_gap := 40.0
 		var max_gap := 52.0
 		var ledger_heavy_sight := _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous"
@@ -19848,16 +27378,17 @@ func _staff_center_y_for_step(step: int) -> float:
 		y -= 2.0
 	elif step < STAFF_TOP_LINE_STEP:
 		y += 1.0
-	# In Note Catcher, bring top ledger notes slightly closer to the top line.
+	# Note Chase only: Treble G5 should sit a touch higher.
 	if _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble" and step == -1:
-		y += 6.0
+		y -= 1.0
 	# Treble D4 (space below first line): raise it so top edge sits close to first line.
 	if _selected_clef == "Treble" and step == 9:
 		y -= 8.0
 		if _selected_mode == MODE_SIGHT:
 			y += 8.0
 	if _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble" and step == 9:
-		y -= 4.0
+		# Note Chase only: Treble D4 should sit slightly lower.
+		y += 9.0
 	# Treble below-staff ledger notes (B3, A3) should sit closer to ledger line.
 	if _selected_clef == "Treble" and step >= 10:
 		y -= 4.0
@@ -19868,6 +27399,12 @@ func _staff_center_y_for_step(step: int) -> float:
 		y += 0.0
 	return y
 
+
+func _grand_staff_bass_center_y_for_step(step: int) -> float:
+	return _ensure_sight_renderer().grand_staff_bass_center_y_for_step(self, step)
+
+func _grand_staff_bass_display_step(step: int) -> int:
+	return _ensure_sight_renderer().grand_staff_bass_display_step(step, _sight_renderer_config())
 
 func _snap_note_to_step(step: int, keep_current_x: bool = false) -> void:
 	var center_y := _staff_center_y_for_step(step)
@@ -19956,7 +27493,8 @@ func _resolve_sight_placement_drop(step: int) -> void:
 		var shielded := _consume_chicken_shield_on_wrong()
 		if not shielded:
 			_streak = 0
-			_lives = maxi(0, _lives - 1)
+			if not _practice_mode_enabled:
+				_lives = maxi(0, _lives - 1)
 			_xp = maxi(0, _xp - 2)
 		else:
 			_xp = maxi(0, _xp - 1)
@@ -19965,7 +27503,9 @@ func _resolve_sight_placement_drop(step: int) -> void:
 		_set_staff_highlight_for_step(step, bad_red)
 		if _is_staff_ledger_step(step):
 			_show_preview_ledger(step, bad_red)
-		await _play_fail_sfx()
+		# Fire SFX immediately so the wrong-press sound lands on the drop, not
+		# after the shake animation. The shake follows for visual reinforcement.
+		_play_fail_sfx()
 		var shake := create_tween()
 		var x0 := _staff_note.position.x
 		shake.tween_property(_staff_note, "position:x", x0 - 8.0, 0.06)
@@ -19988,29 +27528,7 @@ func _resolve_sight_placement_drop(step: int) -> void:
 	_set_staff_highlight_none()
 	_hide_preview_ledger()
 
-	if _lives <= 0:
-		_quiz_active = false
-		_accepting_answer = false
-		await _fly_bird_away_sad()
-		_set_answer_buttons_enabled(false)
-		_replay_button.disabled = true
-		_restart_button.disabled = false
-		_status_label.text = ""
-		_progress_label.text = _final_quiz_result_text(_score, _question_index, _xp)
-		if _sight_progress_track != null:
-			_sight_progress_track.visible = false
-			_set_sight_progress_ratio(0.0, false)
-		_teacher_record_session_metrics(_selected_mode, _score, _question_index)
-		_home_info_label.text = _session_performance_summary()
-		await _play_gameover_fail_sfx()
-		if _selected_mode == MODE_SIGHT:
-			_set_sight_result_background_hidden(true)
-		_result_box_show("Game Over", "No lives left. Restart or Back.")
-		return
-
-	await get_tree().create_timer(_current_post_answer_delay()).timeout
-	if _should_advance_after_delay(quiz_token):
-		await _begin_next_question(quiz_token)
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
 
 func _resolve_tutorial_placement_drop(step: int) -> void:
@@ -20037,7 +27555,7 @@ func _resolve_tutorial_placement_drop(step: int) -> void:
 		_set_staff_highlight_for_step(step, bad_red)
 		if _is_staff_ledger_step(step):
 			_show_preview_ledger(step, bad_red)
-		await _play_fail_sfx()
+		_play_fail_sfx()
 		var guide_x := _staff_note.position.x + (_staff_note.size.x * 0.5)
 		_show_target_dotted_oval(_tutorial_expected_step, ok_green, guide_x)
 		_set_staff_highlight_for_step(_tutorial_expected_step, ok_green)
@@ -20224,31 +27742,11 @@ func _blink_correct_placement_target(step: int, times: int, total_seconds: float
 
 
 func _key_signature_accidental_map() -> Dictionary:
-	var m := {"C": 0, "D": 0, "E": 0, "F": 0, "G": 0, "A": 0, "B": 0}
-	if _sight_key_signature == "1#":
-		m["F"] = 1
-	elif _sight_key_signature == "2#":
-		m["F"] = 1
-		m["C"] = 1
-	elif _sight_key_signature == "3#":
-		m["F"] = 1
-		m["C"] = 1
-		m["G"] = 1
-	elif _sight_key_signature == "1b":
-		m["B"] = -1
-	elif _sight_key_signature == "2b":
-		m["B"] = -1
-		m["E"] = -1
-	elif _sight_key_signature == "3b":
-		m["B"] = -1
-		m["E"] = -1
-		m["A"] = -1
-	return m
+	return _ensure_sight_renderer().key_signature_accidental_map(_sight_key_signature)
 
 
 func _note_letter_pitch_class(letter: String, accidental: int) -> int:
-	var base_map := {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
-	return posmod(int(base_map.get(letter, 0)) + accidental, 12)
+	return _ensure_sight_renderer().note_letter_pitch_class(letter, accidental)
 
 
 func _triad_quality_from_intervals(i3: int, i5: int) -> String:
@@ -20257,8 +27755,6 @@ func _triad_quality_from_intervals(i3: int, i5: int) -> String:
 	if i3 == 3 and i5 == 7:
 		return "Minor"
 	if i3 == 3 and i5 == 6:
-		return "Diminished"
-	if i3 == 4 and i5 == 6:
 		return "Diminished"
 	if i3 == 4 and i5 == 8:
 		return "Augmented"
@@ -20369,69 +27865,52 @@ func _build_accidental_rule_candidate(root_letter: String, target_quality: Strin
 	return _make_sight_chord_candidate(root_letter, third_letter, fifth_letter, root_acc, best_a3, best_a5, sig_map)
 
 
-func _sight_chord_candidates(include_accidental_variants: bool = false) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	var sig_map := _key_signature_accidental_map()
-	var seen: Dictionary = {}
-	for root_letter in NOTE_NAME_ORDER:
-		var r := str(root_letter)
-		var root_i := NOTE_NAME_ORDER.find(r)
-		if root_i < 0:
-			continue
-		var third_letter: String = str(NOTE_NAME_ORDER[(root_i + 2) % 7])
-		var fifth_letter: String = str(NOTE_NAME_ORDER[(root_i + 4) % 7])
-		var acc_r := int(sig_map.get(r, 0))
-		var acc_3 := int(sig_map.get(third_letter, 0))
-		var acc_5 := int(sig_map.get(fifth_letter, 0))
-		var base := _make_sight_chord_candidate(r, third_letter, fifth_letter, acc_r, acc_3, acc_5, sig_map)
-		if base.is_empty():
-			continue
-		var base_key := "%s|%d|%d|%d|%s" % [str(base.get("name", "")), acc_r, acc_3, acc_5, str(base.get("quality", ""))]
-		if not seen.has(base_key):
-			seen[base_key] = true
-			out.append(base)
-	if include_accidental_variants:
-		var tonic := _key_signature_tonic_info()
-		var tonic_letter := str(tonic.get("letter", "C"))
-		var rule_specs := [
-			{"root": _scale_letter_from_tonic(tonic_letter, 0), "quality": "Minor"},       # i minor (e.g., C minor)
-			{"root": _scale_letter_from_tonic(tonic_letter, 3), "quality": "Minor"},       # iv minor (e.g., F minor)
-			{"root": _scale_letter_from_tonic(tonic_letter, 0), "quality": "Augmented"},   # I augmented
-			{"root": _scale_letter_from_tonic(tonic_letter, 0), "quality": "Diminished"},  # I diminished (requested spelling)
-			{"root": _scale_letter_from_tonic(tonic_letter, 1), "quality": "Major"},       # II major (e.g., D major)
-			{"root": _scale_letter_from_tonic(tonic_letter, 2), "quality": "Major"}        # III major (e.g., E major)
-		]
-		for spec in rule_specs:
-			var root_spec := str(spec.get("root", "C"))
-			var quality_spec := str(spec.get("quality", "Major"))
-			var alt := _build_accidental_rule_candidate(root_spec, quality_spec, sig_map)
-			if alt.is_empty():
-				continue
-			if not bool(alt.get("is_accidental", false)):
-				continue
-			var aarr: Array = alt.get("tone_accidentals", [0, 0, 0])
-			var alt_key := "%s|%d|%d|%d|%s" % [
-				str(alt.get("name", "")),
-				int(aarr[0]),
-				int(aarr[1]),
-				int(aarr[2]),
-				str(alt.get("quality", ""))
-			]
-			if not seen.has(alt_key):
-				seen[alt_key] = true
-				out.append(alt)
-	# Keep candidates strictly consistent with the selected key signature, so
-	# drawn notes and answer labels always match.
+func _sight_chord_ids_for_selected_tier() -> Array[String]:
+	var out: Array[String] = []
+	var tier_ids_v: Variant = SIGHT_CHORD_TIER_IDS.get(_sight_selected_chord_tier, SIGHT_CHORD_TIER_IDS[1])
+	if tier_ids_v is Array:
+		for chord_id in tier_ids_v:
+			out.append(str(chord_id))
 	return out
 
+
+func _sight_voicing_quality_for_id(chord_id: String) -> String:
+	return _ensure_sight_renderer().sight_voicing_quality_for_id(chord_id)
+
+
+func _sight_build_chord_candidate(root_letter: String, root_acc: int, chord_id: String, sig_map: Dictionary) -> Dictionary:
+	return _ensure_sight_renderer().build_sight_chord_candidate(
+		root_letter,
+		root_acc,
+		chord_id,
+		sig_map,
+		SIGHT_CHORD_DEFINITIONS,
+		NOTE_NAME_ORDER
+	)
+
+
+func _sight_candidate_has_natural_tones(candidate: Dictionary) -> bool:
+	return _ensure_sight_renderer().sight_candidate_has_natural_tones(candidate)
+
+
+func _sight_chord_candidates(include_accidental_variants: bool = false) -> Array[Dictionary]:
+	return _ensure_sight_renderer().sight_chord_candidates(
+		_sight_selected_chord_tier,
+		include_accidental_variants,
+		SIGHT_CHORD_TIER_IDS,
+		SIGHT_CHORD_DEFINITIONS,
+		NOTE_NAME_ORDER,
+		_key_signature_accidental_map()
+	)
+
 func _generate_sight_chord_round() -> void:
-	var triad: Dictionary = {}
+	var chord_candidate: Dictionary = {}
 	var centers: Array[float] = []
 	var found := false
 	var chosen_inversion := 0
-	var include_accidental_variants := _sight_accidentals_toggle != null and _sight_accidentals_toggle.button_pressed
+	var include_accidental_variants := _sight_include_accidental_variants()
 	var candidates := _sight_chord_candidates(include_accidental_variants)
-	if include_accidental_variants:
+	if _sight_selected_chord_tier == 1 and include_accidental_variants:
 		var accidental_pool: Array[Dictionary] = []
 		var normal_pool: Array[Dictionary] = []
 		for c in candidates:
@@ -20444,28 +27923,78 @@ func _generate_sight_chord_round() -> void:
 		elif not accidental_pool.is_empty():
 			candidates = accidental_pool
 	if candidates.is_empty():
-		candidates = [{"root_letter": "C", "quality": "Major", "name": "C Major", "tone_letters": ["C", "E", "G"], "tone_accidentals": [0, 0, 0]}]
-	for attempt in range(40):
+		candidates = [{
+			"id": "Major",
+			"tier": 1,
+			"quality": "Major",
+			"voicing_quality": "Major",
+			"name": "C Major",
+			"label": "Major",
+			"root_letter": "C",
+			"root_accidental": 0,
+			"tone_letters": ["C", "E", "G"],
+			"tone_accidentals": [0, 0, 0],
+			"intervals": [0, 4, 7],
+			"is_accidental": false
+		}]
+
+	if _grand_staff_active:
+		# Grand staff voicing path
+		_generate_sight_chord_round_grand_staff(candidates)
+		return
+
+	var drawable_candidates: Array[Dictionary] = []
+	for candidate in candidates:
+		var tone_letters_v: Variant = candidate.get("tone_letters", [])
+		if tone_letters_v is Array and (tone_letters_v as Array).size() >= 2:
+			drawable_candidates.append(candidate)
+	if drawable_candidates.is_empty():
+		# Keep fallback local to single-clef rendering path.
+		drawable_candidates = [{
+			"id": "Major",
+			"tier": 1,
+			"quality": "Major",
+			"voicing_quality": "Major",
+			"name": "C Major",
+			"label": "Major",
+			"root_letter": "C",
+			"root_accidental": 0,
+			"tone_letters": ["C", "E", "G"],
+			"tone_accidentals": [0, 0, 0],
+			"intervals": [0, 4, 7],
+			"is_accidental": false
+		}]
+	candidates = drawable_candidates
+
+	for attempt in range(50):
 		var t: Dictionary = candidates[_rng.randi_range(0, candidates.size() - 1)]
-		var root_t := str(t.get("root_letter", "C"))
-		var quality_t := str(t.get("quality", "Major"))
-		var inversion_t := _rng.randi_range(0, 2)
-		var c := _pick_staff_centers_for_triad(root_t, quality_t, inversion_t)
+		var tones_any: Variant = t.get("tone_letters", [])
+		if typeof(tones_any) != TYPE_ARRAY:
+			continue
+		var tones: Array = tones_any as Array
+		if tones.size() < 2:
+			continue
+		var inversion_t := _rng.randi_range(0, tones.size() - 1)
+		var c := _pick_staff_centers_for_chord(tones, inversion_t)
 		if not c.is_empty():
-			triad = t
+			chord_candidate = t
 			centers = c
 			chosen_inversion = inversion_t
 			found = true
 			break
 	if not found:
 		for t in candidates:
-			var root_t := str(t.get("root_letter", "C"))
-			var quality_t := str(t.get("quality", "Major"))
-			for inversion_t in [0, 1, 2]:
-				var c := _pick_staff_centers_for_triad(root_t, quality_t, inversion_t)
+			var tones_any: Variant = t.get("tone_letters", [])
+			if typeof(tones_any) != TYPE_ARRAY:
+				continue
+			var tones: Array = tones_any as Array
+			if tones.size() < 2:
+				continue
+			for inversion_t in range(tones.size()):
+				var c := _pick_staff_centers_for_chord(tones, inversion_t)
 				if c.is_empty():
 					continue
-				triad = t
+				chord_candidate = t
 				centers = c
 				chosen_inversion = inversion_t
 				found = true
@@ -20473,33 +28002,28 @@ func _generate_sight_chord_round() -> void:
 			if found:
 				break
 	if not found:
-		# Last-resort safe fallback that still matches labeling.
-		triad = {"root_letter": "C", "quality": "Major", "name": "C Major", "tone_letters": ["C", "E", "G"], "tone_accidentals": [0, 0, 0]}
-		centers = _pick_staff_centers_for_triad("C", "Major", 0)
+		chord_candidate = {"root_letter": "C", "quality": "Major", "name": "C Major", "tone_letters": ["C", "E", "G"], "tone_accidentals": [0, 0, 0]}
+		centers = _pick_staff_centers_for_chord(["C", "E", "G"], 0)
 		chosen_inversion = 0
 		if centers.is_empty():
 			var b := _effective_sight_step_bounds()
 			centers = [_staff_center_y_for_step(b.y), _staff_center_y_for_step(maxi(b.x, b.y - 2)), _staff_center_y_for_step(maxi(b.x, b.y - 4))]
 
-	var display_accidentals: Array[int] = [0, 0, 0]
-	var display_letters: Array[String] = ["C", "E", "G"]
-	var base_acc: Array = triad.get("tone_accidentals", [0, 0, 0])
-	var base_letters: Array = triad.get("tone_letters", ["C", "E", "G"])
-	if base_acc.size() >= 3:
-		if chosen_inversion == 1:
-			display_accidentals = [int(base_acc[1]), int(base_acc[2]), int(base_acc[0])]
-			display_letters = [str(base_letters[1]), str(base_letters[2]), str(base_letters[0])]
-		elif chosen_inversion == 2:
-			display_accidentals = [int(base_acc[2]), int(base_acc[0]), int(base_acc[1])]
-			display_letters = [str(base_letters[2]), str(base_letters[0]), str(base_letters[1])]
-		else:
-			display_accidentals = [int(base_acc[0]), int(base_acc[1]), int(base_acc[2])]
-			display_letters = [str(base_letters[0]), str(base_letters[1]), str(base_letters[2])]
-	triad["display_accidentals"] = display_accidentals
-	triad["display_letters"] = display_letters
-	_current_sight_chord_def = triad
-	_current_sight_chord_name = str(triad.get("name", "C Major"))
-	_position_sight_chord(centers, triad)
+	var display_accidentals: Array[int] = []
+	var display_letters: Array[String] = []
+	var base_acc: Array = chord_candidate.get("tone_accidentals", [0, 0, 0])
+	var base_letters: Array = chord_candidate.get("tone_letters", ["C", "E", "G"])
+	var rotated_letters: Array = _rotate_sight_chord_values_for_inversion(base_letters, chosen_inversion)
+	var rotated_acc: Array = _rotate_sight_chord_values_for_inversion(base_acc, chosen_inversion)
+	for i in range(rotated_letters.size()):
+		display_letters.append(str(rotated_letters[i]))
+		var acc_value := int(rotated_acc[i]) if i < rotated_acc.size() else 0
+		display_accidentals.append(acc_value)
+	chord_candidate["display_accidentals"] = display_accidentals
+	chord_candidate["display_letters"] = display_letters
+	_current_sight_chord_def = chord_candidate
+	_current_sight_chord_name = str(chord_candidate.get("name", "C Major"))
+	_position_sight_chord(centers, chord_candidate)
 
 	var all_names: Array[String] = []
 	for t in candidates:
@@ -20509,6 +28033,192 @@ func _generate_sight_chord_round() -> void:
 		if i >= _current_sight_chord_choices.size():
 			continue
 		_sight_chord_choice_buttons[i].text = _current_sight_chord_choices[i]
+
+
+func _generate_sight_chord_round_grand_staff(candidates: Array[Dictionary]) -> void:
+	# Grand staff chord generation using ChordVoicingGenerator
+	var sig_map := _key_signature_accidental_map()
+	var chord_def: Dictionary = candidates[_rng.randi_range(0, candidates.size() - 1)]
+	var root_letter := str(chord_def.get("root_letter", "C"))
+	var quality_id := str(chord_def.get("quality", "Major"))
+	var voicing_quality := str(chord_def.get("voicing_quality", _sight_voicing_quality_for_id(quality_id)))
+	var root_acc := int(chord_def.get("root_accidental", 0))
+	if not ChordVoicingGeneratorScript.CHORD_INTERVALS.has(voicing_quality):
+		voicing_quality = "Major"
+		quality_id = "Major"
+		root_letter = "C"
+		root_acc = 0
+	var num_tones := 3  # triads
+	if ChordVoicingGeneratorScript.CHORD_INTERVALS.has(voicing_quality):
+		num_tones = (ChordVoicingGeneratorScript.CHORD_INTERVALS[voicing_quality] as Array).size()
+	var max_inv := num_tones - 1
+	var chord_tier := int(chord_def.get("tier", _sight_selected_chord_tier))
+	var force_root_position := chord_tier <= 2
+	var inversion := 0 if force_root_position else _rng.randi_range(0, max_inv)
+
+	var voicing := ChordVoicingGeneratorScript.generate(root_letter, root_acc, voicing_quality, inversion, sig_map, _rng, true, true)
+	var all_notes: Array = voicing.get("all_notes", [])
+	if all_notes.is_empty():
+		# Fallback
+		var fallback_voicing := ChordVoicingGeneratorScript.generate("C", 0, "Major", 0, sig_map, _rng, true, true)
+		all_notes = fallback_voicing.get("all_notes", [])
+		voicing = fallback_voicing
+		chord_def = {
+			"id": "Major",
+			"tier": 1,
+			"quality": "Major",
+			"voicing_quality": "Major",
+			"name": "C Major",
+			"label": "Major",
+			"root_letter": "C",
+			"root_accidental": 0,
+			"tone_letters": ["C", "E", "G"],
+			"tone_accidentals": [0, 0, 0],
+			"intervals": [0, 4, 7],
+			"is_accidental": false
+		}
+
+	# Build display data from voicing
+	var display_accidentals: Array[int] = []
+	var display_letters: Array[String] = []
+	for note in all_notes:
+		display_accidentals.append(int(note.get("accidental", 0)))
+		display_letters.append(str(note.get("letter", "C")))
+	chord_def["display_accidentals"] = display_accidentals
+	chord_def["display_letters"] = display_letters
+	chord_def["grand_staff_voicing"] = voicing
+	chord_def["inversion"] = inversion
+	_current_sight_chord_def = chord_def
+	_current_sight_chord_name = str(chord_def.get("name", "C Major"))
+
+	_position_sight_chord_grand_staff(voicing, chord_def)
+
+	var all_names: Array[String] = []
+	for t in candidates:
+		all_names.append(str(t.get("name", "C Major")))
+	_current_sight_chord_choices = _build_sight_chord_choices(_current_sight_chord_name, all_names)
+	for i in _sight_chord_choice_buttons.size():
+		if i >= _current_sight_chord_choices.size():
+			continue
+		_sight_chord_choice_buttons[i].text = _current_sight_chord_choices[i]
+
+
+func _sight_required_pc_map(candidate: Dictionary) -> Dictionary:
+	return _ensure_sight_renderer().sight_required_pc_map(candidate)
+
+
+func _sight_candidate_id_from_name(chord_name: String, candidates: Array[Dictionary]) -> String:
+	return _ensure_sight_renderer().sight_candidate_id_from_name(chord_name, candidates)
+
+
+func debug_sight_chord_tiers_sanity(samples_per_tier: int = 200) -> Dictionary:
+	var result: Dictionary = {
+		"ok": true,
+		"samples_per_tier": samples_per_tier,
+		"tiers_tested": SIGHT_CHORD_MAX_TIER,
+		"errors": []
+	}
+	var errors: Array[String] = []
+	var original_tier := _sight_selected_chord_tier
+	var original_key_sig := _sight_key_signature
+	_sight_key_signature = "C"
+	for tier in range(1, SIGHT_CHORD_MAX_TIER + 1):
+		_sight_selected_chord_tier = tier
+		var candidates := _sight_chord_candidates(false)
+		if candidates.is_empty():
+			errors.append("Tier %d: no candidates generated." % tier)
+			continue
+		var sig_map := _key_signature_accidental_map()
+		for _i in range(samples_per_tier):
+			var candidate := candidates[_rng.randi_range(0, candidates.size() - 1)] as Dictionary
+			var chord_id := str(candidate.get("id", ""))
+			if chord_id == "":
+				errors.append("Tier %d: candidate missing chord id." % tier)
+				continue
+			var c_tier := int(candidate.get("tier", -1))
+			if c_tier != tier:
+				errors.append("Tier %d: candidate %s reported tier %d." % [tier, chord_id, c_tier])
+			var root_letter := str(candidate.get("root_letter", "C"))
+			var root_acc := int(candidate.get("root_accidental", 0))
+			var root_pc := _note_letter_pitch_class(root_letter, root_acc)
+			var required_pcs := _sight_required_pc_map(candidate)
+			var tone_letters_v: Variant = candidate.get("tone_letters", [])
+			var tone_accs_v: Variant = candidate.get("tone_accidentals", [])
+			if not (tone_letters_v is Array) or not (tone_accs_v is Array):
+				errors.append("Tier %d: %s has invalid tone arrays." % [tier, chord_id])
+				continue
+			var tone_letters := tone_letters_v as Array
+			var tone_accs := tone_accs_v as Array
+			if tone_letters.size() != tone_accs.size():
+				errors.append("Tier %d: %s tone letters/accidentals size mismatch." % [tier, chord_id])
+				continue
+			var generated_pc_map: Dictionary = {}
+			for ti in range(tone_letters.size()):
+				var tone_pc := _note_letter_pitch_class(str(tone_letters[ti]), int(tone_accs[ti]))
+				generated_pc_map[str(posmod(tone_pc - root_pc, 12))] = true
+			for req_pc in required_pcs.keys():
+				if not generated_pc_map.has(str(req_pc)):
+					errors.append("Tier %d: %s missing required tone pc=%s in candidate tones." % [tier, chord_id, str(req_pc)])
+			var quality := str(candidate.get("voicing_quality", _sight_voicing_quality_for_id(chord_id)))
+			if not ChordVoicingGeneratorScript.CHORD_INTERVALS.has(quality):
+				errors.append("Tier %d: %s missing voicing quality %s." % [tier, chord_id, quality])
+				continue
+			var voice_intervals := ChordVoicingGeneratorScript.CHORD_INTERVALS[quality] as Array
+			var max_inv := maxi(0, voice_intervals.size() - 1)
+			var inversion := _rng.randi_range(0, max_inv)
+			var voicing := ChordVoicingGeneratorScript.generate(root_letter, root_acc, quality, inversion, sig_map, _rng, true, true)
+			var all_notes_v: Variant = voicing.get("all_notes", [])
+			if not (all_notes_v is Array) or (all_notes_v as Array).is_empty():
+				errors.append("Tier %d: %s generated empty voicing." % [tier, chord_id])
+				continue
+			var all_notes := all_notes_v as Array
+			var min_midi := 999
+			var max_midi := -999
+			var voiced_pc_map: Dictionary = {}
+			for nv in all_notes:
+				if not (nv is Dictionary):
+					continue
+				var note := nv as Dictionary
+				var midi := int(note.get("midi", 60))
+				min_midi = mini(min_midi, midi)
+				max_midi = maxi(max_midi, midi)
+				if midi < int(ChordVoicingGeneratorScript.BASS_RANGE_LOW) or midi > int(ChordVoicingGeneratorScript.TREBLE_RANGE_HIGH):
+					errors.append("Tier %d: %s voiced midi %d out of range." % [tier, chord_id, midi])
+				var rel_pc := posmod(posmod(midi, 12) - root_pc, 12)
+				voiced_pc_map[str(rel_pc)] = true
+			var span := max_midi - min_midi
+			if span > int(ChordVoicingGeneratorScript.MAX_VOICING_SPAN):
+				errors.append("Tier %d: %s voicing span %d exceeds %d." % [tier, chord_id, span, int(ChordVoicingGeneratorScript.MAX_VOICING_SPAN)])
+			for req_pc2 in required_pcs.keys():
+				if not voiced_pc_map.has(str(req_pc2)):
+					errors.append("Tier %d: %s voicing missing required tone pc=%s." % [tier, chord_id, str(req_pc2)])
+			var eval_id := _sight_candidate_id_from_name(str(candidate.get("name", "")), candidates)
+			if eval_id != chord_id:
+				errors.append("Tier %d: evaluation mismatch for %s (got %s)." % [tier, chord_id, eval_id])
+			if errors.size() >= 80:
+				break
+		if errors.size() >= 80:
+			break
+	_sight_selected_chord_tier = original_tier
+	_sight_key_signature = original_key_sig
+	if errors.is_empty():
+		if OS.is_debug_build():
+			print("[Sight Chords Tier Sanity] PASS (%d samples/tier)" % samples_per_tier)
+	else:
+		if OS.is_debug_build():
+			print("[Sight Chords Tier Sanity] FAIL (%d issues)" % errors.size())
+			for e in errors:
+				print("  " + e)
+	result["ok"] = errors.is_empty()
+	result["errors"] = errors
+	return result
+
+
+func _position_sight_chord_grand_staff(voicing: Dictionary, chord_def: Dictionary) -> void:
+	_ensure_sight_renderer().position_sight_chord_grand_staff(self, voicing, chord_def, _sight_renderer_config())
+
+func _update_grand_staff_ledger_lines(all_notes: Array, note_panels: Array[Panel]) -> void:
+	_ensure_sight_renderer().update_grand_staff_ledger_lines(self, all_notes, note_panels, _sight_renderer_config())
 
 func _generate_sight_placement_round() -> void:
 	for n in _staff_chord_notes:
@@ -20539,167 +28249,60 @@ func _generate_sight_placement_round() -> void:
 
 
 func _build_sight_chord_choices(correct_name: String, pool: Array[String]) -> Array[String]:
+	var choices: Array[String] = [correct_name]
+	# First pick: a similar-sounding chord from the pool
+	var similar := _get_similar_chord_names(correct_name)
+	for s in similar:
+		var sv := str(s)
+		if pool.has(sv) and sv != correct_name and not choices.has(sv):
+			choices.append(sv)
+			break
+	# Fill remaining with random distractors
 	var distractors: Array[String] = []
 	for n in pool:
-		if n != correct_name:
+		if n != correct_name and not choices.has(n):
 			distractors.append(n)
 	distractors.shuffle()
-	var choices: Array[String] = [correct_name]
-	choices.append_array(distractors.slice(0, 2))
+	var remaining := maxi(0, 3 - choices.size())
+	for di in range(mini(remaining, distractors.size())):
+		choices.append(distractors[di])
 	choices.shuffle()
 	return choices
 
 
 func _staff_step_name_for_clef(step_index: int, clef_name: String) -> String:
-	var treble_seq := ["F", "E", "D", "C", "B", "A", "G"]
-	var bass_seq := ["A", "G", "F", "E", "D", "C", "B"]
-	var seq := bass_seq if clef_name == "Bass" else treble_seq
-	return str(seq[posmod(step_index, seq.size())])
+	return _ensure_sight_renderer().staff_step_name_for_clef(step_index, clef_name)
 
 
 func _pick_staff_centers_for_triad(root: String, _quality: String, inversion: int) -> Array[float]:
-	var bounds := _effective_sight_step_bounds()
-	var root_i := NOTE_NAME_ORDER.find(root)
-	if root_i < 0:
-		root_i = 0
-	var third_i := (root_i + 2) % 7
-	var fifth_i := (root_i + 4) % 7
-	var root_letter := str(NOTE_NAME_ORDER[root_i])
-	var third_letter := str(NOTE_NAME_ORDER[third_i])
-	var fifth_letter := str(NOTE_NAME_ORDER[fifth_i])
-	# Placement is based on chord-tone letters; accidentals are rendered
-	# separately next to the matching noteheads.
-	var tones_low_to_high: Array[String] = []
-	if inversion == 0:
-		tones_low_to_high = [root_letter, third_letter, fifth_letter]
-	elif inversion == 1:
-		tones_low_to_high = [third_letter, fifth_letter, root_letter]
-	else:
-		tones_low_to_high = [fifth_letter, root_letter, third_letter]
-	var step_triplets: Array[Array] = []
-	for s0 in range(-7, 22):
-		if _staff_step_name_for_clef(s0, _selected_clef) != tones_low_to_high[0]:
-			continue
-		for s1 in range(-7, s0):
-			if _staff_step_name_for_clef(s1, _selected_clef) != tones_low_to_high[1]:
-				continue
-			for s2 in range(-7, s1):
-				if _staff_step_name_for_clef(s2, _selected_clef) != tones_low_to_high[2]:
-					continue
-				var gap_top_mid := s0 - s1
-				var gap_mid_low := s1 - s2
-				# Keep triad voices in compact position (avoid very wide spacing).
-				if gap_top_mid < 1 or gap_mid_low < 1:
-					continue
-				if gap_top_mid > 3 or gap_mid_low > 3:
-					continue
-				var c0 := _staff_center_y_for_step(s0)
-				var c1 := _staff_center_y_for_step(s1)
-				var c2 := _staff_center_y_for_step(s2)
-				if s0 < bounds.x or s0 > bounds.y:
-					continue
-				if s1 < bounds.x or s1 > bounds.y:
-					continue
-				if s2 < bounds.x or s2 > bounds.y:
-					continue
-				if c0 < 8.0 or c0 > 304.0:
-					continue
-				if c1 < 8.0 or c1 > 304.0:
-					continue
-				if c2 < 8.0 or c2 > 304.0:
-					continue
-				step_triplets.append([s0, s1, s2])
+	return _ensure_sight_renderer().pick_staff_centers_for_triad(self, root, inversion, NOTE_NAME_ORDER)
 
-	if step_triplets.is_empty():
-		return []
 
-	step_triplets.sort_custom(func(a: Array, b: Array) -> bool:
-		var da: float = absf(float(a[0]) - 10.0)
-		var db: float = absf(float(b[0]) - 10.0)
-		return da < db
-	)
-	var top_bucket: int = mini(3, step_triplets.size()) - 1
-	var picked: Array = step_triplets[_rng.randi_range(0, top_bucket)]
-	return [
-		_staff_center_y_for_step(picked[0]),
-		_staff_center_y_for_step(picked[1]),
-		_staff_center_y_for_step(picked[2])
-	]
+func _pick_staff_centers_for_chord(tone_letters: Array, inversion: int) -> Array[float]:
+	return _ensure_sight_renderer().pick_staff_centers_for_chord(self, tone_letters, inversion)
+
+
+func _rotate_sight_chord_values_for_inversion(values: Array, inversion: int) -> Array:
+	var out: Array = []
+	if values.is_empty():
+		return out
+	var count := values.size()
+	var shift := posmod(inversion, count)
+	for i in range(count):
+		out.append(values[(i + shift) % count])
+	return out
 
 
 func _has_sight_chord_available_in_range() -> bool:
-	for triad in _sight_chord_candidates():
-		var root := str(triad.get("root_letter", "C"))
-		var quality := str(triad.get("quality", "Major"))
-		for inversion in [0, 1, 2]:
-			var centers := _pick_staff_centers_for_triad(root, quality, inversion)
-			if not centers.is_empty():
-				return true
-	return false
+	return _ensure_sight_renderer().has_sight_chord_available_in_range(
+		self,
+		_sight_chord_candidates(_sight_include_accidental_variants()),
+		NOTE_NAME_ORDER
+	)
 
 
 func _position_sight_chord(note_centers: Array[float], chord_def: Dictionary = {}) -> void:
-	if _staff_note == null:
-		return
-	if _selected_mode == MODE_SIGHT:
-		_pick_random_sight_visual_colors()
-		_apply_sight_note_palette()
-	if _staff_clef_label != null:
-		_staff_clef_label.text = char(0x1D122) if _selected_clef == "Bass" else char(0x1D11E)
-	if note_centers.size() < 3:
-		return
-	var display_note_centers: Array[float] = []
-	display_note_centers.resize(note_centers.size())
-	for i in range(note_centers.size()):
-		display_note_centers[i] = float(note_centers[i]) + SIGHT_CHORD_NOTE_CENTER_OFFSET_Y
-
-	var x := _sight_note_snap_x()
-	var first_top := display_note_centers[0] - (_staff_note.size.y * 0.5)
-	_staff_note.visible = true
-	_staff_note.scale = _note_scale_for_y(display_note_centers[0])
-	_staff_note.position = Vector2(x, first_top)
-
-	for i in _staff_chord_notes.size():
-		var n: Panel = _staff_chord_notes[i]
-		var cy := display_note_centers[i + 1]
-		n.visible = true
-		n.scale = _note_scale_for_y(cy)
-		n.position = Vector2(x, cy - (n.size.y * 0.5))
-
-	_update_staff_ledger_lines_for_notes(display_note_centers, x + (_staff_note.size.x * 0.5))
-
-	var tone_accidentals: Array = chord_def.get("display_accidentals", chord_def.get("tone_accidentals", [0, 0, 0]))
-	var tone_letters: Array = chord_def.get("display_letters", chord_def.get("tone_letters", ["C", "E", "G"]))
-	var sig_map := _key_signature_accidental_map()
-	var sharp_sym := char(0x266F)
-	var flat_sym := char(0x266D)
-	var all_note_panels: Array[Panel] = [_staff_note]
-	all_note_panels.append_array(_staff_chord_notes)
-	for i in range(_staff_chord_accidental_labels.size()):
-		var acc_lbl := _staff_chord_accidental_labels[i]
-		if acc_lbl == null:
-			continue
-		if i >= display_note_centers.size() or i >= all_note_panels.size():
-			acc_lbl.visible = false
-			continue
-		var acc_val := int(tone_accidentals[i]) if i < tone_accidentals.size() else 0
-		var letter := str(tone_letters[i]) if i < tone_letters.size() else "C"
-		var key_acc := int(sig_map.get(letter, 0))
-		var needed_acc := acc_val - key_acc
-		if needed_acc == 0:
-			acc_lbl.visible = false
-			continue
-		var p := all_note_panels[i]
-		acc_lbl.text = sharp_sym if needed_acc > 0 else flat_sym
-		acc_lbl.visible = true
-		# Use rendered (scaled) note center so accidental stays aligned in inversions.
-		var center_y := p.position.y + (p.size.y * p.scale.y * 0.5)
-		var note_left := p.position.x
-		var y_adjust := -8.0 if needed_acc < 0 else -1.0
-		acc_lbl.position = Vector2(note_left - 24.0, center_y - (acc_lbl.size.y * 0.5) + y_adjust)
-
-	_stop_sight_note_bounce()
-	_start_sight_note_bounce()
+	_ensure_sight_renderer().position_sight_chord(self, note_centers, chord_def, _sight_renderer_config())
 
 
 func _ledger_visual_note_center_y_for_step(step: int) -> float:
@@ -20735,32 +28338,58 @@ func _nearest_ledger_step_from_visual_note_center_y(note_center_y: float) -> int
 
 
 func _update_staff_ledger_lines_for_notes(note_centers: Array[float], note_center_x: float) -> void:
+	var note_center_xs: Array[float] = []
+	for _i in range(note_centers.size()):
+		note_center_xs.append(note_center_x)
+	_update_staff_ledger_lines_for_note_positions(note_centers, note_center_xs)
+
+
+func _update_staff_ledger_lines_for_note_positions(note_centers: Array[float], note_center_xs: Array[float]) -> void:
 	_clear_staff_ledger_lines()
-	var needed: Array[float] = []
-	for note_center_y in note_centers:
+	var needed: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	for i in range(note_centers.size()):
+		var note_center_y := float(note_centers[i])
+		var note_center_x := float(note_center_xs[i]) if i < note_center_xs.size() else (_sight_note_snap_x() + (_staff_note.size.x * 0.5))
 		var step := _nearest_ledger_step_from_visual_note_center_y(note_center_y)
 		var ledger_steps := _ledger_steps_for_note_step(step)
 		for s in ledger_steps:
 			var y := _active_staff_top_y() + float(s) * _active_staff_step_y()
-			if not needed.has(y):
-				needed.append(y)
-	needed.sort()
-	for yv in needed:
-		_add_staff_ledger_line(float(yv), note_center_x)
+			var key := "%0.2f|%0.2f" % [y, note_center_x]
+			if seen.has(key):
+				continue
+			seen[key] = true
+			needed.append({"y": y, "x": note_center_x})
+	needed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ay := float(a.get("y", 0.0))
+		var by := float(b.get("y", 0.0))
+		if is_equal_approx(ay, by):
+			return float(a.get("x", 0.0)) < float(b.get("x", 0.0))
+		return ay < by
+	)
+	for item_any in needed:
+		if typeof(item_any) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_any as Dictionary
+		_add_staff_ledger_line(float(item.get("y", 0.0)), float(item.get("x", 0.0)))
 
 
 func _pick_sight_note_slot() -> Dictionary:
 	var step := _rng.randi_range(_sight_range_min_step, _sight_range_max_step)
 	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
-		var allowed := _sight_note_set_for_clef(_selected_clef)
-		var allowed_steps: Array[int] = []
-		for note_name in allowed:
-			var s := _sight_step_for_label_in_clef(str(note_name), _selected_clef)
-			if s != 999:
-				allowed_steps.append(s)
-		if not allowed_steps.is_empty():
-			var idx := _rng.randi_range(0, allowed_steps.size() - 1)
-			step = allowed_steps[idx]
+		var forced_step := _first_run_assessment_step_for_question(_question_index)
+		if forced_step != 999:
+			step = forced_step
+		else:
+			var allowed := _sight_note_set_for_clef(_selected_clef)
+			var allowed_steps: Array[int] = []
+			for note_name in allowed:
+				var s := _sight_step_for_label_in_clef(str(note_name), _selected_clef)
+				if s != 999:
+					allowed_steps.append(s)
+			if not allowed_steps.is_empty():
+				var idx := _rng.randi_range(0, allowed_steps.size() - 1)
+				step = allowed_steps[idx]
 	var base_name := _staff_step_name_for_clef(step, _selected_clef)
 	var sig_map := _key_signature_accidental_map()
 	var letter := base_name.substr(0, 1) if base_name.length() > 0 else ""
@@ -20959,137 +28588,75 @@ func _add_staff_ledger_line(line_y: float, center_x: float) -> void:
 		return
 	var ledger := ColorRect.new()
 	ledger.color = _sight_ledger_color
-	ledger.size = Vector2(96, 2)
-	ledger.position = Vector2(center_x - 48.0 + 8.0, line_y - 1.0)
+	var gap := _active_staff_line_gap_y()
+	var sample_y := _active_staff_top_y() + (gap * 2.0)
+	var note_w := 40.0
+	if _staff_note != null:
+		note_w = _staff_note.size.x * _note_scale_for_y(sample_y).x
+	var ledger_w := maxf(note_w * 1.9, gap * 2.6)
+	if _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and _grand_staff_active:
+		ledger_w = maxf(note_w * 1.85, gap * 2.45)
+	ledger_w = clampf(ledger_w, 58.0, 132.0)
+	ledger.size = Vector2(ledger_w, 2)
+	var center_bias := 8.0
+	if _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and _grand_staff_active:
+		center_bias = GRAND_STAFF_LEDGER_RIGHT_NUDGE
+	ledger.position = Vector2(center_x - (ledger_w * 0.5) + center_bias, line_y - 1.0)
 	ledger.z_index = 130
 	_staff_area.add_child(ledger)
 	_staff_ledger_lines.append(ledger)
 
 
 func _update_staff_ledger_lines(note_center_y: float, note_center_x: float) -> void:
-	_update_staff_ledger_lines_for_notes([note_center_y], note_center_x)
+	var one_note_center: Array[float] = [note_center_y]
+	_update_staff_ledger_lines_for_notes(one_note_center, note_center_x)
 
 
 func _show_sight_note_accidental_for_current_note() -> void:
-	if _staff_chord_accidental_labels.is_empty():
-		return
-	var lbl := _staff_chord_accidental_labels[0]
-	if lbl == null:
-		return
-	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
-		lbl.visible = false
-		return
-	var sym := _current_sight_note_explicit_accidental.strip_edges()
-	if sym == "":
-		# Notes mode key-signature behavior otherwise uses implied accidentals.
-		lbl.visible = false
-		return
-	lbl.text = sym
-	lbl.visible = true
-	var center_y := _staff_note.position.y + (_staff_note.size.y * _staff_note.scale.y * 0.5)
-	var note_left := _staff_note.position.x
-	var y_adjust := -4.0 if sym == char(0x266E) else -1.0
-	lbl.position = Vector2(note_left - 24.0, center_y - (lbl.size.y * 0.5) + y_adjust)
+	_ensure_sight_renderer().show_sight_note_accidental_for_current_note(self, _sight_renderer_config())
 
 
 func _position_sight_note(note_name: String, center_y_override: float = NAN) -> void:
-	if _staff_note == null:
-		return
-	if _selected_mode == MODE_SIGHT:
-		_pick_random_sight_visual_colors()
-		_apply_sight_note_palette()
-	for n in _staff_chord_notes:
-		n.visible = false
-	for lbl in _staff_chord_accidental_labels:
-		if lbl != null:
-			lbl.visible = false
-	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
-		_current_sight_note_explicit_accidental = ""
-	var center_y := center_y_override
-	if _selected_mode == MODE_SIGHT:
-		var bounds := _effective_sight_step_bounds()
-		if is_nan(center_y):
-			_current_sight_display_step = _closest_step_for_note_name_in_bounds(note_name, _selected_clef, bounds)
-		else:
-			_current_sight_display_step = _nearest_staff_step_from_center_y(center_y)
-		_current_sight_display_step = clampi(_current_sight_display_step, bounds.x, bounds.y)
-		center_y = _staff_center_y_for_step(_current_sight_display_step)
-		var base_note := _staff_step_name_for_clef(_current_sight_display_step, _selected_clef)
-		if _sight_mode == "Notes":
-			var force_natural := _current_sight_note_explicit_accidental == char(0x266E)
-			_current_sight_note = _sight_note_name_with_key_signature(base_note, force_natural)
-		else:
-			_current_sight_note = base_note
-	if _selected_clef == "Bass":
-		if _staff_clef_label != null:
-			_staff_clef_label.text = char(0x1D122)
-		if is_nan(center_y):
-			var bass_center_map := {"C": 160.0, "D": 144.0, "E": 128.0, "F": 112.0, "G": 96.0, "A": 80.0, "B": 64.0}
-			center_y = float(bass_center_map.get(note_name, 160.0))
-	else:
-		if _staff_clef_label != null:
-			_staff_clef_label.text = char(0x1D11E)
-		if is_nan(center_y):
-			var treble_center_map := {"C": 112.0, "D": 96.0, "E": 80.0, "F": 64.0, "G": 48.0, "A": 32.0, "B": 16.0}
-			center_y = float(treble_center_map.get(note_name, 112.0))
-		if _selected_mode != MODE_SIGHT:
-			center_y += 2.0
-	if _selected_mode == MODE_SIGHT:
-		var b := _effective_sight_step_bounds()
-		_current_sight_display_step = clampi(_current_sight_display_step, b.x, b.y)
-		center_y = _staff_center_y_for_step(_current_sight_display_step) + SIGHT_NOTE_CENTER_OFFSET_Y
-		var base_note2 := _staff_step_name_for_clef(_current_sight_display_step, _selected_clef)
-		if _sight_mode == "Notes":
-			var force_natural2 := _current_sight_note_explicit_accidental == char(0x266E)
-			_current_sight_note = _sight_note_name_with_key_signature(base_note2, force_natural2)
-		else:
-			_current_sight_note = base_note2
-	var top_left_y := center_y - (_staff_note.size.y * 0.5)
-	_staff_note.scale = _note_scale_for_y(center_y)
-	_staff_note.position = Vector2(_sight_note_snap_x(), top_left_y)
-	var center_x := _staff_note.position.x + (_staff_note.size.x * 0.5)
-	_update_staff_ledger_lines(center_y, center_x)
-	_show_sight_note_accidental_for_current_note()
-	_start_sight_note_bounce()
+	# Any new note placement is a new question — drop the previous answer label.
+	_hide_sight_note_name_label()
+	_ensure_sight_renderer().position_sight_note(self, note_name, center_y_override, _sight_renderer_config())
 
 
 func _closest_step_for_note_name_in_bounds(note_name: String, clef_name: String, bounds: Vector2i) -> int:
-	var start: int = clampi(_current_sight_display_step, bounds.x, bounds.y)
-	var best: int = start
-	var best_dist: int = 999999
-	for s in range(bounds.x, bounds.y + 1):
-		if _staff_step_name_for_clef(s, clef_name) != note_name:
-			continue
-		var d: int = absi(s - start)
-		if d < best_dist:
-			best_dist = d
-			best = s
-	return best
+	return _ensure_sight_renderer().closest_step_for_note_name_in_bounds(
+		note_name,
+		clef_name,
+		bounds,
+		_current_sight_display_step
+	)
 
 
 func _sight_note_snap_x() -> float:
-	if _staff_area == null:
-		return STAFF_NOTE_SNAP_X
-	if _selected_mode == MODE_SIGHT:
-		var g := _sight_visual_staff_geometry()
-		var left := float(g.get("left", STAFF_LEFT_X))
-		var width := float(g.get("width", STAFF_LINE_WIDTH))
-		# Shift note/chord prompts a bit right so they sit clearer away from clef/key area.
-		var anchor_ratio := 0.36
-		if _sight_mode == "Notes" or _sight_mode == "Chords":
-			anchor_ratio = 0.40
-		if _sight_mode == "Continuous":
-			anchor_ratio = 0.30
-		return left + (width * anchor_ratio)
-	var usable_w := maxf(260.0, _staff_area.size.x - STAFF_LEFT_X)
-	# Slightly center-left anchor for better readability on large screens.
-	return STAFF_LEFT_X + (usable_w * 0.26)
+	return _ensure_sight_renderer().sight_note_snap_x(
+		_staff_area,
+		_selected_mode,
+		MODE_SIGHT,
+		_sight_mode,
+		STAFF_LEFT_X,
+		STAFF_LINE_WIDTH,
+		STAFF_NOTE_SNAP_X
+	)
 
 
 func _note_scale_for_y(center_y: float) -> Vector2:
 	if _selected_mode == MODE_NOTE_CHASE:
 		return Vector2(1.0, 1.0)
 	if _selected_mode == MODE_SIGHT:
+		# Grand staff chords: keep notehead height slightly below one staff-space,
+		# and widen the head a bit for cleaner chord readability.
+		if _sight_mode == "Chords" and _grand_staff_active:
+			var gap: float = _active_staff_line_gap_y()
+			var base_note_h: float = 28.0
+			if _staff_note != null:
+				base_note_h = maxf(1.0, _staff_note.size.y)
+			var y_scale := clampf((gap * GRAND_STAFF_NOTEHEAD_HEIGHT_RATIO) / base_note_h, 0.58, 0.94)
+			var x_scale := clampf(y_scale * GRAND_STAFF_NOTEHEAD_WIDTH_RATIO, y_scale, 1.05)
+			return Vector2(x_scale, y_scale)
 		var ts := clampf((center_y - (_active_staff_top_y() - 120.0)) / 520.0, 0.0, 1.0)
 		var ss := lerpf(1.01, 1.15, ts)
 		return Vector2(ss, ss)
@@ -21162,6 +28729,17 @@ func _blink_answer_feedback(wrong_btn: Button, correct_btn: Button, times: int) 
 			correct_btn.modulate = correct_original
 		await get_tree().create_timer(0.09).timeout
 
+	# Hold final state for 0.5s so player can clearly read which was correct
+	if wrong_btn != null:
+		wrong_btn.modulate = red
+	if correct_btn != null:
+		correct_btn.modulate = green
+	await get_tree().create_timer(0.5).timeout
+	if wrong_btn != null:
+		wrong_btn.modulate = wrong_original
+	if correct_btn != null:
+		correct_btn.modulate = correct_original
+
 
 func _create_sight_mark(btn: Button, text: String, color: Color) -> Label:
 	if btn == null:
@@ -21205,6 +28783,20 @@ func _blink_sight_feedback(wrong_btn: Button, correct_btn: Button, times: int, w
 	if correct_btn != null:
 		correct_mark = _create_sight_mark(correct_btn, char(0x2713), green)
 
+	# Right-answer fast path: no wrong button to flash, so user gets near-instant
+	# confirmation (~0.22s total). Wrong-answer path keeps full multi-blink + hold
+	# because the user needs time to read the correct answer.
+	if wrong_btn == null and correct_btn != null:
+		correct_btn.modulate = green
+		await get_tree().create_timer(0.18).timeout
+		correct_btn.modulate = correct_original
+		if is_instance_valid(correct_mark):
+			# Let the checkmark linger briefly via fade-out tween so it's not jarring.
+			var fade := create_tween()
+			fade.tween_property(correct_mark, "modulate:a", 0.0, 0.18)
+			fade.tween_callback(correct_mark.queue_free)
+		return
+
 	for i in times:
 		if wrong_btn != null:
 			wrong_btn.modulate = red
@@ -21216,6 +28808,17 @@ func _blink_sight_feedback(wrong_btn: Button, correct_btn: Button, times: int, w
 		if correct_btn != null:
 			correct_btn.modulate = correct_original
 		await get_tree().create_timer(0.09).timeout
+
+	# Hold final state for 0.5s with marks still visible
+	if wrong_btn != null:
+		wrong_btn.modulate = red
+	if correct_btn != null:
+		correct_btn.modulate = green
+	await get_tree().create_timer(0.5).timeout
+	if wrong_btn != null:
+		wrong_btn.modulate = wrong_original
+	if correct_btn != null:
+		correct_btn.modulate = correct_original
 
 	if is_instance_valid(wrong_mark):
 		wrong_mark.queue_free()
@@ -21522,7 +29125,7 @@ func _reset_bird_position() -> void:
 		_bird_home_ready = true
 	_bird_sprite.global_position = _bird_home_global_position
 	_bird_sprite.rotation_degrees = 0.0
-	_bird_sprite.size = Vector2(180, 96)
+	_bird_sprite.size = Vector2(150, 80)
 	_bird_sprite.modulate = BIRD_TINT
 	_bird_sprite.pivot_offset = _bird_sprite.size * 0.5
 	_hide_food_token()
@@ -21549,20 +29152,35 @@ func _hide_food_token() -> void:
 func _feed_chicken_at_target(target_button: Control) -> void:
 	if _bird_sprite == null or target_button == null:
 		return
-	_show_food_at_target(target_button)
-	await _fly_bird_to_nest(target_button)
-	if _food_token != null and _food_token.visible:
-		var food_tween := create_tween()
-		food_tween.set_trans(Tween.TRANS_SINE)
-		food_tween.set_ease(Tween.EASE_IN)
-		food_tween.tween_property(_food_token, "scale", Vector2(0.22, 0.22), 0.16)
-		food_tween.parallel().tween_property(_food_token, "modulate:a", 0.0, 0.16)
-		var peck := create_tween()
-		peck.set_trans(Tween.TRANS_SINE)
-		peck.set_ease(Tween.EASE_IN_OUT)
-		peck.tween_property(_bird_sprite, "rotation_degrees", -9.0, 0.08)
-		peck.tween_property(_bird_sprite, "rotation_degrees", 0.0, 0.08)
-		await food_tween.finished
+	if _food_token == null:
+		return
+	if _selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or _sight_mode == "Continuous"):
+		return
+	# Place food at the button
+	_food_token.scale = Vector2.ONE
+	_food_token.modulate = Color(1, 1, 1, 1)
+	var btn_center := target_button.global_position + (target_button.size * 0.5)
+	_food_token.global_position = btn_center - (_food_token.size * 0.5)
+	_food_token.visible = true
+	# Fly food straight to the chicken (no overshoot)
+	var bird_center := _bird_sprite.global_position + (_bird_sprite.size * 0.5)
+	var food_target := bird_center - (_food_token.size * 0.5)
+	var fly_tween := create_tween()
+	fly_tween.set_trans(Tween.TRANS_SINE)
+	fly_tween.set_ease(Tween.EASE_IN)
+	fly_tween.tween_property(_food_token, "global_position", food_target, 0.4)
+	fly_tween.parallel().tween_property(_food_token, "scale", Vector2(0.5, 0.5), 0.4)
+	await fly_tween.finished
+	if not is_instance_valid(self):
+		return
+	# Chicken eats
+	if _bird_anim != null:
+		_bird_anim.play("eat")
+	var eat_tween := create_tween()
+	eat_tween.tween_property(_food_token, "scale", Vector2(0.1, 0.1), 0.12)
+	eat_tween.parallel().tween_property(_food_token, "modulate:a", 0.0, 0.12)
+	await eat_tween.finished
+	if is_instance_valid(_food_token):
 		_food_token.modulate = Color(1, 1, 1, 1)
 	_hide_food_token()
 
@@ -21622,6 +29240,8 @@ func _fly_bird_away_sad() -> void:
 	_hide_food_token()
 	_stop_bird_idle_anim()
 	_stop_bird_flap_anim()
+	if _bird_anim != null:
+		_bird_anim.play("sad")
 	_bird_sprite.modulate = Color(0.75, 0.78, 0.9, 0.95)
 	var target := _bird_sprite.global_position + Vector2(-260, -120)
 	var tween := create_tween()
@@ -21649,14 +29269,18 @@ func _play_completion_reaction(score_pct: float) -> void:
 
 
 func _play_reaction_roll() -> void:
+	if _bird_anim != null:
+		_bird_anim.play("jump")
 	var y0 := _bird_sprite.position.y
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bird_sprite, "rotation_degrees", 360.0, 0.85)
-	tween.parallel().tween_property(_bird_sprite, "position:y", y0 - 28.0, 0.4)
-	tween.tween_property(_bird_sprite, "position:y", y0, 0.45)
-	tween.finished.connect(func() -> void:
+	if _bird_action_tween != null and is_instance_valid(_bird_action_tween):
+		_bird_action_tween.kill()
+	_bird_action_tween = create_tween()
+	_bird_action_tween.set_trans(Tween.TRANS_SINE)
+	_bird_action_tween.set_ease(Tween.EASE_IN_OUT)
+	_bird_action_tween.tween_property(_bird_sprite, "rotation_degrees", 360.0, 0.85)
+	_bird_action_tween.parallel().tween_property(_bird_sprite, "position:y", y0 - 28.0, 0.4)
+	_bird_action_tween.tween_property(_bird_sprite, "position:y", y0, 0.45)
+	_bird_action_tween.finished.connect(func() -> void:
 		if _bird_sprite != null:
 			_bird_sprite.rotation_degrees = 0.0
 		_start_bird_idle_anim()
@@ -21664,26 +29288,34 @@ func _play_reaction_roll() -> void:
 
 
 func _play_reaction_jump() -> void:
+	if _bird_anim != null:
+		_bird_anim.play("jump")
 	var y0 := _bird_sprite.position.y
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bird_sprite, "position:y", y0 - 34.0, 0.23)
-	tween.tween_property(_bird_sprite, "position:y", y0, 0.28)
-	tween.finished.connect(func() -> void:
+	if _bird_action_tween != null and is_instance_valid(_bird_action_tween):
+		_bird_action_tween.kill()
+	_bird_action_tween = create_tween()
+	_bird_action_tween.set_trans(Tween.TRANS_SINE)
+	_bird_action_tween.set_ease(Tween.EASE_IN_OUT)
+	_bird_action_tween.tween_property(_bird_sprite, "position:y", y0 - 34.0, 0.23)
+	_bird_action_tween.tween_property(_bird_sprite, "position:y", y0, 0.28)
+	_bird_action_tween.finished.connect(func() -> void:
 		_start_bird_idle_anim()
 	)
 
 
 func _play_reaction_walk() -> void:
+	if _bird_anim != null:
+		_bird_anim.play("hop")
 	var x0 := _bird_sprite.global_position.x
-	var tween := create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_bird_sprite, "global_position:x", x0 - 70.0, 0.35)
-	tween.tween_property(_bird_sprite, "global_position:x", x0 + 70.0, 0.35)
-	tween.tween_property(_bird_sprite, "global_position:x", x0, 0.35)
-	tween.finished.connect(func() -> void:
+	if _bird_action_tween != null and is_instance_valid(_bird_action_tween):
+		_bird_action_tween.kill()
+	_bird_action_tween = create_tween()
+	_bird_action_tween.set_trans(Tween.TRANS_SINE)
+	_bird_action_tween.set_ease(Tween.EASE_IN_OUT)
+	_bird_action_tween.tween_property(_bird_sprite, "global_position:x", x0 - 70.0, 0.35)
+	_bird_action_tween.tween_property(_bird_sprite, "global_position:x", x0 + 70.0, 0.35)
+	_bird_action_tween.tween_property(_bird_sprite, "global_position:x", x0, 0.35)
+	_bird_action_tween.finished.connect(func() -> void:
 		_start_bird_idle_anim()
 	)
 
@@ -21704,12 +29336,8 @@ func _start_bird_idle_anim() -> void:
 	if _bird_sprite == null:
 		return
 	_stop_bird_idle_anim()
-	_bird_idle_tween = create_tween()
-	_bird_idle_tween.set_loops()
-	_bird_idle_tween.tween_property(_bird_sprite, "position:y", _bird_sprite.position.y - 6.0, 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_bird_idle_tween.parallel().tween_property(_bird_sprite, "rotation_degrees", -2.0, 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_bird_idle_tween.tween_property(_bird_sprite, "position:y", _bird_sprite.position.y + 6.0, 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_bird_idle_tween.parallel().tween_property(_bird_sprite, "rotation_degrees", 2.0, 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if _bird_anim != null:
+		_bird_anim.play("idle")
 
 
 func _stop_bird_idle_anim() -> void:
@@ -21722,12 +29350,8 @@ func _start_bird_flap_anim() -> void:
 	if _bird_sprite == null:
 		return
 	_stop_bird_flap_anim()
-	_bird_flap_tween = create_tween()
-	_bird_flap_tween.set_loops()
-	_bird_flap_tween.tween_property(_bird_sprite, "scale:y", 0.86, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_bird_flap_tween.parallel().tween_property(_bird_sprite, "rotation_degrees", -8.0, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_bird_flap_tween.tween_property(_bird_sprite, "scale:y", 1.0, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_bird_flap_tween.parallel().tween_property(_bird_sprite, "rotation_degrees", 5.0, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if _bird_anim != null:
+		_bird_anim.play("hop")
 
 
 func _stop_bird_flap_anim() -> void:
@@ -21739,113 +29363,89 @@ func _stop_bird_flap_anim() -> void:
 		_bird_sprite.rotation_degrees = 0.0
 
 
+func _load_bird_sprites_deferred() -> void:
+	if _bird_anim != null:
+		_bird_anim.sprite_frames = _build_bird_sprite_frames()
+		_start_bird_idle_anim()
+
+
+func _build_bird_sprite_frames() -> SpriteFrames:
+	var frames := SpriteFrames.new()
+	if frames.has_animation("default"):
+		frames.remove_animation("default")
+	# Idle: dedicated idle spritesheet, 3 rows (24 frames), forward loop
+	_add_anim_from_sheet(frames, "idle", BIRD_SPRITESHEET_IDLE, BIRD_SPRITESHEET_COLS, 3, 12.0, false)
+	_add_anim_from_sheet(frames, "hop",  BIRD_SPRITESHEET_HOP,  BIRD_SPRITESHEET_COLS, 4, 18.0, false)
+	_add_anim_from_sheet(frames, "sad",  BIRD_SPRITESHEET_SAD,  BIRD_SPRITESHEET_COLS, 7, 12.0, false)
+	_add_anim_from_sheet(frames, "jump", BIRD_SPRITESHEET_JUMP, BIRD_SPRITESHEET_COLS, 5, 20.0, false)
+	_add_anim_from_sheet(frames, "eat",  BIRD_SPRITESHEET_EAT,  BIRD_SPRITESHEET_COLS, 3, 14.0, true)
+	return frames
+
+
+func _add_anim_from_sheet(frames: SpriteFrames, anim_name: String, sheet_path: String,
+		cols: int, rows: int, fps: float, ping_pong: bool) -> void:
+	if not ResourceLoader.exists(sheet_path):
+		return
+	var sheet_tex: Texture2D = load(sheet_path) as Texture2D
+	if sheet_tex == null:
+		return
+	frames.add_animation(anim_name)
+	frames.set_animation_loop(anim_name, true)
+	frames.set_animation_speed(anim_name, fps)
+	var total := cols * rows
+	# Forward pass
+	for i in range(total):
+		var atlas := AtlasTexture.new()
+		atlas.atlas = sheet_tex
+		atlas.region = Rect2(
+			(i % cols) * BIRD_SPRITESHEET_FRAME_W,
+			(i / cols) * BIRD_SPRITESHEET_FRAME_H,
+			BIRD_SPRITESHEET_FRAME_W,
+			BIRD_SPRITESHEET_FRAME_H
+		)
+		frames.add_frame(anim_name, atlas)
+	# Reverse pass for ping-pong (skip first and last frames to avoid duplicate at loop point)
+	if ping_pong and total > 2:
+		for i in range(total - 2, 0, -1):
+			var atlas := AtlasTexture.new()
+			atlas.atlas = sheet_tex
+			atlas.region = Rect2(
+				(i % cols) * BIRD_SPRITESHEET_FRAME_W,
+				(i / cols) * BIRD_SPRITESHEET_FRAME_H,
+				BIRD_SPRITESHEET_FRAME_W,
+				BIRD_SPRITESHEET_FRAME_H
+			)
+			frames.add_frame(anim_name, atlas)
+
+
 func _midi_to_freq(midi_note: int) -> float:
-	return 440.0 * pow(2.0, float(midi_note - 69) / 12.0)
+	if _audio_engine == null:
+		_audio_engine = AudioEngineScript.new()
+	return _audio_engine.midi_to_freq(midi_note)
 
 
 func _load_piano_samples() -> void:
-	_piano_samples.clear()
-	_piano_interval_anchor_samples.clear()
-	_load_sampled_piano_from_folder()
-	if not _piano_samples.is_empty():
-		# Also load trusted fixed anchors for interval mode playback.
-		for midi_key in PIANO_SAMPLE_PATHS.keys():
-			var sample_path_a: String = PIANO_SAMPLE_PATHS[midi_key]
-			if not ResourceLoader.exists(sample_path_a, "AudioStream"):
-				continue
-			var stream_a := ResourceLoader.load(sample_path_a)
-			if stream_a is AudioStream:
-				_piano_interval_anchor_samples[midi_key] = stream_a
-		return
-	# Fallback to legacy sparse sample map.
-	for midi_key in PIANO_SAMPLE_PATHS.keys():
-		var sample_path: String = PIANO_SAMPLE_PATHS[midi_key]
-		if not ResourceLoader.exists(sample_path, "AudioStream"):
-			continue
-		var stream := ResourceLoader.load(sample_path)
-		if stream is AudioStream:
-			_piano_samples[midi_key] = stream
-			_piano_interval_anchor_samples[midi_key] = stream
-
-
-func _load_sampled_piano_from_folder() -> void:
-	var dir := DirAccess.open(PIANO_SAMPLED_DIR)
-	if dir == null:
-		return
-	var files: PackedStringArray = dir.get_files()
-	var lower_names: Dictionary = {}
-	for file_name in files:
-		var f := String(file_name).to_lower()
-		lower_names[f.get_basename()] = true
-	for file_name in files:
-		var f := String(file_name)
-		if not f.to_lower().ends_with(".ogg"):
-			continue
-		var midi := _sampled_filename_to_midi(f, lower_names)
-		if midi < 0:
-			continue
-		var full_path := "%s/%s" % [PIANO_SAMPLED_DIR, f]
-		if not ResourceLoader.exists(full_path, "AudioStream"):
-			continue
-		var stream := ResourceLoader.load(full_path)
-		if stream is AudioStream and not _piano_samples.has(midi):
-			_piano_samples[midi] = stream
-
-
-func _sampled_filename_to_midi(file_name: String, lower_names: Dictionary) -> int:
-	var base := file_name.get_basename().to_lower()
-	var rx := RegEx.new()
-	if rx.compile("^([a-g])(\\d)(?:_(\\d+))?$") != OK:
-		return -1
-	var m := rx.search(base)
-	if m == null:
-		return -1
-	var letter := m.get_string(1)
-	var octave := int(m.get_string(2))
-	var variant_text := m.get_string(3)
-	var variant := int(variant_text) if variant_text != "" else 1
-
-	var natural_semi := _natural_letter_to_semitone(letter)
-	if natural_semi < 0:
-		return -1
-
-	var midi := 12 * (octave + 1) + natural_semi
-	var is_natural_only := letter == "b" or letter == "e"
-	if not is_natural_only:
-		# Naming convention:
-		# - c4_2.ogg => C4 natural
-		# - c4.ogg   => C#4 (one semitone above)
-		# For E/B, no sharp mapping is used here.
-		var has_natural_variant := lower_names.has("%s%d_2" % [letter, octave])
-		if has_natural_variant:
-			var is_natural_file := variant == 2
-			if not is_natural_file:
-				midi += 1
-
-	if midi < 0 or midi > 127:
-		return -1
-	return midi
-
-
-func _natural_letter_to_semitone(letter: String) -> int:
-	match letter:
-		"c":
-			return 0
-		"d":
-			return 2
-		"e":
-			return 4
-		"f":
-			return 5
-		"g":
-			return 7
-		"a":
-			return 9
-		"b":
-			return 11
-		_:
-			return -1
-
+	if _audio_engine == null:
+		_audio_engine = AudioEngineScript.new()
+	var sample_result: Dictionary = _audio_engine.load_piano_samples(
+		PIANO_NUMBERED_DIR,
+		PIANO_NUMBERED_FIRST_INDEX,
+		PIANO_NUMBERED_LAST_INDEX,
+		PIANO_NUMBERED_BASE_MIDI,
+		PIANO_SAMPLED_DIR,
+		PIANO_SAMPLED_MIDI_OVERRIDES,
+		PIANO_SAMPLE_PATHS
+	)
+	var piano_samples_any: Variant = sample_result.get("piano_samples", {})
+	if typeof(piano_samples_any) == TYPE_DICTIONARY:
+		_piano_samples = (piano_samples_any as Dictionary).duplicate(true)
+	else:
+		_piano_samples = {}
+	var interval_anchor_any: Variant = sample_result.get("interval_anchor_samples", {})
+	if typeof(interval_anchor_any) == TYPE_DICTIONARY:
+		_piano_interval_anchor_samples = (interval_anchor_any as Dictionary).duplicate(true)
+	else:
+		_piano_interval_anchor_samples = {}
 
 func _play_note(midi_note: int, duration: float) -> void:
 	var sample_map: Dictionary = _sample_map_for_current_mode()
@@ -21872,15 +29472,9 @@ func _sample_map_for_current_mode() -> Dictionary:
 
 
 func _sample_map_cache_key(sample_map: Dictionary) -> String:
-	var keys: Array = sample_map.keys()
-	keys.sort()
-	var parts: Array[String] = []
-	for k in keys:
-		parts.append(str(k))
-	var mode_tag := str(_selected_mode)
-	if _selected_mode == MODE_SIGHT:
-		mode_tag += ":" + _sight_mode
-	return "%s|%s" % [mode_tag, ",".join(parts)]
+	if _audio_engine == null:
+		_audio_engine = AudioEngineScript.new()
+	return _audio_engine.sample_map_cache_key(sample_map, _selected_mode, _sight_mode, MODE_SIGHT)
 
 
 func _nearest_sample_cached(midi_note: int, sample_map: Dictionary) -> int:
@@ -21899,16 +29493,9 @@ func _nearest_sample_cached(midi_note: int, sample_map: Dictionary) -> int:
 
 
 func _nearest_sample_midi_from_map(target_midi: int, sample_map: Dictionary) -> int:
-	var keys: Array = sample_map.keys()
-	var best: int = int(keys[0])
-	var best_dist: int = int(abs(target_midi - best))
-	for k in keys:
-		var midi: int = int(k)
-		var d: int = int(abs(target_midi - midi))
-		if d < best_dist:
-			best = midi
-			best_dist = d
-	return best
+	if _audio_engine == null:
+		_audio_engine = AudioEngineScript.new()
+	return _audio_engine.nearest_sample_midi_from_map(target_midi, sample_map)
 
 
 func _nearest_sample_midi(target_midi: int) -> int:
@@ -22055,6 +29642,43 @@ func _start_note_chase_music() -> void:
 func _stop_note_chase_music() -> void:
 	if _music_player != null and _music_player.playing:
 		_music_player.stop()
+
+
+func _start_home_ambient() -> void:
+	if _home_ambient_player == null or _piano_samples.is_empty():
+		return
+	_home_ambient_run_id += 1
+	var run_id := _home_ambient_run_id
+	# Gentle C major arpeggio: C3, E3, G3, then a long pause — loops softly
+	var notes := [48, 52, 55]
+	while is_instance_valid(self) and _home_ambient_run_id == run_id:
+		for midi in notes:
+			if _home_ambient_run_id != run_id:
+				break
+			var nearest := _nearest_sample_midi_from_map(midi, _piano_samples)
+			if _piano_samples.has(nearest):
+				_home_ambient_player.stream = _piano_samples[nearest]
+				_home_ambient_player.pitch_scale = pow(2.0, float(midi - nearest) / 12.0)
+				_home_ambient_player.volume_db = -24.0
+				_home_ambient_player.play()
+			await get_tree().create_timer(0.95).timeout
+		if _home_ambient_run_id != run_id:
+			break
+		await get_tree().create_timer(5.5).timeout
+
+
+func _stop_home_ambient() -> void:
+	_home_ambient_run_id += 1  # Invalidates the ambient coroutine
+	if _home_ambient_player == null or not _home_ambient_player.playing:
+		return
+	# Fade out gently
+	var tw := create_tween()
+	tw.tween_property(_home_ambient_player, "volume_db", -60.0, 0.4)
+	tw.finished.connect(func() -> void:
+		if _home_ambient_player != null:
+			_home_ambient_player.stop()
+			_home_ambient_player.volume_db = -24.0
+	)
 
 
 func _push_sine(freq: float, duration: float) -> void:

@@ -1,6 +1,8 @@
 class_name HomeMenuTokens
 extends RefCounted
 
+const FIXED_THEME_ID := "azure_cascade"
+
 const THEMES := {
 	"golden_harvest": {
 		"label": "Golden Harvest",
@@ -80,7 +82,7 @@ const COLORS_HIGH_CONTRAST := {
 	"disabled_overlay": Color(0.42, 0.42, 0.42, 0.62)
 }
 
-var _theme_id := "golden_harvest"
+var _theme_id := FIXED_THEME_ID
 
 const SPACING := {
 	"section_gap": 12,
@@ -98,6 +100,50 @@ const RADIUS := {
 const SHADOW := {
 	"card_size": 10,
 	"button_size": 4
+}
+
+# Single source of truth for menu/config visuals.
+# Keep these stable so all menu screens style consistently.
+const MENU_STYLE_CONTRACT := {
+	# Panels/cards
+	"panel_bg": Color(0.0588, 0.1529, 0.2510, 0.72), # #0F2740
+	"panel_bg_compact": Color(0.0902, 0.2235, 0.3608, 0.74), # #17395C
+	"panel_border": Color(0.9098, 0.6275, 0.1255, 0.46), # #E8A020
+	"panel_border_strong": Color(0.9098, 0.6275, 0.1255, 0.94),
+	# Buttons/chips (inactive)
+	"btn_inactive_bg": Color(0.10, 0.19, 0.32, 0.82),
+	"btn_inactive_hover": Color(0.13, 0.24, 0.39, 0.88),
+	"btn_inactive_pressed": Color(0.08, 0.16, 0.28, 0.90),
+	"btn_inactive_border": Color(0.9098, 0.6275, 0.1255, 0.44),
+	"btn_inactive_text": Color(0.7176, 0.7804, 0.8549, 1.0), # #B7C7DA
+	# Buttons/chips (selected)
+	"btn_selected_bg": Color(0.9098, 0.6275, 0.1255, 0.26),
+	"btn_selected_hover": Color(0.9098, 0.6275, 0.1255, 0.34),
+	"btn_selected_pressed": Color(0.9098, 0.6275, 0.1255, 0.22),
+	"btn_selected_border": Color(0.9098, 0.6275, 0.1255, 0.94),
+	"btn_selected_text": Color(0.9176, 0.9529, 1.0, 1.0), # #EAF3FF
+	"btn_selected_text_dark": Color(0.12, 0.18, 0.27, 1.0),
+	# CTA
+	"cta_bg": Color(0.9098, 0.6275, 0.1255, 0.98),
+	"cta_hover": Color(0.95, 0.70, 0.20, 0.99),
+	"cta_pressed": Color(0.82, 0.54, 0.08, 0.99),
+	"cta_border": Color(0.97, 0.86, 0.40, 0.94),
+	"cta_text": Color(0.12, 0.18, 0.27, 1.0),
+	# Gloss / shadow intensity
+	"gloss_alpha": 0.24,
+	"gloss_height_ratio": 0.24,
+	"gloss_min_h": 10.0,
+	"gloss_max_h": 32.0,
+	"shadow_panel_alpha": 0.14,
+	"shadow_panel_size": 6,
+	"shadow_chip_alpha": 0.10,
+	"shadow_chip_size": 2,
+	"shadow_button_alpha": 0.28,
+	"shadow_button_size": 4,
+	"shadow_nav_alpha": 0.0,
+	"shadow_nav_size": 0,
+	"shadow_nav_hover_size": 0,
+	"shadow_nav_pressed_size": 0
 }
 
 const FONT_SIZES := {
@@ -122,25 +168,24 @@ func profile_for_viewport(vp: Vector2) -> Dictionary:
 	return LAYOUTS["large_phone"]
 
 func theme_ids() -> Array[String]:
-	return ["golden_harvest", "azure_cascade", "slate_foundry", "crimson_nocturne", "rose_velvet"]
+	return [FIXED_THEME_ID]
 
-func set_theme(theme_id: String) -> void:
-	if THEMES.has(theme_id):
-		_theme_id = theme_id
-	else:
-		_theme_id = "golden_harvest"
+func set_theme(_theme_id: String) -> void:
+	# Keep a single stable palette across menu/config screens.
+	_theme_id = FIXED_THEME_ID
 
 func theme_id() -> String:
 	return _theme_id
 
-func theme_label(theme_id: String) -> String:
-	if THEMES.has(theme_id):
-		var d: Dictionary = THEMES[theme_id]
-		return str(d.get("label", theme_id))
-	return "Golden Harvest"
+func theme_label(_theme_id: String) -> String:
+	var d: Dictionary = THEMES.get(FIXED_THEME_ID, THEMES["azure_cascade"])
+	return str(d.get("label", FIXED_THEME_ID))
 
 func colors(high_contrast: bool) -> Dictionary:
 	if high_contrast:
 		return COLORS_HIGH_CONTRAST
-	var d: Dictionary = THEMES.get(_theme_id, THEMES["golden_harvest"])
-	return d.get("colors", THEMES["golden_harvest"]["colors"])
+	var d: Dictionary = THEMES.get(FIXED_THEME_ID, THEMES["azure_cascade"])
+	return d.get("colors", THEMES["azure_cascade"]["colors"])
+
+func menu_style_contract() -> Dictionary:
+	return MENU_STYLE_CONTRACT.duplicate(true)

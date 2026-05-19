@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://ui/components/virtual_piano_selector.gd" id="1_script"]
 
 [node name="VirtualPianoSelector" type="Control"]
-custom_minimum_size = Vector2(0, 156)
+custom_minimum_size = Vector2(0, 174)
 size_flags_horizontal = 3
 script = ExtResource("1_script")
 
@@ -20,7 +20,7 @@ horizontal_scroll_mode = 2
 vertical_scroll_mode = 0
 
 [node name="Keyboard" type="Control" parent="Scroll"]
-custom_minimum_size = Vector2(640, 156)
+custom_minimum_size = Vector2(640, 174)
 layout_mode = 2
 
 [node name="WhiteLayer" type="Control" parent="Scroll/Keyboard"]
@@ -49,3 +49,15 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="FeedbackLabel" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 10.0
+offset_top = 4.0
+offset_right = -10.0
+offset_bottom = 24.0
+mouse_filter = 2
+horizontal_alignment = 1
+vertical_alignment = 1
