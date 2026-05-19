@@ -1,16 +1,114 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Clefira app logo">
-  <rect width="1024" height="1024" fill="#101A36" rx="0"/>
-  <g>
-    <path
-      d="M 760 320 A 300 300 0 1 0 760 704"
-      fill="none"
-      stroke="#79D1CC"
-      stroke-width="140"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-    <path d="M 286 548 C 405 456 548 462 706 380" fill="none" stroke="#101A36" stroke-width="34" stroke-linecap="round"/>
-    <path d="M 312 620 C 434 532 576 542 732 456" fill="none" stroke="#101A36" stroke-width="34" stroke-linecap="round"/>
-    <path d="M 338 692 C 463 610 603 622 756 540" fill="none" stroke="#101A36" stroke-width="34" stroke-linecap="round"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Clefira C note logo">
+  <defs>
+    <linearGradient id="c-main" x1="226" y1="198" x2="770" y2="818" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A9F5FF"/>
+      <stop offset="0.42" stop-color="#55D7E4"/>
+      <stop offset="1" stop-color="#1795B2"/>
+    </linearGradient>
+    <linearGradient id="c-highlight" x1="274" y1="210" x2="536" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.76"/>
+      <stop offset="0.58" stop-color="#D8FBFF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#D8FBFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="note-main" x1="506" y1="248" x2="724" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF2A8"/>
+      <stop offset="0.48" stop-color="#F5C842"/>
+      <stop offset="1" stop-color="#D68616"/>
+    </linearGradient>
+    <linearGradient id="note-highlight" x1="516" y1="268" x2="646" y2="612" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.72"/>
+      <stop offset="0.55" stop-color="#FFF4BE" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#FFF4BE" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <path
+    d="M 724 230 A 318 318 0 1 0 724 794"
+    fill="none"
+    stroke="#06152F"
+    stroke-width="178"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.34"
+  />
+  <path
+    d="M 708 218 A 318 318 0 1 0 708 806"
+    fill="none"
+    stroke="#0A2348"
+    stroke-width="142"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.45"
+  />
+  <path
+    d="M 706 220 A 318 318 0 1 0 706 804"
+    fill="none"
+    stroke="url(#c-main)"
+    stroke-width="122"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M 670 228 A 264 264 0 0 0 318 400"
+    fill="none"
+    stroke="url(#c-highlight)"
+    stroke-width="30"
+    stroke-linecap="round"
+    opacity="0.92"
+  />
+  <path
+    d="M 324 658 A 266 266 0 0 0 596 805"
+    fill="none"
+    stroke="#0D5B80"
+    stroke-width="24"
+    stroke-linecap="round"
+    opacity="0.18"
+  />
+
+  <path
+    d="M 448 674 C 443 623 491 586 547 596 C 605 606 638 655 615 702 C 592 748 532 762 485 734 C 461 720 450 697 448 674 Z"
+    fill="#071730"
+    opacity="0.36"
+  />
+  <path
+    d="M 464 654 C 459 610 502 578 552 586 C 602 594 632 637 613 680 C 594 719 541 733 499 708 C 477 695 466 676 464 654 Z"
+    fill="url(#note-main)"
+  />
+  <path
+    d="M 493 633 C 517 607 564 607 589 636"
+    fill="none"
+    stroke="url(#note-highlight)"
+    stroke-width="24"
+    stroke-linecap="round"
+  />
+
+  <rect x="584" y="280" width="70" height="390" rx="35" fill="#071730" opacity="0.34"/>
+  <rect x="604" y="258" width="54" height="386" rx="27" fill="url(#note-main)"/>
+  <rect x="618" y="284" width="15" height="316" rx="7.5" fill="url(#note-highlight)" opacity="0.82"/>
+
+  <path
+    d="M 636 256 C 733 269 797 326 812 407 C 760 374 704 352 636 348 Z"
+    fill="#071730"
+    opacity="0.34"
+  />
+  <path
+    d="M 648 258 C 736 274 792 326 804 398 C 754 366 704 348 648 344 Z"
+    fill="url(#note-main)"
+  />
+  <path
+    d="M 666 282 C 717 295 757 326 776 364"
+    fill="none"
+    stroke="url(#note-highlight)"
+    stroke-width="18"
+    stroke-linecap="round"
+    opacity="0.86"
+  />
+  <path
+    d="M 660 346 C 712 353 754 372 792 400"
+    fill="none"
+    stroke="#8A5510"
+    stroke-width="14"
+    stroke-linecap="round"
+    opacity="0.22"
+  />
 </svg>

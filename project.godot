@@ -19,7 +19,7 @@ config/description="Clefira — Music Learning that actually sticks"
 run/main_scene="res://scenes/ui/SplashScreen.tscn"
 config/features=PackedStringArray("4.6")
 boot_splash/show_image=false
-config/icon="res://icon.svg"
+config/icon="res://assets/logos/clefira-logo.svg"
 
 [audio]
 

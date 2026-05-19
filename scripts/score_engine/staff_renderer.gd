@@ -34,19 +34,22 @@ var draw_paper: bool = false
 var cluster_mode: bool = false
 # Vertical gap between staves in a grand staff, measured in staff spaces.
 var inter_staff_gap_spaces: float = 4.5
-# Multi-system layout: how many bars per line. 0 = single line (no wrapping).
+# Multi-system layout fallback when adaptive wrapping is off.
 var bars_per_system: int = 4
-# When true (default), bars_per_system is recomputed dynamically from the current
-# render width so the layout adapts to screen size / window resizes.
+# Adaptive wrapping packs each line by screen width and rhythmic density.
 var auto_bars_per_system: bool = true
 # Minimum comfortable bar width (in pixels) when computing adaptive bars-per-line.
 # Smaller → more bars per line (denser). Larger → fewer bars per line (more spacious).
 var min_bar_width_px: float = 140.0
 # Cap on adaptive bars-per-line so very wide monitors don't end up with 20 bars
 # of tiny eighth-notes per line.
-var max_bars_per_system: int = 8
+var max_bars_per_system: int = 6
+var target_events_per_system: int = 18
 # Vertical gap between successive systems, in staff spaces.
 var system_vertical_gap_spaces: float = 6.0
+# Extra page margin for ledger notes, fingerings, and 8va markings.
+var page_top_margin_spaces: float = 8.0
+var page_bottom_margin_spaces: float = 5.0
 
 # --- Engraving-rule constants ---
 const SHARP_ORDER := ["F", "C", "G", "D", "A", "E", "B"]
@@ -65,6 +68,9 @@ const OPTICAL_WIDTH := {
 const CLEF_BASELINE_NUDGE_SPACES := -0.48
 const KEY_SIGNATURE_BASELINE_NUDGE_SPACES := -0.28
 const TIME_SIGNATURE_BASELINE_NUDGE_SPACES := -0.86
+const BASS_TO_TREBLE_MIN_MIDI := 67 # G4. Three bass-ledger-line passages read better in treble clef.
+const BASS_TO_TREBLE_FORCE_LEDGER_COUNT := 4
+const TREBLE_8VA_MIN_MIDI := 84 # C6. Sustained passages above B5 read better with 8va.
 
 # --- Internal layout state (recomputed each draw) ---
 var _content_x_start: float = 0.0
@@ -72,7 +78,7 @@ var _content_x_end: float = 0.0
 
 
 func _ready() -> void:
-	resized.connect(queue_redraw)
+	resized.connect(_on_resized)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	SMuFLFont.register_change_listener(Callable(self, "_on_smufl_font_changed"))
 
@@ -82,6 +88,11 @@ func _exit_tree() -> void:
 
 
 func _on_smufl_font_changed() -> void:
+	queue_redraw()
+
+
+func _on_resized() -> void:
+	_update_required_height_for_systems()
 	queue_redraw()
 
 
@@ -101,38 +112,186 @@ func _update_required_height_for_systems() -> void:
 	var staves: Array = score.get("staves", [])
 	if staves.is_empty():
 		return
-	var measure_count: int = 0
-	for st in staves:
-		var ms: Array = (st as Dictionary).get("measures", [])
-		if ms.size() > measure_count:
-			measure_count = ms.size()
+	var measure_count: int = _measure_count_for_staves(staves)
 	if measure_count <= 0:
 		return
-	var bars_per_line: int = _effective_bars_per_line()
-	var system_count: int = maxi(1, int(ceil(float(measure_count) / float(bars_per_line))))
 	var staff_count: int = staves.size()
 	var staff_h: float = staff_space * 4.0
 	var inter_staff: float = staff_space * inter_staff_gap_spaces
 	var per_system_h: float = float(staff_count) * staff_h + float(maxi(0, staff_count - 1)) * inter_staff
 	var system_gap: float = staff_space * system_vertical_gap_spaces
-	var total_h: float = float(system_count) * per_system_h + float(maxi(0, system_count - 1)) * system_gap + staff_space * 4.0
-	if total_h > custom_minimum_size.y:
-		custom_minimum_size = Vector2(custom_minimum_size.x, total_h)
+	var staff_x := 24.0
+	var staff_w: float = _layout_width() - staff_x - 28.0
+	var system_ranges := _layout_system_ranges(
+		staves,
+		measure_count,
+		staff_w,
+		staff_count,
+		int(score.get("key_fifths", 0)),
+		int(score.get("time_sig_num", 4)),
+		int(score.get("time_sig_den", 4))
+	)
+	var system_count: int = maxi(1, system_ranges.size())
+	var top_margin: float = staff_space * page_top_margin_spaces
+	var bottom_margin: float = staff_space * page_bottom_margin_spaces
+	var systems_h: float = float(system_count) * per_system_h + float(maxi(0, system_count - 1)) * system_gap
+	var total_h: float = top_margin + systems_h + bottom_margin
+	var target_h := maxf(220.0, total_h)
+	if absf(target_h - custom_minimum_size.y) > 1.0:
+		custom_minimum_size = Vector2(custom_minimum_size.x, target_h)
 
 
-# Returns the bars-per-line value to actually use for this render. When the auto
-# flag is on, computes based on current width so the layout adapts. Falls back to
-# the explicit bars_per_system value if auto is off or width is not yet known.
-func _effective_bars_per_line() -> int:
-	if not auto_bars_per_system:
-		return maxi(1, bars_per_system) if bars_per_system > 0 else 4
-	var w: float = size.x
+func _layout_width() -> float:
+	var w := size.x
 	if w < 100.0:
-		# Renderer hasn't been laid out yet (initial set_score); fall back to default.
-		return maxi(1, bars_per_system) if bars_per_system > 0 else 4
-	var avail: float = w - 80.0  # subtract prelude + side margins
-	var computed: int = int(floor(avail / maxf(60.0, min_bar_width_px)))
-	return clampi(computed, 1, max_bars_per_system)
+		w = custom_minimum_size.x
+	if w < 100.0:
+		w = 900.0
+	return w
+
+
+func _measure_count_for_staves(staves: Array) -> int:
+	var measure_count := 1
+	for staff in staves:
+		var measures: Array = (staff as Dictionary).get("measures", [])
+		if measures.size() > measure_count:
+			measure_count = measures.size()
+	return measure_count
+
+
+func _prelude_width(staff_count: int, key_fifths: int, time_num: int, time_den: int, include_time_signature: bool) -> float:
+	var brace_w: float = staff_space * 1.4 if staff_count >= 2 else 0.0
+	var clef_w: float = staff_space * 2.6
+	var key_w: float = float(absi(key_fifths)) * staff_space * 0.95
+	var ts_w: float = staff_space * float(maxi(str(time_num).length(), str(time_den).length())) * 1.4
+	if include_time_signature:
+		return brace_w + 8.0 + clef_w + 8.0 + key_w + 8.0 + ts_w + 14.0
+	return brace_w + 8.0 + clef_w + 8.0 + key_w + 14.0
+
+
+func _measure_layout_stats(staves: Array, measure_idx: int) -> Dictionary:
+	var events_by_beat: Dictionary = {}
+	for staff_any in staves:
+		var staff: Dictionary = staff_any
+		var measures: Array = staff.get("measures", [])
+		if measure_idx < 0 or measure_idx >= measures.size():
+			continue
+		var measure: Dictionary = measures[measure_idx]
+		var notes_in_bar: Array = measure.get("notes", [])
+		for ev_any in _collect_events(notes_in_bar):
+			var ev: Dictionary = ev_any
+			var notes: Array = ev.get("notes", [])
+			var has_note := false
+			for note_any in notes:
+				var note: Dictionary = note_any
+				if int(note.get("midi", -1)) >= 0 and not bool(note.get("rest", false)):
+					has_note = true
+					break
+			var weight := _optical_width_for(float(ev.get("duration_beats", 0.5)))
+			if not has_note:
+				weight *= 0.55
+			weight += maxf(0.0, float(notes.size() - 1)) * 0.35
+			var key := _event_x_key(float(ev.get("beat_offset", 0.0)))
+			events_by_beat[key] = maxf(float(events_by_beat.get(key, 0.0)), weight)
+	var total_weight := 0.0
+	for key in events_by_beat.keys():
+		total_weight += float(events_by_beat[key])
+	var event_count := events_by_beat.size()
+	if event_count <= 0:
+		event_count = 1
+		total_weight = _optical_width_for(4.0) * 0.65
+	return {
+		"events": event_count,
+		"weight": maxf(1.0, total_weight),
+	}
+
+
+func _measure_raw_width_px(staves: Array, measure_idx: int) -> float:
+	var stats := _measure_layout_stats(staves, measure_idx)
+	var event_count := int(stats.get("events", 1))
+	var weight := float(stats.get("weight", 1.0))
+	var base_px := staff_space * 7.0
+	var event_px := float(event_count) * staff_space * 1.55
+	var weight_px := weight * staff_space * 1.20
+	return maxf(min_bar_width_px, base_px + event_px + weight_px)
+
+
+func _measure_widths_for_range(staves: Array, first_bar: int, last_bar_exclusive: int) -> Array:
+	var widths: Array = []
+	for bar_idx in range(first_bar, last_bar_exclusive):
+		widths.append(_measure_raw_width_px(staves, bar_idx))
+	return widths
+
+
+func _layout_system_ranges(staves: Array, measure_count: int, staff_w: float, staff_count: int, key_fifths: int, time_num: int, time_den: int) -> Array:
+	var ranges: Array = []
+	var first_bar := 0
+	if not auto_bars_per_system:
+		var fixed_bars := maxi(1, bars_per_system) if bars_per_system > 0 else measure_count
+		while first_bar < measure_count:
+			var last_fixed := mini(first_bar + fixed_bars, measure_count)
+			ranges.append({"first_bar": first_bar, "last_bar_exclusive": last_fixed})
+			first_bar = last_fixed
+		return ranges
+	while first_bar < measure_count:
+		var include_time := ranges.is_empty()
+		var available_w := maxf(min_bar_width_px, staff_w - _prelude_width(staff_count, key_fifths, time_num, time_den, include_time))
+		var used_w := 0.0
+		var used_events := 0
+		var last_bar := first_bar
+		while last_bar < measure_count:
+			var stats := _measure_layout_stats(staves, last_bar)
+			var measure_events := int(stats.get("events", 1))
+			var measure_w := _measure_raw_width_px(staves, last_bar)
+			var bars_on_line := last_bar - first_bar
+			var exceeds_width := bars_on_line > 0 and used_w + measure_w > available_w
+			var exceeds_events := bars_on_line > 0 and used_events + measure_events > target_events_per_system
+			var exceeds_bar_cap := bars_on_line > 0 and bars_on_line >= max_bars_per_system
+			if exceeds_width or exceeds_events or exceeds_bar_cap:
+				break
+			used_w += measure_w
+			used_events += measure_events
+			last_bar += 1
+		if last_bar == first_bar:
+			last_bar += 1
+		ranges.append({"first_bar": first_bar, "last_bar_exclusive": last_bar})
+		first_bar = last_bar
+	return ranges
+
+
+func get_scroll_y_for_beat(beat_offset: float) -> int:
+	if score.is_empty():
+		return 0
+	var staves: Array = score.get("staves", [])
+	if staves.is_empty():
+		return 0
+	var time_num: int = int(score.get("time_sig_num", 4))
+	var time_den: int = int(score.get("time_sig_den", 4))
+	var beats_per_bar: float = float(time_num) * (4.0 / float(time_den))
+	var measure_count := _measure_count_for_staves(staves)
+	var target_bar := clampi(int(floor(maxf(0.0, beat_offset) / maxf(0.001, beats_per_bar))), 0, maxi(0, measure_count - 1))
+	var staff_count := staves.size()
+	var staff_height: float = staff_space * 4.0
+	var inter_staff_gap: float = staff_space * inter_staff_gap_spaces
+	var per_system_h: float = float(staff_count) * staff_height + float(maxi(0, staff_count - 1)) * inter_staff_gap
+	var system_gap: float = staff_space * system_vertical_gap_spaces
+	var staff_x := 24.0
+	var staff_w: float = _layout_width() - staff_x - 28.0
+	var ranges := _layout_system_ranges(staves, measure_count, staff_w, staff_count, int(score.get("key_fifths", 0)), time_num, time_den)
+	var top_margin: float = staff_space * page_top_margin_spaces
+	var bottom_margin: float = staff_space * page_bottom_margin_spaces
+	var systems_h: float = float(ranges.size()) * per_system_h + float(maxi(0, ranges.size() - 1)) * system_gap
+	var total_h: float = top_margin + systems_h + bottom_margin
+	var first_system_top: float = (size.y - total_h) * 0.5 + top_margin
+	if total_h > size.y - 24.0:
+		first_system_top = top_margin
+	first_system_top = maxf(top_margin, first_system_top)
+	for sys_idx in range(ranges.size()):
+		var r: Dictionary = ranges[sys_idx]
+		if target_bar >= int(r.get("first_bar", 0)) and target_bar < int(r.get("last_bar_exclusive", 0)):
+			var system_top := first_system_top + float(sys_idx) * (per_system_h + system_gap)
+			return int(maxf(0.0, system_top - staff_space * 3.0))
+	return 0
 
 
 func set_highlight_index(idx: int) -> void:
@@ -183,29 +342,21 @@ func _draw_score(staves: Array) -> void:
 	var time_num: int = int(score.get("time_sig_num", 4))
 	var time_den: int = int(score.get("time_sig_den", 4))
 
-	# Determine total measure count.
-	var measure_count: int = 1
-	for staff in staves:
-		var measures: Array = staff.get("measures", [])
-		if measures.size() > measure_count:
-			measure_count = measures.size()
-
-	# Chunk into systems (lines). Width-adaptive when auto_bars_per_system is on.
-	var bars_per_line: int = _effective_bars_per_line()
-	if bars_per_line < 1:
-		bars_per_line = measure_count
-	bars_per_line = maxi(1, bars_per_line)
-	var system_count: int = maxi(1, int(ceil(float(measure_count) / float(bars_per_line))))
+	var measure_count: int = _measure_count_for_staves(staves)
+	var staff_x: float = 24.0
+	var staff_w: float = _layout_width() - staff_x - 28.0
+	var system_ranges := _layout_system_ranges(staves, measure_count, staff_w, staff_count, key_fifths, time_num, time_den)
+	var system_count: int = maxi(1, system_ranges.size())
 
 	# Vertical positioning: total stack of systems centered (or top-aligned if too tall).
-	var total_h: float = float(system_count) * per_system_h + float(maxi(0, system_count - 1)) * system_gap
-	var first_system_top: float = (size.y - total_h) * 0.5
+	var top_margin: float = staff_space * page_top_margin_spaces
+	var bottom_margin: float = staff_space * page_bottom_margin_spaces
+	var systems_h: float = float(system_count) * per_system_h + float(maxi(0, system_count - 1)) * system_gap
+	var total_h: float = top_margin + systems_h + bottom_margin
+	var first_system_top: float = (size.y - total_h) * 0.5 + top_margin
 	if total_h > size.y - 24.0:
-		first_system_top = 12.0  # top-align when content exceeds available height
-	first_system_top = maxf(12.0, first_system_top)
-
-	var staff_x: float = 24.0
-	var staff_w: float = size.x - staff_x - 28.0
+		first_system_top = top_margin  # top-align when content exceeds available height
+	first_system_top = maxf(top_margin, first_system_top)
 
 	# Per-system prelude widths: clef + key sig always; time signature only on system 0
 	# (standard engraving convention).
@@ -225,8 +376,9 @@ func _draw_score(staves: Array) -> void:
 		per_staff_event_offsets.append(0)
 
 	for sys_idx in range(system_count):
-		var first_bar: int = sys_idx * bars_per_line
-		var last_bar_exclusive: int = mini(first_bar + bars_per_line, measure_count)
+		var system_range: Dictionary = system_ranges[sys_idx] if sys_idx < system_ranges.size() else {"first_bar": 0, "last_bar_exclusive": measure_count}
+		var first_bar: int = int(system_range.get("first_bar", 0))
+		var last_bar_exclusive: int = int(system_range.get("last_bar_exclusive", measure_count))
 		var system_top: float = first_system_top + float(sys_idx) * (per_system_h + system_gap)
 
 		var staff_tops: Array[float] = []
@@ -244,10 +396,19 @@ func _draw_score(staves: Array) -> void:
 		if system_bar_count <= 0:
 			continue
 		var notes_w: float = content_x_end - content_x_start
-		var bar_w: float = notes_w / float(system_bar_count)
+		var raw_widths := _measure_widths_for_range(staves, first_bar, last_bar_exclusive)
+		var raw_total := 0.0
+		for raw_w_any in raw_widths:
+			raw_total += maxf(1.0, float(raw_w_any))
+		if raw_total <= 0.0:
+			raw_total = float(system_bar_count)
 		var bar_x_positions: Array[float] = []
-		for b in range(system_bar_count + 1):
-			bar_x_positions.append(content_x_start + float(b) * bar_w)
+		var cur_bar_x := content_x_start
+		bar_x_positions.append(cur_bar_x)
+		for raw_w_any in raw_widths:
+			var scaled_w := (maxf(1.0, float(raw_w_any)) / raw_total) * notes_w
+			cur_bar_x += scaled_w
+			bar_x_positions.append(cur_bar_x)
 
 		# Brace (per system) when grand staff
 		if staff_count >= 2:
@@ -285,7 +446,7 @@ func _draw_score(staves: Array) -> void:
 			system_staves.append(sliced)
 		var shared_event_x_maps: Array = []
 		if staff_count >= 2:
-			shared_event_x_maps = _build_shared_event_x_maps(system_staves, system_bar_count, bar_x_positions, bar_w, beats_per_bar)
+			shared_event_x_maps = _build_shared_event_x_maps(system_staves, system_bar_count, bar_x_positions, beats_per_bar)
 
 		# Per staff: lines, clef, key sig, (time sig on first system only), notes
 		for i in range(staff_count):
@@ -298,11 +459,10 @@ func _draw_score(staves: Array) -> void:
 				_draw_time_signature(time_num, time_den, x_after_key + 8.0, top_y_draw)
 			var system_staff: Dictionary = system_staves[i]
 			# Pass the running event index so highlighting tracks correctly across systems.
-			per_staff_event_offsets[i] = _draw_staff_notes_subset(system_staff, top_y_draw, bar_x_positions, bar_w, key_fifths, i, shared_event_x_maps, per_staff_event_offsets[i])
+			per_staff_event_offsets[i] = _draw_staff_notes_subset(system_staff, top_y_draw, bar_x_positions, 0.0, key_fifths, i, shared_event_x_maps, per_staff_event_offsets[i])
 
-	# Adaptive height: if width-driven bars_per_line changed the system count from
-	# what set_score originally estimated, defer-grow custom_minimum_size so parent
-	# layouts give us the room. Deferred to avoid layout-loop during the draw pass.
+	# Adaptive height: if width-driven system wrapping changed after layout,
+	# defer-grow custom_minimum_size so parent layouts give us the room.
 	if total_h > custom_minimum_size.y + 1.0:
 		call_deferred("_apply_min_height_grow", total_h)
 
@@ -460,7 +620,7 @@ func _event_x_key(beat_offset: float) -> String:
 	return "%.3f" % beat_offset
 
 
-func _build_shared_event_x_maps(staves: Array, measure_count: int, bar_x_positions: Array, bar_w: float, beats_per_bar: float) -> Array:
+func _build_shared_event_x_maps(staves: Array, measure_count: int, bar_x_positions: Array, beats_per_bar: float) -> Array:
 	var maps: Array = []
 	for m in range(measure_count):
 		var events_by_key: Dictionary = {}
@@ -492,6 +652,7 @@ func _build_shared_event_x_maps(staves: Array, measure_count: int, bar_x_positio
 			return float(a.get("beat_offset", 0.0)) < float(b.get("beat_offset", 0.0))
 		)
 		if not shared_events.is_empty():
+			var bar_w := float(bar_x_positions[m + 1]) - float(bar_x_positions[m]) if m + 1 < bar_x_positions.size() else min_bar_width_px
 			_assign_event_x_positions(shared_events, float(bar_x_positions[m]), bar_w, beats_per_bar, m)
 		var x_map: Dictionary = {}
 		for ev in shared_events:
@@ -513,20 +674,24 @@ func _draw_staff_notes_subset(staff: Dictionary, staff_top: float, bar_x_positio
 	var highlight_beat: float = float(score.get("highlight_beat", -1.0))
 
 	var global_event_idx: int = event_idx_start
+	var display_state := {"clef": clef, "ottava": 0}
 	for m in range(measures.size()):
 		var measure: Dictionary = measures[m]
 		var notes_in_bar: Array = measure.get("notes", [])
 		if notes_in_bar.is_empty():
 			continue
 		var bar_x: float = bar_x_positions[m]
+		var bar_w_actual: float = float(bar_x_positions[m + 1]) - bar_x if m + 1 < bar_x_positions.size() else bar_w
 		var events: Array = _collect_events(notes_in_bar)
 		if shared_event_x_maps.size() > m:
 			var shared_map: Dictionary = shared_event_x_maps[m]
 			for ev in events:
 				var key := _event_x_key(float(ev.get("beat_offset", 0.0)))
-				ev["x"] = float(shared_map.get(key, bar_x + bar_w * 0.5))
+				ev["x"] = float(shared_map.get(key, bar_x + bar_w_actual * 0.5))
 		else:
-			_assign_event_x_positions(events, bar_x, bar_w, beats_per_bar, m)
+			_assign_event_x_positions(events, bar_x, bar_w_actual, beats_per_bar, m)
+		_prepare_event_display(events, clef, display_state)
+		_draw_ottava_spans(events, staff_top, clef)
 		var beam_groups: Array = []
 		if not cluster_mode:
 			beam_groups = _collect_beam_groups(events)
@@ -551,12 +716,14 @@ func _draw_staff_notes(staff: Dictionary, staff_top: float, bar_x_positions: Arr
 	var highlight_beat: float = float(score.get("highlight_beat", -1.0))
 
 	var global_event_idx := 0
+	var display_state := {"clef": clef, "ottava": 0}
 	for m in range(measures.size()):
 		var measure: Dictionary = measures[m]
 		var notes_in_bar: Array = measure.get("notes", [])
 		if notes_in_bar.is_empty():
 			continue
 		var bar_x: float = bar_x_positions[m]
+		var bar_w_actual: float = float(bar_x_positions[m + 1]) - bar_x if m + 1 < bar_x_positions.size() else bar_w
 		# 1) Group notes by beat_offset → events (each event = chord cluster or single note)
 		var events: Array = _collect_events(notes_in_bar)
 		# 2) Compute X positions for each event using optical spacing
@@ -564,9 +731,11 @@ func _draw_staff_notes(staff: Dictionary, staff_top: float, bar_x_positions: Arr
 			var shared_map: Dictionary = shared_event_x_maps[m]
 			for ev in events:
 				var key := _event_x_key(float(ev.get("beat_offset", 0.0)))
-				ev["x"] = float(shared_map.get(key, bar_x + bar_w * 0.5))
+				ev["x"] = float(shared_map.get(key, bar_x + bar_w_actual * 0.5))
 		else:
-			_assign_event_x_positions(events, bar_x, bar_w, beats_per_bar, m)
+			_assign_event_x_positions(events, bar_x, bar_w_actual, beats_per_bar, m)
+		_prepare_event_display(events, clef, display_state)
+		_draw_ottava_spans(events, staff_top, clef)
 		# 3) Identify beam groups (consecutive eighths/sixteenths in the same beat group)
 		var beam_groups: Array = []
 		if not cluster_mode:
@@ -639,6 +808,122 @@ func _optical_width_for(dur_beats: float) -> float:
 	return best
 
 
+func _prepare_event_display(events: Array, staff_clef: String, display_state: Dictionary) -> void:
+	if not display_state.has("clef"):
+		display_state["clef"] = staff_clef
+	if not display_state.has("ottava"):
+		display_state["ottava"] = 0
+	for event_idx in range(events.size()):
+		var event: Dictionary = events[event_idx]
+		if bool(event.get("rest", false)):
+			event["display_clef"] = str(display_state.get("clef", staff_clef))
+			event["ottava_shift"] = int(display_state.get("ottava", 0))
+			event["draw_clef_change"] = false
+			event["draw_ottava_mark"] = false
+			continue
+		var active_clef := str(display_state.get("clef", staff_clef))
+		var active_ottava := int(display_state.get("ottava", 0))
+		var display_clef := _prepared_display_clef_for_event(events, event_idx, staff_clef, active_clef)
+		var ottava_shift := _prepared_ottava_shift_for_event(events, event_idx, display_clef, active_ottava)
+		event["display_clef"] = display_clef
+		event["ottava_shift"] = ottava_shift
+		event["draw_clef_change"] = display_clef != active_clef
+		event["draw_ottava_mark"] = ottava_shift > 0 and (ottava_shift != active_ottava or display_clef != active_clef)
+		display_state["clef"] = display_clef
+		display_state["ottava"] = ottava_shift
+
+
+func _prepared_display_clef_for_event(events: Array, event_idx: int, staff_clef: String, active_clef: String) -> String:
+	var event: Dictionary = events[event_idx]
+	var display_clef := _display_clef_for_event(event, staff_clef)
+	if staff_clef != "bass" or display_clef != "treble":
+		return display_clef
+	if active_clef == "treble":
+		return "treble"
+	var bass_burden := _event_ledger_burden(event, "bass", 0)
+	var sustained_high := _has_neighbor_event_at_or_above(events, event_idx, BASS_TO_TREBLE_MIN_MIDI)
+	if sustained_high or bass_burden >= BASS_TO_TREBLE_FORCE_LEDGER_COUNT:
+		return "treble"
+	return staff_clef
+
+
+func _display_clef_for_event(event: Dictionary, staff_clef: String) -> String:
+	if staff_clef == "bass" and _event_max_midi(event) >= BASS_TO_TREBLE_MIN_MIDI:
+		var bass_burden := _event_ledger_burden(event, "bass", 0)
+		var treble_shift := _ottava_shift_for_event(event, "treble")
+		var treble_burden := _event_ledger_burden(event, "treble", treble_shift)
+		if treble_burden < bass_burden:
+			return "treble"
+	return staff_clef
+
+
+func _ottava_shift_for_event(event: Dictionary, display_clef: String) -> int:
+	if display_clef == "treble" and _event_max_midi(event) >= TREBLE_8VA_MIN_MIDI:
+		return 12
+	return 0
+
+
+func _prepared_ottava_shift_for_event(events: Array, event_idx: int, display_clef: String, active_ottava: int) -> int:
+	var event: Dictionary = events[event_idx]
+	var base_shift := _ottava_shift_for_event(event, display_clef)
+	if base_shift <= 0:
+		return 0
+	if active_ottava > 0:
+		return base_shift
+	# Do not octave-shift a single peak note in an otherwise unshifted scale run.
+	# That reads like a wrong-note drop. Reserve 8va for sustained high passages.
+	return base_shift if _has_neighbor_event_at_or_above(events, event_idx, TREBLE_8VA_MIN_MIDI) else 0
+
+
+func _has_neighbor_event_at_or_above(events: Array, event_idx: int, midi_threshold: int) -> bool:
+	if event_idx > 0:
+		var prev_event: Dictionary = events[event_idx - 1]
+		if _event_max_midi(prev_event) >= midi_threshold:
+			return true
+	if event_idx < events.size() - 1:
+		var next_event: Dictionary = events[event_idx + 1]
+		if _event_max_midi(next_event) >= midi_threshold:
+			return true
+	return false
+
+
+func _event_max_midi(event: Dictionary) -> int:
+	var max_midi := -1
+	var notes: Array = event.get("notes", [])
+	for n in notes:
+		var note: Dictionary = n
+		if bool(note.get("rest", false)):
+			continue
+		var midi := int(note.get("midi", -1))
+		if midi >= 0:
+			max_midi = maxi(max_midi, midi)
+	return max_midi
+
+
+func _event_ledger_burden(event: Dictionary, clef: String, ottava_shift: int) -> int:
+	var total := 0
+	var notes: Array = event.get("notes", [])
+	for n in notes:
+		var note: Dictionary = n
+		if bool(note.get("rest", false)):
+			continue
+		var midi := int(note.get("midi", -1))
+		if midi >= 0:
+			total += _ledger_count_for_display_midi(midi - ottava_shift, clef)
+	return total
+
+
+func _ledger_count_for_display_midi(midi: int, clef: String) -> int:
+	var note_y := _midi_to_staff_y(midi, clef, 0.0)
+	var top_y := 0.0
+	var bot_y := staff_space * 4.0
+	if note_y < top_y - staff_space * 0.5:
+		return int(floor(((top_y - note_y) + 0.01) / staff_space))
+	if note_y > bot_y + staff_space * 0.5:
+		return int(floor(((note_y - bot_y) + 0.01) / staff_space))
+	return 0
+
+
 # --- Event drawing (single notes + chord clusters) ---
 
 func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: float, highlight: bool) -> void:
@@ -647,6 +932,8 @@ func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: fl
 	var event_x: float = float(event.get("x", 0.0))
 	var dur_beats: float = float(event.get("duration_beats", 0.5))
 	var is_rest: bool = bool(event.get("rest", false))
+	var display_clef := str(event.get("display_clef", clef))
+	var ottava_shift := int(event.get("ottava_shift", 0))
 	if is_rest:
 		var rest_glyph := SMuFLFont.rest_for_duration(dur_beats)
 		var rest_y := staff_top + staff_space * 2.0
@@ -655,6 +942,9 @@ func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: fl
 	var notes: Array = event.get("notes", [])
 	if notes.is_empty():
 		return
+	if bool(event.get("draw_clef_change", false)):
+		var clef_x := maxf(_content_x_start + staff_space * 0.15, event_x - staff_space * 2.35)
+		_draw_inline_clef_change(display_clef, clef_x, staff_top)
 	# Sort notes by pitch ascending — required for cluster column assignment.
 	notes.sort_custom(func(a, b): return int(a.get("midi", 0)) < int(b.get("midi", 0)))
 	# Compute Y for each note (carry over the fingering field if present)
@@ -663,11 +953,13 @@ func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: fl
 		var midi: int = int(n.get("midi", -1))
 		if midi < 0:
 			continue
-		var note_y := _midi_to_staff_y(midi, clef, staff_top)
+		var display_midi := midi - ottava_shift
+		var note_y := _midi_to_staff_y(display_midi, display_clef, staff_top)
 		note_layouts.append({
 			"midi": midi,
+			"display_midi": display_midi,
 			"y": note_y,
-			"letter_idx": _midi_letter_index(midi),
+			"letter_idx": _midi_letter_index(display_midi),
 			"fingering": int(n.get("fingering", 0)),
 		})
 	if note_layouts.is_empty():
@@ -705,6 +997,73 @@ func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: fl
 	# Flag for unbeamed eighths/sixteenths (beams handled separately by beam group draw)
 	if dur_beats <= 0.5 and not is_beamed:
 		_draw_flag_for_event(event_x, note_layouts, stem_up, dur_beats, color)
+
+
+func _draw_inline_clef_change(clef: String, x: float, staff_top: float) -> void:
+	var font := SMuFLFont.get_font()
+	var glyph := SMuFLFont.glyph("gClef" if clef == "treble" else "fClef")
+	var glyph_size := int(staff_space * 3.0)
+	var baseline_y := staff_top + ((3.35 if clef == "treble" else 1.35) + CLEF_BASELINE_NUDGE_SPACES) * staff_space
+	var mark_color := line_color
+	mark_color.a *= 0.82
+	draw_string(font, Vector2(x, baseline_y), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, glyph_size, mark_color)
+
+
+func _draw_ottava_spans(events: Array, staff_top: float, default_clef: String) -> void:
+	var span_start := -1
+	var span_show_label := false
+	for event_idx in range(events.size() + 1):
+		var is_shifted := false
+		if event_idx < events.size():
+			var event: Dictionary = events[event_idx]
+			is_shifted = int(event.get("ottava_shift", 0)) > 0 and not bool(event.get("rest", false))
+		if is_shifted and span_start < 0:
+			span_start = event_idx
+			var start_event: Dictionary = events[event_idx]
+			span_show_label = bool(start_event.get("draw_ottava_mark", false))
+		elif not is_shifted and span_start >= 0:
+			_draw_ottava_mark(events, span_start, event_idx - 1, staff_top, default_clef, span_show_label)
+			span_start = -1
+			span_show_label = false
+
+
+func _draw_ottava_mark(events: Array, start_idx: int, end_idx: int, staff_top: float, default_clef: String, show_label: bool = true) -> void:
+	if start_idx < 0 or end_idx < start_idx or start_idx >= events.size():
+		return
+	end_idx = mini(end_idx, events.size() - 1)
+	var mark_color := line_color
+	mark_color.a *= 0.76
+	var size_px := int(staff_space * 1.1)
+	var start_event: Dictionary = events[start_idx]
+	var end_event: Dictionary = events[end_idx]
+	var start_x := float(start_event.get("x", 0.0)) - staff_space * 0.85
+	var end_x := float(end_event.get("x", 0.0)) + staff_space * 2.15
+	if end_x <= start_x:
+		end_x = start_x + staff_space * 2.2
+	var highest_note_y := INF
+	for idx in range(start_idx, end_idx + 1):
+		var event: Dictionary = events[idx]
+		var display_clef := str(event.get("display_clef", default_clef))
+		var ottava_shift := int(event.get("ottava_shift", 0))
+		var notes: Array = event.get("notes", [])
+		for note_any in notes:
+			var note: Dictionary = note_any
+			var midi := int(note.get("midi", -1))
+			if midi < 0 or bool(note.get("rest", false)):
+				continue
+			var note_y := _midi_to_staff_y(midi - ottava_shift, display_clef, staff_top)
+			highest_note_y = minf(highest_note_y, note_y)
+	if highest_note_y == INF:
+		highest_note_y = staff_top
+	var line_y: float = minf(staff_top - staff_space * 2.85, highest_note_y - staff_space * 2.05)
+	var label_x := start_x - staff_space * 0.15
+	var label_y := line_y + staff_space * 0.30
+	var line_start := start_x
+	if show_label:
+		draw_string(ThemeDB.fallback_font, Vector2(label_x, label_y), "8va", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, mark_color)
+		line_start = label_x + staff_space * 1.75
+	draw_line(Vector2(line_start, line_y), Vector2(end_x, line_y), mark_color, maxf(1.0, staff_space * 0.08), true)
+	draw_line(Vector2(end_x, line_y), Vector2(end_x, line_y + staff_space * 0.55), mark_color, maxf(1.0, staff_space * 0.08), true)
 
 
 func _draw_event_fingerings(note_layouts: Array, event_x: float, head_advance: float, staff_top: float, color: Color) -> void:
@@ -838,6 +1197,7 @@ func _collect_beam_groups(events: Array) -> Array:
 	var groups: Array = []
 	var current: Array = []
 	var current_beat_group: int = -1
+	var current_display_sig := ""
 	for i in range(events.size()):
 		var ev: Dictionary = events[i]
 		if bool(ev.get("rest", false)):
@@ -845,6 +1205,7 @@ func _collect_beam_groups(events: Array) -> Array:
 				groups.append(current.duplicate())
 			current.clear()
 			current_beat_group = -1
+			current_display_sig = ""
 			continue
 		var dur: float = float(ev.get("duration_beats", 0.5))
 		var beat: float = float(ev.get("beat_offset", 0.0))
@@ -853,13 +1214,16 @@ func _collect_beam_groups(events: Array) -> Array:
 				groups.append(current.duplicate())
 			current.clear()
 			current_beat_group = -1
+			current_display_sig = ""
 			continue
 		var bg := int(floor(beat))
-		if bg != current_beat_group:
+		var display_sig := "%s:%d" % [str(ev.get("display_clef", "")), int(ev.get("ottava_shift", 0))]
+		if bg != current_beat_group or (not current.is_empty() and display_sig != current_display_sig):
 			if current.size() >= 2:
 				groups.append(current.duplicate())
 			current.clear()
 			current_beat_group = bg
+			current_display_sig = display_sig
 		current.append(i)
 		ev["beamed"] = true if current.size() >= 2 else false
 	if current.size() >= 2:
@@ -882,13 +1246,15 @@ func _draw_beam_group(group: Array, events: Array, clef: String, staff_top: floa
 	for idx in group:
 		var ev: Dictionary = events[int(idx)]
 		var notes: Array = ev.get("notes", [])
+		var display_clef := str(ev.get("display_clef", clef))
+		var ottava_shift := int(ev.get("ottava_shift", 0))
 		var min_y: float = INF
 		var max_y: float = -INF
 		for n in notes:
 			var midi: int = int(n.get("midi", -1))
 			if midi < 0:
 				continue
-			var y := _midi_to_staff_y(midi, clef, staff_top)
+			var y := _midi_to_staff_y(midi - ottava_shift, display_clef, staff_top)
 			if y < min_y: min_y = y
 			if y > max_y: max_y = y
 			sum_y += y
