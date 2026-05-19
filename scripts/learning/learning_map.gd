@@ -2,6 +2,7 @@ extends Control
 
 signal module_selected(module_id: String)
 signal test_out_selected(module_id: String)
+signal placement_selected
 signal back_pressed
 signal review_weak_pressed
 
@@ -23,8 +24,7 @@ const TEXT_MUTED := Color(0.82, 0.90, 0.97, 0.70)
 var _progress: RefCounted
 var _pin_container: VBoxContainer
 var _chicken_label: Label
-var _review_btn: Button = null
-var _review_section: Control = null
+var _overview_section: MarginContainer = null
 var _pace_buttons: Array[Button] = []
 var _current_pace: String = "normal"
 
@@ -42,7 +42,7 @@ func refresh() -> void:
 	_populate_pins()
 	if _chicken_label != null:
 		_chicken_label.text = _get_progress_greeting()
-	_update_review_visibility()
+	_refresh_overview_section()
 
 
 func _build_ui() -> void:
@@ -77,18 +77,9 @@ func _build_ui() -> void:
 	var chicken_row := _build_chicken_row()
 	outer_vbox.add_child(chicken_row)
 
-	# Pace selector
-	var pace_row := _build_pace_selector()
-	outer_vbox.add_child(pace_row)
-
-	# Review weak concepts section
-	_review_section = _build_review_section()
-	outer_vbox.add_child(_review_section)
-
-	# Spacer
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 12)
-	outer_vbox.add_child(spacer)
+	# Learning overview
+	_overview_section = _build_overview_section()
+	outer_vbox.add_child(_overview_section)
 
 	# Pin list
 	_pin_container = VBoxContainer.new()
@@ -248,53 +239,6 @@ func _build_chicken_animated_sprite() -> AnimatedSprite2D:
 	return sprite
 
 
-func _build_pace_selector() -> MarginContainer:
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 50)
-	margin.add_theme_constant_override("margin_right", 50)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 4)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	margin.add_child(vbox)
-
-	var label := Label.new()
-	label.text = "Learning Pace"
-	label.add_theme_font_override("font", FONT_TITLE)
-	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", TEXT_MUTED)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(label)
-
-	var btn_row := HBoxContainer.new()
-	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	btn_row.add_theme_constant_override("separation", 8)
-	vbox.add_child(btn_row)
-
-	_current_pace = _progress.get_pace_setting() if _progress != null else "normal"
-	_pace_buttons.clear()
-	var paces := [
-		{"id": "guided", "label": "Guided", "tip": "Extra hints & recap"},
-		{"id": "normal", "label": "Normal", "tip": "Standard flow"},
-		{"id": "quick", "label": "Quick", "tip": "Skip intros & recaps"},
-	]
-	for p in paces:
-		var btn := Button.new()
-		btn.text = p["label"]
-		btn.add_theme_font_override("font", FONT_BODY)
-		btn.add_theme_font_size_override("font_size", 14)
-		btn.custom_minimum_size = Vector2(90, 32)
-		btn.tooltip_text = p["tip"]
-		var pace_id: String = p["id"]
-		_apply_pace_button_style(btn, pace_id == _current_pace)
-		btn.pressed.connect(_on_pace_selected.bind(pace_id))
-		btn_row.add_child(btn)
-		_pace_buttons.append(btn)
-
-	return margin
-
 
 func _apply_pace_button_style(btn: Button, selected: bool) -> void:
 	var sb := StyleBoxFlat.new()
@@ -340,9 +284,10 @@ func _populate_pins() -> void:
 		var entry: Dictionary = modules[i]
 		var m: Dictionary = entry["module"]
 		var state: int = entry["state"]
+		var lock_reason: String = str(entry.get("lock_reason", ""))
 		if i > 0:
 			_pin_container.add_child(_build_connector())
-		_pin_container.add_child(_build_pin_row(m, state, i))
+		_pin_container.add_child(_build_pin_row(m, state, i, lock_reason))
 
 
 func _build_connector() -> CenterContainer:
@@ -361,7 +306,7 @@ func _build_connector() -> CenterContainer:
 	return center
 
 
-func _build_pin_row(module: Dictionary, state: int, index: int) -> Control:
+func _build_pin_row(module: Dictionary, state: int, index: int, lock_reason: String = "") -> Control:
 	var margin := MarginContainer.new()
 	var offset_x := 40 if index % 2 == 0 else -40
 	margin.add_theme_constant_override("margin_left", 50 + maxi(offset_x, 0))
@@ -445,11 +390,12 @@ func _build_pin_row(module: Dictionary, state: int, index: int) -> Control:
 	text_col.add_child(title_label)
 
 	var desc_label := Label.new()
-	desc_label.text = module.get("description", "")
+	desc_label.text = lock_reason if state == LMD.STATE_LOCKED and lock_reason != "" else module.get("description", "")
 	desc_label.add_theme_font_override("font", FONT_BODY)
 	desc_label.add_theme_font_size_override("font_size", 14)
 	desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	desc_label.add_theme_color_override("font_color", Color(0.55, 0.58, 0.60, 0.55) if state == LMD.STATE_LOCKED else TEXT_MUTED)
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_label.add_theme_color_override("font_color", Color(0.78, 0.82, 0.86, 0.72) if state == LMD.STATE_LOCKED else TEXT_MUTED)
 	text_col.add_child(desc_label)
 
 	# Stars + estimated time row
@@ -634,125 +580,218 @@ func _style_flat_button(btn: Button) -> void:
 		btn.add_theme_stylebox_override(state_name, sb)
 
 
-func _build_review_section() -> MarginContainer:
+func _build_overview_section() -> MarginContainer:
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 50)
 	margin.add_theme_constant_override("margin_right", 50)
 	margin.add_theme_constant_override("margin_top", 6)
 	margin.add_theme_constant_override("margin_bottom", 2)
+	_populate_overview_section(margin)
+	return margin
 
+
+func _refresh_overview_section() -> void:
+	if _overview_section == null:
+		return
+	for child in _overview_section.get_children():
+		child.queue_free()
+	_populate_overview_section(_overview_section)
+
+
+func _populate_overview_section(host: MarginContainer) -> void:
 	var card := PanelContainer.new()
 	var card_sb := StyleBoxFlat.new()
-	card_sb.bg_color = Color(0.16, 0.22, 0.38, 0.80)
+	card_sb.bg_color = Color(0.10, 0.17, 0.24, 0.84)
 	card_sb.corner_radius_top_left = 16
 	card_sb.corner_radius_top_right = 16
 	card_sb.corner_radius_bottom_left = 16
 	card_sb.corner_radius_bottom_right = 16
-	card_sb.border_color = Color(0.50, 0.70, 0.90, 0.60)
+	card_sb.border_color = Color(0.48, 0.68, 0.82, 0.55)
 	card_sb.border_width_left = 2
 	card_sb.border_width_top = 2
 	card_sb.border_width_right = 2
 	card_sb.border_width_bottom = 2
-	card_sb.content_margin_left = 18
-	card_sb.content_margin_right = 18
-	card_sb.content_margin_top = 14
-	card_sb.content_margin_bottom = 14
+	card_sb.content_margin_left = 16
+	card_sb.content_margin_right = 16
+	card_sb.content_margin_top = 12
+	card_sb.content_margin_bottom = 12
 	card_sb.shadow_color = Color(0.0, 0.0, 0.0, 0.14)
 	card_sb.shadow_size = 6
 	card.add_theme_stylebox_override("panel", card_sb)
-	margin.add_child(card)
+	host.add_child(card)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
 	card.add_child(vbox)
 
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 8)
-	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(title_row)
+	# Row 1: Primary CTA — full-width "Continue" button
+	var next_entry: Dictionary = _get_next_recommended_module()
+	var next_module: Dictionary = next_entry.get("module", {})
+	if not next_module.is_empty():
+		var cta := Button.new()
+		cta.text = "▶  Continue: %s" % str(next_module.get("title", "Next Lesson"))
+		cta.add_theme_font_override("font", FONT_TITLE)
+		cta.add_theme_font_size_override("font_size", 16)
+		cta.custom_minimum_size = Vector2(0, 40)
+		cta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var cta_sb := StyleBoxFlat.new()
+		cta_sb.bg_color = Color(0.29, 0.54, 0.82, 0.92)
+		cta_sb.corner_radius_top_left = 10
+		cta_sb.corner_radius_top_right = 10
+		cta_sb.corner_radius_bottom_left = 10
+		cta_sb.corner_radius_bottom_right = 10
+		cta_sb.content_margin_left = 14
+		cta_sb.content_margin_right = 14
+		cta_sb.content_margin_top = 6
+		cta_sb.content_margin_bottom = 6
+		cta.add_theme_stylebox_override("normal", cta_sb)
+		var cta_hover: StyleBoxFlat = cta_sb.duplicate()
+		cta_hover.bg_color = cta_sb.bg_color.lightened(0.12)
+		cta.add_theme_stylebox_override("hover", cta_hover)
+		cta.add_theme_stylebox_override("pressed", cta_sb)
+		cta.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+		var mid: String = str(next_module.get("id", ""))
+		cta.pressed.connect(func(): module_selected.emit(mid))
+		vbox.add_child(cta)
 
-	var icon_lbl := Label.new()
-	icon_lbl.text = "🔄"
-	icon_lbl.add_theme_font_size_override("font_size", 20)
-	icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_row.add_child(icon_lbl)
+	# Row 2: Secondary action pills (compact, side by side)
+	var due_reviews: int = _progress.get_due_review_count(12) if _progress != null and _progress.has_method("get_due_review_count") else 0
+	var total_modules: int = RegistryScript.get_all_modules().size()
+	var completed: int = _progress.get_completed_count() if _progress != null else 0
+	var placement_taken: bool = _progress.has_placement_result() if _progress != null and _progress.has_method("has_placement_result") else false
+	var has_secondary := due_reviews > 0 or completed < total_modules
+	if has_secondary:
+		var pill_row := HBoxContainer.new()
+		pill_row.add_theme_constant_override("separation", 8)
+		pill_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		vbox.add_child(pill_row)
+		if due_reviews > 0:
+			pill_row.add_child(_build_pill_button(
+				"Review (%d)" % due_reviews,
+				Color(0.24, 0.56, 0.40, 0.92),
+				func(): review_weak_pressed.emit()
+			))
+		if completed < total_modules:
+			pill_row.add_child(_build_pill_button(
+				"Retake Placement" if placement_taken else "Find My Level",
+				Color(0.54, 0.36, 0.18, 0.92),
+				func(): placement_selected.emit()
+			))
 
-	var title_lbl := Label.new()
-	title_lbl.text = "Review Weak Concepts"
-	title_lbl.add_theme_font_override("font", FONT_TITLE)
-	title_lbl.add_theme_font_size_override("font_size", 18)
-	title_lbl.add_theme_color_override("font_color", TEXT_PRIMARY)
-	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_row.add_child(title_lbl)
+	# Row 3: Activity heatmap (day-of-week labels)
+	vbox.add_child(_build_heatmap_row())
 
-	var desc_lbl := Label.new()
-	desc_lbl.text = _get_review_description()
-	desc_lbl.add_theme_font_override("font", FONT_BODY)
-	desc_lbl.add_theme_font_size_override("font_size", 13)
-	desc_lbl.add_theme_color_override("font_color", TEXT_MUTED)
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(desc_lbl)
-
-	_review_btn = Button.new()
-	_review_btn.text = "Start Review"
-	_review_btn.add_theme_font_override("font", FONT_TITLE)
-	_review_btn.add_theme_font_size_override("font_size", 16)
-	_review_btn.custom_minimum_size = Vector2(160, 40)
-	_review_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var btn_sb := StyleBoxFlat.new()
-	btn_sb.bg_color = Color(0.30, 0.55, 0.80, 0.90)
-	btn_sb.corner_radius_top_left = 10
-	btn_sb.corner_radius_top_right = 10
-	btn_sb.corner_radius_bottom_left = 10
-	btn_sb.corner_radius_bottom_right = 10
-	btn_sb.content_margin_left = 16
-	btn_sb.content_margin_right = 16
-	btn_sb.content_margin_top = 6
-	btn_sb.content_margin_bottom = 6
-	_review_btn.add_theme_stylebox_override("normal", btn_sb)
-	var btn_hover := btn_sb.duplicate()
-	btn_hover.bg_color = Color(0.38, 0.62, 0.88, 0.95)
-	_review_btn.add_theme_stylebox_override("hover", btn_hover)
-	var btn_pressed := btn_sb.duplicate()
-	btn_pressed.bg_color = Color(0.22, 0.45, 0.68, 0.90)
-	_review_btn.add_theme_stylebox_override("pressed", btn_pressed)
-	_review_btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-	_review_btn.pressed.connect(func(): review_weak_pressed.emit())
-	vbox.add_child(_review_btn)
-
-	_update_review_visibility()
-	return margin
-
-
-func _update_review_visibility() -> void:
-	if _review_section == null:
-		return
-	var has_weak: bool = _has_weak_concepts()
-	_review_section.visible = has_weak
+	# Row 4: Inline pace selector
+	var pace_row := HBoxContainer.new()
+	pace_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	pace_row.add_theme_constant_override("separation", 6)
+	var pace_label := Label.new()
+	pace_label.text = "Pace:"
+	pace_label.add_theme_font_override("font", FONT_BODY)
+	pace_label.add_theme_font_size_override("font_size", 13)
+	pace_label.add_theme_color_override("font_color", TEXT_MUTED)
+	pace_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pace_row.add_child(pace_label)
+	_current_pace = _progress.get_pace_setting() if _progress != null else "normal"
+	_pace_buttons.clear()
+	var paces := [
+		{"id": "guided", "label": "Guided"},
+		{"id": "normal", "label": "Normal"},
+		{"id": "quick", "label": "Quick"},
+	]
+	for p in paces:
+		var btn := Button.new()
+		btn.text = p["label"]
+		btn.add_theme_font_override("font", FONT_BODY)
+		btn.add_theme_font_size_override("font_size", 12)
+		btn.custom_minimum_size = Vector2(72, 26)
+		var pace_id: String = p["id"]
+		_apply_pace_button_style(btn, pace_id == _current_pace)
+		btn.pressed.connect(_on_pace_selected.bind(pace_id))
+		pace_row.add_child(btn)
+		_pace_buttons.append(btn)
+	vbox.add_child(pace_row)
 
 
-func _has_weak_concepts() -> bool:
-	if _progress == null:
-		return false
-	var rq: RefCounted = _progress.get_review_queue()
-	if rq == null:
-		return false
-	var weak: Array = rq.get_weak_concepts(1)
-	return weak.size() > 0
+func _build_pill_button(text: String, bg_color: Color, on_pressed: Callable) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.add_theme_font_override("font", FONT_BODY)
+	btn.add_theme_font_size_override("font_size", 13)
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, 32)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg_color
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover: StyleBoxFlat = sb.duplicate()
+	hover.bg_color = sb.bg_color.lightened(0.12)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.pressed.connect(on_pressed)
+	return btn
 
 
-func _get_review_description() -> String:
-	if _progress == null:
-		return "Review concepts you've struggled with."
-	var rq: RefCounted = _progress.get_review_queue()
-	if rq == null:
-		return "Review concepts you've struggled with."
-	var weak: Array = rq.get_weak_concepts(8)
-	if weak.size() == 0:
-		return "No weak concepts found — great job!"
-	var count: int = weak.size()
-	return "%d concept%s need%s practice. Focus on your weak spots!" % [count, "s" if count > 1 else "", "s" if count == 1 else ""]
+func _build_heatmap_row() -> Control:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 6)
+	var activity_window: Array[Dictionary] = _progress.get_daily_activity_window(7) if _progress != null and _progress.has_method("get_daily_activity_window") else []
+	var weekday_names := ["S", "M", "T", "W", "T", "F", "S"]
+	for entry in activity_window:
+		var day_box := VBoxContainer.new()
+		day_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		day_box.add_theme_constant_override("separation", 2)
+
+		var weekday_idx: int = int(entry.get("label", 0))
+		var day_lbl := Label.new()
+		day_lbl.text = weekday_names[clampi(weekday_idx, 0, 6)]
+		day_lbl.add_theme_font_override("font", FONT_BODY)
+		day_lbl.add_theme_font_size_override("font_size", 10)
+		day_lbl.add_theme_color_override("font_color", TEXT_MUTED)
+		day_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		day_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		day_box.add_child(day_lbl)
+
+		var tile := ColorRect.new()
+		tile.custom_minimum_size = Vector2(16, 16)
+		tile.color = _heat_color_for_count(int(entry.get("count", 0)))
+		day_box.add_child(tile)
+
+		row.add_child(day_box)
+	return row
+
+
+func _heat_color_for_count(count: int) -> Color:
+	if count <= 0:
+		return Color(0.18, 0.24, 0.30, 0.90)
+	if count == 1:
+		return Color(0.24, 0.46, 0.36, 0.95)
+	if count == 2:
+		return Color(0.30, 0.62, 0.42, 0.98)
+	if count == 3:
+		return Color(0.44, 0.74, 0.50, 1.0)
+	return Color(0.72, 0.88, 0.58, 1.0)
+
+
+func _get_next_recommended_module() -> Dictionary:
+	var modules := RegistryScript.resolve_states(_progress)
+	for entry_variant in modules:
+		var entry: Dictionary = entry_variant
+		var module_data: Dictionary = entry.get("module", {})
+		var module_id: String = str(module_data.get("id", ""))
+		if int(entry.get("state", LMD.STATE_LOCKED)) == LMD.STATE_UNLOCKED and (_progress == null or not _progress.is_completed(module_id)):
+			return entry
+	return {}
+
 
 
 func _get_progress_greeting() -> String:
@@ -762,6 +801,8 @@ func _get_progress_greeting() -> String:
 	var total_modules: int = RegistryScript.get_all_modules().size()
 	var total_correct: int = _progress.get_total_quizzes_correct()
 	if completed == 0:
+		if _progress.has_method("has_placement_result") and _progress.has_placement_result():
+			return "Placement complete. Start with the first unlocked lesson or review what felt weak."
 		return "Welcome to your Learning Path! Tap a module to begin."
 	elif completed == total_modules:
 		return "Amazing! You've completed all %d modules! You're a music theory pro! 🎵" % total_modules

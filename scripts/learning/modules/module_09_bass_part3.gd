@@ -139,10 +139,10 @@ static func get_module_data() -> Dictionary:
 		"Let's Review!",
 		"Here are the lower bass notes you just learned:",
 		[
-			{"label": "B2", "detail": "On the second line from the bottom", "clef": "bass"},
-			{"label": "A2", "detail": "In the first space from the bottom", "clef": "bass"},
-			{"label": "G2", "detail": "On the bottom line", "clef": "bass"},
-			{"label": "F2", "detail": "Below the staff on a ledger line", "clef": "bass"},
+			{"label": "B2", "detail": "On the second line from the bottom", "clef": "bass", "note_step": 6},
+			{"label": "A2", "detail": "In the first space from the bottom", "clef": "bass", "note_step": 7},
+			{"label": "G2", "detail": "On the bottom line", "clef": "bass", "note_step": 8},
+			{"label": "F2", "detail": "Below the staff on a ledger line", "clef": "bass", "note_step": 9},
 		]
 	))
 

@@ -1,6 +1,12 @@
 class_name TeacherStore
 extends RefCounted
 
+# Current schema version. Bump when introducing a breaking change to the data
+# layout, then add a migration step in _migrate_from_version below.
+# The file lives in `user://` which Godot persists across app updates on every
+# supported platform — so user data is NOT lost when a new build ships.
+const CURRENT_SCHEMA_VERSION: int = 1
+
 var data: Dictionary = {"students": []}
 
 
@@ -15,11 +21,13 @@ func get_data() -> Dictionary:
 
 func load_from_path(path: String, ensure_student_defaults: Callable) -> Dictionary:
 	if not FileAccess.file_exists(path):
-		data = {"students": []}
+		data = {"students": [], "schema_version": CURRENT_SCHEMA_VERSION}
 		return get_data()
 	var teacher_file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if teacher_file == null:
-		data = {"students": []}
+		# File exists but can't be opened (permission etc.) — DO NOT wipe in-memory data
+		# silently. Start empty in memory but don't trigger a save that would overwrite.
+		data = {"students": [], "schema_version": CURRENT_SCHEMA_VERSION}
 		return get_data()
 	var text: String = teacher_file.get_as_text()
 	teacher_file.close()
@@ -27,7 +35,16 @@ func load_from_path(path: String, ensure_student_defaults: Callable) -> Dictiona
 	if typeof(parsed) == TYPE_DICTIONARY:
 		data = (parsed as Dictionary).duplicate(true)
 	else:
-		data = {"students": []}
+		# File exists but is corrupted (failed JSON parse). Back up the bad file
+		# so the user can recover manually instead of silently overwriting it.
+		_backup_corrupt_file(path, text)
+		data = {"students": [], "schema_version": CURRENT_SCHEMA_VERSION}
+	# Schema version handling — supports forward-compat: an OLDER app reading a
+	# NEWER file will use .get() defaults for unknown fields and still work.
+	var loaded_version: int = int(data.get("schema_version", 0))
+	if loaded_version < CURRENT_SCHEMA_VERSION:
+		_migrate_from_version(loaded_version)
+	data["schema_version"] = CURRENT_SCHEMA_VERSION
 	_ensure_students_array()
 	var students: Array = data["students"]
 	for i in range(students.size()):
@@ -46,11 +63,74 @@ func load_from_path(path: String, ensure_student_defaults: Callable) -> Dictiona
 
 func save_to_path(path: String) -> void:
 	_ensure_students_array()
+	data["schema_version"] = CURRENT_SCHEMA_VERSION
+	# Rotate-and-keep last 3 backups BEFORE overwriting the live file. If a future
+	# bug ever produces bad data, the teacher has recoverable history.
+	_rotate_backups(path)
 	var teacher_file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
 	if teacher_file == null:
 		return
 	teacher_file.store_string(JSON.stringify(data, "\t"))
 	teacher_file.close()
+
+
+# Keep up to BACKUP_KEEP rotating backups of the live file in user://teacher_backups/.
+# Skips when the live file doesn't exist yet (first save).
+const BACKUP_KEEP: int = 3
+
+func _rotate_backups(path: String) -> void:
+	if not FileAccess.file_exists(path):
+		return
+	var backup_dir: String = "user://teacher_backups"
+	if not DirAccess.dir_exists_absolute(backup_dir):
+		DirAccess.make_dir_absolute(backup_dir)
+	# Read current live file content; we'll copy it as the new most-recent backup.
+	var src: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if src == null:
+		return
+	var live_text: String = src.get_as_text()
+	src.close()
+	# Shift existing backups: teacher_backup_2 → 3, 1 → 2, then write new 1.
+	for i in range(BACKUP_KEEP - 1, 0, -1):
+		var older := "%s/teacher_backup_%d.json" % [backup_dir, i + 1]
+		var newer := "%s/teacher_backup_%d.json" % [backup_dir, i]
+		if FileAccess.file_exists(newer):
+			# Remove older to make room, then rename newer → older.
+			if FileAccess.file_exists(older):
+				DirAccess.remove_absolute(older)
+			DirAccess.rename_absolute(newer, older)
+	# Write the new most-recent backup
+	var fresh_path := "%s/teacher_backup_1.json" % backup_dir
+	var fresh: FileAccess = FileAccess.open(fresh_path, FileAccess.WRITE)
+	if fresh == null:
+		return
+	fresh.store_string(live_text)
+	fresh.close()
+
+
+# Migration hook. Add new branches below as the schema evolves. Example:
+#   if from_version < 2:
+#       _migrate_v1_to_v2()   # e.g., rename "practice_note" → "homework"
+# Always preserve existing data — migrations should only enrich/rename, not delete.
+func _migrate_from_version(from_version: int) -> void:
+	# Version 0 = pre-versioned. No structural change needed; .get() defaults
+	# already handle missing fields in existing student/lesson entries.
+	if from_version < 1:
+		pass
+
+
+# When we fail to parse an existing file, save the raw bytes alongside as
+# `<path>.corrupt.<unix>` so the user has a manual recovery option. Without
+# this, a corrupted file would be silently overwritten on the next save.
+func _backup_corrupt_file(path: String, text: String) -> void:
+	var stamp: int = int(Time.get_unix_time_from_system())
+	var backup_path: String = "%s.corrupt.%d" % [path, stamp]
+	var backup_file: FileAccess = FileAccess.open(backup_path, FileAccess.WRITE)
+	if backup_file == null:
+		return
+	backup_file.store_string(text)
+	backup_file.close()
+	push_warning("TeacherStore: corrupted teacher_data.json backed up to %s" % backup_path)
 
 
 func students_array() -> Array:
@@ -441,6 +521,215 @@ func remove_assignment(student_id: String, assignment_idx: int) -> Dictionary:
 		"student_id": student_id,
 		"student": student
 	}
+
+
+func record_item_stats(student_id: String, item_stats_asked: Dictionary, item_stats_correct: Dictionary, category: String) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var all_item_stats: Dictionary = _dictionary_from_variant(student.get("item_stats", {}))
+	var cat_stats: Dictionary = _dictionary_from_variant(all_item_stats.get(category, {}))
+	for key in item_stats_asked:
+		var k := str(key)
+		var entry: Dictionary = _dictionary_from_variant(cat_stats.get(k, {}))
+		entry["asked"] = int(entry.get("asked", 0)) + int(item_stats_asked[key])
+		entry["correct"] = int(entry.get("correct", 0)) + int(item_stats_correct.get(key, 0))
+		cat_stats[k] = entry
+	all_item_stats[category] = cat_stats
+	student["item_stats"] = all_item_stats
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id}
+
+
+func get_weak_items(student_id: String, min_asked: int = 3, max_results: int = 6) -> Array[Dictionary]:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return []
+	var student: Dictionary = _dictionary_from_variant(students_array()[idx])
+	var all_item_stats: Dictionary = _dictionary_from_variant(student.get("item_stats", {}))
+	var weak: Array[Dictionary] = []
+	for category in all_item_stats:
+		var cat_stats: Dictionary = _dictionary_from_variant(all_item_stats[category])
+		for item_key in cat_stats:
+			var entry: Dictionary = _dictionary_from_variant(cat_stats[item_key])
+			var asked := int(entry.get("asked", 0))
+			var correct := int(entry.get("correct", 0))
+			if asked < min_asked:
+				continue
+			var accuracy := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+			if accuracy < 70:
+				weak.append({"category": str(category), "item": str(item_key), "accuracy": accuracy, "asked": asked})
+	weak.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("accuracy", 100)) < int(b.get("accuracy", 100)))
+	if weak.size() > max_results:
+		weak.resize(max_results)
+	return weak
+
+
+func add_lesson_log_entry(student_id: String, entry: Dictionary) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var log: Array = _array_from_variant(student.get("lesson_log", []))
+	log.insert(0, entry)
+	student["lesson_log"] = log
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id, "student": student}
+
+
+# Replace an existing lesson-log entry at a given index. Used by the inline-edit
+# UI so teachers can refine a log as the class progresses without creating a new row.
+# Preserves any unknown fields on the existing entry (forward-compat for future
+# additions like attachments, mood, skill tags).
+func update_lesson_log_entry(student_id: String, entry_idx: int, entry: Dictionary) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var log: Array = _array_from_variant(student.get("lesson_log", []))
+	if entry_idx < 0 or entry_idx >= log.size():
+		return {"updated": false}
+	# Merge: keep existing keys, overwrite ones from the new entry. This protects
+	# any future-added fields that the current UI doesn't know about.
+	var existing: Dictionary = _dictionary_from_variant(log[entry_idx])
+	for k in entry.keys():
+		existing[k] = entry[k]
+	log[entry_idx] = existing
+	student["lesson_log"] = log
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id, "student": student, "entry": existing}
+
+
+# Delete a lesson-log entry. Useful safety operation alongside edit.
+func delete_lesson_log_entry(student_id: String, entry_idx: int) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var log: Array = _array_from_variant(student.get("lesson_log", []))
+	if entry_idx < 0 or entry_idx >= log.size():
+		return {"updated": false}
+	log.remove_at(entry_idx)
+	student["lesson_log"] = log
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id, "student": student}
+
+
+func update_piece(student_id: String, piece_idx: int, piece: Dictionary) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var pieces: Array = _array_from_variant(student.get("current_pieces", []))
+	if piece_idx < 0 or piece_idx >= pieces.size():
+		return {"updated": false}
+	pieces[piece_idx] = piece
+	student["current_pieces"] = pieces
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id, "student": student}
+
+
+func add_piece(student_id: String, piece: Dictionary) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var pieces: Array = _array_from_variant(student.get("current_pieces", []))
+	pieces.append(piece)
+	student["current_pieces"] = pieces
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id, "student": student}
+
+
+func ensure_piece_defaults(piece: Variant) -> Dictionary:
+	var p: Dictionary = {}
+	if typeof(piece) == TYPE_DICTIONARY:
+		p = (piece as Dictionary).duplicate(true)
+	elif typeof(piece) == TYPE_STRING:
+		p = {"title": str(piece)}
+	var defaults := {
+		"title": "", "composer": "", "source_book": "",
+		"status": "working", "date_assigned": "", "date_completed": "",
+		"target_bpm": 0, "current_bpm": 0,
+		"memory_status": "reading", "focus_bars": "",
+		"notes": "", "last_reviewed": "",
+		"ratings": {"notes": 0, "rhythm": 0, "technique": 0, "musicality": 0, "memory": 0}
+	}
+	for key in defaults:
+		if not p.has(key):
+			p[key] = defaults[key]
+	if typeof(p.get("ratings")) != TYPE_DICTIONARY:
+		p["ratings"] = defaults["ratings"]
+	return p
+
+
+func ensure_tech_defaults(item: Variant) -> Dictionary:
+	var t: Dictionary = {}
+	if typeof(item) == TYPE_DICTIONARY:
+		t = (item as Dictionary).duplicate(true)
+	elif typeof(item) == TYPE_STRING:
+		t = {"title": str(item)}
+	var defaults := {
+		"title": "", "category": "scale", "key_or_root": "",
+		"quality_or_mode": "", "hands": "HT",
+		"motion": "parallel", "status": "not_started",
+		"target_bpm": 0, "current_bpm": 0,
+		"notes": "", "last_checked": ""
+	}
+	for key in defaults:
+		if not t.has(key):
+			t[key] = defaults[key]
+	return t
+
+
+func ensure_student_defaults(student: Dictionary) -> Dictionary:
+	var s := student.duplicate(true)
+	var str_defaults := {
+		"id": "", "name": "", "level": "", "instrument": "Piano",
+		"lesson_day": "", "parent_name": "", "parent_contact": "",
+		"next_lesson_focus": ""
+	}
+	for key in str_defaults:
+		if not s.has(key):
+			s[key] = str_defaults[key]
+	if not s.has("age"):
+		s["age"] = 0
+	if not s.has("lesson_duration_min"):
+		s["lesson_duration_min"] = 30
+	var dict_defaults := {"current_book": {"name": "", "part": ""}, "metrics": {}, "training_stats": {}}
+	for key in dict_defaults:
+		if not s.has(key) or typeof(s[key]) != TYPE_DICTIONARY:
+			s[key] = dict_defaults[key]
+	var arr_defaults := ["current_pieces", "repertoire_history", "current_technical",
+		"tech_history", "lesson_log", "assignments", "session_history",
+		"book_history", "piece_history", "teacher_flags"]
+	for key in arr_defaults:
+		if not s.has(key) or typeof(s[key]) != TYPE_ARRAY:
+			s[key] = []
+	# Migrate pieces to rich format
+	var pieces: Array = s["current_pieces"]
+	for i in pieces.size():
+		pieces[i] = ensure_piece_defaults(pieces[i])
+	s["current_pieces"] = pieces
+	# Migrate tech items to dict format
+	var tech: Array = s["current_technical"]
+	for i in tech.size():
+		tech[i] = ensure_tech_defaults(tech[i])
+	s["current_technical"] = tech
+	return s
 
 
 func _ensure_students_array() -> void:

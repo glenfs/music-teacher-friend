@@ -91,11 +91,11 @@ static func get_module_data() -> Dictionary:
 		"All Five Bass Notes!",
 		"Here are all five bass notes you now know:",
 		[
-			{"label": "C (Middle C)", "detail": "On its own ledger line above the staff", "clef": "bass"},
-			{"label": "B", "detail": "In the space just above the top line", "clef": "bass"},
-			{"label": "A", "detail": "On the top line of the staff", "clef": "bass"},
-			{"label": "G", "detail": "In the top space, just below the A line", "clef": "bass"},
-			{"label": "F", "detail": "On the fourth line — where the bass clef dots are", "clef": "bass"},
+			{"label": "C (Middle C)", "detail": "On its own ledger line above the staff", "clef": "bass", "note_step": -2},
+			{"label": "B", "detail": "In the space just above the top line", "clef": "bass", "note_step": -1},
+			{"label": "A", "detail": "On the top line of the staff", "clef": "bass", "note_step": 0},
+			{"label": "G", "detail": "In the top space, just below the A line", "clef": "bass", "note_step": 1},
+			{"label": "F", "detail": "On the fourth line — where the bass clef dots are", "clef": "bass", "note_step": 2},
 		]
 	))
 
@@ -130,7 +130,7 @@ static func get_module_data() -> Dictionary:
 		"Note Review",
 		"Final review! Name these bass clef notes.",
 		LMD.bass_note_pool_basic(),
-		5
+		8
 	))
 
 	# Final Recap
@@ -138,11 +138,11 @@ static func get_module_data() -> Dictionary:
 		"Module Complete!",
 		"Awesome! You've mastered your first five bass clef notes!",
 		[
-			{"label": "C (Middle C)", "detail": "On a ledger line above the bass staff"},
-			{"label": "B", "detail": "In the space just above the top line"},
-			{"label": "A", "detail": "On the top line of the staff"},
-			{"label": "G", "detail": "In the top space, just below the A line"},
-			{"label": "F", "detail": "On the fourth line — where the bass clef dots are!"},
+			{"label": "C (Middle C)", "detail": "On a ledger line above the bass staff", "clef": "bass", "note_step": -2},
+			{"label": "B", "detail": "In the space just above the top line", "clef": "bass", "note_step": -1},
+			{"label": "A", "detail": "On the top line of the staff", "clef": "bass", "note_step": 0},
+			{"label": "G", "detail": "In the top space, just below the A line", "clef": "bass", "note_step": 1},
+			{"label": "F", "detail": "On the fourth line — where the bass clef dots are!", "clef": "bass", "note_step": 2},
 		]
 	))
 

@@ -474,63 +474,55 @@ func sight_note_hint_lines(
 	var profile: Dictionary = profile_any as Dictionary if typeof(profile_any) == TYPE_DICTIONARY else fallback_profile
 	var is_line := posmod(current_sight_display_step, 2) == 0
 	var lane_txt := "line" if is_line else "space"
-	var note_bank := {
-		"C": ["Look for middle-C area first.", "C is a common landmark.", "Find C, then move up/down.", "C often anchors reading.", "Say C first, then confirm."],
-		"D": ["D is one step from C.", "Find C then move to D.", "D sits close to center often.", "Check line/space around C.", "Use step counting for D."],
-		"E": ["E is easy near lower treble line.", "Find nearby D/F and step.", "E is often a chord tone.", "Check if it is line-based here.", "Anchor from C or G."],
-		"F": ["F is tied to bass clef marker note.", "In treble, F is first space.", "Use clef clue for F quickly.", "Find E/G and step.", "F is a strong landmark note."],
-		"G": ["G is tied to treble clef marker.", "Find treble clef curl line for G.", "G sits as a common anchor.", "Use F/A around it.", "G is often easy to spot."],
-		"A": ["A is one step above G.", "Find G then move to A.", "A appears often in melodies.", "Check if line or space here.", "Use neighbor notes to confirm A."],
-		"B": ["B sits near C anchor.", "Find C then step to B.", "B can be leading tone feel.", "Check accidental if key has sharps/flats.", "Use A/C around B."]
+	var is_treble := clef_name == "Treble"
+	# Clef-specific note hints — only show hints relevant to the current clef
+	var treble_bank := {
+		"C": ["Middle C sits on the ledger line below the staff.", "C is your anchor -- find it first, then count."],
+		"D": ["D is just above middle C -- right below the first line.", "One step up from C."],
+		"E": ["E sits on the first (bottom) line of the treble staff.", "Remember: Every Good Boy Does Fine -- E is first."],
+		"F": ["F is in the first space of the treble staff.", "FACE spells the spaces -- F is first."],
+		"G": ["G sits on the second line -- the treble clef curls around it.", "The G-clef is named after this note."],
+		"A": ["A is in the second space.", "FACE -- A is the second space note."],
+		"B": ["B sits on the third line.", "Every Good Boy Does Fine -- B is third."],
 	}
-	var lines: Array = note_bank.get(letter, ["Find nearby anchor.", "Count by steps.", "Check clef.", "Line or space first.", "Confirm letter."])
-	var note_extra := [
-		"Extra hint: target letter is %s." % letter,
-		"Extra hint: read %s clef first." % clef_name,
-		"Extra hint: confirm line vs space.",
-		"Extra hint: move by one alphabet step at a time.",
-		"Extra hint: use nearby landmark notes.",
-		"Treble lines (bottom to top): E G B D F.",
-		"Treble spaces (bottom to top): F A C E (FACE).",
-		"Bass lines (bottom to top): G B D F A.",
-		"Bass spaces (bottom to top): A C E G.",
-		"Treble first line is E. Start there and count.",
-		"Treble second line is G (the G-clef line).",
-		"Treble first space is F.",
-		"Bass first line is G.",
-		"Bass first space is A.",
-		"Bass fourth line is F (bass clef dots surround F).",
-		"Space-note tip (treble): FACE.",
-		"Line-note tip (treble): EGBDF.",
-		"Line-note tip (bass): GBDFA.",
-		"Space-note tip (bass): ACEG.",
-		"Landmark tip: find middle C, then count steps.",
-		"Landmark tip: treble G sits on the 2nd line.",
-		"Landmark tip: bass F sits on the 4th line."
-	]
+	var bass_bank := {
+		"C": ["Middle C sits on the ledger line above the bass staff.", "C is your anchor up top."],
+		"D": ["D is just below middle C in bass clef.", "One step down from C."],
+		"E": ["E is in the fourth space of the bass staff.", "ACEG -- E is third space. Or top space in some positions."],
+		"F": ["F sits on the fourth line -- the bass clef dots surround it.", "The F-clef is named after this note."],
+		"G": ["G sits on the first (bottom) line of the bass staff.", "Good Boys Do Fine Always -- G is first."],
+		"A": ["A is in the first space of the bass staff.", "All Cows Eat Grass -- A is first."],
+		"B": ["B sits on the second line.", "Good Boys Do Fine Always -- B is second."],
+	}
+	var note_bank: Dictionary = treble_bank if is_treble else bass_bank
+	var note_hints: Array = note_bank.get(letter, ["Find a nearby landmark note and count steps."])
+	# Clef-specific position hints
+	var position_hint := ""
+	if is_treble:
+		if is_line:
+			position_hint = "This note is on a LINE. Treble lines (bottom to top): E - G - B - D - F."
+		else:
+			position_hint = "This note is in a SPACE. Treble spaces (bottom to top): F - A - C - E."
+	else:
+		if is_line:
+			position_hint = "This note is on a LINE. Bass lines (bottom to top): G - B - D - F - A."
+		else:
+			position_hint = "This note is in a SPACE. Bass spaces (bottom to top): A - C - E - G."
 	var hints: Array[String] = []
 	if clear_hint:
-		hints.append("Clear: note is %s on a %s." % [letter, lane_txt])
-		hints.append("Clear: first check %s clef." % clef_name)
-		hints.append("Theory: notes go A-B-C-D-E-F-G.")
-		hints.append("Theory: line and space alternate by step.")
-		hints.append("Tip: use landmarks like C/F/G.")
-	for line in lines:
-		hints.append(str(line))
-	for line2 in note_extra:
-		hints.append(str(line2))
-	hints.append("In %s clef, look near %s." % [clef_name, str(profile.get("treble", "") if clef_name == "Treble" else profile.get("bass", ""))])
-	if not clear_hint:
-		if clef_name == "Treble" and lane_txt == "space":
-			hints.append("Treble spaces spell FACE.")
-		elif clef_name == "Treble":
-			hints.append("Treble lines: E-G-B-D-F.")
-		elif clef_name == "Bass" and lane_txt == "space":
-			hints.append("Bass spaces: A-C-E-G.")
-		else:
-			hints.append("Bass lines: G-B-D-F-A.")
-	while hints.size() < 20:
-		hints.append("Count one staff step at a time.")
+		hints.append("The note is %s, on a %s in %s clef." % [letter, lane_txt, clef_name])
+	hints.append(position_hint)
+	for h in note_hints:
+		hints.append(str(h))
+	hints.append("The note is %s." % letter)
+	if is_treble:
+		hints.append("Mnemonic for lines: Every Good Boy Does Fine.")
+		hints.append("Mnemonic for spaces: FACE.")
+	else:
+		hints.append("Mnemonic for lines: Good Boys Do Fine Always.")
+		hints.append("Mnemonic for spaces: All Cows Eat Grass.")
+	while hints.size() < 10:
+		hints.append("Count one step at a time from a landmark note.")
 	return hints
 
 

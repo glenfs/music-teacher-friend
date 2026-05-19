@@ -139,10 +139,10 @@ static func get_module_data() -> Dictionary:
 		"Let's Review!",
 		"Here are the upper treble notes you just learned:",
 		[
-			{"label": "D5", "detail": "On the fourth line from the bottom", "clef": "treble"},
-			{"label": "E5", "detail": "In the top space of the staff", "clef": "treble"},
-			{"label": "F5", "detail": "On the top line", "clef": "treble"},
-			{"label": "G5", "detail": "Just above the top line", "clef": "treble"},
+			{"label": "D5", "detail": "On the fourth line from the bottom", "clef": "treble", "note_step": 2},
+			{"label": "E5", "detail": "In the top space of the staff", "clef": "treble", "note_step": 1},
+			{"label": "F5", "detail": "On the top line", "clef": "treble", "note_step": 0},
+			{"label": "G5", "detail": "Just above the top line", "clef": "treble", "note_step": -1},
 		]
 	))
 

@@ -88,7 +88,7 @@ func animate_section_visibility(section: VBoxContainer, card: Control, visible: 
 func apply_focus_chain(controls: Array[Control], default_focus: Control) -> void:
 	var valid: Array[Control] = []
 	for c in controls:
-		if c != null and is_instance_valid(c) and c.focus_mode != Control.FOCUS_NONE:
+		if c != null and is_instance_valid(c) and c.visible and not c.disabled and c.focus_mode != Control.FOCUS_NONE:
 			valid.append(c)
 	if valid.is_empty():
 		return

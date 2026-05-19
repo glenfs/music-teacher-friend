@@ -109,10 +109,10 @@ static func get_module_data() -> Dictionary:
 		"Let's Review!",
 		"Here are the ledger line notes we learned:",
 		[
-			{"label": "B3 (Treble)", "detail": "Space below Middle C's ledger line", "clef": "treble"},
-			{"label": "A3 (Treble)", "detail": "On a second ledger line below the staff", "clef": "treble"},
-			{"label": "D4 (Bass)", "detail": "Space above Middle C's ledger line", "clef": "bass"},
-			{"label": "E4 (Bass)", "detail": "On a second ledger line above the staff", "clef": "bass"},
+			{"label": "B3 (Treble)", "detail": "Space below Middle C's ledger line", "clef": "treble", "note_step": 11},
+			{"label": "A3 (Treble)", "detail": "On a second ledger line below the staff", "clef": "treble", "note_step": 12},
+			{"label": "D4 (Bass)", "detail": "Space above Middle C's ledger line", "clef": "bass", "note_step": -3},
+			{"label": "E4 (Bass)", "detail": "On a second ledger line above the staff", "clef": "bass", "note_step": -4},
 		]
 	))
 

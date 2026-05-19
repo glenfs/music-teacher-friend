@@ -15,10 +15,15 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="MusicEd - Interval Birds"
+config/description="Clefira — Music Learning that actually sticks"
 run/main_scene="res://scenes/ui/SplashScreen.tscn"
 config/features=PackedStringArray("4.6")
 boot_splash/show_image=false
 config/icon="res://icon.svg"
+
+[audio]
+
+driver/enable_input=true
 
 [display]
 

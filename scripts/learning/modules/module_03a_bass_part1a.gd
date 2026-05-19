@@ -110,9 +110,9 @@ static func get_module_data() -> Dictionary:
 		"Let's Review!",
 		"Here are your first three bass notes:",
 		[
-			{"label": "C (Middle C)", "detail": "On its own ledger line above the staff", "clef": "bass"},
-			{"label": "B", "detail": "In the space just above the top line", "clef": "bass"},
-			{"label": "A", "detail": "On the top line of the staff", "clef": "bass"},
+			{"label": "C (Middle C)", "detail": "On its own ledger line above the staff", "clef": "bass", "note_step": -2},
+			{"label": "B", "detail": "In the space just above the top line", "clef": "bass", "note_step": -1},
+			{"label": "A", "detail": "On the top line of the staff", "clef": "bass", "note_step": 0},
 		]
 	))
 
@@ -152,9 +152,9 @@ static func get_module_data() -> Dictionary:
 		"Module Complete!",
 		"Great work! You've learned three bass clef notes — Middle C, B, and A!",
 		[
-			{"label": "C (Middle C)", "detail": "On a ledger line above the bass staff"},
-			{"label": "B", "detail": "In the space just above the top line"},
-			{"label": "A", "detail": "On the top line of the staff"},
+			{"label": "C (Middle C)", "detail": "On a ledger line above the bass staff", "clef": "bass", "note_step": -2},
+			{"label": "B", "detail": "In the space just above the top line", "clef": "bass", "note_step": -1},
+			{"label": "A", "detail": "On the top line of the staff", "clef": "bass", "note_step": 0},
 		]
 	))
 

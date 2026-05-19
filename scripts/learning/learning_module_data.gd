@@ -155,14 +155,17 @@ static func create_melody_example_step(title: String, chicken_text: String, clef
 	})
 
 
-static func create_rhythm_tap_step(title: String, chicken_text: String, pattern: Array, bpm: int = 100, time_sig_top: int = 4) -> Dictionary:
-	return create_step(STEP_RHYTHM_TAP, {
+static func create_rhythm_tap_step(title: String, chicken_text: String, pattern: Array, bpm: int = 100, time_sig_top: int = 4, extra: Dictionary = {}) -> Dictionary:
+	var data := {
 		"title": title,
 		"chicken_text": chicken_text,
-		"pattern": pattern,  # Array of floats: beat values e.g. [1.0, 1.0, 1.0, 1.0] for 4 quarter notes
+		"pattern": pattern,  # Array of floats or Dictionaries with beats/rest metadata
 		"bpm": bpm,
 		"time_sig_top": time_sig_top,
-	})
+	}
+	for key in extra:
+		data[key] = extra[key]
+	return create_step(STEP_RHYTHM_TAP, data)
 
 
 static func create_note_identify_step(clef: String, target_note_id: String, target_step: int, distractor_steps: Array, chicken_correct: String = "", chicken_wrong: String = "") -> Dictionary:
@@ -252,6 +255,14 @@ static func note_id_to_midi(note_id: String) -> int:
 
 
 # Pool builder helpers for cumulative quizzes
+static func treble_note_pool_part1a() -> Array:
+	# C4-E4 from module 02a
+	return [
+		{"clef": "treble", "note_name": "C", "note_step": 10, "note_id": "C4"},
+		{"clef": "treble", "note_name": "D", "note_step": 9, "note_id": "D4"},
+		{"clef": "treble", "note_name": "E", "note_step": 8, "note_id": "E4"},
+	]
+
 static func treble_note_pool_basic() -> Array:
 	# C4-G4 from module 02
 	return [

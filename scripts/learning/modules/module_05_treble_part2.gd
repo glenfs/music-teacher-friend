@@ -206,9 +206,9 @@ static func get_module_data() -> Dictionary:
 		[
 			{"label": "Line Notes", "detail": "E G B D F — Every Good Boy Does Fine", "clef": "treble"},
 			{"label": "Space Notes", "detail": "F A C E — the spaces spell FACE", "clef": "treble"},
-			{"label": "A4", "detail": "Second space from the bottom", "clef": "treble"},
-			{"label": "B4", "detail": "On the middle line", "clef": "treble"},
-			{"label": "C5", "detail": "In the third space", "clef": "treble"},
+			{"label": "A4", "detail": "Second space from the bottom", "clef": "treble", "note_step": 5},
+			{"label": "B4", "detail": "On the middle line", "clef": "treble", "note_step": 4},
+			{"label": "C5", "detail": "In the third space", "clef": "treble", "note_step": 3},
 		]
 	))
 

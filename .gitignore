@@ -32,6 +32,12 @@ keys/*.p12
 build/
 android/
 *.apk
+*.exe
+*.pck
+*.wasm
+# Web export bundle — kept locally but never committed
+web/Note Catcher3.*
+web/index.*
 
 # QA/runtime outputs
 qa_screenshots/
