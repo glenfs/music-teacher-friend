@@ -106,6 +106,7 @@ const PracticeDrillsPanelScript = preload("res://scripts/ui/practice_drills_pane
 const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_dialog.gd")
 const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
 const TheoryQuestionGeneratorScript = preload("res://scripts/exercises/theory_question_generator.gd")
+const PitchMatchTheoryScript = preload("res://scripts/exercises/pitch_match_theory.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -24417,181 +24418,51 @@ func _build_pitch_match_keyboard() -> void:
 
 
 func _pitch_match_key_pc() -> int:
-	for opt in PRACTICE_KEY_OPTIONS:
-		if str(opt[0]) == _pitch_match_key:
-			return int(opt[1])
-	return 0
+	return PitchMatchTheoryScript.key_pc(_pitch_match_key, PRACTICE_KEY_OPTIONS)
 
 
 func _pitch_match_tonic_midi() -> int:
-	return 60 + _pitch_match_key_pc()
+	return PitchMatchTheoryScript.tonic_midi(_pitch_match_key, PRACTICE_KEY_OPTIONS)
 
 
 func _pitch_match_scale_steps() -> Array[int]:
-	var raw_steps: Array = SCALE_MODE_DEFS.get(_pitch_match_scale, SCALE_MODE_DEFS["Major"])
-	var steps: Array[int] = []
-	for step_any in raw_steps:
-		var step := int(step_any)
-		if step >= 12:
-			continue
-		if not steps.has(step):
-			steps.append(step)
-	if steps.is_empty():
-		steps = [0, 2, 4, 5, 7, 9, 11]
-	return steps
+	return PitchMatchTheoryScript.scale_steps(_pitch_match_scale, SCALE_MODE_DEFS)
 
 
-# Returns the semitone offsets the round generator may pick from, scoped to the
-# user-selected difficulty level. Steps are semitones from the tonic.
-#   L1 = tonic + 5th-degree (dominant)
-#   L2 = triad tones (1, 3, 5 scale degrees)
-#   L3 = pentachord (1..5 scale degrees)
-#   L4 = full diatonic scale (default — same as _pitch_match_scale_steps())
-#   L5 = diatonic + common chromatic borrows (b2, b3, #4/b5, b6, b7)
-#   L6 = full chromatic (all 12 pitch classes)
 func _pitch_match_level_steps() -> Array[int]:
-	var scale: Array[int] = _pitch_match_scale_steps()
-	var level: int = clampi(_pitch_match_level, 1, 6)
-	match level:
-		1:
-			var out: Array[int] = []
-			if scale.size() > 0:
-				out.append(scale[0])
-			if scale.size() > 4:
-				out.append(scale[4])
-			elif scale.size() > 0:
-				# Tiny scale fallback — still want two notes for any contrast.
-				out.append((scale[0] + 7) % 12)
-			return out
-		2:
-			var out: Array[int] = []
-			for i in [0, 2, 4]:
-				if i < scale.size():
-					out.append(scale[i])
-			return out
-		3:
-			var out: Array[int] = []
-			for i in range(mini(5, scale.size())):
-				out.append(scale[i])
-			return out
-		4:
-			return scale
-		5:
-			var chromatic_borrows: Array[int] = [1, 3, 6, 8, 10]
-			var combined: Array[int] = []
-			for s in scale:
-				if not combined.has(s):
-					combined.append(s)
-			for s in chromatic_borrows:
-				if not combined.has(s):
-					combined.append(s)
-			combined.sort()
-			return combined
-		6:
-			return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-	return scale
+	return PitchMatchTheoryScript.level_steps(_pitch_match_scale_steps(), _pitch_match_level)
 
 
-# Human-friendly label for the current level (used by the setup-screen dropdown
-# and any help text).
 func _pitch_match_level_label(level: int) -> String:
-	match clampi(level, 1, 6):
-		1: return "L1 — Tonic + 5th"
-		2: return "L2 — Triad (1·3·5)"
-		3: return "L3 — Pentachord (1–5)"
-		4: return "L4 — Full Diatonic"
-		5: return "L5 — Diatonic + Chromatic Borrows"
-		6: return "L6 — Chromatic"
-	return "L4 — Full Diatonic"
+	return PitchMatchTheoryScript.level_label(level)
 
 
 func _pitch_match_degree_label_for_step(step: int) -> String:
-	var steps := _pitch_match_scale_steps()
-	var idx := steps.find(step)
-	if idx >= 0:
-		return str(idx + 1)
-	# Chromatic note that isn't in the current diatonic scale (only reachable on
-	# level 5 / 6). Label it as an alteration of the nearest scale degree —
-	# e.g. ♭3 between scale degrees 2 and 3 (in major).
-	var below: int = -1
-	var above: int = -1
-	for i in range(steps.size()):
-		if steps[i] < step:
-			below = i
-		elif steps[i] > step and above == -1:
-			above = i
-	if below >= 0 and above >= 0:
-		# Choose alteration relative to whichever is nearer.
-		if absi(step - steps[above]) <= absi(step - steps[below]):
-			return "♭%d" % (above + 1)
-		return "♯%d" % (below + 1)
-	if below >= 0:
-		return "♯%d" % (below + 1)
-	if above >= 0:
-		return "♭%d" % (above + 1)
-	return "?"
+	return PitchMatchTheoryScript.degree_label_for_step(step, _pitch_match_scale_steps())
 
 
 func _pitch_match_note_label(midi: int) -> String:
-	return "%s%d" % [_midi_pitch_class_name(midi), int(midi / 12 - 1)]
+	return PitchMatchTheoryScript.note_label(midi)
 
 
-# Movable-do solfege syllables keyed by semitone offset from tonic. Flat and
-# sharp alterations use the standard syllables (Ra, Me, Fi, Le, Te).
-const _PITCH_MATCH_SOLFEGE := {
-	0: "Do", 1: "Ra", 2: "Re", 3: "Me", 4: "Mi", 5: "Fa",
-	6: "Fi", 7: "Sol", 8: "Le", 9: "La", 10: "Te", 11: "Ti",
-}
-
-
-# Returns a display label for the given MIDI under the active label mode:
-#   "letter" — absolute note name with octave (e.g. C4)
-#   "solfege" — movable-do syllable relative to the current key (Do, Re, …)
-#   "degree" — scale degree relative to current key/scale (1, 2, ♭3, …)
 func _pitch_match_display_label_for_midi(midi: int) -> String:
-	var mode: String = _pitch_match_label_mode
-	if mode == "solfege":
-		var tonic := _pitch_match_tonic_midi()
-		var off: int = posmod(midi - tonic, 12)
-		return str(_PITCH_MATCH_SOLFEGE.get(off, "?"))
-	if mode == "degree":
-		var tonic2 := _pitch_match_tonic_midi()
-		var off2: int = posmod(midi - tonic2, 12)
-		return _pitch_match_degree_label_for_step(off2)
-	return _pitch_match_note_label(midi)
+	return PitchMatchTheoryScript.display_label_for_midi(midi, _pitch_match_label_mode, _pitch_match_tonic_midi(), _pitch_match_scale_steps())
 
 
 func _selected_pitch_match_labels() -> Array[String]:
-	# Use the level-aware step pool so the review queue tracks every pitch class
-	# that can actually appear at the current level (including chromatic notes
-	# on L5/L6).
 	var labels: Array[String] = []
 	var tonic := _pitch_match_tonic_midi()
 	for step in _pitch_match_level_steps():
-		labels.append(_pitch_match_note_label(tonic + step))
+		labels.append(PitchMatchTheoryScript.note_label(tonic + step))
 	return labels
 
 
 func _pitch_match_tonic_triad() -> Array[int]:
-	var tonic := _pitch_match_tonic_midi()
-	var third := 3 if _pitch_match_scale == "Natural Minor" else 4
-	return [tonic, tonic + third, tonic + 7]
+	return PitchMatchTheoryScript.tonic_triad(_pitch_match_tonic_midi(), _pitch_match_scale)
 
 
-# I-IV-V-I cadence chords in the current key. V is always major (raised 7th in
-# minor) for the classic "leading-tone resolution" feel. Used to ground the
-# ear in the key at round 1 when pitch_match_play_cadence_start is enabled.
-# Inner arrays are explicitly Array[int] so _play_chord_block accepts them.
 func _pitch_match_cadence_chords() -> Array:
-	var tonic := _pitch_match_tonic_midi()
-	var is_minor: bool = _pitch_match_scale == "Natural Minor"
-	var third_i: int = 3 if is_minor else 4
-	var third_iv: int = 3 if is_minor else 4
-	var i_chord: Array[int] = [tonic, tonic + third_i, tonic + 7]
-	var iv_chord: Array[int] = [tonic + 5, tonic + 5 + third_iv, tonic + 5 + 7]
-	# V is major regardless of mode — that's the classic cadence sound.
-	var v_chord: Array[int] = [tonic + 7, tonic + 7 + 4, tonic + 7 + 7]
-	return [i_chord, iv_chord, v_chord, i_chord]
+	return PitchMatchTheoryScript.cadence_chords(_pitch_match_tonic_midi(), _pitch_match_scale)
 
 
 # Drone tonic — soft sustained tonic note that loops under gameplay so the
