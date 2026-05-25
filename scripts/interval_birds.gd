@@ -107,6 +107,7 @@ const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_di
 const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
 const TheoryQuestionGeneratorScript = preload("res://scripts/exercises/theory_question_generator.gd")
 const PitchMatchTheoryScript = preload("res://scripts/exercises/pitch_match_theory.gd")
+const MusicHelpersScript = preload("res://scripts/music_theory/music_helpers.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -10652,75 +10653,15 @@ func _refresh_home_section_emphasis() -> void:
 
 
 func _inversion_name(inversion: int) -> String:
-	match inversion:
-		1: return "1st Inversion"
-		2: return "2nd Inversion"
-		3: return "3rd Inversion"
-		_: return "Root Position"
+	return MusicHelpersScript.inversion_name(inversion)
 
 
 func _interval_display_name(interval_id: String) -> String:
-	match interval_id:
-		"P1":
-			return "Unison"
-		"m2":
-			return "Minor 2nd"
-		"M2":
-			return "Major 2nd"
-		"m3":
-			return "Minor 3rd"
-		"M3":
-			return "Major 3rd"
-		"P4":
-			return "Perfect 4th"
-		"TT":
-			return "Tritone"
-		"P5":
-			return "Perfect 5th"
-		"m6":
-			return "Minor 6th"
-		"M6":
-			return "Major 6th"
-		"m7":
-			return "Minor 7th"
-		"M7":
-			return "Major 7th"
-		"P8":
-			return "Octave"
-		_:
-			return interval_id
+	return MusicHelpersScript.interval_display_name(interval_id)
 
 
 func _interval_id_for_semitones(semitones: int) -> String:
-	match semitones:
-		0:
-			return "P1"
-		1:
-			return "m2"
-		2:
-			return "M2"
-		3:
-			return "m3"
-		4:
-			return "M3"
-		5:
-			return "P4"
-		6:
-			return "TT"
-		7:
-			return "P5"
-		8:
-			return "m6"
-		9:
-			return "M6"
-		10:
-			return "m7"
-		11:
-			return "M7"
-		12:
-			return "P8"
-		_:
-			return "P1"
+	return MusicHelpersScript.interval_id_for_semitones(semitones)
 
 
 func _refresh_practice_hud_style() -> void:
@@ -12379,104 +12320,23 @@ func _request_chicken_hint() -> void:
 
 
 func _midi_pitch_class_name(midi: int) -> String:
-	var names := ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
-	var idx := posmod(midi, 12)
-	return names[idx]
+	return MusicHelpersScript.midi_pitch_class_name(midi)
 
 
 func _chord_family_id_from_name(quality_name: String) -> String:
-	var q := quality_name.to_lower()
-	# Order matters: check longer/more-specific strings first
-	if q == "augmaj7" or q.find("augmaj7") >= 0:
-		return "augmaj7"
-	if q == "aug7" or q.find("aug7") >= 0:
-		return "aug7"
-	if q == "mmaj7" or q.find("mmaj7") >= 0:
-		return "mmaj7"
-	if q == "half-dim" or q.find("half-dim") >= 0 or q.find("m7b5") >= 0:
-		return "halfdim"
-	if q.find("dim7") >= 0 or q.find("diminished 7") >= 0:
-		return "dim7"
-	if q == "maj9" or q.find("maj9") >= 0:
-		return "maj9"
-	if q == "min9" or q.find("min9") >= 0:
-		return "min9"
-	if q == "dom9" or q.find("dom9") >= 0:
-		return "dom9"
-	if q == "add9" or q.find("add9") >= 0:
-		return "add9"
-	if q.find("maj7") >= 0 or q.find("major 7") >= 0:
-		return "maj7"
-	if q.find("min7") >= 0 or q.find("minor 7") >= 0:
-		return "min7"
-	if q.find("dom7") >= 0 or q.find("dominant 7") >= 0:
-		return "dom7"
-	if q == "7sus4" or q.find("7sus4") >= 0:
-		return "7sus4"
-	if q == "6/9" or q.find("6/9") >= 0:
-		return "69"
-	if q == "maj6" or q.find("maj6") >= 0:
-		return "maj6"
-	if q == "min6" or q.find("min6") >= 0:
-		return "min6"
-	if q.find("power") >= 0:
-		return "power"
-	if q.find("aug") >= 0:
-		return "aug"
-	if q.find("dim") >= 0:
-		return "dim"
-	if q.find("sus2") >= 0:
-		return "sus2"
-	if q.find("sus4") >= 0 or q.find("sus") >= 0:
-		return "sus4"
-	if q.find("min") >= 0 or q.find("minor") >= 0:
-		return "minor"
-	if q == "5":
-		return "power"
-	return "major"
+	return MusicHelpersScript.chord_family_id_from_name(quality_name)
 
 
 func _chord_hint_meta(quality_name: String) -> Dictionary:
-	var family := _chord_family_id_from_name(quality_name)
-	var _hint_intervals := {
-		"major": [0, 4, 7], "minor": [0, 3, 7], "power": [0, 7],
-		"dim": [0, 3, 6], "aug": [0, 4, 8],
-		"sus2": [0, 2, 7], "sus4": [0, 5, 7],
-		"maj7": [0, 4, 7, 11], "dom7": [0, 4, 7, 10], "min7": [0, 3, 7, 10],
-		"dim7": [0, 3, 6, 9], "halfdim": [0, 3, 6, 10], "mmaj7": [0, 3, 7, 11],
-		"aug7": [0, 4, 8, 10], "augmaj7": [0, 4, 8, 11],
-		"7sus4": [0, 5, 7, 10],
-		"maj6": [0, 4, 7, 9], "min6": [0, 3, 7, 9], "69": [0, 4, 7, 9, 14],
-		"dom9": [0, 4, 7, 10, 14], "maj9": [0, 4, 7, 11, 14], "min9": [0, 3, 7, 10, 14],
-		"add9": [0, 4, 7, 14],
-	}
-	return {"intervals": _hint_intervals.get(family, [0, 4, 7]), "family": family}
+	return MusicHelpersScript.chord_hint_meta(quality_name)
 
 
 func _parse_root_midi_from_chord_name(name: String) -> int:
-	var t := name.strip_edges()
-	if t.is_empty():
-		return 60
-	var parts := t.split(" ", false)
-	var root_token := parts[0] if not parts.is_empty() else "C"
-	var base := root_token.substr(0, 1).to_upper()
-	var semis := {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
-	var semi := int(semis.get(base, 0))
-	if root_token.find("#") >= 0:
-		semi += 1
-	if root_token.find("b") >= 0:
-		semi -= 1
-	return 60 + semi
+	return MusicHelpersScript.parse_root_midi_from_chord_name(name)
 
 
 func _note_letter_from_name(note_name: String) -> String:
-	var t := note_name.strip_edges()
-	if t.is_empty():
-		return "C"
-	var c := t.substr(0, 1).to_upper()
-	if NOTE_NAME_ORDER.has(c):
-		return c
-	return "C"
+	return MusicHelpersScript.note_letter_from_name(note_name, NOTE_NAME_ORDER)
 
 
 func _pick_topic_hint_line(topic_key: String, lines: Array) -> String:
