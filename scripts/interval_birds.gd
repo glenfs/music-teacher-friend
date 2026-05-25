@@ -26788,20 +26788,11 @@ func _rhythm_flow_log_generated_exercise() -> void:
 
 
 func _rhythm_flow_has_token(token_text: String) -> bool:
-	if token_text.is_empty():
-		return false
-	for bar_v in _rhythm_flow_generated_bars:
-		var toks := str(bar_v).split(" ", false)
-		for t in toks:
-			if str(t) == token_text:
-				return true
-	return false
+	return RhythmFlowLibraryScript.has_token(_rhythm_flow_generated_bars, token_text)
 
 
 func _rhythm_flow_hint_suffix_for_current_bars() -> String:
-	if _rhythm_flow_has_token("t4"):
-		return " | Quarter note triplet: fit 3 notes into 2 beats."
-	return ""
+	return RhythmFlowLibraryScript.hint_suffix_for_bars(_rhythm_flow_generated_bars)
 
 
 func _rhythm_flow_generator_self_test() -> bool:

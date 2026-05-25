@@ -185,6 +185,26 @@ static func now_stamp() -> String:
 	]
 
 
+# True when any bar in the generated bars contains the given token.
+static func has_token(generated_bars: Array, token_text: String) -> bool:
+	if token_text.is_empty():
+		return false
+	for bar_v in generated_bars:
+		var toks := str(bar_v).split(" ", false)
+		for t in toks:
+			if str(t) == token_text:
+				return true
+	return false
+
+
+# Status-line hint suffix surfaced when a generated exercise contains
+# quarter-note triplets (t4) — most players need a nudge to count "3 over 2".
+static func hint_suffix_for_bars(generated_bars: Array) -> String:
+	if has_token(generated_bars, "t4"):
+		return " | Quarter note triplet: fit 3 notes into 2 beats."
+	return ""
+
+
 # Returns the exercise pattern bank for the given 1-indexed difficulty level.
 # Each pattern is an Array of event dicts: {type: "hit"|"rest", duration_beats: float}.
 # Levels above the table cap clamp to the densest set.
