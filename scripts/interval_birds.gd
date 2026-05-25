@@ -108,6 +108,7 @@ const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
 const TheoryQuestionGeneratorScript = preload("res://scripts/exercises/theory_question_generator.gd")
 const PitchMatchTheoryScript = preload("res://scripts/exercises/pitch_match_theory.gd")
 const MusicHelpersScript = preload("res://scripts/music_theory/music_helpers.gd")
+const NoteChaseDifficultyScript = preload("res://scripts/exercises/note_chase_difficulty.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -416,54 +417,9 @@ const NEW_QUESTION_SFX_PATH := "res://assets/audio/sfx/new_question.wav"
 const POWERUP_SFX_PATH := "res://assets/audio/sfx/powerup.wav"
 const TRANSITION_WHOOSH_SFX_PATH := "res://assets/audio/sfx/transition-whoosh-sound.wav"
 const SHIELD_ACTIVATE_SFX_PATH := "res://assets/audio/sfx/268185__andychristen__wristwatchtic-tac.wav"
-const NOTE_CHASE_BGM_PATH := "res://assets/audio/sfx/module-complete.wav"
-const NOTE_CHASE_NOTE_COLORS := [
-	Color(1.0, 0.47, 0.73, 0.97), # pink
-	Color(0.34, 0.58, 0.98, 0.97), # blue
-	Color(0.35, 0.95, 0.95, 0.97), # cyan
-	Color(0.66, 0.46, 0.96, 0.97), # purple
-	Color(0.54, 0.35, 0.92, 0.97), # violet
-	Color(0.13, 0.58, 0.25, 0.97), # dark green
-	Color(0.96, 0.66, 0.36, 0.97), # warm orange
-	Color(1.0, 0.41, 0.41, 0.97), # coral red
-	Color(0.41, 0.93, 0.64, 0.97), # mint
-	Color(0.98, 0.80, 0.25, 0.97), # amber
-	Color(0.31, 0.84, 0.96, 0.97), # sky
-	Color(0.92, 0.42, 0.84, 0.97), # magenta
-	Color(0.74, 0.90, 0.34, 0.97), # lime
-	Color(0.98, 0.52, 0.67, 0.97), # rose
-	Color(0.44, 0.82, 0.76, 0.97), # teal mint
-	Color(0.86, 0.60, 0.30, 0.97) # bronze
-]
-const NOTE_CHASE_STAFF_COLORS := [
-	Color(1.0, 0.84, 0.40, 0.96),
-	Color(0.45, 0.86, 1.0, 0.96),
-	Color(1.0, 0.62, 0.78, 0.96),
-	Color(0.58, 0.95, 0.66, 0.96),
-	Color(0.83, 0.62, 1.0, 0.96),
-	Color(1.0, 0.56, 0.38, 0.96),
-	Color(0.48, 0.92, 0.78, 0.96),
-	Color(0.94, 0.72, 0.34, 0.96),
-	Color(0.35, 0.78, 0.98, 0.96),
-	Color(0.94, 0.54, 0.88, 0.96),
-	Color(0.72, 0.92, 0.35, 0.96),
-	Color(0.94, 0.64, 0.46, 0.96)
-]
-const NOTE_CHASE_THEME_TINTS := [
-	Color(0.90, 0.96, 1.0, 1.0),
-	Color(1.0, 0.90, 0.96, 1.0),
-	Color(0.90, 1.0, 1.0, 1.0),
-	Color(0.94, 0.90, 1.0, 1.0),
-	Color(0.92, 0.88, 1.0, 1.0),
-	Color(0.88, 1.0, 0.90, 1.0),
-	Color(1.0, 0.92, 0.84, 1.0),
-	Color(0.86, 0.97, 0.93, 1.0),
-	Color(0.98, 0.89, 0.83, 1.0),
-	Color(0.90, 0.94, 1.0, 1.0),
-	Color(0.89, 0.98, 0.92, 1.0),
-	Color(0.98, 0.91, 0.90, 1.0),
-	Color(0.91, 0.93, 0.99, 1.0)
-]
+# Note Chase tables live in NoteChaseDifficultyScript (NOTE_COLORS / STAFF_COLORS /
+# THEME_TINTS / BGM_PATH). Keep these aliases so existing call sites compile.
+const NOTE_CHASE_BGM_PATH := NoteChaseDifficultyScript.BGM_PATH
 const SIGHT_NOTE_COLORS := [
 	Color(1.0, 0.47, 0.73, 0.98),
 	Color(0.35, 0.58, 0.98, 0.98),
@@ -2591,7 +2547,7 @@ func _mvp_is_sight_clef_enabled(clef_name: String, mode_name: String = "") -> bo
 
 
 func _mvp_is_note_chase_clef_enabled(clef_mode: String) -> bool:
-	return clef_mode == "Treble"
+	return NoteChaseDifficultyScript.is_clef_enabled(clef_mode)
 
 
 func _show_mvp_locked_hint() -> void:
@@ -18743,17 +18699,11 @@ func _note_chase_apply_speed_stage() -> void:
 
 
 func _note_chase_speed_multiplier() -> float:
-	var stage := mini(_note_chase_speed_stage, 12)
-	var curve := [1.18, 1.62, 1.66, 1.84, 2.02, 2.24, 2.46, 2.68, 2.90, 3.12, 3.34, 3.56, 3.78]
-	var mul := float(curve[stage])
-	if stage >= 5:
-		# Slight extra speed bump from level 6 onward.
-		mul += 0.04 * float(stage - 4)
-	return mul
+	return NoteChaseDifficultyScript.speed_multiplier(_note_chase_speed_stage)
 
 
 func _note_chase_points_per_note() -> int:
-	return 10 + (_note_chase_speed_stage * 2)
+	return NoteChaseDifficultyScript.points_per_note(_note_chase_speed_stage)
 
 
 func _set_note_chase_overlay(text: String, visible: bool) -> void:
@@ -18764,52 +18714,23 @@ func _set_note_chase_overlay(text: String, visible: bool) -> void:
 
 
 func _note_chase_stage_note_color() -> Color:
-	if NOTE_CHASE_NOTE_COLORS.is_empty():
-		return Color(0.99, 0.99, 0.99, 0.97)
-	return NOTE_CHASE_NOTE_COLORS[_note_chase_speed_stage % NOTE_CHASE_NOTE_COLORS.size()]
+	return NoteChaseDifficultyScript.stage_note_color(_note_chase_speed_stage)
 
 
 func _note_chase_target_bias() -> float:
-	var selected_count := maxi(1, _note_chase_selected_notes.size())
-	var base := 0.72
-	if selected_count == 2:
-		base = 0.60
-	elif selected_count >= 3:
-		base = 0.48
-	if _note_chase_boss_active:
-		base += 0.10
-	return clampf(base, 0.35, 0.86)
+	return NoteChaseDifficultyScript.target_bias(_note_chase_selected_notes.size(), _note_chase_boss_active)
 
 
 func _note_chase_decoy_chance() -> float:
-	if _note_chase_speed_stage < 2:
-		return 0.0
-	var c := 0.10 + (0.02 * float(_note_chase_speed_stage - 2))
-	if _note_chase_boss_active:
-		c += 0.08
-	return clampf(c, 0.0, 0.34)
+	return NoteChaseDifficultyScript.decoy_chance(_note_chase_speed_stage, _note_chase_boss_active)
 
 
 func _note_chase_rainbow_chance() -> float:
-	if _note_chase_speed_stage < 3:
-		return 0.0
-	var c := 0.07 + (0.01 * float(_note_chase_speed_stage - 3))
-	# Slightly increase rainbow chance after level 7, then a bit more after level 10.
-	if _note_chase_speed_stage >= 6:
-		c += 0.012
-	if _note_chase_speed_stage >= 9:
-		c += 0.016
-	return clampf(c, 0.0, 0.16)
+	return NoteChaseDifficultyScript.rainbow_chance(_note_chase_speed_stage)
 
 
 func _note_chase_score_multiplier() -> float:
-	var mul := 1.0
-	if _note_chase_fever_active:
-		mul *= 2.0
-	if _note_chase_boss_active:
-		mul *= 2.0
-	mul *= float(maxi(1, _note_chase_combo_mult))
-	return mul
+	return NoteChaseDifficultyScript.score_multiplier(_note_chase_fever_active, _note_chase_boss_active, _note_chase_combo_mult)
 
 
 func _note_chase_refresh_progress_text() -> void:
@@ -18843,7 +18764,7 @@ func _note_chase_start_boss_round() -> void:
 func _note_chase_apply_note_style(panel: Panel, is_target: bool, decoy: bool, rainbow: bool = false) -> void:
 	if panel == null:
 		return
-	var base_color: Color = _note_chase_stage_note_color() if not rainbow else NOTE_CHASE_NOTE_COLORS[_rng.randi_range(0, NOTE_CHASE_NOTE_COLORS.size() - 1)]
+	var base_color: Color = _note_chase_stage_note_color() if not rainbow else NoteChaseDifficultyScript.NOTE_COLORS[_rng.randi_range(0, NoteChaseDifficultyScript.NOTE_COLORS.size() - 1)]
 	var border_color: Color = Color(0.0, 0.0, 0.0, 0.95)
 	if rainbow:
 		border_color = Color(1.0, 0.95, 0.55, 1.0)
@@ -19181,16 +19102,16 @@ func _apply_note_chase_staff_colors() -> void:
 	for i in range(_staff_lines.size()):
 		var line := _staff_lines[i]
 		if line != null:
-			if colorize and not NOTE_CHASE_STAFF_COLORS.is_empty():
-				var c: Color = NOTE_CHASE_STAFF_COLORS[(i + _note_chase_speed_stage) % NOTE_CHASE_STAFF_COLORS.size()]
+			if colorize and not NoteChaseDifficultyScript.STAFF_COLORS.is_empty():
+				var c: Color = NoteChaseDifficultyScript.STAFF_COLORS[(i + _note_chase_speed_stage) % NoteChaseDifficultyScript.STAFF_COLORS.size()]
 				line.color = c
 			else:
 				line.color = Color(1.0, 1.0, 1.0, 0.95)
 		if i < _note_chase_staff_clone_lines.size():
 			var clone := _note_chase_staff_clone_lines[i]
 			if clone != null:
-				if colorize and not NOTE_CHASE_STAFF_COLORS.is_empty():
-					var cc: Color = NOTE_CHASE_STAFF_COLORS[(i + _note_chase_speed_stage) % NOTE_CHASE_STAFF_COLORS.size()]
+				if colorize and not NoteChaseDifficultyScript.STAFF_COLORS.is_empty():
+					var cc: Color = NoteChaseDifficultyScript.STAFF_COLORS[(i + _note_chase_speed_stage) % NoteChaseDifficultyScript.STAFF_COLORS.size()]
 					clone.color = cc
 				else:
 					clone.color = Color(1.0, 1.0, 1.0, 0.95)
@@ -19204,96 +19125,13 @@ func _note_chase_step_for_letter(letter: String) -> int:
 
 
 func _note_chase_step_pool() -> Array[int]:
-	var pool: Array[int] = []
-	var stage := _note_chase_speed_stage # stage 0 == level 1
-	if _selected_clef == "Bass":
-		# Base level (L1): include B3 explicitly.
-		for s in range(-2, 6):
-			if not pool.has(s):
-				pool.append(s)
-		if not pool.has(-1):
-			pool.append(-1) # B3 (must appear at level 1)
-		# Level 1+: include upper bass edge notes D4/E4.
-		if stage >= 0:
-			if not pool.has(-3):
-				pool.append(-3) # D4
-			if not pool.has(-4):
-				pool.append(-4) # E4
-		# Level 6+: add lower ledger notes D2/C2.
-		if stage >= 5:
-			if not pool.has(11):
-				pool.append(11) # D2
-			if not pool.has(12):
-				pool.append(12) # C2
-		# Keep broader range available as difficulty rises.
-		if stage >= 1:
-			for s in range(6, 11):
-				if not pool.has(s):
-					pool.append(s)
-	else:
-		# Base level (L1): include D4 explicitly.
-		for s in range(4, 11):
-			if not pool.has(s):
-				pool.append(s)
-		if not pool.has(9):
-			pool.append(9) # D4 (must appear at level 1)
-		# Level 1+: include lower ledger notes B3/A3.
-		if stage >= 0:
-			if not pool.has(11):
-				pool.append(11) # B3
-			if not pool.has(12):
-				pool.append(12) # A3
-			for s in range(-3, 4):
-				if not pool.has(s):
-					pool.append(s)
-		# Level 6+: add upper ledger notes C6/B6.
-		if stage >= 5:
-			if not pool.has(-4):
-				pool.append(-4) # C6
-	var safe_top := _note_chase_safe_y_top()
-	var safe_bottom := _note_chase_safe_y_bottom()
-	var filtered: Array[int] = []
-	for s in pool:
-		var y := _staff_center_y_for_step(s)
-		if y >= safe_top and y <= safe_bottom:
-			filtered.append(s)
-	# Ensure required milestone notes remain available even near safe-edge areas.
-	var required_steps: Array[int] = []
-	if _selected_clef == "Bass":
-		required_steps.append(-1) # B3 level 1
-		if stage >= 0:
-			required_steps.append(-3) # D4 level 3+
-			required_steps.append(-4) # E4 level 3+
-		if stage >= 5:
-			required_steps.append(11) # D2 level 6+
-			required_steps.append(12) # C2 level 6+
-	else:
-		required_steps.append(9) # D4 level 1
-		if stage >= 0:
-			required_steps.append(11) # B3 level 2+
-			required_steps.append(12) # A3 level 2+
-		if stage >= 5:
-			required_steps.append(-4) # C6 level 6+
-	for rs in required_steps:
-		if pool.has(rs) and not filtered.has(rs):
-			filtered.append(rs)
-	# Absolute clef bounds for Note Chaser:
-	# Treble max high note C6 (step -4), Bass max low note C2 (step 12).
-	var bounded: Array[int] = []
-	for s in filtered:
-		if _selected_clef == "Treble":
-			if s < -4:
-				continue
-		elif _selected_clef == "Bass":
-			if s > 12:
-				continue
-		bounded.append(s)
-	filtered = bounded
-	if not filtered.is_empty():
-		return filtered
-	if pool.is_empty():
-		pool = [4, 5, 6, 7, 8]
-	return pool
+	return NoteChaseDifficultyScript.step_pool(
+		_selected_clef,
+		_note_chase_speed_stage,
+		_note_chase_safe_y_top(),
+		_note_chase_safe_y_bottom(),
+		Callable(self, "_staff_center_y_for_step")
+	)
 
 
 func _note_chase_safe_y_top() -> float:
