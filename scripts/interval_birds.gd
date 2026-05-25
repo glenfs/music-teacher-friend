@@ -94,6 +94,7 @@ const ChordRecognizerScript = preload("res://scripts/music_theory/chord_recogniz
 const AnswerExplanationsScript = preload("res://scripts/music_theory/answer_explanations.gd")
 const HintBanksScript = preload("res://scripts/music_theory/hint_banks.gd")
 const BadgeSystemScript = preload("res://scripts/gamification/badge_system.gd")
+const DailyChallengeScript = preload("res://scripts/gamification/daily_challenge.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -23084,38 +23085,16 @@ func _on_home_focus_drill_start_pressed(mode: int, focus_ids: Array) -> void:
 	_on_mode_button_pressed(mode)
 
 
-# --- SR7 — Daily Challenge ---
+# --- SR7 — Daily Challenge (config in DailyChallengeScript) ---
 
 # Returns today's date as YYYY-MM-DD, used as the per-day persistence key.
 func _today_date_str() -> String:
-	var d := Time.get_date_dict_from_system()
-	return "%04d-%02d-%02d" % [int(d["year"]), int(d["month"]), int(d["day"])]
+	return DailyChallengeScript.today_date_str()
 
 
-# Deterministic challenge configuration for today. Same input → same output
-# regardless of player. Rotates across mode / key signature / question count
-# so each day feels different but is identical for any two players on a
-# given date.
+# Today's deterministic challenge config (mode + key + question count).
 func _compute_daily_challenge_config() -> Dictionary:
-	var date_str: String = _today_date_str()
-	# Simple integer hash from date — sum of digits times year so output spans
-	# day boundaries cleanly. Not cryptographic; just for rotation.
-	var h: int = 0
-	for c in date_str:
-		h = (h * 31 + c.unicode_at(0)) % 1000000007
-	var rotation_modes: Array = ["Notes", "Chords", "Notes"]  # 2/3 chance Notes
-	var rotation_keys: Array[String] = ["C", "1#", "1b", "2#", "2b"]
-	var picked_mode: String = rotation_modes[h % rotation_modes.size()]
-	var picked_key: String = rotation_keys[(h / 3) % rotation_keys.size()]
-	var question_count: int = 10
-	var label: String = "Sight Reading: %s in %s · %d questions" % [picked_mode, picked_key, question_count]
-	return {
-		"date": date_str,
-		"mode": picked_mode,
-		"key_sig": picked_key,
-		"questions": question_count,
-		"label": label,
-	}
+	return DailyChallengeScript.config_for_today()
 
 
 func _refresh_home_daily_challenge_card() -> void:
