@@ -93,6 +93,7 @@ const ChordVoicingGeneratorScript = preload("res://scripts/music_theory/chord_vo
 const ChordRecognizerScript = preload("res://scripts/music_theory/chord_recognizer.gd")
 const AnswerExplanationsScript = preload("res://scripts/music_theory/answer_explanations.gd")
 const HintBanksScript = preload("res://scripts/music_theory/hint_banks.gd")
+const BadgeSystemScript = preload("res://scripts/gamification/badge_system.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -608,17 +609,9 @@ var _home_daily_challenge_card: PanelContainer = null
 var _home_daily_challenge_vbox: VBoxContainer = null
 var _daily_challenge_scores: Dictionary = {}  # date_str → {"best_correct": N, "total": M}
 var _daily_challenge_active_date: String = ""  # non-empty while a daily challenge is running
-# SS5 — Mastery badges. Persisted as Array[String] of earned badge ids.
-# Icons stored as int codepoints — converted to glyphs via char() at render time.
-const BADGE_DEFS: Array[Dictionary] = [
-	{"id": "first_session", "name": "First Steps", "desc": "Complete your first quiz", "icon": 0x2B50},
-	{"id": "perfect_session", "name": "Perfect Run", "desc": "100% accuracy on a session of 5+ questions", "icon": 0x1F3C6},
-	{"id": "streak_10", "name": "On Fire", "desc": "Hit a 10-answer streak", "icon": 0x1F525},
-	{"id": "streak_25", "name": "Legendary Streak", "desc": "Hit a 25-answer streak", "icon": 0x26A1},
-	{"id": "sight_reader_100", "name": "Sight Reader", "desc": "100 correct sight-reading answers (lifetime)", "icon": 0x1F4D6},
-	{"id": "chord_whiz_100", "name": "Chord Whiz", "desc": "100 correct chord answers (lifetime)", "icon": 0x1F3B9},
-	{"id": "daily_3", "name": "Daily Devotee", "desc": "Complete the daily challenge 3 days", "icon": 0x1F4C5},
-]
+# SS5 — Mastery badges. Definitions + predicate evaluation now live in
+# scripts/gamification/badge_system.gd. Persisted state stays here because
+# we own ear_settings.json; the UI card (`_home_badges_card`) too.
 var _earned_badges: Array[String] = []
 var _badge_lifetime_correct_sight: int = 0
 var _badge_lifetime_correct_chord: int = 0
@@ -23225,30 +23218,26 @@ func _record_daily_challenge_score_if_active() -> void:
 		_save_ear_settings()
 
 
-# --- SS5 — Mastery badges ---
+# --- SS5 — Mastery badges (data + predicates in BadgeSystemScript) ---
 
-# Run after each session ends. Checks every predicate against current state
-# and awards any newly-met badges. Shows a celebration toast per new award.
+# Run after each session ends. Updates lifetime counters, then delegates the
+# predicate check to BadgeSystemScript and awards any newly-met badges.
 func _check_and_award_badges(session_total: int, session_correct: int) -> void:
-	var newly_earned: Array[String] = []
-	if not _earned_badges.has("first_session") and session_total > 0:
-		newly_earned.append("first_session")
-	if not _earned_badges.has("perfect_session") and session_total >= 5 and session_correct == session_total:
-		newly_earned.append("perfect_session")
-	if not _earned_badges.has("streak_10") and _session_best_streak >= 10:
-		newly_earned.append("streak_10")
-	if not _earned_badges.has("streak_25") and _session_best_streak >= 25:
-		newly_earned.append("streak_25")
+	# Lifetime counters bumped HERE (not in BadgeSystem) because we need
+	# them persisted to ear_settings.json regardless of badge awards.
 	if _selected_mode == MODE_SIGHT:
 		_badge_lifetime_correct_sight += session_correct
 	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_PITCH_MATCH:
 		_badge_lifetime_correct_chord += session_correct
-	if not _earned_badges.has("sight_reader_100") and _badge_lifetime_correct_sight >= 100:
-		newly_earned.append("sight_reader_100")
-	if not _earned_badges.has("chord_whiz_100") and _badge_lifetime_correct_chord >= 100:
-		newly_earned.append("chord_whiz_100")
-	if not _earned_badges.has("daily_3") and _badge_daily_completed_dates.size() >= 3:
-		newly_earned.append("daily_3")
+	var newly_earned: Array[String] = BadgeSystemScript.check_earned(
+		_earned_badges,
+		session_total,
+		session_correct,
+		_session_best_streak,
+		_badge_lifetime_correct_sight,
+		_badge_lifetime_correct_chord,
+		_badge_daily_completed_dates.size()
+	)
 	if newly_earned.is_empty():
 		_save_ear_settings()
 		return
@@ -23260,11 +23249,7 @@ func _check_and_award_badges(session_total: int, session_correct: int) -> void:
 
 
 func _show_badge_earned_toast(badge_id: String) -> void:
-	var def: Dictionary = {}
-	for d in BADGE_DEFS:
-		if str(d.get("id", "")) == badge_id:
-			def = d
-			break
+	var def: Dictionary = BadgeSystemScript.find_def(badge_id)
 	if def.is_empty():
 		return
 	var text := "%s  Badge unlocked: %s" % [char(int(def.get("icon", 0x2B50))), str(def.get("name", badge_id))]
@@ -23285,7 +23270,7 @@ func _refresh_home_badges_card() -> void:
 	for child in _home_badges_vbox.get_children():
 		child.queue_free()
 	var header := Label.new()
-	header.text = "%s  Badges (%d/%d)" % [char(0x1F396), _earned_badges.size(), BADGE_DEFS.size()]
+	header.text = "%s  Badges (%d/%d)" % [char(0x1F396), _earned_badges.size(), BadgeSystemScript.DEFS.size()]
 	header.add_theme_font_size_override("font_size", 15)
 	header.add_theme_color_override("font_color", Color(0.96, 0.86, 0.42, 1.0))
 	_home_badges_vbox.add_child(header)
@@ -23293,7 +23278,7 @@ func _refresh_home_badges_card() -> void:
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 6)
 	_home_badges_vbox.add_child(grid)
-	for def in BADGE_DEFS:
+	for def in BadgeSystemScript.DEFS:
 		var bid: String = str(def.get("id", ""))
 		var earned: bool = _earned_badges.has(bid)
 		var chip := PanelContainer.new()
