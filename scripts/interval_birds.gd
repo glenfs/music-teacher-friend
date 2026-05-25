@@ -104,6 +104,7 @@ const PianoKeyStylesScript = preload("res://scripts/ui/piano_key_styles.gd")
 const ChordExplorerPanelScript = preload("res://scripts/ui/chord_explorer_panel.gd")
 const PracticeDrillsPanelScript = preload("res://scripts/ui/practice_drills_panel.gd")
 const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_dialog.gd")
+const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -735,10 +736,7 @@ var _midi_toggle_button: CheckButton = null
 var _midi_any_octave_button: CheckButton = null
 var _midi_status_label: Label = null
 var _midi_piano_viz: Control = null
-var _midi_piano_viz_keys: Dictionary = {}
-var _midi_piano_viz_lit_until: Dictionary = {}
-var _midi_piano_viz_pressed_at: Dictionary = {}
-var _midi_piano_viz_feedback_roles: Dictionary = {}
+# Keys + lit/pressed/feedback state now live inside the MidiPianoViz panel.
 var _midi_button_pop_tweens: Dictionary = {}
 var _midi_chord_buffer: Array[int] = []
 var _midi_chord_window_start: float = -1.0
@@ -21678,185 +21676,41 @@ func _midi_pitch_to_note_name(pitch: int) -> String:
 	return sharps[pc]
 
 
-const MIDI_PIANO_VIZ_LOW := 48   # C3
-const MIDI_PIANO_VIZ_HIGH := 83  # B5
-const MIDI_PIANO_VIZ_WHITE_W := 30.0
-const MIDI_PIANO_VIZ_WHITE_H := 92.0
-const MIDI_PIANO_VIZ_BLACK_W := 19.0
-const MIDI_PIANO_VIZ_BLACK_H := 58.0
-const MIDI_PIANO_VIZ_FRAME_PAD := 10.0
-const MIDI_PIANO_VIZ_BOTTOM_MARGIN := 14.0
-const MIDI_PIANO_VIZ_MAX_HOLD_SEC := 1.2  # auto-release if no note-off arrives
 
 
-func _midi_pitch_is_black(pitch: int) -> bool:
-	var pc := ((pitch % 12) + 12) % 12
-	return pc in [1, 3, 6, 8, 10]
-
-
-func _midi_pitch_white_index_within_octave(pitch: int) -> int:
-	# Returns 0..6 for C,D,E,F,G,A,B; -1 for black keys.
-	var pc := ((pitch % 12) + 12) % 12
-	match pc:
-		0: return 0
-		2: return 1
-		4: return 2
-		5: return 3
-		7: return 4
-		9: return 5
-		11: return 6
-		_: return -1
+# --- MIDI piano viz (delegates to MidiPianoViz panel) ---
 
 
 func _build_midi_piano_viz() -> void:
-	_midi_piano_viz = Control.new()
-	_midi_piano_viz.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_midi_piano_viz.visible = false
-	_midi_piano_viz.z_as_relative = false
-	_midi_piano_viz.z_index = 270
+	_midi_piano_viz = MidiPianoVizScript.new()
 	add_child(_midi_piano_viz)
-
-	var num_octaves := int((MIDI_PIANO_VIZ_HIGH - MIDI_PIANO_VIZ_LOW + 1) / 12)
-	var total_whites := num_octaves * 7
-	var keys_w := total_whites * MIDI_PIANO_VIZ_WHITE_W
-	var keys_h := MIDI_PIANO_VIZ_WHITE_H
-	var frame_w := keys_w + MIDI_PIANO_VIZ_FRAME_PAD * 2.0
-	var frame_h := keys_h + MIDI_PIANO_VIZ_FRAME_PAD * 2.0 + 6.0  # extra for top reveal strip
-
-	# Anchor bottom-center, sitting at the very bottom with a small margin so it stays clear of the staff/question area.
-	_midi_piano_viz.anchor_left = 0.5
-	_midi_piano_viz.anchor_right = 0.5
-	_midi_piano_viz.anchor_top = 1.0
-	_midi_piano_viz.anchor_bottom = 1.0
-	_midi_piano_viz.offset_left = -frame_w * 0.5
-	_midi_piano_viz.offset_right = frame_w * 0.5
-	_midi_piano_viz.offset_top = -frame_h - MIDI_PIANO_VIZ_BOTTOM_MARGIN
-	_midi_piano_viz.offset_bottom = -MIDI_PIANO_VIZ_BOTTOM_MARGIN
-	_midi_piano_viz.custom_minimum_size = Vector2(frame_w, frame_h)
-
-	# Wood-grain style frame around the keys.
-	var frame_panel := Panel.new()
-	frame_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = Color(0.12, 0.10, 0.09, 0.96)
-	frame_style.border_width_left = 2
-	frame_style.border_width_right = 2
-	frame_style.border_width_top = 2
-	frame_style.border_width_bottom = 2
-	frame_style.border_color = Color(0.32, 0.22, 0.16, 1.0)
-	frame_style.corner_radius_top_left = 10
-	frame_style.corner_radius_top_right = 10
-	frame_style.corner_radius_bottom_left = 10
-	frame_style.corner_radius_bottom_right = 10
-	frame_style.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
-	frame_style.shadow_size = 8
-	frame_style.shadow_offset = Vector2(0, 4)
-	frame_panel.add_theme_stylebox_override("panel", frame_style)
-	frame_panel.position = Vector2.ZERO
-	frame_panel.size = Vector2(frame_w, frame_h)
-	_midi_piano_viz.add_child(frame_panel)
-
-	# Felt strip just above the keys (the red felt of a real piano).
-	var felt := Panel.new()
-	felt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var felt_style := StyleBoxFlat.new()
-	felt_style.bg_color = Color(0.55, 0.10, 0.12, 1.0)
-	felt_style.border_width_top = 0
-	felt_style.border_width_bottom = 0
-	felt.add_theme_stylebox_override("panel", felt_style)
-	felt.position = Vector2(MIDI_PIANO_VIZ_FRAME_PAD, MIDI_PIANO_VIZ_FRAME_PAD)
-	felt.size = Vector2(keys_w, 4)
-	_midi_piano_viz.add_child(felt)
-
-	# Container that holds the actual keys, positioned inside the frame.
-	var keys_root := Control.new()
-	keys_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	keys_root.position = Vector2(MIDI_PIANO_VIZ_FRAME_PAD, MIDI_PIANO_VIZ_FRAME_PAD + 6)
-	keys_root.size = Vector2(keys_w, keys_h)
-	_midi_piano_viz.add_child(keys_root)
-
-	var white_style := StyleBoxFlat.new()
-	white_style.bg_color = Color(0.985, 0.985, 0.975, 1.0)
-	white_style.border_width_left = 1
-	white_style.border_width_right = 1
-	white_style.border_width_top = 0
-	white_style.border_width_bottom = 2
-	white_style.border_color = Color(0.62, 0.60, 0.58, 1.0)
-	white_style.corner_radius_bottom_left = 5
-	white_style.corner_radius_bottom_right = 5
-	white_style.shadow_color = Color(0.0, 0.0, 0.0, 0.18)
-	white_style.shadow_size = 2
-	white_style.shadow_offset = Vector2(0, 2)
-
-	var black_style := StyleBoxFlat.new()
-	black_style.bg_color = Color(0.08, 0.09, 0.11, 1.0)
-	black_style.border_width_left = 1
-	black_style.border_width_right = 1
-	black_style.border_width_top = 1
-	black_style.border_width_bottom = 3
-	black_style.border_color = Color(0.02, 0.02, 0.04, 1.0)
-	black_style.corner_radius_bottom_left = 4
-	black_style.corner_radius_bottom_right = 4
-	black_style.shadow_color = Color(0.0, 0.0, 0.0, 0.45)
-	black_style.shadow_size = 3
-	black_style.shadow_offset = Vector2(0, 2)
-
-	var white_x := 0.0
-	var white_positions: Dictionary = {}
-	for pitch in range(MIDI_PIANO_VIZ_LOW, MIDI_PIANO_VIZ_HIGH + 1):
-		if _midi_pitch_is_black(pitch):
-			continue
-		var w_key := Panel.new()
-		w_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		w_key.add_theme_stylebox_override("panel", white_style)
-		w_key.position = Vector2(white_x, 0)
-		w_key.size = Vector2(MIDI_PIANO_VIZ_WHITE_W, MIDI_PIANO_VIZ_WHITE_H)
-		w_key.set_meta("base_pos", w_key.position)
-		w_key.set_meta("is_black", false)
-		keys_root.add_child(w_key)
-		_midi_piano_viz_keys[pitch] = w_key
-		white_positions[pitch] = white_x
-		var pc := ((pitch % 12) + 12) % 12
-		if pc == 0:
-			var lbl := Label.new()
-			lbl.text = "C%d" % int(pitch / 12 - 1)
-			lbl.add_theme_font_size_override("font_size", 11)
-			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.38, 0.92))
-			lbl.position = Vector2(3, MIDI_PIANO_VIZ_WHITE_H - 18)
-			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			w_key.add_child(lbl)
-		white_x += MIDI_PIANO_VIZ_WHITE_W
-
-	for pitch in range(MIDI_PIANO_VIZ_LOW, MIDI_PIANO_VIZ_HIGH + 1):
-		if not _midi_pitch_is_black(pitch):
-			continue
-		var prev_white := pitch - 1
-		if not white_positions.has(prev_white):
-			continue
-		var b_key := Panel.new()
-		b_key.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b_key.add_theme_stylebox_override("panel", black_style)
-		var bx: float = float(white_positions[prev_white]) + MIDI_PIANO_VIZ_WHITE_W - MIDI_PIANO_VIZ_BLACK_W * 0.5
-		b_key.position = Vector2(bx, 0)
-		b_key.size = Vector2(MIDI_PIANO_VIZ_BLACK_W, MIDI_PIANO_VIZ_BLACK_H)
-		b_key.set_meta("base_pos", b_key.position)
-		b_key.set_meta("is_black", true)
-		keys_root.add_child(b_key)
-		_midi_piano_viz_keys[pitch] = b_key
+	_midi_piano_viz.setup(Callable(self, "_midi_piano_viz_apply_role_style"))
 
 
-func _midi_piano_viz_lit_color(pitch: int) -> Color:
-	if _midi_pitch_is_black(pitch):
-		return Color(0.32, 0.78, 1.0, 1.0)
-	return Color(0.55, 0.88, 1.0, 1.0)
+func _midi_piano_viz_light(pitch: int, on: bool) -> void:
+	if _midi_piano_viz != null:
+		_midi_piano_viz.light(pitch, on)
 
 
-func _midi_piano_viz_apply_press_offset(panel: Panel, pressed: bool) -> void:
-	var base: Vector2 = panel.get_meta("base_pos", panel.position)
-	if pressed:
-		panel.position = base + Vector2(0, 2)
-	else:
-		panel.position = base
+func _midi_piano_viz_tick(delta: float) -> void:
+	if _midi_piano_viz != null:
+		_midi_piano_viz.tick(delta)
+
+
+func _midi_piano_viz_clear_all() -> void:
+	if _midi_piano_viz != null:
+		_midi_piano_viz.clear_all()
+
+
+# Compatibility wrapper for external apply_feedback_style callers.
+func _midi_piano_viz_apply_feedback_style(pitch: int) -> void:
+	if _midi_piano_viz == null:
+		return
+	var panel: Panel = _midi_piano_viz.get_keys().get(pitch, null) as Panel
+	if panel == null:
+		return
+	var role: String = _midi_piano_viz.get_feedback_role(pitch)
+	_midi_piano_viz_apply_role_style(pitch, panel, role, bool(panel.get_meta("is_black", false)))
 
 
 # ============================================================================
@@ -24257,15 +24111,14 @@ func _visible_sight_big_piano_pitch_for_note_name(note_name: String, anchor_pitc
 func _visible_midi_piano_viz_pitch_for_midi(midi_note: int) -> int:
 	if midi_note < 0:
 		return -1
-	return _visible_pitch_for_midi(midi_note, MIDI_PIANO_VIZ_LOW, MIDI_PIANO_VIZ_HIGH)
+	return _visible_pitch_for_midi(midi_note, MidiPianoVizScript.LOW, MidiPianoVizScript.HIGH)
 
 
-func _midi_piano_viz_apply_feedback_style(pitch: int) -> void:
-	var panel: Panel = _midi_piano_viz_keys.get(pitch, null) as Panel
-	if panel == null:
-		return
-	var role := str(_midi_piano_viz_feedback_roles.get(pitch, ""))
-	var is_black := bool(panel.get_meta("is_black", false))
+# Role-to-style applier injected into MidiPianoViz. Called for every key
+# during clear_all/tick/set_feedback_role. Role names ("root", "tone",
+# "correct", "wrong", "") map to colors via _sight_keyboard_feedback_color
+# (shared with the Sight Reader's big piano).
+func _midi_piano_viz_apply_role_style(_pitch: int, panel: Panel, role: String, is_black: bool) -> void:
 	var sb := StyleBoxFlat.new()
 	if is_black:
 		if role.is_empty():
@@ -24346,17 +24199,8 @@ func _clear_sight_answer_keyboard_feedback() -> void:
 		btn.modulate = Color.WHITE
 		_sight_big_piano_apply_feedback_style(pitch)
 
-	_midi_piano_viz_feedback_roles.clear()
-	_midi_piano_viz_lit_until.clear()
-	_midi_piano_viz_pressed_at.clear()
-	for midi_key in _midi_piano_viz_keys.keys():
-		var midi_pitch := int(midi_key)
-		var panel: Panel = _midi_piano_viz_keys[midi_key] as Panel
-		if panel == null:
-			continue
-		panel.modulate = Color.WHITE
-		_midi_piano_viz_apply_feedback_style(midi_pitch)
-		_midi_piano_viz_apply_press_offset(panel, false)
+	if _midi_piano_viz != null:
+		_midi_piano_viz.clear_all()
 	_refresh_sight_chord_feedback_keyboard_visibility()
 
 
@@ -24417,7 +24261,7 @@ func _current_sight_chord_feedback_midis() -> Array[int]:
 			continue
 		var acc := int(tone_accs[i]) if i < tone_accs.size() else 0
 		var pc := posmod(_note_letter_pitch_class(letter.substr(0, 1), acc), 12)
-		var pitch := _nearest_visible_pitch_for_pc(pc, anchor, MIDI_PIANO_VIZ_LOW, MIDI_PIANO_VIZ_HIGH)
+		var pitch := _nearest_visible_pitch_for_pc(pc, anchor, MidiPianoVizScript.LOW, MidiPianoVizScript.HIGH)
 		if pitch >= 0 and not out.has(pitch):
 			out.append(pitch)
 			anchor = pitch + 2
@@ -24434,73 +24278,10 @@ func _show_sight_chord_keyboard_feedback() -> void:
 		var pitch := _visible_midi_piano_viz_pitch_for_midi(int(midi_note))
 		if pitch < 0:
 			continue
-		var role := "root" if root_pc >= 0 and posmod(pitch, 12) == root_pc else "tone"
-		_midi_piano_viz_feedback_roles[pitch] = role
-		_midi_piano_viz_apply_feedback_style(pitch)
+		var role: String = "root" if root_pc >= 0 and posmod(pitch, 12) == root_pc else "tone"
+		if _midi_piano_viz != null:
+			_midi_piano_viz.set_feedback_role(pitch, role)
 	_refresh_sight_chord_feedback_keyboard_visibility()
-
-
-func _midi_piano_viz_light(pitch: int, on: bool) -> void:
-	if _midi_piano_viz == null:
-		return
-	var panel: Panel = _midi_piano_viz_keys.get(pitch, null) as Panel
-	if panel == null:
-		return
-	var now := float(Time.get_ticks_msec()) / 1000.0
-	if on:
-		panel.modulate = _midi_piano_viz_lit_color(pitch)
-		_midi_piano_viz_apply_press_offset(panel, true)
-		_midi_piano_viz_lit_until[pitch] = -1.0  # held until note-off or auto-release
-		_midi_piano_viz_pressed_at[pitch] = now
-	else:
-		_midi_piano_viz_lit_until[pitch] = now + 0.35
-		_midi_piano_viz_pressed_at.erase(pitch)
-
-
-func _midi_piano_viz_tick(_delta: float) -> void:
-	if _midi_piano_viz == null or _midi_piano_viz_lit_until.is_empty():
-		return
-	var now := float(Time.get_ticks_msec()) / 1000.0
-	var to_clear: Array[int] = []
-	for pitch_key in _midi_piano_viz_lit_until.keys():
-		var pitch := int(pitch_key)
-		var until: float = float(_midi_piano_viz_lit_until[pitch])
-		var panel: Panel = _midi_piano_viz_keys.get(pitch, null) as Panel
-		if panel == null:
-			to_clear.append(pitch)
-			continue
-		if until < 0.0:
-			# Held — force release if note-off never arrived.
-			var pressed_at: float = float(_midi_piano_viz_pressed_at.get(pitch, now))
-			if now - pressed_at >= MIDI_PIANO_VIZ_MAX_HOLD_SEC:
-				_midi_piano_viz_lit_until[pitch] = now + 0.35
-				_midi_piano_viz_pressed_at.erase(pitch)
-			continue
-		if now >= until:
-			panel.modulate = Color.WHITE
-			_midi_piano_viz_apply_feedback_style(pitch)
-			_midi_piano_viz_apply_press_offset(panel, false)
-			to_clear.append(pitch)
-		else:
-			var t := clampf((until - now) / 0.35, 0.0, 1.0)
-			panel.modulate = Color.WHITE.lerp(_midi_piano_viz_lit_color(pitch), t)
-			_midi_piano_viz_apply_press_offset(panel, t > 0.5)
-	for p in to_clear:
-		_midi_piano_viz_lit_until.erase(p)
-
-
-func _midi_piano_viz_clear_all() -> void:
-	if _midi_piano_viz == null:
-		return
-	_midi_piano_viz_feedback_roles.clear()
-	for k in _midi_piano_viz_keys.keys():
-		var panel: Panel = _midi_piano_viz_keys[k] as Panel
-		if panel != null:
-			panel.modulate = Color.WHITE
-			_midi_piano_viz_apply_feedback_style(int(k))
-			_midi_piano_viz_apply_press_offset(panel, false)
-	_midi_piano_viz_lit_until.clear()
-	_midi_piano_viz_pressed_at.clear()
 
 
 # ============================================================================
