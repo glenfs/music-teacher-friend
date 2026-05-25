@@ -101,6 +101,7 @@ const LessonSummaryHtmlScript = preload("res://scripts/students/lesson_summary_h
 const LearningStepFactoryScript = preload("res://scripts/learning/learning_step_factory.gd")
 const ChordExplorerTheoryScript = preload("res://scripts/music_theory/chord_explorer_theory.gd")
 const PianoKeyStylesScript = preload("res://scripts/ui/piano_key_styles.gd")
+const ChordExplorerPanelScript = preload("res://scripts/ui/chord_explorer_panel.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -653,48 +654,9 @@ var _learning_mode_card_button: Button = null
 var _learning_map: Control
 var _learning_lesson_player: Control
 
-# --- Chord Explorer mode ---
-var _chord_explorer_panel: Control = null
+# --- Chord Explorer mode (panel owns widgets + recent-notes state internally) ---
+var _chord_explorer_panel: PanelContainer = null  # actually ChordExplorerPanel
 var _chord_explorer_active: bool = false
-# Arpeggio window model: every recent note-on lives here until the window expires.
-# Re-pressing a pitch refreshes its timestamp; the next note-on after expiry wipes the set.
-var _chord_explorer_recent_notes: Dictionary = {}  # pitch (int) -> last note-on time (float)
-var _chord_explorer_window_expires_at: float = -1.0
-var _chord_explorer_key_pc: int = 0  # 0=C
-var _chord_explorer_key_is_minor: bool = false
-var _chord_explorer_chord_name_label: Label = null
-var _chord_explorer_full_name_label: Label = null
-var _chord_explorer_intervals_label: Label = null
-var _chord_explorer_roman_label: Label = null
-var _chord_explorer_diatonic_label: Label = null
-var _chord_explorer_inversion_label: Label = null
-var _chord_explorer_staff_area: Control = null
-var _chord_explorer_key_option: OptionButton = null
-var _chord_explorer_minor_check: CheckButton = null
-var _chord_explorer_back_button: Button = null
-var _chord_explorer_clear_button: Button = null
-var _chord_explorer_play_button: Button = null
-var _chord_explorer_help_label: Label = null
-var _chord_explorer_window_bar: ProgressBar = null
-var _chord_explorer_note_nodes: Array[Control] = []
-var _chord_explorer_last_info: Dictionary = {}
-var _chord_explorer_keyboard: Control = null
-var _chord_explorer_keyboard_keys: Dictionary = {}  # pitch -> Button
-const CHORD_EXPLORER_ARPEGGIO_WINDOW_SEC := 1.5  # MIDI: how long a recent note-on stays in the chord
-const CHORD_EXPLORER_CLICK_WINDOW_SEC := 12.0  # Click: much longer so users can build chords at their own pace
-const CHORD_EXPLORER_KEYBOARD_LOW := 36   # C2
-const CHORD_EXPLORER_KEYBOARD_HIGH := 84  # C6
-const CHORD_EXPLORER_WHITE_W := 40.0
-const CHORD_EXPLORER_WHITE_H := 196.0
-const CHORD_EXPLORER_BLACK_W := 26.0
-const CHORD_EXPLORER_BLACK_H := 124.0
-# Function colors used on staff and on the interactive piano.
-const CHORD_FN_ROOT  := Color(1.00, 0.78, 0.22, 1.0)  # gold
-const CHORD_FN_THIRD := Color(0.36, 0.78, 1.00, 1.0)  # cyan
-const CHORD_FN_FIFTH := Color(0.40, 0.92, 0.55, 1.0)  # green
-const CHORD_FN_SEVENTH := Color(0.95, 0.50, 0.85, 1.0) # magenta
-const CHORD_FN_EXTENSION := Color(0.78, 0.74, 1.00, 1.0) # lavender (9/11/13)
-const CHORD_FN_OTHER := Color(0.86, 0.86, 0.94, 1.0)  # silver
 
 # --- Practice Drills (technical exercises) ---
 var _practice_drills_panel: Control = null
@@ -24863,535 +24825,94 @@ func _midi_piano_viz_clear_all() -> void:
 # Chord Explorer
 # ============================================================================
 
-const CHORD_EXPLORER_KEY_OPTIONS := [
-	["C", 0], ["G", 7], ["D", 2], ["A", 9], ["E", 4], ["B", 11], ["F#", 6],
-	["F", 5], ["Bb", 10], ["Eb", 3], ["Ab", 8], ["Db", 1], ["Gb", 6],
-]
 
 
 func _build_chord_explorer_panel() -> void:
-	_chord_explorer_panel = PanelContainer.new()
-	_chord_explorer_panel.set_anchors_preset(PRESET_FULL_RECT)
-	_chord_explorer_panel.visible = false
-	_chord_explorer_panel.z_as_relative = false
-	_chord_explorer_panel.z_index = 200
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.06, 0.11, 0.19, 1.0)
-	_chord_explorer_panel.add_theme_stylebox_override("panel", panel_style)
+	_chord_explorer_panel = ChordExplorerPanelScript.new()
 	add_child(_chord_explorer_panel)
-
-	var root_vbox := VBoxContainer.new()
-	root_vbox.add_theme_constant_override("separation", 18)
-	var root_margin := MarginContainer.new()
-	root_margin.add_theme_constant_override("margin_left", 22)
-	root_margin.add_theme_constant_override("margin_right", 22)
-	root_margin.add_theme_constant_override("margin_top", 22)
-	root_margin.add_theme_constant_override("margin_bottom", 18)
-	_chord_explorer_panel.add_child(root_margin)
-	root_margin.add_child(root_vbox)
-
-	# Top bar: Back | Title | Key selector
-	var top_bar := HBoxContainer.new()
-	top_bar.add_theme_constant_override("separation", 16)
-	root_vbox.add_child(top_bar)
-
-	_chord_explorer_back_button = Button.new()
-	_chord_explorer_back_button.text = "← Home"
-	_chord_explorer_back_button.custom_minimum_size = Vector2(120, 42)
-	if _ui_title_font != null:
-		_chord_explorer_back_button.add_theme_font_override("font", _ui_title_font)
-	_chord_explorer_back_button.add_theme_font_size_override("font_size", 16)
-	_chord_explorer_back_button.pressed.connect(_on_chord_explorer_close)
-	top_bar.add_child(_chord_explorer_back_button)
-
-	var title_label := Label.new()
-	title_label.text = "Chord Explorer"
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	if _ui_title_font != null:
-		title_label.add_theme_font_override("font", _ui_title_font)
-	title_label.add_theme_font_size_override("font_size", 28)
-	title_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
-	top_bar.add_child(title_label)
-
-	var key_row := HBoxContainer.new()
-	key_row.add_theme_constant_override("separation", 8)
-	top_bar.add_child(key_row)
-
-	var key_label := Label.new()
-	key_label.text = "Key:"
-	if _ui_font != null:
-		key_label.add_theme_font_override("font", _ui_font)
-	key_label.add_theme_font_size_override("font_size", 16)
-	key_label.add_theme_color_override("font_color", Color(0.72, 0.84, 0.96, 0.92))
-	key_row.add_child(key_label)
-
-	_chord_explorer_key_option = OptionButton.new()
-	_chord_explorer_key_option.custom_minimum_size = Vector2(96, 38)
-	for opt in CHORD_EXPLORER_KEY_OPTIONS:
-		_chord_explorer_key_option.add_item(str(opt[0]))
-	_chord_explorer_key_option.selected = 0
-	_chord_explorer_key_option.item_selected.connect(_on_chord_explorer_key_changed)
-	key_row.add_child(_chord_explorer_key_option)
-
-	_chord_explorer_minor_check = CheckButton.new()
-	_chord_explorer_minor_check.text = "Minor"
-	_chord_explorer_minor_check.toggled.connect(_on_chord_explorer_minor_toggled)
-	key_row.add_child(_chord_explorer_minor_check)
-	# Music Notation Font picker — global setting, surfaced here next to the key controls.
-	_build_score_font_picker(key_row)
-	# Clear button now lives next to the keyboard for quicker access — see _build_chord_explorer_keyboard.
-
-	var chord_body_scroll := ScrollContainer.new()
-	chord_body_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	chord_body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	chord_body_scroll.follow_focus = false
-	root_vbox.add_child(chord_body_scroll)
-
-	var chord_body := VBoxContainer.new()
-	chord_body.add_theme_constant_override("separation", 18)
-	chord_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	chord_body.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	chord_body_scroll.add_child(chord_body)
-
-	# Staff area (centered)
-	var staff_wrap := PanelContainer.new()
-	staff_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	staff_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	var staff_wrap_style := StyleBoxFlat.new()
-	staff_wrap_style.bg_color = Color(0.99, 0.98, 0.95, 0.96)
-	staff_wrap_style.corner_radius_top_left = 14
-	staff_wrap_style.corner_radius_top_right = 14
-	staff_wrap_style.corner_radius_bottom_left = 14
-	staff_wrap_style.corner_radius_bottom_right = 14
-	staff_wrap_style.shadow_color = Color(0.0, 0.0, 0.0, 0.32)
-	staff_wrap_style.shadow_size = 8
-	staff_wrap.add_theme_stylebox_override("panel", staff_wrap_style)
-	chord_body.add_child(staff_wrap)
-
-	_chord_explorer_staff_area = StaffRendererScript.new()
-	_chord_explorer_staff_area.custom_minimum_size = Vector2(720, 240)
-	_chord_explorer_staff_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_chord_explorer_staff_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_chord_explorer_staff_area.set("draw_paper", true)
-	_chord_explorer_staff_area.set("cluster_mode", true)
-	_chord_explorer_staff_area.set("inter_staff_gap_spaces", 5.0)
-	staff_wrap.add_child(_chord_explorer_staff_area)
-
-	# Chord display (the main visual reward) — wrapped in an HBox so it stays centered and capped in width.
-	var name_wrap := HBoxContainer.new()
-	name_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
-	name_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	chord_body.add_child(name_wrap)
-	var name_panel := PanelContainer.new()
-	name_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	name_panel.custom_minimum_size = Vector2(560, 0)
-	var name_panel_style := StyleBoxFlat.new()
-	name_panel_style.bg_color = Color(0.10, 0.16, 0.26, 0.96)
-	name_panel_style.border_color = MENU_PRIMARY_ACCENT
-	name_panel_style.border_width_left = 2
-	name_panel_style.border_width_right = 2
-	name_panel_style.border_width_top = 2
-	name_panel_style.border_width_bottom = 2
-	name_panel_style.corner_radius_top_left = 12
-	name_panel_style.corner_radius_top_right = 12
-	name_panel_style.corner_radius_bottom_left = 12
-	name_panel_style.corner_radius_bottom_right = 12
-	name_panel.add_theme_stylebox_override("panel", name_panel_style)
-	name_wrap.add_child(name_panel)
-
-	var name_inner := VBoxContainer.new()
-	name_inner.alignment = BoxContainer.ALIGNMENT_CENTER
-	name_inner.add_theme_constant_override("separation", 4)
-	var name_margin := MarginContainer.new()
-	name_margin.add_theme_constant_override("margin_left", 18)
-	name_margin.add_theme_constant_override("margin_right", 18)
-	name_margin.add_theme_constant_override("margin_top", 14)
-	name_margin.add_theme_constant_override("margin_bottom", 14)
-	name_panel.add_child(name_margin)
-	name_margin.add_child(name_inner)
-
-	_chord_explorer_window_bar = ProgressBar.new()
-	_chord_explorer_window_bar.show_percentage = false
-	_chord_explorer_window_bar.min_value = 0.0
-	_chord_explorer_window_bar.max_value = 1.0
-	_chord_explorer_window_bar.value = 0.0
-	_chord_explorer_window_bar.custom_minimum_size = Vector2(180, 4)
-	_chord_explorer_window_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_chord_explorer_window_bar.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	var bar_bg := StyleBoxFlat.new()
-	bar_bg.bg_color = Color(1.0, 1.0, 1.0, 0.10)
-	bar_bg.corner_radius_top_left = 2
-	bar_bg.corner_radius_top_right = 2
-	bar_bg.corner_radius_bottom_left = 2
-	bar_bg.corner_radius_bottom_right = 2
-	var bar_fg := StyleBoxFlat.new()
-	bar_fg.bg_color = MENU_PRIMARY_ACCENT
-	bar_fg.corner_radius_top_left = 2
-	bar_fg.corner_radius_top_right = 2
-	bar_fg.corner_radius_bottom_left = 2
-	bar_fg.corner_radius_bottom_right = 2
-	_chord_explorer_window_bar.add_theme_stylebox_override("background", bar_bg)
-	_chord_explorer_window_bar.add_theme_stylebox_override("fill", bar_fg)
-	name_inner.add_child(_chord_explorer_window_bar)
-
-	var name_head := HBoxContainer.new()
-	name_head.alignment = BoxContainer.ALIGNMENT_CENTER
-	name_head.add_theme_constant_override("separation", 16)
-	name_inner.add_child(name_head)
-
-	_chord_explorer_chord_name_label = Label.new()
-	_chord_explorer_chord_name_label.text = "Play a chord..."
-	_chord_explorer_chord_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_chord_explorer_chord_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_chord_explorer_chord_name_label.clip_text = true
-	if _ui_title_font != null:
-		_chord_explorer_chord_name_label.add_theme_font_override("font", _ui_title_font)
-	_chord_explorer_chord_name_label.add_theme_font_size_override("font_size", 44)
-	_chord_explorer_chord_name_label.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
-	name_head.add_child(_chord_explorer_chord_name_label)
-
-	# Sub-info chips now share the title row instead of stacking below it.
-	var info_row := HBoxContainer.new()
-	info_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	info_row.add_theme_constant_override("separation", 12)
-	info_row.size_flags_horizontal = Control.SIZE_SHRINK_END
-	name_head.add_child(info_row)
-
-	_chord_explorer_roman_label = _build_chord_explorer_chip(info_row, "—", Color(0.62, 0.86, 0.96, 1.0))
-	_chord_explorer_inversion_label = _build_chord_explorer_chip(info_row, "", Color(0.96, 0.78, 0.42, 1.0))
-	_chord_explorer_diatonic_label = _build_chord_explorer_chip(info_row, "", Color(0.45, 0.92, 0.62, 1.0))
-	_chord_explorer_intervals_label = _build_chord_explorer_chip(info_row, "", Color(0.84, 0.84, 0.92, 1.0))
-
-	_chord_explorer_full_name_label = Label.new()
-	_chord_explorer_full_name_label.text = ""
-	_chord_explorer_full_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if _ui_font != null:
-		_chord_explorer_full_name_label.add_theme_font_override("font", _ui_font)
-	_chord_explorer_full_name_label.add_theme_font_size_override("font_size", 18)
-	_chord_explorer_full_name_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
-	name_inner.add_child(_chord_explorer_full_name_label)
-
-	_build_chord_explorer_keyboard(chord_body)
-
-
-func _build_chord_explorer_chip(parent: Control, initial_text: String, accent: Color) -> Label:
-	var chip_panel := PanelContainer.new()
-	var chip_style := StyleBoxFlat.new()
-	chip_style.bg_color = Color(accent.r, accent.g, accent.b, 0.16)
-	chip_style.border_color = Color(accent.r, accent.g, accent.b, 0.65)
-	chip_style.border_width_left = 1
-	chip_style.border_width_right = 1
-	chip_style.border_width_top = 1
-	chip_style.border_width_bottom = 1
-	chip_style.corner_radius_top_left = 8
-	chip_style.corner_radius_top_right = 8
-	chip_style.corner_radius_bottom_left = 8
-	chip_style.corner_radius_bottom_right = 8
-	chip_style.content_margin_left = 10
-	chip_style.content_margin_right = 10
-	chip_style.content_margin_top = 4
-	chip_style.content_margin_bottom = 4
-	chip_panel.add_theme_stylebox_override("panel", chip_style)
-	parent.add_child(chip_panel)
-	var lbl := Label.new()
-	lbl.text = initial_text
-	if _ui_font != null:
-		lbl.add_theme_font_override("font", _ui_font)
-	lbl.add_theme_font_size_override("font_size", 14)
-	lbl.add_theme_color_override("font_color", accent)
-	chip_panel.add_child(lbl)
-	chip_panel.set_meta("chip_label", lbl)
-	chip_panel.visible = not initial_text.is_empty()
-	return lbl
+	_chord_explorer_panel.setup(
+		_ui_font,
+		_ui_title_font,
+		Callable(self, "_play_note"),
+		Callable(self, "_sample_map_for_current_mode"),
+		Callable(self, "_nearest_sample_midi_from_map"),
+		Callable(self, "_build_score_font_picker")
+	)
+	_chord_explorer_panel.closed.connect(_on_chord_explorer_panel_closed)
+	_chord_explorer_panel.chord_cleared.connect(_on_chord_explorer_panel_chord_cleared)
+	_chord_explorer_panel.note_pressed_via_keyboard.connect(_on_chord_explorer_panel_keyboard_note)
 
 
 func _on_chord_explorer_open() -> void:
 	if _chord_explorer_panel == null:
 		return
 	_chord_explorer_active = true
-	_chord_explorer_recent_notes.clear()
-	_chord_explorer_window_expires_at = -1.0
 	if _home_panel != null:
 		_home_panel.visible = false
-	_chord_explorer_panel.visible = true
-	_chord_explorer_refresh_display()
+	_chord_explorer_panel.present()
 	if _midi_enabled and _midi_platform_supported():
 		_open_midi_inputs_for_detection()
 		_midi_active = true
-	# The big interactive keyboard replaces the small viz while in Chord Explorer.
 	if _midi_piano_viz != null:
 		_midi_piano_viz_clear_all()
 		_midi_piano_viz.visible = false
 
 
 func _on_chord_explorer_close() -> void:
-	_chord_explorer_active = false
-	_chord_explorer_recent_notes.clear()
-	_chord_explorer_window_expires_at = -1.0
+	# Programmatic close — funnels through the panel's own dismiss path so
+	# both routes (back button + parent-initiated) end with the same state.
 	if _chord_explorer_panel != null:
-		_chord_explorer_panel.visible = false
+		_chord_explorer_panel.dismiss()
+	_on_chord_explorer_panel_closed()
+
+
+func _on_chord_explorer_panel_closed() -> void:
+	_chord_explorer_active = false
 	if _midi_active:
 		_stop_midi_listening()
 	_show_home()
 
 
-func _on_chord_explorer_clear_pressed() -> void:
-	_chord_explorer_recent_notes.clear()
-	_chord_explorer_window_expires_at = -1.0
+func _on_chord_explorer_panel_chord_cleared() -> void:
 	if _midi_piano_viz != null:
 		_midi_piano_viz_clear_all()
-	_chord_explorer_refresh_display()
 
 
-func _on_chord_explorer_play_pressed() -> void:
-	if _chord_explorer_recent_notes.is_empty():
-		return
-	var sample_map: Dictionary = _sample_map_for_current_mode()
-	if sample_map.is_empty():
-		return
-	var pitches := _chord_explorer_active_pitches()
-	# Brief visual cue: dim the play button while sounding.
-	if _chord_explorer_play_button != null:
-		_chord_explorer_play_button.modulate = Color(0.78, 0.78, 0.78, 1.0)
-	# 25 ms stagger between note onsets gives a soft "brushed" feel rather than a hard block hit.
-	for i in range(pitches.size()):
-		_ce_play_note_soft(int(pitches[i]), sample_map)
-		if i < pitches.size() - 1:
-			await get_tree().create_timer(0.025).timeout
-	# Restore button modulate after the chord rings out a bit.
-	await get_tree().create_timer(0.25).timeout
-	if _chord_explorer_play_button != null:
-		_chord_explorer_play_button.modulate = Color.WHITE
-
-
-func _ce_play_note_soft(pitch: int, sample_map: Dictionary) -> void:
-	var nearest := _nearest_sample_midi_from_map(pitch, sample_map)
-	if not sample_map.has(nearest):
-		return
-	var stream: AudioStream = sample_map[nearest]
-	var player := AudioStreamPlayer.new()
-	player.stream = stream
-	player.pitch_scale = pow(2.0, float(pitch - nearest) / 12.0)
-	player.volume_db = -12.0  # pianissimo — about half loudness vs the default playback
-	add_child(player)
-	player.finished.connect(player.queue_free)
-	player.play()
-
-
-func _on_chord_explorer_key_changed(idx: int) -> void:
-	if idx < 0 or idx >= CHORD_EXPLORER_KEY_OPTIONS.size():
-		return
-	_chord_explorer_key_pc = int(CHORD_EXPLORER_KEY_OPTIONS[idx][1])
-	_chord_explorer_refresh_display()
-
-
-func _on_chord_explorer_minor_toggled(pressed: bool) -> void:
-	_chord_explorer_key_is_minor = pressed
-	_chord_explorer_refresh_display()
+func _on_chord_explorer_panel_keyboard_note(pitch: int) -> void:
+	_midi_piano_viz_light(pitch, true)
 
 
 func _handle_midi_note_on_for_chord_explorer(pitch: int, click_source: bool = false) -> void:
-	var now := float(Time.get_ticks_msec()) / 1000.0
-	var window_sec := CHORD_EXPLORER_CLICK_WINDOW_SEC if click_source else CHORD_EXPLORER_ARPEGGIO_WINDOW_SEC
-	# If the previous chord's window has expired, wipe before adding the new note.
-	if _chord_explorer_window_expires_at > 0.0 and now > _chord_explorer_window_expires_at and not _chord_explorer_recent_notes.is_empty():
-		_chord_explorer_recent_notes.clear()
-		if _midi_piano_viz != null:
-			_midi_piano_viz_clear_all()
-		_midi_piano_viz_light(pitch, true)
-	_chord_explorer_recent_notes[pitch] = now
-	_chord_explorer_window_expires_at = now + window_sec
-	if has_method("_play_note"):
-		_play_note(pitch, 0.45)
-	_chord_explorer_refresh_display()
+	if _chord_explorer_panel != null:
+		_chord_explorer_panel.handle_note_on(pitch, click_source)
 
 
 func _handle_midi_note_off_for_chord_explorer(_pitch: int) -> void:
-	# Intentional no-op: arpeggio mode lets recent notes accumulate; the window timer is the only thing that clears them.
-	pass
+	pass  # arpeggio mode is accumulate-only; window timer clears notes
 
 
 func _chord_explorer_tick() -> void:
-	if not _chord_explorer_active or _chord_explorer_window_bar == null:
-		return
-	if _chord_explorer_recent_notes.is_empty():
-		_chord_explorer_window_bar.modulate.a = 0.0
-		return
-	var now := float(Time.get_ticks_msec()) / 1000.0
-	var remaining := _chord_explorer_window_expires_at - now
-	if remaining <= 0.0:
-		_chord_explorer_window_bar.value = 0.0
-		_chord_explorer_window_bar.modulate.a = 0.55
-		return
-	var progress := clampf(remaining / CHORD_EXPLORER_ARPEGGIO_WINDOW_SEC, 0.0, 1.0)
-	_chord_explorer_window_bar.value = progress
-	# Fade the bar in when fresh, fade slightly as it shrinks.
-	_chord_explorer_window_bar.modulate.a = lerpf(0.55, 1.0, progress)
+	if _chord_explorer_panel != null:
+		_chord_explorer_panel.tick(0.0)
 
 
-func _chord_explorer_active_pitches() -> Array[int]:
-	var arr: Array[int] = []
-	for k in _chord_explorer_recent_notes.keys():
-		arr.append(int(k))
-	arr.sort()
-	return arr
+# --- Interactive keyboard ---
+
+func _ce_pitch_is_black(pitch: int) -> bool:
+	return PianoKeyStylesScript.is_black_key(pitch)
 
 
-func _chord_explorer_push_notes_to_renderer(pitches: Array[int]) -> void:
-	if _chord_explorer_staff_area == null or not _chord_explorer_staff_area.has_method("set_score"):
-		return
-	# Build a flat list of notes — all at beat 0 with duration 4 (whole) so cluster_mode draws them as stacked noteheads.
-	var flat_notes: Array = []
-	for p in pitches:
-		flat_notes.append({
-			"midi": int(p),
-			"duration_beats": 4.0,
-			"beat_offset": 0.0,
-			"rest": false,
-		})
-	# Pick fifths from current key (major/minor doesn't change fifths for our recognizer use).
-	var fifths: int = ChordExplorerTheoryScript.key_pc_to_fifths(_chord_explorer_key_pc, _chord_explorer_key_is_minor)
-	var score_dict: Dictionary = ScoreModelScript.from_flat_notes_grand_staff(
-		flat_notes, 4, 4, fifths, _chord_explorer_key_is_minor, 80, "", 60
-	)
-	_chord_explorer_staff_area.set_score(score_dict)
+# Shared with Sight Reader's big piano keyboard — thin wrappers around
+# PianoKeyStyles so external callers can keep using the same names.
+func _chord_explorer_apply_white_style(btn: Button, tint: Color) -> void:
+	PianoKeyStylesScript.apply_white_style(btn, tint)
 
 
+func _chord_explorer_apply_black_style(btn: Button, tint: Color) -> void:
+	PianoKeyStylesScript.apply_black_style(btn, tint)
 
 
-func _chord_explorer_refresh_display() -> void:
-	if _chord_explorer_staff_area == null:
-		return
-	if _chord_explorer_chord_name_label == null:
-		return
-	var pitches: Array[int] = _chord_explorer_active_pitches()
-	# Push the played notes into the StaffRenderer as a grand-staff cluster.
-	_chord_explorer_push_notes_to_renderer(pitches)
-	if pitches.is_empty():
-		_chord_explorer_chord_name_label.text = "Play a chord..."
-		_chord_explorer_chord_name_label.add_theme_color_override("font_color", Color(0.62, 0.86, 0.96, 0.62))
-		_chord_explorer_full_name_label.text = ""
-		_chord_explorer_set_chip(_chord_explorer_roman_label, "")
-		_chord_explorer_set_chip(_chord_explorer_inversion_label, "")
-		_chord_explorer_set_chip(_chord_explorer_diatonic_label, "")
-		_chord_explorer_set_chip(_chord_explorer_intervals_label, "")
-		if _chord_explorer_window_bar != null:
-			_chord_explorer_window_bar.modulate.a = 0.0
-		_chord_explorer_last_info = {}
-		_chord_explorer_refresh_keyboard_lighting()
-		return
-	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _chord_explorer_key_pc, _chord_explorer_key_is_minor)
-	_chord_explorer_last_info = info
-	_chord_explorer_refresh_keyboard_lighting()
-	_chord_explorer_chord_name_label.text = str(info.get("short_name", ""))
-	_chord_explorer_chord_name_label.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
-	_chord_explorer_full_name_label.text = str(info.get("full_name", ""))
-	var roman := str(info.get("roman", ""))
-	_chord_explorer_set_chip(_chord_explorer_roman_label, roman if not roman.is_empty() else "")
-	var inv := str(info.get("inversion_label", ""))
-	_chord_explorer_set_chip(_chord_explorer_inversion_label, inv if not inv.is_empty() else "")
-	if str(info.get("quality", "")) != "" and str(info.get("quality", "")) != "single" and str(info.get("quality", "")) != "interval" and str(info.get("quality", "")) != "cluster":
-		var dia: bool = bool(info.get("is_diatonic", false))
-		_chord_explorer_set_chip(_chord_explorer_diatonic_label, "In key" if dia else "Borrowed")
-	else:
-		_chord_explorer_set_chip(_chord_explorer_diatonic_label, "")
-	var intervals: Array = info.get("intervals_from_root", [])
-	if intervals.size() >= 2:
-		var iv_strs: Array[String] = []
-		for iv in intervals:
-			iv_strs.append("%d" % int(iv))
-		_chord_explorer_set_chip(_chord_explorer_intervals_label, "[%s]" % " ".join(iv_strs))
-	else:
-		_chord_explorer_set_chip(_chord_explorer_intervals_label, "")
-
-
-func _chord_explorer_set_chip(label: Label, text: String) -> void:
-	if label == null:
-		return
-	var chip_panel := label.get_parent() as PanelContainer
-	if text.is_empty():
-		if chip_panel != null:
-			chip_panel.visible = false
-		return
-	if chip_panel != null:
-		chip_panel.visible = true
-	label.text = text
-
-
-func _on_chord_explorer_staff_draw() -> void:
-	if _chord_explorer_staff_area == null:
-		return
-	var area := _chord_explorer_staff_area
-	var w := area.size.x
-	var h := area.size.y
-	var line_color := Color(0.18, 0.22, 0.30, 1.0)
-	var ledger_color := Color(0.30, 0.34, 0.42, 0.85)
-	var gap := 11.0
-	var staff_x := 90.0
-	var staff_w := w - staff_x - 40.0
-	var treble_top := h * 0.18
-	var bass_top := treble_top + gap * 4.0 + gap * 4.0  # 4 line gaps for treble + 4 for inter-staff
-	# Treble staff lines (5)
-	for i in range(5):
-		var y := treble_top + i * gap
-		area.draw_line(Vector2(staff_x, y), Vector2(staff_x + staff_w, y), line_color, 1.6)
-	# Bass staff lines (5)
-	for i in range(5):
-		var y2 := bass_top + i * gap
-		area.draw_line(Vector2(staff_x, y2), Vector2(staff_x + staff_w, y2), line_color, 1.6)
-	# Brace (simple vertical bar + arc fakes via two arcs)
-	area.draw_line(Vector2(staff_x - 6, treble_top - 1), Vector2(staff_x - 6, bass_top + gap * 4 + 1), line_color, 3.0)
-	# Clef glyphs (text labels — simple, readable)
-	var treble_label := "𝄞"
-	var bass_label := "𝄢"
-	var clef_font := _ui_title_font if _ui_title_font != null else ThemeDB.fallback_font
-	var clef_size := 36
-	area.draw_string(clef_font, Vector2(staff_x - 50, treble_top + gap * 3.5), treble_label, HORIZONTAL_ALIGNMENT_LEFT, -1, clef_size, line_color)
-	area.draw_string(clef_font, Vector2(staff_x - 46, bass_top + gap * 2.0), bass_label, HORIZONTAL_ALIGNMENT_LEFT, -1, clef_size - 2, line_color)
-	# Key signature (just a count; future polish: actual sharp/flat glyphs)
-	var key_letter: String = NOTE_NAMES_SHARP_GLOBAL[((_chord_explorer_key_pc % 12) + 12) % 12]
-	var key_text := "%s %s" % [key_letter, "minor" if _chord_explorer_key_is_minor else "major"]
-	area.draw_string(clef_font, Vector2(staff_x + 8, treble_top - 8), key_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.36, 0.42, 0.55, 0.95))
-	# Notes — compute per-pitch column offsets for proper notation of seconds/clusters.
-	var pitches := _chord_explorer_active_pitches()
-	var offsets := ChordExplorerTheoryScript.notation_offsets(pitches)
-	for pitch in pitches:
-		var col := int(offsets.get(int(pitch), 0))
-		_chord_explorer_draw_note(area, int(pitch), col, staff_x, treble_top, bass_top, gap, staff_w, ledger_color, line_color)
-
-
-func _chord_explorer_draw_note(area: Control, pitch: int, column: int, staff_x: float, treble_top: float, bass_top: float, gap: float, staff_w: float, ledger_color: Color, line_color: Color) -> void:
-	# Treble top line = F5 (MIDI 77); Bass top line = A3 (MIDI 57). Each line/space = half-gap.
-	var on_treble := pitch >= 60
-	var anchor_y := treble_top if on_treble else bass_top
-	var ref_pitch := 77 if on_treble else 57
-	var diatonic_steps := ChordExplorerTheoryScript.diatonic_steps_between(pitch, ref_pitch)
-	var note_y := anchor_y + diatonic_steps * (gap * 0.5)
-	# Column 0 = stem-side; column 1 = offset notehead-width to the RIGHT (per Gould "Behind Bars" — second-interval placement).
-	var notehead_rx := 8.5  # horizontal radius — wider
-	var notehead_ry := 6.2  # vertical radius — slightly shorter
-	var notehead_w := notehead_rx * 2.0  # column step matches notehead width so seconds touch edge-to-edge
-	var base_x := staff_x + staff_w * 0.55
-	var note_x := base_x + column * notehead_w
-	_chord_explorer_draw_ledgers_for_note(area, note_x, note_y, anchor_y, gap, ledger_color, on_treble)
-	var note_color := _chord_explorer_note_color_for_pitch(pitch)
-	_draw_oval_notehead(area, Vector2(note_x, note_y), notehead_rx, notehead_ry, note_color, line_color)
-	# Sharp/flat indicator if pitch is accidental
-	var pc := ((pitch % 12) + 12) % 12
-	if pc in [1, 3, 6, 8, 10]:
-		var use_flat := false
-		var key_letter: String = NOTE_NAMES_SHARP_GLOBAL[((_chord_explorer_key_pc % 12) + 12) % 12]
-		if not (key_letter in ["C", "G", "D", "A", "E", "B", "F#"]):
-			use_flat = true
-		var glyph := "♭" if use_flat else "♯"
-		var fnt := _ui_title_font if _ui_title_font != null else ThemeDB.fallback_font
-		area.draw_string(fnt, Vector2(note_x - 18, note_y + 5), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, line_color)
-
-
-
-
+# Used by Practice Drills staff drawing.
 func _draw_oval_notehead(area: Control, center: Vector2, rx: float, ry: float, fill: Color, outline: Color) -> void:
 	var num_segs := 28
 	var pts := PackedVector2Array()
@@ -25404,37 +24925,10 @@ func _draw_oval_notehead(area: Control, center: Vector2, rx: float, ry: float, f
 	for i in range(num_segs):
 		fill_colors[i] = fill
 	area.draw_polygon(pts, fill_colors)
-	# Outline
 	for i in range(num_segs):
 		var p1: Vector2 = pts[i]
 		var p2: Vector2 = pts[(i + 1) % num_segs]
 		area.draw_line(p1, p2, outline, 1.3)
-
-
-func _chord_explorer_draw_ledgers_for_note(area: Control, note_x: float, note_y: float, anchor_y: float, gap: float, ledger_color: Color, on_treble: bool) -> void:
-	# Draw ledger lines at every gap step from the staff edge to the note position.
-	var staff_top_y := anchor_y
-	var staff_bottom_y := anchor_y + gap * 4
-	var ledger_w := 16.0
-	if note_y < staff_top_y - gap * 0.5:
-		var y := staff_top_y - gap
-		while y >= note_y - gap * 0.5:
-			area.draw_line(Vector2(note_x - ledger_w * 0.5, y), Vector2(note_x + ledger_w * 0.5, y), ledger_color, 1.4)
-			y -= gap
-	elif note_y > staff_bottom_y + gap * 0.5:
-		var y2 := staff_bottom_y + gap
-		while y2 <= note_y + gap * 0.5:
-			area.draw_line(Vector2(note_x - ledger_w * 0.5, y2), Vector2(note_x + ledger_w * 0.5, y2), ledger_color, 1.4)
-			y2 += gap
-
-
-const NOTE_NAMES_SHARP_GLOBAL := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-
-
-# --- Interactive keyboard ---
-
-func _ce_pitch_is_black(pitch: int) -> bool:
-	return PianoKeyStylesScript.is_black_key(pitch)
 
 
 func _build_pitch_match_keyboard() -> void:
@@ -26803,231 +26297,6 @@ func _pitch_match_apply_key_style(pitch: int) -> void:
 		_chord_explorer_apply_white_style(btn, tint)
 
 
-func _build_chord_explorer_keyboard(parent_vbox: VBoxContainer) -> void:
-	var hbox := HBoxContainer.new()
-	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	hbox.add_theme_constant_override("separation", 16)
-	hbox.mouse_filter = Control.MOUSE_FILTER_PASS
-	parent_vbox.add_child(hbox)
-	_chord_explorer_keyboard = hbox
-
-	var num_octaves := 4
-	var num_whites := num_octaves * 7
-	var keys_w := num_whites * CHORD_EXPLORER_WHITE_W
-	var keys_h := CHORD_EXPLORER_WHITE_H
-	var frame_pad := 12.0
-	var frame_w := keys_w + frame_pad * 2.0
-	var frame_h := keys_h + frame_pad * 2.0 + 8.0  # extra for top felt strip
-
-	# Frame (wood-grain cabinet around the keys) — fixed-size Panel inside HBox so layout is reliable.
-	var frame := Panel.new()
-	frame.mouse_filter = Control.MOUSE_FILTER_PASS
-	frame.custom_minimum_size = Vector2(frame_w, frame_h)
-	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	frame.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	var frame_style := StyleBoxFlat.new()
-	frame_style.bg_color = Color(0.10, 0.08, 0.07, 0.98)
-	frame_style.border_color = Color(0.30, 0.20, 0.14, 1.0)
-	frame_style.border_width_left = 2
-	frame_style.border_width_right = 2
-	frame_style.border_width_top = 2
-	frame_style.border_width_bottom = 2
-	frame_style.corner_radius_top_left = 14
-	frame_style.corner_radius_top_right = 14
-	frame_style.corner_radius_bottom_left = 14
-	frame_style.corner_radius_bottom_right = 14
-	frame_style.shadow_color = Color(0.0, 0.0, 0.0, 0.60)
-	frame_style.shadow_size = 10
-	frame_style.shadow_offset = Vector2(0, 6)
-	frame.add_theme_stylebox_override("panel", frame_style)
-	hbox.add_child(frame)
-
-	# Felt strip above keys (the red felt of a real piano).
-	var felt := Panel.new()
-	felt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var felt_style := StyleBoxFlat.new()
-	felt_style.bg_color = Color(0.55, 0.10, 0.12, 1.0)
-	felt.add_theme_stylebox_override("panel", felt_style)
-	felt.position = Vector2(frame_pad, frame_pad)
-	felt.size = Vector2(keys_w, 6)
-	frame.add_child(felt)
-
-	# Container for actual keys (positioned inside the frame, below the felt).
-	var keys_root := Control.new()
-	keys_root.mouse_filter = Control.MOUSE_FILTER_PASS
-	keys_root.position = Vector2(frame_pad, frame_pad + 8)
-	keys_root.size = Vector2(keys_w, keys_h)
-	frame.add_child(keys_root)
-
-	# White keys first
-	var white_x := 0.0
-	var white_positions: Dictionary = {}
-	for pitch in range(CHORD_EXPLORER_KEYBOARD_LOW, CHORD_EXPLORER_KEYBOARD_HIGH + 1):
-		if _ce_pitch_is_black(pitch):
-			continue
-		var btn := Button.new()
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP
-		btn.position = Vector2(white_x, 0)
-		btn.size = Vector2(CHORD_EXPLORER_WHITE_W, CHORD_EXPLORER_WHITE_H)
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.text = ""
-		var captured_pitch := pitch
-		btn.pressed.connect(func(): _on_chord_explorer_key_pressed(captured_pitch))
-		_chord_explorer_apply_white_style(btn, Color.WHITE)
-		keys_root.add_child(btn)
-		_chord_explorer_keyboard_keys[pitch] = btn
-		white_positions[pitch] = white_x
-		# Label C-notes for orientation
-		var pc := ((pitch % 12) + 12) % 12
-		if pc == 0:
-			var lbl := Label.new()
-			lbl.text = "C%d" % int(pitch / 12 - 1)
-			lbl.add_theme_font_size_override("font_size", 13)
-			if _ui_font != null:
-				lbl.add_theme_font_override("font", _ui_font)
-			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.40, 0.92))
-			lbl.position = Vector2(4, CHORD_EXPLORER_WHITE_H - 24)
-			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			btn.add_child(lbl)
-		white_x += CHORD_EXPLORER_WHITE_W
-
-	# Black keys overlaid on top
-	for pitch in range(CHORD_EXPLORER_KEYBOARD_LOW, CHORD_EXPLORER_KEYBOARD_HIGH + 1):
-		if not _ce_pitch_is_black(pitch):
-			continue
-		var prev_white := pitch - 1
-		if not white_positions.has(prev_white):
-			continue
-		var btn := Button.new()
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP
-		var bx: float = float(white_positions[prev_white]) + CHORD_EXPLORER_WHITE_W - CHORD_EXPLORER_BLACK_W * 0.5
-		btn.position = Vector2(bx, 0)
-		btn.size = Vector2(CHORD_EXPLORER_BLACK_W, CHORD_EXPLORER_BLACK_H)
-		btn.focus_mode = Control.FOCUS_NONE
-		btn.text = ""
-		btn.z_index = 1
-		var captured_pitch_b := pitch
-		btn.pressed.connect(func(): _on_chord_explorer_key_pressed(captured_pitch_b))
-		_chord_explorer_apply_black_style(btn, Color.WHITE)
-		keys_root.add_child(btn)
-		_chord_explorer_keyboard_keys[pitch] = btn
-
-	# Side control column: Clear (top) + Play (below) — placed right next to the keyboard for quick access.
-	var side_col := VBoxContainer.new()
-	side_col.alignment = BoxContainer.ALIGNMENT_BEGIN
-	side_col.add_theme_constant_override("separation", 12)
-	side_col.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	hbox.add_child(side_col)
-
-	_chord_explorer_clear_button = _build_chord_explorer_side_button(
-		side_col, "Clear", Color(0.92, 0.46, 0.42, 1.0), _on_chord_explorer_clear_pressed
-	)
-	_chord_explorer_play_button = _build_chord_explorer_side_button(
-		side_col, "♪ Play", MENU_PRIMARY_ACCENT, _on_chord_explorer_play_pressed
-	)
-
-
-func _build_chord_explorer_side_button(parent: Control, text: String, accent: Color, callback: Callable) -> Button:
-	var btn := Button.new()
-	btn.text = text
-	btn.custom_minimum_size = Vector2(96, 56)
-	btn.focus_mode = Control.FOCUS_NONE
-	if _ui_title_font != null:
-		btn.add_theme_font_override("font", _ui_title_font)
-	btn.add_theme_font_size_override("font_size", 16)
-	btn.add_theme_color_override("font_color", Color(0.10, 0.12, 0.16, 1.0))
-	btn.add_theme_color_override("font_hover_color", Color(0.05, 0.07, 0.10, 1.0))
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.92)
-	sb.border_color = Color(accent.r * 0.65, accent.g * 0.65, accent.b * 0.65, 1.0)
-	sb.border_width_left = 1
-	sb.border_width_right = 1
-	sb.border_width_top = 1
-	sb.border_width_bottom = 3
-	sb.corner_radius_top_left = 8
-	sb.corner_radius_top_right = 8
-	sb.corner_radius_bottom_left = 8
-	sb.corner_radius_bottom_right = 8
-	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.30)
-	sb.shadow_size = 4
-	sb.shadow_offset = Vector2(0, 2)
-	btn.add_theme_stylebox_override("normal", sb)
-	var hover := sb.duplicate()
-	(hover as StyleBoxFlat).bg_color = (sb.bg_color as Color).lightened(0.08)
-	btn.add_theme_stylebox_override("hover", hover)
-	var pressed_sb := sb.duplicate()
-	(pressed_sb as StyleBoxFlat).bg_color = (sb.bg_color as Color).darkened(0.10)
-	(pressed_sb as StyleBoxFlat).shadow_size = 1
-	(pressed_sb as StyleBoxFlat).shadow_offset = Vector2(0, 1)
-	btn.add_theme_stylebox_override("pressed", pressed_sb)
-	btn.pressed.connect(callback)
-	parent.add_child(btn)
-	return btn
-
-
-func _chord_explorer_apply_white_style(btn: Button, tint: Color) -> void:
-	PianoKeyStylesScript.apply_white_style(btn, tint)
-
-
-func _chord_explorer_apply_black_style(btn: Button, tint: Color) -> void:
-	PianoKeyStylesScript.apply_black_style(btn, tint)
-
-
-func _on_chord_explorer_key_pressed(pitch: int) -> void:
-	if not _chord_explorer_active:
-		return
-	var p := int(pitch)
-	# If the key is already in the chord, clicking again toggles it OFF.
-	if _chord_explorer_recent_notes.has(p):
-		_chord_explorer_recent_notes.erase(p)
-		_chord_explorer_refresh_display()
-		return
-	# Otherwise, treat as a click-source note-on (longer window than MIDI).
-	_handle_midi_note_on_for_chord_explorer(p, true)
-
-
-func _chord_explorer_refresh_keyboard_lighting() -> void:
-	if _chord_explorer_keyboard_keys.is_empty():
-		return
-	var held: Dictionary = {}
-	for k in _chord_explorer_recent_notes.keys():
-		held[int(k)] = true
-	for pitch_key in _chord_explorer_keyboard_keys.keys():
-		var pitch := int(pitch_key)
-		var btn: Button = _chord_explorer_keyboard_keys[pitch_key] as Button
-		if btn == null:
-			continue
-		var is_black := _ce_pitch_is_black(pitch)
-		if held.has(pitch):
-			var color := _chord_explorer_note_color_for_pitch(pitch)
-			if is_black:
-				_chord_explorer_apply_black_style(btn, color)
-			else:
-				_chord_explorer_apply_white_style(btn, color)
-		else:
-			if is_black:
-				_chord_explorer_apply_black_style(btn, Color.WHITE)
-			else:
-				_chord_explorer_apply_white_style(btn, Color.WHITE)
-
-
-func _chord_explorer_note_color_for_pitch(pitch: int) -> Color:
-	if _chord_explorer_last_info.is_empty():
-		return MENU_PRIMARY_ACCENT
-	var root_pc_v = _chord_explorer_last_info.get("root_pc", -1)
-	if int(root_pc_v) < 0:
-		return MENU_PRIMARY_ACCENT
-	var pc := ((int(pitch) % 12) + 12) % 12
-	var degree := ((pc - int(root_pc_v)) + 12) % 12
-	match degree:
-		0: return CHORD_FN_ROOT
-		3, 4: return CHORD_FN_THIRD
-		6, 7, 8: return CHORD_FN_FIFTH
-		10, 11: return CHORD_FN_SEVENTH
-		2, 5, 9: return CHORD_FN_EXTENSION
-		_: return CHORD_FN_OTHER
 
 
 # ============================================================================
