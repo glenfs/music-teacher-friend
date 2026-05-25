@@ -95,6 +95,7 @@ const AnswerExplanationsScript = preload("res://scripts/music_theory/answer_expl
 const HintBanksScript = preload("res://scripts/music_theory/hint_banks.gd")
 const BadgeSystemScript = preload("res://scripts/gamification/badge_system.gd")
 const DailyChallengeScript = preload("res://scripts/gamification/daily_challenge.gd")
+const ChoiceBuilderScript = preload("res://scripts/exercises/choice_builder.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -17311,77 +17312,15 @@ func _build_interval_pool_for_settings() -> Array[String]:
 
 
 func _build_interval_choices(correct_id: String, pool: Array[String]) -> Array[String]:
-	var correct_st: int = int(INTERVAL_DATA.get(correct_id, {"semitones": [0]})["semitones"][0])
-	var distractors: Array[String] = []
-	for id in pool:
-		var iid := str(id)
-		if iid != correct_id:
-			distractors.append(iid)
-	# Sort distractors by semitone proximity — closest intervals are the hardest distractors
-	distractors.sort_custom(func(a: String, b: String) -> bool:
-		var a_st: int = int(INTERVAL_DATA.get(a, {"semitones": [0]})["semitones"][0])
-		var b_st: int = int(INTERVAL_DATA.get(b, {"semitones": [0]})["semitones"][0])
-		return abs(a_st - correct_st) < abs(b_st - correct_st)
-	)
-	var choices: Array[String] = [correct_id]
-	var pick_count := mini(maxi(1, _ear_choice_count - 1), distractors.size())
-	for di in range(pick_count):
-		choices.append(distractors[di])
-	choices.shuffle()
-	return choices
+	return ChoiceBuilderScript.interval_choices(correct_id, pool, _ear_choice_count, INTERVAL_DATA)
 
 
 func _get_similar_chord_names(chord_name: String) -> Array:
-	# Returns chords that are commonly confused with the given chord
-	var similar_map := {
-		"Major": ["Maj7", "Dom7", "Sus4", "Power"],
-		"Minor": ["Min7", "Diminished", "mMaj7", "Sus2"],
-		"Dom7": ["Maj7", "Major", "Min7", "7sus4"],
-		"Maj7": ["Dom7", "Major", "Maj6", "AugMaj7"],
-		"Min7": ["Minor", "Dom7", "Half-dim", "mMaj7"],
-		"Diminished": ["Minor", "Half-dim", "Dim7"],
-		"Augmented": ["Major", "AugMaj7", "Aug7"],
-		"Sus2": ["Minor", "Sus4", "Add9"],
-		"Sus4": ["Major", "Sus2", "7sus4"],
-		"Dim7": ["Diminished", "Half-dim", "Min7"],
-		"Half-dim": ["Min7", "Dim7", "Diminished"],
-		"mMaj7": ["Minor", "Min7", "Maj7"],
-		"Aug7": ["Dom7", "Augmented", "AugMaj7"],
-		"AugMaj7": ["Maj7", "Augmented", "Aug7"],
-		"7sus4": ["Dom7", "Sus4", "Maj7"],
-		"Maj6": ["Major", "Maj7", "Min6"],
-		"Min6": ["Minor", "Maj6", "Min7"],
-		"6/9": ["Maj6", "Add9", "Maj9"],
-		"Dom9": ["Dom7", "Maj9", "Min9"],
-		"Maj9": ["Maj7", "Dom9", "Add9"],
-		"Min9": ["Min7", "Dom9", "Maj9"],
-		"Add9": ["Major", "Maj9", "Sus2"],
-		"Power": ["Major", "Sus4", "Minor"],
-	}
-	return similar_map.get(chord_name, [])
+	return ChoiceBuilderScript.similar_chord_names(chord_name)
 
 
 func _build_chord_choices(correct_name: String, pool: Array[String]) -> Array[String]:
-	var choices: Array[String] = [correct_name]
-	# First pick: a similar-sounding chord from the pool
-	var similar := _get_similar_chord_names(correct_name)
-	for s in similar:
-		var sv := str(s)
-		if pool.has(sv) and sv != correct_name and not choices.has(sv):
-			choices.append(sv)
-			break
-	# Fill remaining slots with random distractors
-	var distractors: Array[String] = []
-	for chord_name in pool:
-		var n: String = str(chord_name)
-		if n != correct_name and not choices.has(n):
-			distractors.append(n)
-	distractors.shuffle()
-	var max_distractors: int = maxi(0, mini(_ear_choice_count - choices.size(), distractors.size()))
-	for di in range(max_distractors):
-		choices.append(distractors[di])
-	choices.shuffle()
-	return choices
+	return ChoiceBuilderScript.chord_choices(correct_name, pool, _ear_choice_count)
 
 
 func _selected_progression_ids() -> Array[String]:
@@ -17552,103 +17491,11 @@ func _apply_theory_question_payload(payload: Dictionary) -> void:
 
 
 func _build_text_choices(correct_name: String, pool: Array[String], count: int = 4) -> Array[String]:
-	var candidates: Array[String] = []
-	for item in pool:
-		var n := str(item)
-		if not candidates.has(n):
-			candidates.append(n)
-	var picks := maxi(1, mini(count - 1, maxi(0, candidates.size() - 1)))
-	var distractors: Array[String] = DistractorsScript.pick_similar(correct_name, candidates, picks)
-	if distractors.size() < picks:
-		var fallback: Array[String] = []
-		for n in candidates:
-			if n != correct_name and not distractors.has(n):
-				fallback.append(n)
-		fallback.shuffle()
-		for n in fallback:
-			distractors.append(n)
-			if distractors.size() >= picks:
-				break
-	var choices: Array[String] = [correct_name]
-	for di in range(mini(picks, distractors.size())):
-		choices.append(distractors[di])
-	choices.shuffle()
-	return choices
+	return ChoiceBuilderScript.text_choices(correct_name, pool, count)
 
 
 func _build_progression_label_choices(correct_progression_id: String, progression_ids: Array[String]) -> Array[String]:
-	var correct_def: Dictionary = PROGRESSION_DEFS.get(correct_progression_id, {})
-	var correct_label := str(correct_def.get("label", correct_progression_id))
-	var correct_steps: Array = correct_def.get("steps", [])
-	var target_len := correct_steps.size()
-	var same_len_pool: Array[String] = []
-	var other_pool: Array[String] = []
-	var label_to_steps: Dictionary = {}
-	for pid_any in progression_ids:
-		var pid := str(pid_any)
-		if pid == correct_progression_id:
-			continue
-		var pdef: Dictionary = PROGRESSION_DEFS.get(pid, {})
-		var label := str(pdef.get("label", pid))
-		if label == "":
-			continue
-		var steps: Array = pdef.get("steps", [])
-		label_to_steps[label] = steps.duplicate()
-		if steps.size() == target_len:
-			same_len_pool.append(label)
-		else:
-			other_pool.append(label)
-	var count := 3 if progression_ids.size() >= 3 else maxi(2, progression_ids.size())
-	var distractor_count := maxi(1, count - 1)
-	var distractors: Array[String] = []
-	var mixed_pool: Array[String] = []
-	for item_same in same_len_pool:
-		if not mixed_pool.has(item_same):
-			mixed_pool.append(item_same)
-	for item_other in other_pool:
-		if not mixed_pool.has(item_other):
-			mixed_pool.append(item_other)
-	var ranked_pool: Array[Dictionary] = []
-	for label_any in mixed_pool:
-		var label := str(label_any)
-		var steps_any: Array = label_to_steps.get(label, [])
-		var score := 0
-		if steps_any.size() == target_len:
-			score += 20
-		if not correct_steps.is_empty() and not steps_any.is_empty():
-			if int(steps_any[0]) == int(correct_steps[0]):
-				score += 12
-			if int(steps_any[steps_any.size() - 1]) == int(correct_steps[correct_steps.size() - 1]):
-				score += 12
-		var overlap := 0
-		for step in steps_any:
-			if correct_steps.has(step):
-				overlap += 1
-		score += overlap * 4
-		score += _rng.randi_range(0, 2)
-		ranked_pool.append({"label": label, "score": score})
-	ranked_pool.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("score", 0)) > int(b.get("score", 0))
-	)
-	for item_ranked in ranked_pool:
-		var picked := str(item_ranked.get("label", ""))
-		if picked == "" or picked == correct_label or distractors.has(picked):
-			continue
-		distractors.append(picked)
-		if distractors.size() >= distractor_count:
-			break
-	if distractors.size() < distractor_count:
-		var more := DistractorsScript.pick_similar(correct_label, mixed_pool, distractor_count)
-		for item2 in more:
-			if item2 != correct_label and not distractors.has(item2):
-				distractors.append(item2)
-			if distractors.size() >= distractor_count:
-				break
-	var choices: Array[String] = [correct_label]
-	for di in range(mini(distractor_count, distractors.size())):
-		choices.append(distractors[di])
-	choices.shuffle()
-	return choices
+	return ChoiceBuilderScript.progression_label_choices(correct_progression_id, progression_ids, PROGRESSION_DEFS, _rng)
 
 
 func _apply_interval_choice_texts(interval_ids: Array[String], use_interval_names: bool) -> void:
