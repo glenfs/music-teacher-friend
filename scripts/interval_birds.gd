@@ -407,8 +407,8 @@ const ICON_DUMBBELL_PATH   := "res://assets/icons/dumbbell.svg"
 const ICON_GRADUATION_PATH := "res://assets/icons/graduation-cap.svg"
 const UI_CLICK_SFX_PATH := "res://assets/audio/sfx/ui-basic-click.wav"
 const UI_SIGHT_ANSWER_CLICK_SFX_PATH := "res://assets/audio/sfx/ui-basic-click-2-glass.wav"
-const RHYTHM_FLOW_TAP_SFX_PATH := "res://assets/audio/sfx/178668__hanbaal__snare.wav"
-const RHYTHM_FLOW_DOWNBEAT_SFX_PATH := "res://assets/audio/sfx/50982__matiasreccius__bass2.wav"
+const RHYTHM_FLOW_TAP_SFX_PATH := RhythmFlowLibraryScript.TAP_SFX_PATH
+const RHYTHM_FLOW_DOWNBEAT_SFX_PATH := RhythmFlowLibraryScript.DOWNBEAT_SFX_PATH
 const CORRECT_SFX_PATH := "res://assets/audio/sfx/correct.mp3"
 const WRONG_CHOICE_SFX_PATH := "res://assets/audio/sfx/wrong-choice.wav"
 const FAIL_GAMEOVER_SFX_PATH := "res://assets/audio/sfx/fail.mp3"
@@ -979,8 +979,8 @@ var _rhythm_triplet_guide_last_tick_idx := -1
 var _rhythm_triplet_guide_flash_dot := -1
 var _rhythm_triplet_guide_flash_until_sec := -1.0
 
-const RHYTHM_FLOW_SESSION_PLAYING := 0
-const RHYTHM_FLOW_SESSION_DEMO := 1
+const RHYTHM_FLOW_SESSION_PLAYING := RhythmFlowLibraryScript.SESSION_PLAYING
+const RHYTHM_FLOW_SESSION_DEMO := RhythmFlowLibraryScript.SESSION_DEMO
 
 var _status_label: Label
 var _score_label: Label
@@ -13454,56 +13454,22 @@ func _refresh_pitch_match_setup_controls() -> void:
 
 
 func _rhythm_flow_empty_saved_map_slot() -> Dictionary:
-	return {
-		"name": "",
-		"bars": [],
-		"difficulty_level": 1,
-		"bpm": 44,
-		"saved_at": ""
-	}
+	return RhythmFlowLibraryScript.empty_saved_map_slot()
 
 
 func _rhythm_flow_ensure_saved_maps_slots() -> void:
-	if _rhythm_flow_saved_maps == null:
-		_rhythm_flow_saved_maps = []
-	while _rhythm_flow_saved_maps.size() < 5:
-		_rhythm_flow_saved_maps.append(_rhythm_flow_empty_saved_map_slot())
-	if _rhythm_flow_saved_maps.size() > 5:
-		_rhythm_flow_saved_maps = _rhythm_flow_saved_maps.slice(0, 5)
-	for i in range(_rhythm_flow_saved_maps.size()):
-		var slot_v: Variant = _rhythm_flow_saved_maps[i]
-		if typeof(slot_v) != TYPE_DICTIONARY:
-			_rhythm_flow_saved_maps[i] = _rhythm_flow_empty_saved_map_slot()
-			continue
-		var slot := (slot_v as Dictionary).duplicate(true)
-		if not slot.has("name"):
-			slot["name"] = ""
-		if not slot.has("bars") or typeof(slot["bars"]) != TYPE_ARRAY:
-			slot["bars"] = []
-		if not slot.has("difficulty_level"):
-			slot["difficulty_level"] = 1
-		if not slot.has("bpm"):
-			slot["bpm"] = 44
-		if not slot.has("saved_at"):
-			slot["saved_at"] = ""
-		_rhythm_flow_saved_maps[i] = slot
+	var typed: Array[Dictionary] = []
+	for item in RhythmFlowLibraryScript.ensure_saved_maps_slots(_rhythm_flow_saved_maps):
+		typed.append(item)
+	_rhythm_flow_saved_maps = typed
 
 
 func _rhythm_flow_slot_is_filled(slot_idx: int) -> bool:
-	if slot_idx < 0 or slot_idx >= _rhythm_flow_saved_maps.size():
-		return false
-	var slot := _rhythm_flow_saved_maps[slot_idx]
-	var bars_v: Variant = slot.get("bars", [])
-	return bars_v is Array and not (bars_v as Array).is_empty()
+	return RhythmFlowLibraryScript.slot_is_filled(_rhythm_flow_saved_maps, slot_idx)
 
 
 func _rhythm_flow_now_stamp() -> String:
-	var d := Time.get_date_dict_from_system()
-	var t := Time.get_time_dict_from_system()
-	return "%04d-%02d-%02d %02d:%02d" % [
-		int(d.get("year", 0)), int(d.get("month", 0)), int(d.get("day", 0)),
-		int(t.get("hour", 0)), int(t.get("minute", 0))
-	]
+	return RhythmFlowLibraryScript.now_stamp()
 	if _ear_theme_select != null:
 		for i in range(_ear_theme_select.item_count):
 			var v := str(_ear_theme_select.get_item_metadata(i))
@@ -26635,58 +26601,22 @@ func _rhythm_flow_timing_windows() -> Dictionary:
 
 
 func _rhythm_flow_timing_windows_for_event(evt: Dictionary) -> Dictionary:
-	var wins := _rhythm_flow_timing_windows().duplicate()
-	if not _rhythm_flow_triplet_assist_enabled:
-		return wins
-	if not bool(evt.get("triplet", false)):
-		return wins
-	var token := str(evt.get("triplet_token", ""))
-	var perfect_mult := 1.25
-	var good_mult := 1.35
-	var ok_mult := 1.45
-	if token == "t4":
-		perfect_mult = 1.35
-		good_mult = 1.50
-		ok_mult = 1.65
-	wins["perfect"] = float(wins.get("perfect", 0.050)) * perfect_mult
-	wins["good"] = float(wins.get("good", 0.100)) * good_mult
-	wins["ok"] = float(wins.get("ok", 0.200)) * ok_mult
-	return wins
+	return RhythmFlowLibraryScript.timing_windows_for_event(evt, _rhythm_flow_triplet_assist_enabled)
 
 
 func _rhythm_flow_tap_latency_sec() -> float:
-	return float(_rhythm_flow_tap_latency_ms) / 1000.0
+	return RhythmFlowLibraryScript.tap_latency_sec(_rhythm_flow_tap_latency_ms)
 
 
 func _rhythm_flow_triplet_snap_window_sec(evt: Dictionary) -> float:
-	var step_sec := _rhythm_flow_seconds_per_beat() / 3.0
-	if step_sec <= 0.0:
-		return 0.0
-	var token := str(evt.get("triplet_token", ""))
-	if token == "t4":
-		return minf(0.110, step_sec * 0.45)
-	return minf(0.085, step_sec * 0.38)
+	return RhythmFlowLibraryScript.triplet_snap_window_sec(evt, _rhythm_flow_seconds_per_beat())
 
 
 func _rhythm_flow_triplet_snapped_tap_time(tap_t: float, evt: Dictionary) -> float:
-	if not _rhythm_flow_triplet_assist_enabled:
-		return tap_t
-	if not bool(evt.get("triplet", false)):
-		return tap_t
-	var step_sec: float = _rhythm_flow_seconds_per_beat() / 3.0
-	if step_sec <= 0.0:
-		return tap_t
-	var anchor_t: float = _rhythm_flow_count_in_seconds
-	var rel: float = tap_t - anchor_t
-	var snapped: float = anchor_t + (roundf(rel / step_sec) * step_sec)
-	var snap_delta: float = absf(snapped - tap_t)
-	if snap_delta > _rhythm_flow_triplet_snap_window_sec(evt):
-		return tap_t
-	var expected_t := float(evt.get("expected_time_sec", tap_t))
-	var ok_win := float(_rhythm_flow_timing_windows_for_event(evt).get("ok", 0.2))
-	if absf(snapped - expected_t) > ok_win:
-		return tap_t
-	return snapped
+	return RhythmFlowLibraryScript.triplet_snapped_tap_time(
+		tap_t, evt, _rhythm_flow_count_in_seconds,
+		_rhythm_flow_seconds_per_beat(), _rhythm_flow_triplet_assist_enabled
+	)
 
 
 func _rhythm_flow_triplet_guides_active_near_head() -> bool:
@@ -27486,7 +27416,7 @@ func _rhythm_flow_update_demo_scheduler() -> void:
 
 
 func _rhythm_flow_seconds_per_beat() -> float:
-	return 60.0 / float(maxi(1, _rhythm_flow_bpm))
+	return RhythmFlowLibraryScript.seconds_per_beat(_rhythm_flow_bpm)
 
 
 func _ensure_rhythm_flow_beat_labels(min_count: int = 4) -> void:
@@ -27890,17 +27820,7 @@ func _rhythm_flow_find_live_note_for_event(event_idx: int) -> int:
 
 
 func _rhythm_flow_feedback_color(judgement: String) -> Color:
-	match judgement:
-		"Demo":
-			return Color(0.74, 0.98, 1.0, 1.0)
-		"Perfect":
-			return Color(0.72, 1.0, 0.20, 1.0)
-		"Good":
-			return Color(0.42, 0.92, 1.0, 1.0)
-		"OK":
-			return Color(1.0, 0.84, 0.25, 1.0)
-		_:
-			return Color(1.0, 0.42, 0.42, 1.0)
+	return RhythmFlowLibraryScript.feedback_color(judgement)
 
 
 func _rhythm_flow_apply_judgement(event_idx: int, judgement: String, tap_time_sec: float) -> void:
@@ -31383,14 +31303,7 @@ func _play_sight_answer_click_sfx() -> void:
 
 
 func _rhythm_flow_is_downbeat_event(event_idx: int) -> bool:
-	if event_idx < 0 or event_idx >= _rhythm_flow_events.size():
-		return false
-	var evt := _rhythm_flow_events[event_idx]
-	if str(evt.get("type", "")) != "hit":
-		return false
-	var start_beat := float(evt.get("start_beat", 0.0))
-	var beat_in_measure := fposmod(start_beat - float(_rhythm_flow_count_in_beats), 4.0)
-	return absf(beat_in_measure) <= 0.001
+	return RhythmFlowLibraryScript.is_downbeat_event(event_idx, _rhythm_flow_events, _rhythm_flow_count_in_beats)
 
 
 func _play_rhythm_flow_tap_sfx(event_idx: int = -1) -> void:
