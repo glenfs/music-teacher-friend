@@ -96,6 +96,7 @@ const HintBanksScript = preload("res://scripts/music_theory/hint_banks.gd")
 const BadgeSystemScript = preload("res://scripts/gamification/badge_system.gd")
 const DailyChallengeScript = preload("res://scripts/gamification/daily_challenge.gd")
 const ChoiceBuilderScript = preload("res://scripts/exercises/choice_builder.gd")
+const RhythmFlowLibraryScript = preload("res://scripts/rhythm/rhythm_flow_library.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -30568,186 +30569,11 @@ func _continuous_can_spawn_note() -> bool:
 
 
 func _rhythm_flow_pattern_library() -> Array[Array]:
-	var exercises: Array = [
-		[
-			[
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 1.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 2.0},
-				{"type": "hit", "duration_beats": 2.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 4.0}
-			],
-			[
-				{"type": "rest", "duration_beats": 2.0},
-				{"type": "hit", "duration_beats": 2.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 2.0},
-				{"type": "rest", "duration_beats": 2.0}
-			]
-		],
-		[
-			[
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "rest", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 2.0},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 4.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 2.0}
-			]
-		],
-		[
-			[
-				{"type": "hit", "duration_beats": 2.0},
-				{"type": "rest", "duration_beats": 2.0}
-			],
-			[
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 3.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 1.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 2.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 4.0}
-			]
-		],
-		[
-			# 16th-note intro (beamed pairs/runs)
-			[
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 2.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 1.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 1.0}
-			]
-		],
-		[
-			# 16th-note practice (denser runs)
-			[
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 2.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "rest", "duration_beats": 1.0},
-				{"type": "hit", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.5},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "rest", "duration_beats": 1.0}
-			],
-			[
-				{"type": "hit", "duration_beats": 3.0},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25},
-				{"type": "hit", "duration_beats": 0.25}
-			]
-		]
-	]
-	var idx := clampi(_rhythm_flow_difficulty_level - 1, 0, exercises.size() - 1)
-	var selected: Array = exercises[idx]
-	var out: Array[Array] = []
-	for pattern_v in selected:
-		out.append(pattern_v as Array)
-	return out
+	return RhythmFlowLibraryScript.pattern_library(_rhythm_flow_difficulty_level)
 
 
 func _rhythm_flow_timing_windows() -> Dictionary:
-	return {"perfect": 0.050, "good": 0.100, "ok": 0.200}
+	return RhythmFlowLibraryScript.timing_windows()
 
 
 func _rhythm_flow_timing_windows_for_event(evt: Dictionary) -> Dictionary:
