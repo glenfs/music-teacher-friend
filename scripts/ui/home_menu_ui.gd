@@ -142,5 +142,8 @@ func ensure_grid_layout(row: Control, columns: int, h_gap: int, v_gap: int) -> C
 	for child in row.get_children():
 		row.remove_child(child)
 		grid.add_child(child)
-	row.queue_free()
+	# The old row is already detached and empty, so free it immediately. Using
+	# queue_free() here can leave short-lived orphan containers in shutdown/leak
+	# diagnostics when the app exits soon after startup.
+	row.free()
 	return grid

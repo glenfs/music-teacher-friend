@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MusicEd / Clefira — Monetization Plan (Teacher Edition Paid Tier)</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --card: #ffffff;
+    --ink: #1d2025;
+    --ink-2: #4a4f57;
+    --muted: #757a82;
+    --accent: #1c5f8c;
+    --hl: #fff3a6;
+    --hl-strong: #ffd24a;
+    --recommend: #2a7a4f;
+    --recommend-bg: #dff0e3;
+    --warn: #b56b1a;
+    --warn-bg: #fbedd6;
+    --decision: #6e4aa3;
+    --decision-bg: #ede4f7;
+    --pro: #c14a3a;
+    --pro-bg: #fde7e3;
+    --free: #4a7a3a;
+    --free-bg: #e2f0d8;
+    --code-bg: #f1efe8;
+    --border: #e5e2d8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header.page {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+  }
+  header.page h1 {
+    margin: 0 0 4px;
+    font-size: 32px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  header.page .sub {
+    color: var(--muted);
+    font-size: 15px;
+  }
+  header.page .meta {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  h2 {
+    margin: 56px 0 18px;
+    font-size: 24px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    margin: 22px 0 10px;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  mark {
+    background: var(--hl);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  mark.strong {
+    background: var(--hl-strong);
+    font-weight: 600;
+  }
+  code, .code {
+    font-family: "SF Mono", "Consolas", "Menlo", monospace;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #3b3b3b;
+  }
+  .recommend-banner {
+    background: var(--recommend-bg);
+    border-left: 4px solid var(--recommend);
+    padding: 12px 18px;
+    border-radius: 8px;
+    margin: 14px 0;
+    color: var(--ink);
+  }
+  .recommend-banner strong { color: var(--recommend); }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 28px 0 16px;
+    box-shadow: var(--shadow);
+  }
+  .toc h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .toc ol {
+    margin: 0;
+    padding-left: 22px;
+    font-size: 14.5px;
+  }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .framing, .architecture, .gotchas, .strengths {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  .strengths ul { padding-left: 22px; margin: 6px 0 0; }
+  .strengths li { margin-bottom: 6px; color: var(--ink-2); }
+  .decision {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--decision);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 18px 0;
+    box-shadow: var(--shadow);
+  }
+  .decision .tag {
+    display: inline-block;
+    color: var(--decision);
+    background: var(--decision-bg);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .decision h3 { display: inline; font-size: 19px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 10px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: #f3f1ea;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  tr.picked td {
+    background: var(--recommend-bg);
+  }
+  tr.picked td:first-child::after {
+    content: " ★";
+    color: var(--recommend);
+    font-weight: 700;
+  }
+  .free-cell { color: var(--free); font-weight: 600; }
+  .pro-cell { color: var(--pro); font-weight: 600; }
+  .pro-cell::before { content: "Pro · "; opacity: 0.7; font-weight: 500; }
+  .none-cell { color: var(--muted); }
+  .architecture pre {
+    background: var(--code-bg);
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    overflow-x: auto;
+    color: #333;
+    border: 1px solid #e4e1d4;
+  }
+  .gotchas {
+    background: var(--warn-bg);
+    border: 1px solid #f3d9a6;
+    border-left: 4px solid var(--warn);
+  }
+  .gotchas h3 { margin-top: 0; color: var(--warn); }
+  .gotchas ul { padding-left: 22px; margin: 6px 0 0; }
+  .gotchas li { margin-bottom: 8px; color: var(--ink-2); }
+  .phase {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    padding: 16px 22px;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+  }
+  .phase .label {
+    display: inline-block;
+    background: var(--decision-bg);
+    color: var(--decision);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 10px;
+  }
+  .phase ol { padding-left: 22px; margin: 8px 0 0; }
+  .phase li { margin-bottom: 4px; color: var(--ink-2); }
+  .phase .effort {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .ready-banner {
+    background: linear-gradient(135deg, #fdf2d0 0%, #fae6a3 100%);
+    border: 1px solid var(--hl-strong);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 36px 0 10px;
+  }
+  .ready-banner h2 {
+    margin: 0 0 6px;
+    border: none;
+    color: #a87a14;
+    font-size: 21px;
+  }
+  .ready-banner .sub {
+    color: var(--ink-2);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+  footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 28px 18px 60px; }
+    header.page h1 { font-size: 26px; }
+    h2 { font-size: 21px; }
+    table { font-size: 13.5px; }
+    th, td { padding: 8px 8px; }
+  }
+  @media print {
+    body { background: white; }
+    .wrap { padding: 24px; max-width: none; }
+    .decision, .framing, .architecture, .gotchas, .strengths, .phase, .toc, .ready-banner, .recommend-banner {
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Monetization Plan</h1>
+  <div class="sub">Adding a paid <strong>Teacher Edition</strong> tier to MusicEd / Clefira — strategy, architecture, and a phased rollout.</div>
+  <div class="meta">Planning doc · 2026-05-21 · References: <code>pre_launch_deferred.md</code> item #1 (the #1 launch blocker) · Cloud Sync (just shipped) is the architectural prerequisite this builds on.</div>
+</header>
+
+<section class="recommend-banner">
+  <p style="margin:0;"><strong>Status:</strong> per-user identity is already in place (Supabase auth via OTP, just shipped). That's the architectural piece every paid product needs. <mark class="strong">Adding subscriptions is now incremental — one table, one webhook, one paywall dialog.</mark></p>
+</section>
+
+<section class="toc">
+  <h3>Jump to</h3>
+  <ol>
+    <li><a href="#strengths">What you already have working in your favor</a></li>
+    <li><a href="#decisions">The three strategic decisions</a></li>
+    <li><a href="#features">What to gate (Free vs Pro)</a></li>
+    <li><a href="#architecture">Technical architecture</a></li>
+    <li><a href="#rollout">Phased rollout</a></li>
+    <li><a href="#gotchas">Gotchas: legal, operational, conversion</a></li>
+    <li><a href="#first">My one-thing-first recommendation</a></li>
+  </ol>
+</section>
+
+<h2 id="strengths">What you already have working in your favor</h2>
+<section class="strengths">
+  <ul>
+    <li><strong>Per-user identity</strong> — Supabase auth via email + OTP. <mark>The single most important piece of paid software</mark>: a stable account that survives across devices.</li>
+    <li><strong>Cross-device state</strong> — Cloud Sync Tier A shipped this week. Subscription status will sync the same way.</li>
+    <li><strong>Per-user table with Row Level Security</strong> — proven pattern (the <code>sync_snapshots</code> table). A <code>subscriptions</code> table copies the same shape.</li>
+    <li><strong><code>IS_TEACHER_EDITION</code> flag already exists</strong> — the codebase already separates Teacher Edition from Student Edition. Adding an <code>is_pro_subscribed()</code> check beside it is small.</li>
+    <li><strong>Bundled deliverable already present</strong> — students, lessons, progress are already organized into per-student folders. <mark>Teachers paying for "all my students backed up + reports" is a natural value proposition.</mark></li>
+  </ul>
+</section>
+
+<h2 id="decisions">The three strategic decisions</h2>
+
+<!-- Decision 1: Business model -->
+<div class="decision">
+  <span class="tag">Decision 1</span>
+  <h3>Business model</h3>
+  <table>
+    <thead>
+      <tr><th>Model</th><th>Pros</th><th>Cons</th><th>Fit for this app</th></tr>
+    </thead>
+    <tbody>
+      <tr class="picked">
+        <td><strong>Subscription</strong> ($/mo or $/yr)</td>
+        <td>Recurring revenue funds cloud sync + new content. Industry-standard for SaaS teaching tools.</td>
+        <td>Higher friction. Some teachers resist.</td>
+        <td><mark class="strong">Best fit.</mark> Cloud sync = ongoing server cost = subscription is honest.</td>
+      </tr>
+      <tr>
+        <td>One-time purchase</td>
+        <td>Low friction, "own it" psychology.</td>
+        <td>No recurring revenue. Can't fund ongoing cloud sync long-term.</td>
+        <td>Works as a "Lifetime" tier alongside subscriptions ($299).</td>
+      </tr>
+      <tr>
+        <td>Freemium</td>
+        <td>Wide top-of-funnel, low-risk for the teacher.</td>
+        <td>Conversion typically 2–5%.</td>
+        <td>Combine with subscription. Best results.</td>
+      </tr>
+      <tr>
+        <td>Per-student pricing</td>
+        <td>Scales with the studio.</td>
+        <td>Adds complexity; harder to communicate.</td>
+        <td>Defer until you have data on studio sizes.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="recommend-banner"><strong>★ My pick:</strong> <mark class="strong">Freemium → subscription.</mark> Free tier with 1–2 students + core practice features; <strong>Pro</strong> tier ($9.99/mo or $99/yr) unlocks unlimited students, cloud sync, auto reports, recital prep, etc. Add a <strong>Studio</strong> tier ($19.99/mo) later for multi-teacher.</div>
+</div>
+
+<!-- Decision 2: Pricing -->
+<div class="decision">
+  <span class="tag">Decision 2</span>
+  <h3>Pricing — anchor against the market</h3>
+  <table>
+    <thead>
+      <tr><th>App</th><th>Pricing</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Tonara</td><td>$10–30 / month</td></tr>
+      <tr><td>Modacity</td><td>~$10 / month</td></tr>
+      <tr><td>TeacherZone</td><td>$15–45 / month</td></tr>
+      <tr><td>MusicProdigy</td><td>$15–50 / month per studio</td></tr>
+    </tbody>
+  </table>
+  <div class="recommend-banner">
+    <strong>★ My pick:</strong>
+    <ul style="margin:8px 0 0;">
+      <li><strong>Pro</strong>: <mark class="strong">$9.99 / month or $99 / year</mark> (~17% annual discount).</li>
+      <li><strong>Studio</strong> (later): $19.99 / month per studio — unlimited students + multi-teacher.</li>
+      <li><strong>Lifetime</strong> (optional): $299 — for teachers who hate subscriptions.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Decision 3: Distribution channel -->
+<div class="decision">
+  <span class="tag">Decision 3</span>
+  <h3>Distribution channel — platform constraints matter</h3>
+  <table>
+    <thead>
+      <tr><th>Channel</th><th>Fee</th><th>Constraints</th></tr>
+    </thead>
+    <tbody>
+      <tr class="picked">
+        <td><strong>Direct (Stripe / Paddle / Lemon Squeezy on your website)</strong></td>
+        <td>3–5%</td>
+        <td><mark>Best margins.</mark> Perfect for desktop. Cannot be advertised inside an Android app sold via Play Store for digital goods (Google's "anti-steering" rule).</td>
+      </tr>
+      <tr>
+        <td><strong>Google Play Billing</strong></td>
+        <td>15% (first $1M/yr), 30% above</td>
+        <td><mark>Required if app is on Play Store</mark> selling digital subscriptions. Has its own UI flows.</td>
+      </tr>
+      <tr>
+        <td>Apple App Store</td>
+        <td>15% first year, 30% later</td>
+        <td>Required for iOS. Same anti-steering issues.</td>
+      </tr>
+      <tr>
+        <td>Itch.io / Gumroad</td>
+        <td>10%</td>
+        <td>Easy for desktop. Less professional-feeling for teachers.</td>
+      </tr>
+      <tr>
+        <td>Steam</td>
+        <td>30%</td>
+        <td>Probably overkill for a music app.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="recommend-banner"><strong>★ My pick:</strong> Ship <mark class="strong">direct billing (Stripe) first</mark> for Windows desktop + a web subscription page. Add <strong>Google Play Billing</strong> when you publish on Play Store. Add <strong>Apple IAP</strong> only when launching iOS.</div>
+</div>
+
+<h2 id="features">What to gate (Free vs Pro)</h2>
+<p>This is the single most important UX decision. Get it wrong and you either convert nobody, or make the free tier so bad nobody tries it. <mark>The free tier should feel useful but lonely; Pro should feel like "you have a studio business".</mark></p>
+<table>
+  <thead>
+    <tr><th>Feature</th><th>Free</th><th>Pro</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Ear training, sight reading, all 8 practice modes</td><td class="free-cell">✓</td><td class="pro-cell">✓</td></tr>
+    <tr><td>Learning Mode (22 modules)</td><td class="free-cell">✓</td><td class="pro-cell">✓</td></tr>
+    <tr><td>Practice Drills with generators (Hanon / Czerny / Scale)</td><td class="free-cell">✓</td><td class="pro-cell">✓</td></tr>
+    <tr><td><strong>Students in roster</strong></td><td class="free-cell">1 student</td><td class="pro-cell">Unlimited</td></tr>
+    <tr><td><strong>Cloud Sync</strong></td><td class="none-cell">—</td><td class="pro-cell">✓</td></tr>
+    <tr><td><strong>Auto parent reports</strong> (when built)</td><td class="none-cell">—</td><td class="pro-cell">✓</td></tr>
+    <tr><td><strong>Recital prep mode</strong> (when built)</td><td class="none-cell">—</td><td class="pro-cell">✓</td></tr>
+    <tr><td><strong>Multi-teacher</strong> (when built)</td><td class="none-cell">—</td><td class="pro-cell">✓</td></tr>
+    <tr><td><strong>Lesson plan templates + AI agenda</strong> (when built)</td><td class="none-cell">—</td><td class="pro-cell">✓</td></tr>
+    <tr><td><strong>Practice journal / weakness-biased generators</strong> (when built)</td><td class="none-cell">—</td><td class="pro-cell">✓</td></tr>
+  </tbody>
+</table>
+<p><mark class="strong">A teacher with even 2 students has to pay within a month.</mark> That's the design.</p>
+
+<h2 id="architecture">Technical architecture</h2>
+<section class="architecture">
+  <h3 style="margin-top:0;">New Supabase table: <code>subscriptions</code></h3>
+  <pre>create table public.subscriptions (
+  user_id              uuid primary key references auth.users(id) on delete cascade,
+  status               text not null,   -- 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired'
+  plan                 text,            -- 'monthly' | 'annual' | 'studio' | 'lifetime'
+  current_period_end   timestamptz,     -- when access expires
+  trial_ends_at        timestamptz,     -- 14-day trial window
+  stripe_customer_id   text,
+  stripe_subscription_id text,
+  provider             text,            -- 'stripe' | 'google_play' | 'app_store'
+  created_at           timestamptz default now(),
+  updated_at           timestamptz default now()
+);
+
+-- RLS: users read only their own row.
+alter table public.subscriptions enable row level security;
+create policy "read own subscription"
+  on public.subscriptions for select
+  using (auth.uid() = user_id);
+-- Writes only via service role (webhook). No client-side write policy.</pre>
+
+  <h3>Three components in the Godot app</h3>
+  <ul>
+    <li><code>scripts/billing/subscription_service.gd</code> — reads the subscription row, exposes <code>is_pro()</code>, <code>trial_days_left()</code>, <code>expires_at()</code>. Cached locally for offline use.</li>
+    <li><code>scripts/billing/paywall_dialog.gd</code> — shown when a gated feature is accessed without Pro. Lists the value prop + "Start free trial" / "Subscribe" buttons.</li>
+    <li><strong>Platform adapters</strong> — <code>stripe_checkout_launcher.gd</code> (opens browser to Stripe Checkout), later <code>google_play_billing.gd</code> for Android, <code>app_store_iap.gd</code> for iOS.</li>
+  </ul>
+
+  <h3>One server piece (outside Godot)</h3>
+  <p>A tiny webhook receiver — one <strong>Supabase Edge Function</strong> in TypeScript, ~50 lines — that:</p>
+  <ol style="padding-left: 22px;">
+    <li>Receives Stripe webhook events: <code>checkout.session.completed</code>, <code>customer.subscription.updated</code>, <code>customer.subscription.deleted</code>.</li>
+    <li>Updates the <code>subscriptions</code> table accordingly.</li>
+  </ol>
+  <p><mark>That's literally all the server-side code you need.</mark></p>
+
+  <h3>The flow end-to-end</h3>
+  <p><strong>Desktop subscription:</strong></p>
+  <ol style="padding-left: 22px;">
+    <li>Teacher hits a Pro feature → paywall dialog → "Subscribe $9.99 / mo".</li>
+    <li>App calls <code>OS.shell_open("https://yourapp.com/subscribe?user_id=&lt;id&gt;")</code>.</li>
+    <li>Browser opens Stripe Checkout. Teacher pays.</li>
+    <li>Stripe webhook fires → updates Supabase <code>subscriptions.status = 'active'</code>.</li>
+    <li>App polls the subscription row (every 30s while paywall is open, then on launch) → sees <code>active</code> → unlocks features.</li>
+  </ol>
+  <p><strong>Android subscription</strong> (later):</p>
+  <ol style="padding-left: 22px;">
+    <li>Same paywall, but the "Subscribe" button uses Google Play Billing (Godot plugin).</li>
+    <li>Play Billing returns a purchase token.</li>
+    <li>App sends token to your server → server validates with Google's API → updates Supabase.</li>
+    <li>App polls subscription row → unlocked.</li>
+  </ol>
+</section>
+
+<h2 id="rollout">Phased rollout</h2>
+
+<div class="phase">
+  <span class="label">Phase A · ~1 week</span>
+  <strong>Pre-launch: desktop end-to-end paid</strong>
+  <ol>
+    <li><code>subscriptions</code> table + RLS in Supabase. ~30 min.</li>
+    <li><code>subscription_service.gd</code> reading the row + caching locally. ~2 days.</li>
+    <li><strong>Paywall dialog</strong> visual + copy. ~1 day.</li>
+    <li><strong>Stripe account</strong> setup, products + prices in Stripe dashboard. ~2 hrs.</li>
+    <li><strong>Stripe webhook</strong> Edge Function → updates Supabase. ~2 hrs.</li>
+    <li>Subscribe button → Stripe Checkout flow. ~1 day.</li>
+    <li><strong>Free-trial logic</strong>: first sign-in starts a 14-day trial automatically. ~half day.</li>
+    <li><strong>Gate the features</strong> listed in the Free-vs-Pro table with <code>subscription_service.is_pro()</code> checks. ~1 day.</li>
+  </ol>
+  <div class="effort">Total: about a week of focused work. <mark>You can launch paid on desktop end-to-end with just this.</mark></div>
+</div>
+
+<div class="phase">
+  <span class="label">Phase B · ~1 week</span>
+  <strong>Android (when you publish to Play Store)</strong>
+  <ol>
+    <li>Register subscription products in Google Play Console.</li>
+    <li>Add <code>godot-google-play-billing</code> plugin.</li>
+    <li>Server-side validation of Play purchase tokens.</li>
+    <li>Hook into the same paywall — different button label on Android.</li>
+  </ol>
+</div>
+
+<div class="phase">
+  <span class="label">Phase C · ~1 week</span>
+  <strong>iOS App Store (only if you go iOS)</strong>
+  <ol>
+    <li>Same shape as Android but with StoreKit.</li>
+    <li>Required: Apple Sign In if any social sign-in is offered.</li>
+  </ol>
+</div>
+
+<div class="phase">
+  <span class="label">Phase D · later</span>
+  <strong>Maturity — when you have real subscriber data</strong>
+  <ol>
+    <li>Annual plan with discount (already in pricing).</li>
+    <li>Studio tier (multi-teacher).</li>
+    <li>Lifetime tier ($299).</li>
+    <li>Promo codes (music teacher conferences, beta-tester rewards).</li>
+    <li>Referral discounts.</li>
+    <li>Team / multi-teacher billing.</li>
+  </ol>
+</div>
+
+<h2 id="gotchas">Gotchas: legal, operational, conversion</h2>
+
+<section class="gotchas">
+  <h3>Legal</h3>
+  <ul>
+    <li><strong>Terms of Service</strong> — subscription terms, cancellation policy, refund policy.</li>
+    <li><strong>Privacy Policy</strong> — <mark>student data is minor data</mark>: COPPA/FERPA implications for US, GDPR-K for EU. The privacy notice from the cloud-sync plan covers most of this.</li>
+    <li><strong>EU cancellation rights</strong> — cancellation must be <mark>as easy as subscription</mark>, no friction allowed.</li>
+    <li><strong>Data export rights</strong> — users can request all their data. You already have the bundle code from sync.</li>
+  </ul>
+</section>
+
+<section class="gotchas">
+  <h3>Operational</h3>
+  <ul>
+    <li><strong>Refunds</strong> — handled automatically by Stripe webhooks. Your code just demotes <code>status</code>.</li>
+    <li><strong>Payment failures</strong> — 3–7 day grace period before locking features is standard.</li>
+    <li><strong>Family sharing</strong> — Apple's Family Sharing for iOS subscriptions. Plan for it.</li>
+    <li><strong>Tax (VAT, GST, sales tax)</strong> — use <strong>Stripe Tax</strong> OR switch to <strong>Paddle / Lemon Squeezy</strong> (they're "merchant of record" — they handle all tax for you in exchange for slightly higher fees ~5–6%). <mark class="strong">For an indie shipping internationally, MoR is worth every penny.</mark></li>
+  </ul>
+</section>
+
+<section class="gotchas">
+  <h3>Conversion</h3>
+  <ul>
+    <li><strong>First-run = trial</strong>, never gate at sign-up. <mark>Show value before asking for money.</mark></li>
+    <li><strong>No credit card required for trial.</strong> Lowest possible friction.</li>
+    <li><strong>Days-left counter</strong> visible during trial (subtle, in the corner).</li>
+    <li><strong>At trial end</strong>: dialog with <em>"your data stays for 90 days while you decide"</em> reassurance.</li>
+    <li><strong>Cancellation flow</strong>: ask why, offer 50% discount once, let them leave easily.</li>
+  </ul>
+</section>
+
+<div class="ready-banner" id="first">
+  <h2 style="border:none; padding:0; margin:0;">★ My one-thing-first recommendation</h2>
+  <p class="sub">If you do exactly ONE thing before everything else:</p>
+  <p style="margin-top:10px;"><mark class="strong">Set up the <code>subscriptions</code> table + a 14-day free trial that starts on first sign-in, with no paywall yet.</mark></p>
+  <p>That gives you:</p>
+  <ul>
+    <li>Server-side per-user subscription state (the architectural piece).</li>
+    <li>Trial counter visible in the app.</li>
+    <li>Data on how many teachers actually use the app for 14+ days (your activation funnel).</li>
+    <li><strong>Zero risk</strong> — nothing gets gated yet.</li>
+  </ul>
+  <p>Then you can ship paywalls + Stripe + paid Pro tier as a follow-up, <mark>with the knowledge of who's a real candidate vs. who churned.</mark></p>
+</div>
+
+<footer>
+  MusicEd / Clefira · Monetization Plan · 2026-05-21 · For internal planning
+</footer>
+
+</div>
+</body>
+</html>

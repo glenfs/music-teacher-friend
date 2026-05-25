@@ -20,7 +20,7 @@ static func encode(exercise: Dictionary) -> String:
 	sb.append('  </work>\n')
 	sb.append('  <identification>\n')
 	sb.append('    <encoding>\n')
-	sb.append('      <software>MusicEd Practice Drills</software>\n')
+	sb.append('      <software>Clefira Practice Drills</software>\n')
 	sb.append('      <encoding-date>%s</encoding-date>\n' % _today_iso())
 	sb.append('    </encoding>\n')
 	sb.append('  </identification>\n')

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MusicEd / Clefira — Payment Processor Comparison</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --card: #ffffff;
+    --ink: #1d2025;
+    --ink-2: #4a4f57;
+    --muted: #757a82;
+    --accent: #1c5f8c;
+    --hl: #fff3a6;
+    --hl-strong: #ffd24a;
+    --recommend: #2a7a4f;
+    --recommend-bg: #dff0e3;
+    --warn: #b56b1a;
+    --warn-bg: #fbedd6;
+    --decision: #6e4aa3;
+    --decision-bg: #ede4f7;
+    --code-bg: #f1efe8;
+    --border: #e5e2d8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header.page {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+  }
+  header.page h1 {
+    margin: 0 0 4px;
+    font-size: 32px;
+    letter-spacing: -0.01em;
+  }
+  header.page .sub {
+    color: var(--muted);
+    font-size: 15px;
+  }
+  header.page .meta {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  h2 {
+    margin: 48px 0 18px;
+    font-size: 24px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    margin: 22px 0 10px;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  mark {
+    background: var(--hl);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  mark.strong {
+    background: var(--hl-strong);
+    font-weight: 600;
+  }
+  code, .code {
+    font-family: "SF Mono", "Consolas", "Menlo", monospace;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #3b3b3b;
+  }
+  .recommend-banner {
+    background: var(--recommend-bg);
+    border-left: 4px solid var(--recommend);
+    padding: 12px 18px;
+    border-radius: 8px;
+    margin: 14px 0;
+  }
+  .recommend-banner strong { color: var(--recommend); }
+  .warn-banner {
+    background: var(--warn-bg);
+    border-left: 4px solid var(--warn);
+    padding: 12px 18px;
+    border-radius: 8px;
+    margin: 14px 0;
+  }
+  .warn-banner strong { color: var(--warn); }
+  .framing {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 10px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: #f3f1ea;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  tr.picked td { background: var(--recommend-bg); }
+  tr.picked td:first-child::after { content: " ★"; color: var(--recommend); font-weight: 700; }
+  tr.deprecated td { opacity: 0.78; }
+  .fees { font-family: "SF Mono", "Consolas", monospace; white-space: nowrap; }
+  .pick-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--decision);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+  }
+  .pick-card .tag {
+    display: inline-block;
+    color: var(--decision);
+    background: var(--decision-bg);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .pick-card h3 { display: inline; font-size: 19px; }
+  .pick-card.recommended { border-left-color: var(--recommend); background: linear-gradient(180deg, var(--recommend-bg) 0%, #ffffff 60%); }
+  .pick-card.recommended .tag { color: white; background: var(--recommend); }
+  .flowchart {
+    background: linear-gradient(135deg, #fdf2d0 0%, #fae6a3 100%);
+    border: 1px solid var(--hl-strong);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 36px 0;
+  }
+  .flowchart h2 { border: none; color: #a87a14; margin-top: 0; }
+  .flowchart ol { margin: 6px 0 0; padding-left: 22px; }
+  .flowchart li { margin-bottom: 10px; color: var(--ink-2); }
+  .flowchart li strong { color: var(--ink); }
+  .flowchart .arrow { color: var(--accent); font-weight: 600; }
+  footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 28px 18px 60px; }
+    header.page h1 { font-size: 26px; }
+    h2 { font-size: 21px; }
+    table { font-size: 13.5px; }
+    th, td { padding: 8px 8px; }
+  }
+  @media print {
+    body { background: white; }
+    .wrap { padding: 24px; max-width: none; }
+    .pick-card, .framing, .recommend-banner, .warn-banner, .flowchart {
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Payment Processor Comparison</h1>
+  <div class="sub">Choosing between Paddle, Polar, Stripe, Lemon Squeezy, and friends for paid MusicEd / Clefira Teacher Edition.</div>
+  <div class="meta">Planning doc · 2026-05-21 · Companion to <code>monetization_plan.html</code> · For deciding the payment layer that sits between Supabase auth and Stripe-style billing.</div>
+</header>
+
+<section class="framing">
+  <h3 style="margin-top:0;">The two big choices</h3>
+  <p><strong>Merchant of Record (MoR)</strong> — service handles global tax (VAT, GST, sales tax), chargebacks, refunds, multi-currency. <mark>Higher fees (4–6%) in exchange for not thinking about tax compliance.</mark></p>
+  <p><strong>DIY processor (Stripe direct)</strong> — lowest fees (~3%), but you're the merchant of record. You're responsible for collecting and remitting tax everywhere you sell.</p>
+  <p style="margin-bottom:0;"><mark class="strong">For a solo indie shipping internationally, MoR is almost always the right call.</mark> The tax handling alone justifies the higher fee — collecting EU VAT, registering for IOSS, and filing returns in 50 countries is a part-time job by itself.</p>
+</section>
+
+<h2>Merchant-of-Record options (handle tax for you)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>Fees</th>
+      <th>Best for</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="picked">
+      <td><strong>Paddle</strong></td>
+      <td class="fees">~5% + $0.50</td>
+      <td>Indie SaaS, software products, subscription apps</td>
+      <td>Most mature MoR. Strong dashboard, recurring billing built in, well-documented API. <mark>What most indie SaaS picks today.</mark></td>
+    </tr>
+    <tr>
+      <td><strong>Polar.sh</strong></td>
+      <td class="fees">4% + $0.40</td>
+      <td>Developer tools, GitHub-native projects, modern indie</td>
+      <td>Newer (2023). Open-source, very clean API, indie-dev-friendly. Lower fees than Paddle. Smaller community.</td>
+    </tr>
+    <tr class="deprecated">
+      <td><strong>Lemon Squeezy</strong></td>
+      <td class="fees">~5% + $0.50</td>
+      <td>Was the indie favorite pre-2024</td>
+      <td><mark>Acquired by Stripe in 2024.</mark> Still works, but integration with Stripe's broader product is evolving. Less differentiated now — if going Stripe ecosystem, just use Stripe + Stripe Tax directly.</td>
+    </tr>
+    <tr>
+      <td><strong>FastSpring</strong></td>
+      <td class="fees">~5.9%</td>
+      <td>Established software vendors, mid-size indies</td>
+      <td>Mature, popular with bigger indies. Higher fees but very capable. Less indie-friendly UI than Paddle.</td>
+    </tr>
+    <tr>
+      <td><strong>Gumroad</strong></td>
+      <td class="fees">10%</td>
+      <td>Creators, one-time digital products, simple lifetime licenses</td>
+      <td>Easiest to set up — practically zero config. But subscription/SaaS support is weaker, and 10% adds up. Good for "Lifetime $299" tier as a side option.</td>
+    </tr>
+    <tr>
+      <td><strong>Whop</strong></td>
+      <td class="fees">3% + tx fee</td>
+      <td>Creator subscriptions, communities, course-style products</td>
+      <td>Newer, popular with content creators. Less SaaS-focused — built more for "join my community" tier sales.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="recommend-banner">
+  All MoRs handle: <strong>global tax (VAT, GST, sales tax), chargebacks, refunds, multi-currency, fraud screening</strong>. That tax handling alone is worth the higher fee for an indie shipping internationally — collecting EU VAT compliantly is a real job on its own.
+</div>
+
+<h2>DIY (you handle tax yourself)</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>Fees</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Stripe</strong></td>
+      <td class="fees">2.9% + $0.30</td>
+      <td>Lowest fees, most flexible API. <mark>You become the merchant of record</mark> — you collect VAT/GST/sales tax. Add <strong>Stripe Tax</strong> (+0.5%) for automated tax calculation; still doesn't shield you legally the way an MoR does, but covers most compliance.</td>
+    </tr>
+    <tr>
+      <td><strong>PayPal</strong></td>
+      <td class="fees">~3.5% + $0.49</td>
+      <td>Widely supported, clunky checkout, recurring subscriptions are workable but not great UX. Many SaaS skip it.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="warn-banner">
+  <strong>Important reality check:</strong> "DIY tax" means registering for VAT in EU member states above the IOSS threshold, sales-tax permits in US states with economic nexus, GST in India / Australia, etc. <mark>For an indie selling $9.99/month internationally, this overhead easily exceeds the 2% fee delta vs. an MoR.</mark>
+</div>
+
+<h2>Region-specific options</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Service</th>
+      <th>Where</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Razorpay</strong></td>
+      <td>India</td>
+      <td>Best in India — UPI, NetBanking, local cards. Lower fees than Stripe in India. Worth considering if a meaningful share of your teachers are Indian.</td>
+    </tr>
+    <tr>
+      <td><strong>Mollie</strong></td>
+      <td>Europe</td>
+      <td>Strong in EU, multiple local payment methods. Lower friction for European buyers.</td>
+    </tr>
+    <tr>
+      <td><strong>Square</strong></td>
+      <td>US / AU / UK / JP</td>
+      <td>More retail / point-of-sale focused. Less natural fit for a SaaS app.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>My recommendation</h2>
+
+<div class="pick-card recommended">
+  <span class="tag">★ Top Pick</span>
+  <h3>Paddle</h3>
+  <p>Most mature MoR. ~5% fees but you stop thinking about tax forever — they collect VAT/GST/sales tax for you and remit it to every government you sell into. Plays well with Supabase via webhooks (the architecture in <code>monetization_plan.html</code> is the same shape: Paddle webhook → Supabase Edge Function → updates <code>subscriptions</code> table).</p>
+  <p><strong>Best for you because:</strong> solo indie, music teachers are international (US, EU, India, AU all major markets), $9.99/mo at low volume = tax compliance is way more expensive in time than the ~2% fee delta vs Stripe.</p>
+</div>
+
+<div class="pick-card">
+  <span class="tag">Strong Alt</span>
+  <h3>Polar.sh</h3>
+  <p>Newer entrant (2023), modern API, cheaper fees (~4%). Worth a serious look if you like minimalist developer-first tools. Open-source ethos. Smaller community than Paddle — fewer Stack Overflow answers when things go wrong, but the product is sharper.</p>
+  <p><strong>Pick this if:</strong> you prefer a cleaner API/dashboard over Paddle's broader ecosystem, and the slightly lower fees matter.</p>
+</div>
+
+<div class="pick-card">
+  <span class="tag">Backup Option</span>
+  <h3>Stripe + Stripe Tax</h3>
+  <p>Lowest total fees (~3.4%). Becomes interesting once you have real volume and tax compliance becomes a known overhead you can scope. <mark>Skip this initially</mark> — the time you save with an MoR while still small is more valuable than the fee delta.</p>
+</div>
+
+<div class="pick-card" style="opacity:0.85;">
+  <span class="tag">Skip</span>
+  <h3>Lemon Squeezy (in 2026)</h3>
+  <p>Post-Stripe acquisition, it's no longer the differentiated option it was. If you're going to use Stripe's ecosystem anyway, just use Stripe + Stripe Tax directly. Lemon Squeezy still works, but there's no longer a strong reason to pick it over either Paddle (real alternative MoR) or Stripe (lowest fees).</p>
+</div>
+
+<div class="flowchart">
+  <h2>Decision flowchart</h2>
+  <ol>
+    <li><strong>Will you sell internationally from day one?</strong> <span class="arrow">→</span> MoR (Paddle or Polar). Skip Stripe direct.</li>
+    <li><strong>US/Canada only, OK with sales-tax filings yourself?</strong> <span class="arrow">→</span> Stripe direct + Stripe Tax.</li>
+    <li><strong>Just want simple one-time / lifetime sales without subscription headache?</strong> <span class="arrow">→</span> Gumroad.</li>
+  </ol>
+  <p style="margin-top:14px;"><strong>For "MusicEd Teacher Pro $9.99/month sold globally" → <mark class="strong">Paddle or Polar</mark>.</strong></p>
+</div>
+
+<footer>
+  MusicEd / Clefira · Payment Processor Comparison · 2026-05-21 · Companion to monetization_plan.html
+</footer>
+
+</div>
+</body>
+</html>

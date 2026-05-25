@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Adagio Music Trainer — Deep Product & Code Review (May 2026)</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a212b;
+    --panel-2: #222a36;
+    --ink: #e8edf2;
+    --muted: #97a3b0;
+    --accent: #4fbf9f;
+    --accent-2: #ffc857;
+    --danger: #ef6b6b;
+    --warn: #f0a868;
+    --ok: #6ed28a;
+    --line: #2c3644;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 32px 96px; }
+  header { border-bottom: 2px solid var(--accent); padding-bottom: 24px; margin-bottom: 32px; }
+  header .tag { display: inline-block; background: var(--accent); color: #0f1419; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  h1 { font-size: 34px; margin: 12px 0 6px; }
+  h2 { font-size: 24px; margin-top: 48px; padding-bottom: 8px; border-bottom: 1px solid var(--line); color: var(--accent-2); }
+  h3 { font-size: 18px; margin-top: 28px; color: var(--accent); }
+  h4 { font-size: 15px; margin-top: 18px; color: var(--ink); }
+  p, li { color: var(--ink); }
+  .muted { color: var(--muted); font-size: 14px; }
+  code { background: var(--panel-2); color: var(--accent-2); padding: 1px 6px; border-radius: 3px; font-size: 13px; font-family: "JetBrains Mono", Consolas, monospace; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px 24px; margin: 16px 0; }
+  .panel.warn { border-left: 4px solid var(--warn); }
+  .panel.danger { border-left: 4px solid var(--danger); }
+  .panel.ok { border-left: 4px solid var(--ok); }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--panel-2); color: var(--accent-2); text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--line); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:hover td { background: var(--panel); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pill.hi { background: #4a1f1f; color: var(--danger); }
+  .pill.md { background: #4a3a1f; color: var(--warn); }
+  .pill.lo { background: #1f3a4a; color: #6cb6e8; }
+  .pill.ok { background: #1f4a2a; color: var(--ok); }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .check::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+  .x::before { content: "✗ "; color: var(--danger); font-weight: 700; }
+  .toc { background: var(--panel); border-radius: 8px; padding: 16px 24px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+  blockquote { border-left: 3px solid var(--accent); margin: 12px 0; padding: 4px 16px; color: var(--muted); font-style: italic; }
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .stat { background: var(--panel-2); padding: 14px; border-radius: 6px; text-align: center; }
+  .stat .num { font-size: 24px; font-weight: 700; color: var(--accent-2); }
+  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  @media (max-width: 720px) { .grid2, .stat-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="tag">Deep Review · May 22, 2026</span>
+  <h1>Adagio Music Trainer — Product &amp; Code Review</h1>
+  <p class="muted">A thorough analysis of MusicEd as a tool for teachers and students. Findings, gaps, UI issues, and the path to 1,000 paying customers.</p>
+</header>
+
+<div class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#exec">Executive summary</a></li>
+    <li><a href="#features">Gameplay &amp; feature completeness</a></li>
+    <li><a href="#ui">UI / UX analysis</a></li>
+    <li><a href="#code">Code quality &amp; tech debt</a></li>
+    <li><a href="#competitors">Competitive landscape</a></li>
+    <li><a href="#pro">Path to "Pro &amp; 1K customers"</a></li>
+    <li><a href="#fixes">Top priority fix list</a></li>
+    <li><a href="#roadmap">Suggested 12-week roadmap</a></li>
+  </ol>
+</div>
+
+<h2 id="exec">1. Executive Summary</h2>
+
+<div class="stat-row">
+  <div class="stat"><div class="num">8</div><div class="lbl">Training modes</div></div>
+  <div class="stat"><div class="num">22</div><div class="lbl">Learning modules</div></div>
+  <div class="stat"><div class="num">33K</div><div class="lbl">Lines in main script</div></div>
+  <div class="stat"><div class="num">5</div><div class="lbl">Teacher tabs</div></div>
+</div>
+
+<p>MusicEd is a <strong>technically ambitious music education app</strong> with substantial breadth: eight training modes, twenty-two learning modules, procedural exercise generation (Hanon / Czerny / Scales), and a thoughtful product layer for per-student data and a teacher dashboard. The ear-training and sight-reading gameplay loop is genuinely strong; the procedural exercise generator is a real competitive moat.</p>
+
+<p>However, the product today is best described as <em>"a practice app with a teacher dashboard attached, not yet a studio tool."</em> Five gaps stand between MusicEd and a viable paid teacher product:</p>
+
+<div class="panel danger">
+  <ol>
+    <li><strong>Cloud sync is unfinished</strong> — multi-device teachers will lose data.</li>
+    <li><strong>Teachers can't see what students actually practiced</strong> — the data exists in <code>module_progress.json</code> but is never surfaced in the dashboard.</li>
+    <li><strong>Assignments don't reach students</strong> — <code>TeacherStore.add_assignment()</code> works, but there is no student-side queue UI.</li>
+    <li><strong>No curriculum alignment</strong> — no link from exercises to ABRSM / RCM / Faber method books.</li>
+    <li><strong>33K-line monolith</strong> in <code>scripts/interval_birds.gd</code> makes every change risky and onboarding nearly impossible.</li>
+  </ol>
+</div>
+
+<h2 id="features">2. Gameplay &amp; Feature Completeness</h2>
+
+<h3>What's strong</h3>
+<ul>
+  <li class="check"><strong>Eight training modes</strong> with configurable difficulty (Interval, Chord, Sight Notes / Chords / Grand Staff, Rhythm Flow, Note Chase, Progression, Scale/Mode, Cadence). Rare breadth for a consumer app.</li>
+  <li class="check"><strong>22-module learning curriculum</strong> with gated progression, 1–3 star mastery, review queue (spaced repetition), and hands-on exercises tied to notation concepts.</li>
+  <li class="check"><strong>Procedural exercise generation</strong> (Phases 1–8 live): Hanon, Czerny, scales, arpeggios, 5-finger drills with difficulty estimation. Competitors don't have this.</li>
+  <li class="check"><strong>Per-student data architecture</strong>: <code>user://students/&lt;id&gt;/</code> routing, <code>ActiveStudent</code> selector, <code>LessonSession</code> tracking, legacy-migration path. Well-designed, though currently underutilized.</li>
+  <li class="check"><strong>Audio engine via <code>Conductor</code></strong> avoids drift from <code>get_tree().create_timer()</code> — gives accurate musical timing.</li>
+</ul>
+
+<h3>Critical gaps</h3>
+
+<div class="panel warn">
+  <h4>2.1 Sight singing is incomplete</h4>
+  <p><code>scripts/sight_singing/sight_singing_session.gd</code> handles note-by-note evaluation, but <code>singing_evaluator.gd</code> and <code>phrase_analyzer.gd</code> are minimal. The custom <code>sight_singing_staff.gd</code> Control is documented as "no longer used" — suggesting an incomplete refactor. Playable, but phrase/legato scoring is missing.</p>
+</div>
+
+<div class="panel warn">
+  <h4>2.2 No assignment system end-to-end</h4>
+  <p><code>TeacherStore.add_assignment()</code> / <code>mark_assignment_done()</code> exist (~lines 451–527), but there is <strong>no UI to create assignments</strong> and <strong>no student-side queue</strong> showing "Today's assignments". The data plumbing is half-done.</p>
+</div>
+
+<div class="panel warn">
+  <h4>2.3 No grading or feedback loop</h4>
+  <p>Teacher can log "Sarah practiced scales," but the dashboard does not surface:</p>
+  <ul>
+    <li>What modules Sarah actually completed (per-student progress JSON exists but isn't rendered).</li>
+    <li>Her accuracy trends across sessions.</li>
+    <li>Weak intervals / notes. <code>ProgressStore.compute_missed_ids()</code> and <code>TeacherStore.get_weak_items()</code> are both implemented but <strong>never called from the teacher flow</strong>.</li>
+  </ul>
+</div>
+
+<div class="panel warn">
+  <h4>2.4 Missing teacher-workflow features</h4>
+  <ul>
+    <li><strong>Attendance tracking</strong> — no way to mark "Sarah missed lesson."</li>
+    <li><strong>Practice time metrics</strong> — no "Sarah practiced 45 min this week" rollup.</li>
+    <li><strong>Parent dashboard / shareable reports</strong> — no PDF export, no parent link.</li>
+    <li><strong>Recital planning</strong> — no event/performance tracking.</li>
+    <li><strong>Billing</strong> — no invoice, lesson rate, or subscription management.</li>
+    <li><strong>Curriculum alignment</strong> — no link between exercises and ABRSM / RCM / Faber method books.</li>
+  </ul>
+</div>
+
+<h2 id="ui">3. UI / UX Analysis</h2>
+
+<h3>Home menu</h3>
+<p>Two flows — Practice and Learn — render through <code>HomeMenuState</code> + <code>HomeMenuUI</code> + <code>HomeFlowController</code>. Decoupled state from rendering is good. But:</p>
+<ul>
+  <li class="x"><strong>No visual hierarchy</strong>. Eight modes are presented at roughly equal weight. A new student doesn't know where to start. The "Quick Practice" button helps, but the menu still feels like a control panel rather than a path.</li>
+  <li class="x"><strong>Settings panel proliferation</strong>. Each mode opens its own settings (chord tiers, interval choices, BPM, etc.). The chord tier accordion alone has 22 chord types in 4 collapsible groups. For a student/teacher in a 30-min lesson, this is friction.</li>
+  <li class="x"><strong>Theme selector hidden</strong> per memory note. Good for MVP, but indicates the UI is carrying dead controls that should be deleted, not hidden.</li>
+</ul>
+
+<h3>Teacher dashboard</h3>
+<p>Five tabs (Overview, Repertoire, Lesson Log, Assignments, Technique) built procedurally in <code>teacher_dashboard.gd</code> (~1,500 lines of <code>_build_*</code> methods).</p>
+
+<div class="panel danger">
+  <strong>Visibility issue:</strong> The dashboard is the most important surface for paid adoption, and the most underbuilt screen.
+  <ul>
+    <li><strong>Overview tab is sparse</strong> — student list + a few summary fields. No "what did this student practice this week?" card. No weak-area surfacing. No streak/attendance signal.</li>
+    <li><strong>Lesson log sort order is wrong</strong>: entries are <code>insert(0, ...)</code> — backdated entries appear out of order. Audit doc item #1 flags this; still unfixed.</li>
+    <li><strong>No live refresh</strong>: <code>_module_progress_stats</code> is passed in at setup and never updated — teacher sees a static snapshot.</li>
+    <li><strong>No search or filter on lesson logs</strong>: past ~20 entries becomes unmanageable.</li>
+    <li><strong>No undo on delete</strong>: lesson logs and assignments deleted with one click. Risky for a teacher's data.</li>
+  </ul>
+</div>
+
+<h3>In-session HUD &amp; result screen</h3>
+<ul>
+  <li class="check">Practice-mode HUD distinction (teal/blue background) and streak toasts are good polish.</li>
+  <li class="check">Result screen bounce animation + dynamic motivational title is a nice touch.</li>
+  <li class="x"><strong>Result screen is text-heavy</strong>. Time / accuracy / miss summary / focus tip are all stacked text. A small chart (accuracy line, miss count bar) would communicate more in less space.</li>
+  <li class="x"><strong>No "share to teacher" action</strong> from the result screen. The natural moment for a student to send progress to their teacher is right after finishing a session.</li>
+</ul>
+
+<h3>Sight reading &amp; grand staff</h3>
+<ul>
+  <li class="check">Grand staff (treble + bass) for sight chords is well-implemented with realistic voicing constraints.</li>
+  <li class="x"><strong>Hardcoded absolute X/Y positioning</strong> (<code>STAFF_LEFT_X := 56.0</code>, etc.) — on a small phone profile the staff can clip. <code>DeviceProfileResolver</code> isn't applied to staff layout.</li>
+  <li class="x"><strong>Z-order strategy is fragile</strong>: hardcoded <code>z_index</code> values (0/10/20/50). One incorrect <code>add_child()</code> could bury content. Worth replacing with named CanvasLayer groups.</li>
+</ul>
+
+<h3>Onboarding</h3>
+<ul>
+  <li class="check">First-run auto-launches Quick Practice (beginner intervals) — excellent zero-friction start.</li>
+  <li class="check">Per-mode onboarding overlays (ear intro, note chase intro) with "How to Play" replay button.</li>
+  <li class="x"><strong>No teacher onboarding</strong>. A teacher opening the app for the first time gets dropped into the student experience. There's no "I'm a teacher → set up your studio" path.</li>
+  <li class="x"><strong>No empty-state UI</strong> in the teacher dashboard. New teachers see blank tabs with no prompts.</li>
+</ul>
+
+<h3>Learning map</h3>
+<ul>
+  <li class="check">Compact overview card consolidating pace + heatmap + review CTA is a good design.</li>
+  <li class="check">Pace controls (Guided / Normal / Quick) respected by lesson player.</li>
+  <li class="x"><strong>18-module map</strong> in one scrollable view is a lot. Grouping into chapters or seasons (e.g. "Reading Basics", "Intervals &amp; Chords", "Capstone") would help orientation.</li>
+</ul>
+
+<h2 id="code">4. Code Quality &amp; Tech Debt</h2>
+
+<table>
+<tr><th>Component</th><th>Lines</th><th>Status</th></tr>
+<tr><td><code>interval_birds.gd</code></td><td>~33,000</td><td><span class="pill hi">MONOLITH</span></td></tr>
+<tr><td><code>teacher_dashboard.gd</code></td><td>~1,500</td><td><span class="pill md">Procedural UI, no state classes</span></td></tr>
+<tr><td><code>TeacherStore</code> + <code>ProgressStore</code></td><td>~900</td><td><span class="pill ok">Solid: schema versioning, backups</span></td></tr>
+<tr><td><code>SessionController</code></td><td>~868</td><td><span class="pill ok">Well-decomposed state machine</span></td></tr>
+<tr><td>Learning modules (22×)</td><td>~2,500 total</td><td><span class="pill ok">Thin wrappers, content in metadata</span></td></tr>
+<tr><td>Exercise generators</td><td>~1,200</td><td><span class="pill ok">Working — Phases 1–8 live</span></td></tr>
+<tr><td>Sync layer</td><td>partial</td><td><span class="pill hi">Skeleton, not finished</span></td></tr>
+</table>
+
+<h3>The 33K-line monolith</h3>
+<p><code>scripts/interval_birds.gd</code> contains mode constants, gameplay state, UI setup, audio orchestration, settings persistence, teacher integration, learning routing, and QA hooks — <strong>all in one file</strong>. Costs:</p>
+<ul>
+  <li>Bug fixes anywhere touch unrelated concerns.</li>
+  <li>New contributors cannot orient.</li>
+  <li>Merge conflicts are guaranteed for any team.</li>
+  <li>Hidden coupling: instance vars like <code>_practice_mode_enabled</code> and <code>_focus_missed_ids</code> are read from a dozen handlers.</li>
+</ul>
+
+<p><strong>Suggested extraction:</strong></p>
+<ul>
+  <li><code>GameplayStateMachine</code> — mode transitions, scoring, lives, streak.</li>
+  <li><code>GameplayUIController</code> — HUD, result box, status label.</li>
+  <li><code>GameplayAudioController</code> — prompt playback, feedback, replay.</li>
+  <li><code>TeacherIntegration</code> — student tracking, weak-item recording.</li>
+  <li>Per-mode controllers: <code>IntervalMode</code>, <code>ChordMode</code>, <code>SightMode</code>, etc.</li>
+</ul>
+
+<h3>Save/load robustness</h3>
+<ul>
+  <li class="check"><code>TeacherStore</code> backs up files before overwrite; corrupt files moved to <code>.corrupt.&lt;timestamp&gt;</code>.</li>
+  <li class="check">JSON parsing uses <code>typeof()</code> guards.</li>
+  <li class="check">Session tokens prevent race conditions in the quiz loop.</li>
+  <li class="x">No streaming for large rosters — everything in memory.</li>
+  <li class="x"><code>FileAccess.open()</code> failures are silent — teacher loses data with no toast / warning.</li>
+  <li class="x">No conflict detection for multi-device edits (planned in Tier 3 cloud sync).</li>
+</ul>
+
+<h3>Audio assets</h3>
+<p>88 piano MP3 samples loaded at startup. Estimated 10–15 MB resident memory. Mitigations to consider for mobile:</p>
+<ul>
+  <li>Load only the octave range in current use.</li>
+  <li>Stream less-frequent samples (sub-C3, super-C6).</li>
+  <li>Add a per-session audio warm-up step rather than full preload.</li>
+</ul>
+
+<h3>Testing</h3>
+<p><code>qa_run.ps1</code> runs <code>qa_runner.gd</code> — an integration-level bot, not unit tests. There are no tests for:</p>
+<ul>
+  <li>Stat computation (<code>compute_missed_ids</code>, <code>get_weak_items</code>).</li>
+  <li>Date sorting in lesson logs.</li>
+  <li>JSON migration between schema versions.</li>
+  <li>Exercise generator output validity (the <code>self_test</code> helpers exist but aren't part of CI).</li>
+</ul>
+<p>The five intermittent QA failures noted in memory (Ear 5/6, Progression smoke, Scale/Mode smoke, Note Chase) suggest the QA bot has timing flakiness — worth fixing before shipping so a CI green light is meaningful.</p>
+
+<h2 id="competitors">5. Competitive Landscape</h2>
+
+<table>
+<tr><th>Feature</th><th>Simply Piano</th><th>Yousician</th><th>Tenuto / Studio</th><th>MusicEd</th></tr>
+<tr><td>Ear training</td><td>Limited</td><td>Yes</td><td>Yes</td><td><span class="pill ok">Yes</span></td></tr>
+<tr><td>Sight reading</td><td>Yes</td><td>Yes</td><td>Yes</td><td><span class="pill ok">Yes</span></td></tr>
+<tr><td>Exercise generator</td><td>No</td><td>No</td><td>No</td><td><span class="pill ok">Yes (moat)</span></td></tr>
+<tr><td>Multi-student tracking</td><td>No</td><td>No</td><td>Studio only</td><td><span class="pill ok">Yes</span></td></tr>
+<tr><td>Teacher dashboard</td><td>No</td><td>No</td><td>Studio only</td><td><span class="pill md">Partial</span></td></tr>
+<tr><td>Cloud sync</td><td>Yes</td><td>Yes</td><td>Yes</td><td><span class="pill hi">No</span></td></tr>
+<tr><td>Assignment workflow</td><td>No</td><td>No</td><td>Studio only</td><td><span class="pill hi">Partial</span></td></tr>
+<tr><td>Parent reports</td><td>No</td><td>No</td><td>Studio only</td><td><span class="pill hi">No</span></td></tr>
+<tr><td>Curriculum alignment</td><td>Faber</td><td>Generic</td><td>Sheet music</td><td><span class="pill hi">No</span></td></tr>
+<tr><td>Payment / subscription</td><td>Yes</td><td>Yes</td><td>Yes</td><td><span class="pill hi">Not built</span></td></tr>
+</table>
+
+<h2 id="pro">6. Path to "Pro &amp; 1K Customers"</h2>
+
+<h3>Tier 1 — Make teachers stick (Months 1–3)</h3>
+<ol>
+  <li><strong>Finish cloud sync.</strong> Supabase skeleton already in <code>scripts/sync/</code>. Finish OAuth, snapshot push/pull, conflict resolution. Teachers use tablet in studio + laptop at home; without sync, the roster fragments and they churn.</li>
+  <li><strong>Surface practice data in the dashboard Overview.</strong> Call <code>ProgressStore.compute_missed_ids()</code> and <code>TeacherStore.get_weak_items()</code>. Render a "Since last lesson" card per student: time practiced, modules completed, weak intervals. This is the biggest pedagogical ROI in the codebase — the data exists, it's just hidden.</li>
+  <li><strong>Assignment → student pipeline.</strong> Build a "Create assignment" UI in the Assignments tab. Add "Today's Assignments" section to the student home menu. Mark complete on session end.</li>
+  <li><strong>Polish or descope sight singing.</strong> Either finish phrase scoring or hide the mode until v2.</li>
+</ol>
+
+<h3>Tier 2 — Differentiate (Months 4–6)</h3>
+<ol start="5">
+  <li><strong>Curriculum alignment.</strong> Add <code>data/curriculum_mapping.json</code> linking exercises to ABRSM / RCM / Faber. Search the exercise library by method book.</li>
+  <li><strong>Parent dashboard / exportable PDF reports.</strong> Monthly summary: accuracy trends, pieces completed, weak areas. Use existing <code>LearningProgress</code> + <code>TeacherStore</code> session history.</li>
+  <li><strong>Lesson scheduling.</strong> Calendar with recurring slots, attendance marking, auto-drafted lesson log template.</li>
+  <li><strong>Empty-state &amp; teacher onboarding.</strong> First-run teacher path: "I'm a teacher" → create studio → add first student → assign first exercise.</li>
+</ol>
+
+<h3>Tier 3 — Studio governance (Months 7+)</h3>
+<ol start="9">
+  <li><strong>Multi-teacher support.</strong> <code>teacher_id</code> in <code>TeacherStore</code> schema; per-teacher assignment history; PIN gate on dashboard.</li>
+  <li><strong>Billing integration.</strong> Stripe / RevenueCat — lesson rate, attendance-driven invoices, subscription tiers.</li>
+  <li><strong>Teacher composer UI.</strong> Let teachers build custom drills from the procedural generator — turns the moat into a teacher-facing feature.</li>
+  <li><strong>Recital / event mode.</strong> Performance tracking, student showcase, video/audio recording integration.</li>
+</ol>
+
+<h2 id="fixes">7. Top Priority Fix List</h2>
+
+<h3>High (do first)</h3>
+<table>
+<tr><th>#</th><th>Issue</th><th>Files</th><th>Why</th><th>Est.</th></tr>
+<tr><td>1</td><td>Finish cloud sync</td><td><code>scripts/sync/supabase_sync_provider.gd</code>, <code>sync_bundle.gd</code></td><td>Multi-device blocker; teachers need it</td><td>40h</td></tr>
+<tr><td>2</td><td>Surface practice data in Overview tab</td><td><code>teacher_dashboard.gd</code> — call <code>compute_missed_ids()</code> + <code>get_weak_items()</code></td><td>Biggest teacher-retention win; data already exists</td><td>12h</td></tr>
+<tr><td>3</td><td>Lesson log sort order</td><td><code>teacher_dashboard.gd</code> ~line 600</td><td>Backdated entries break order</td><td>2h</td></tr>
+<tr><td>4</td><td>Assignment → student bridge</td><td><code>teacher_dashboard.gd</code> Assignments tab + <code>home_menu_ui.gd</code></td><td>Teachers can add, students can't see</td><td>20h</td></tr>
+<tr><td>5</td><td>Sight singing polish or descope</td><td><code>scripts/sight_singing/</code></td><td>Half-shipped state hurts perceived quality</td><td>24h</td></tr>
+<tr><td>6</td><td>Break up <code>interval_birds.gd</code></td><td>All of <code>interval_birds.gd</code></td><td>33K-line monolith blocks team work</td><td>60h</td></tr>
+</table>
+
+<h3>Medium (next wave)</h3>
+<table>
+<tr><th>#</th><th>Issue</th><th>Files</th><th>Why</th><th>Est.</th></tr>
+<tr><td>7</td><td>Curriculum metadata</td><td>New <code>data/curriculum_mapping.json</code></td><td>Differentiator vs. Simply Piano</td><td>30h</td></tr>
+<tr><td>8</td><td>Search / filter lesson logs</td><td><code>teacher_dashboard.gd</code></td><td>&gt;20 logs becomes unmanageable</td><td>10h</td></tr>
+<tr><td>9</td><td>Undo on delete (toast)</td><td><code>teacher_dashboard.gd</code> delete handlers</td><td>Data-safety polish</td><td>4h</td></tr>
+<tr><td>10</td><td>Teacher first-run onboarding</td><td><code>home_menu_ui.gd</code> + new teacher setup overlay</td><td>No path for "I'm a teacher" today</td><td>16h</td></tr>
+<tr><td>11</td><td>Responsive grand-staff layout</td><td>Sight rendering in <code>interval_birds.gd</code></td><td>Clips on small phones</td><td>8h</td></tr>
+<tr><td>12</td><td>PDF report export</td><td>New <code>scripts/reporting/</code></td><td>Parent-facing artifact</td><td>20h</td></tr>
+</table>
+
+<h3>Low (polish)</h3>
+<table>
+<tr><th>#</th><th>Issue</th><th>Why</th><th>Est.</th></tr>
+<tr><td>13</td><td>Lesson count + practice time stat on Overview</td><td>Term review at a glance</td><td>4h</td></tr>
+<tr><td>14</td><td>"Share to teacher" CTA on result screen</td><td>Captures the natural sharing moment</td><td>6h</td></tr>
+<tr><td>15</td><td>Group learning map into chapters</td><td>18 modules in one scroll is a lot</td><td>6h</td></tr>
+<tr><td>16</td><td>Delete dead UI (theme selector, etc.) rather than hide</td><td>Reduce drift</td><td>2h</td></tr>
+<tr><td>17</td><td>Unit tests for stat computation + JSON migrations</td><td>CI green light becomes meaningful</td><td>16h</td></tr>
+<tr><td>18</td><td>Fix the 5 intermittent QA failures</td><td>Reliable QA signal</td><td>8h</td></tr>
+</table>
+
+<h2 id="roadmap">8. Suggested 12-Week Roadmap</h2>
+
+<div class="grid2">
+  <div class="panel ok">
+    <h4>Weeks 1–4 — Foundation</h4>
+    <ul>
+      <li>Cloud sync finished (Supabase).</li>
+      <li>Practice data in Overview tab.</li>
+      <li>Lesson log sort + search + undo.</li>
+      <li>Decision on sight singing (polish or descope).</li>
+    </ul>
+  </div>
+  <div class="panel ok">
+    <h4>Weeks 5–8 — Teacher value</h4>
+    <ul>
+      <li>Assignment → student pipeline shipped.</li>
+      <li>Teacher first-run onboarding.</li>
+      <li>Curriculum metadata + library filter.</li>
+      <li>PDF report export (v1).</li>
+    </ul>
+  </div>
+  <div class="panel ok">
+    <h4>Weeks 9–10 — Health</h4>
+    <ul>
+      <li>Extract gameplay state machine from <code>interval_birds.gd</code>.</li>
+      <li>Extract mode controllers (interval / chord / sight).</li>
+      <li>Add unit tests for stats + migrations.</li>
+    </ul>
+  </div>
+  <div class="panel ok">
+    <h4>Weeks 11–12 — Launch prep</h4>
+    <ul>
+      <li>Payment integration (Stripe / RevenueCat).</li>
+      <li>Landing page, pricing, trial flow.</li>
+      <li>Beta cohort of 20 teachers; iterate on dashboard.</li>
+      <li>Marketing copy aligned to "studio tool, not a game".</li>
+    </ul>
+  </div>
+</div>
+
+<hr>
+
+<h2>Closing</h2>
+<p>The hard part — building a fun, musically credible practice engine with 8 modes, 22 modules, and procedural exercise generation — is <strong>done</strong>. The remaining work is mostly <em>connecting what already exists</em>: surfacing student progress to teachers, syncing data between devices, and routing assignments back to students. Those connections, plus the monolith refactor and a basic payment flow, take MusicEd from "interesting educational app" to "viable teacher tool."</p>
+
+<p>The moat (procedural exercises, multi-mode breadth, learning curriculum) is real. The biggest risk is shipping the product in its current half-connected state, where teachers see the dashboard, fail to find their student's practice data, and conclude the app is "just another practice game." Prioritize the visibility work before any marketing push.</p>
+
+<p class="muted">— Review by Claude (Opus 4.7), May 22, 2026.</p>
+
+</div>
+</body>
+</html>

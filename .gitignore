@@ -30,11 +30,33 @@ keys/*.p12
 
 # Build/export artifacts
 build/
+builds/**
+!builds/
+!builds/.gitkeep
+!builds/windows/
+!builds/windows/.gitkeep
+!builds/windows/teacher/
+!builds/windows/teacher/.gitkeep
+!builds/windows/student/
+!builds/windows/student/.gitkeep
+!builds/macos/
+!builds/macos/.gitkeep
+!builds/macos/teacher/
+!builds/macos/teacher/.gitkeep
+!builds/macos/student/
+!builds/macos/student/.gitkeep
+!builds/linux/
+!builds/linux/.gitkeep
+!builds/linux/teacher/
+!builds/linux/teacher/.gitkeep
+!builds/linux/student/
+!builds/linux/student/.gitkeep
 android/
 *.apk
 *.exe
 *.pck
 *.wasm
+*.zip
 # Web export bundle — kept locally but never committed
 web/Note Catcher3.*
 web/index.*
@@ -51,6 +73,10 @@ web/
 *.bat
 *.sql
 backup/
+*.bmp
+*.bmp.import
+Recording*.m4a
+screen ideas/
 !assets/fonts/FONT_CREDITS.txt
 !attribution.txt
 !assets/LICENSES.md

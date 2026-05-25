@@ -222,6 +222,7 @@ func apply_metric_update(
 	accuracy_pct: int,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_sight: int,
 	last_session_value: String
 ) -> Dictionary:
@@ -230,7 +231,7 @@ func apply_metric_update(
 	var sight_sessions: int = int(metrics.get("sight_sessions", 0))
 	var ear_accuracy: int = int(metrics.get("ear_accuracy", 0))
 	var sight_accuracy: int = int(metrics.get("sight_accuracy", 0))
-	if mode == mode_interval or mode == mode_chord:
+	if mode == mode_interval or mode == mode_chord or mode == mode_pitch_match:
 		ear_accuracy = int(round((float(ear_accuracy * ear_sessions) + float(accuracy_pct)) / float(ear_sessions + 1)))
 		ear_sessions += 1
 	elif mode == mode_sight:
@@ -252,10 +253,12 @@ func record_session_metrics(
 	asked_count: int,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_sight: int,
 	last_session_value: String,
 	session_history_date: String,
-	mode_label_for_mode: Callable
+	mode_label_for_mode: Callable,
+	best_streak: int = 0
 ) -> Dictionary:
 	var sid: String = get_active_student_id(selected_student_id)
 	if sid == "":
@@ -277,6 +280,7 @@ func record_session_metrics(
 		accuracy,
 		mode_interval,
 		mode_chord,
+		mode_pitch_match,
 		mode_sight,
 		last_session_value
 	)
@@ -287,7 +291,8 @@ func record_session_metrics(
 		"mode": mode_label,
 		"correct": correct_count,
 		"asked": asked_count,
-		"accuracy": accuracy
+		"accuracy": accuracy,
+		"best_streak": best_streak
 	})
 	while sessions.size() > 200:
 		sessions.remove_at(0)

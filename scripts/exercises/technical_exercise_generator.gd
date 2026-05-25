@@ -4,6 +4,7 @@ class_name TechnicalExerciseGenerator
 const HanonComposerScript = preload("res://scripts/exercises/composers/hanon_composer.gd")
 const ScaleComposerScript = preload("res://scripts/exercises/composers/scale_composer.gd")
 const CzernyComposerScript = preload("res://scripts/exercises/composers/czerny_composer.gd")
+const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 
 # Generates technical practice exercises (scales, arpeggios, five-finger drills)
 # at multiple difficulty levels. Output is a Dictionary that can be rendered
@@ -52,35 +53,66 @@ const LEVEL_PRESETS := {
 }
 
 
-static func generate(exercise_type: String, key_pc: int, key_is_minor: bool, level: int = 1, hand: String = "right", octaves_override: int = -1, tempo_override: int = -1) -> Dictionary:
+static func generate(exercise_type: String, key_pc: int, key_is_minor: bool, level: int = 1, hand: String = "right", octaves_override: int = -1, tempo_override: int = -1, seed: int = -1) -> Dictionary:
 	var lvl: int = clampi(level, 1, 10)
 	var preset: Dictionary = LEVEL_PRESETS.get(lvl, LEVEL_PRESETS[1])
 	var octaves: int = octaves_override if octaves_override > 0 else int(preset["octaves"])
 	var tempo: int = tempo_override if tempo_override > 0 else int(preset["tempo_bpm"])
+	# Use the seed if provided so callers can reproduce a roll across runs;
+	# templates ignore it but the field is plumbed end-to-end via _stamp_meta.
+	var effective_seed: int = seed
+	# Catalog mode dispatch. Generator entries route through a stochastic
+	# sampler; templates use the deterministic path below.
+	if ExerciseLibraryScript.is_generator(exercise_type):
+		var rng := RandomNumberGenerator.new()
+		if effective_seed < 0:
+			effective_seed = int(Time.get_ticks_usec()) & 0x7fffffff
+		rng.seed = effective_seed
+		var profile: Dictionary = ExerciseLibraryScript.style_profile_for_id(exercise_type)
+		var entry_dict: Dictionary = ExerciseLibraryScript.entry(exercise_type)
+		var kind: String = str(entry_dict.get("kind", ""))
+		var hand_norm_gen: String = "right" if hand == "both" else hand
+		var ex_gen: Dictionary = {}
+		match kind:
+			"hanon":
+				ex_gen = HanonComposerScript.generate_random(profile, key_pc, key_is_minor, lvl, tempo, hand_norm_gen, rng, exercise_type)
+			"hanon_any":
+				# Roll picks between the 5-finger and alternating-fingers style profiles.
+				var picked: Dictionary = HanonComposerScript.STYLE_5_FINGER if (rng.randi() & 1) == 0 else HanonComposerScript.STYLE_ALTERNATING_FINGERS
+				ex_gen = HanonComposerScript.generate_random(picked, key_pc, key_is_minor, lvl, tempo, hand_norm_gen, rng, exercise_type)
+			"czerny":
+				ex_gen = CzernyComposerScript.generate_random(profile, key_pc, key_is_minor, lvl, tempo, hand_norm_gen, octaves, rng, exercise_type)
+			"scale":
+				ex_gen = ScaleComposerScript.generate_random(profile, key_pc, key_is_minor, lvl, tempo, hand_norm_gen, octaves, rng, exercise_type)
+			_:
+				push_warning("[TechnicalExerciseGenerator] unknown generator kind '%s' for %s; falling through to template path." % [kind, exercise_type])
+		if not ex_gen.is_empty():
+			return _stamp_meta(ex_gen, effective_seed, exercise_type)
+		# Otherwise fall through to the template path below.
 	# Dispatch to Hanon composer for "hanon_N" types (N = exercise number).
 	# Returns single-hand notes; the Practice Drills "Grand" mode calls this once
 	# per hand and merges via its own logic.
 	if exercise_type.begins_with("hanon_"):
 		var num: int = int(exercise_type.substr(6))
 		var hand_for_hanon: String = "right" if hand == "both" else hand
-		return HanonComposerScript.generate(num, key_pc, key_is_minor, tempo, hand_for_hanon, false)
+		return _stamp_meta(HanonComposerScript.generate(num, key_pc, key_is_minor, tempo, hand_for_hanon, false), effective_seed, exercise_type)
 	# Scale variants (thirds, sixths, chromatic, contrary motion)
 	var hand_norm: String = "right" if hand == "both" else hand
 	match exercise_type:
 		"scale_thirds":
-			return ScaleComposerScript.generate_thirds(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(ScaleComposerScript.generate_thirds(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"scale_sixths":
-			return ScaleComposerScript.generate_sixths(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(ScaleComposerScript.generate_sixths(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"scale_chromatic":
-			return ScaleComposerScript.generate_chromatic(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(ScaleComposerScript.generate_chromatic(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"scale_contrary":
-			return ScaleComposerScript.generate_contrary(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(ScaleComposerScript.generate_contrary(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"czerny_velocity":
-			return CzernyComposerScript.generate_velocity_run(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(CzernyComposerScript.generate_velocity_run(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"czerny_alberti":
-			return CzernyComposerScript.generate_alberti_etude(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(CzernyComposerScript.generate_alberti_etude(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"czerny_sequence":
-			return CzernyComposerScript.generate_scale_sequence(key_pc, key_is_minor, octaves, hand_norm, tempo)
+			return _stamp_meta(CzernyComposerScript.generate_scale_sequence(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 	var pc: int = ((int(key_pc) % 12) + 12) % 12
 	var key_letter: String = _spell_key_letter(pc, key_is_minor)
 	var fifths: int = _key_to_fifths(pc, key_is_minor)
@@ -134,7 +166,26 @@ static func generate(exercise_type: String, key_pc: int, key_is_minor: bool, lev
 		"fifths": fifths,
 		"notes": notes,
 		"total_beats": beat,
+		"seed": effective_seed,
+		"generator_id": "",
 	}
+
+
+# Stamps catalog-level metadata onto an exercise dict returned by a composer.
+# - `seed` rides along whether or not the composer used it (templates ignore it;
+#   generators will read it once Phase 6 wires them up).
+# - `generator_id` is empty for template entries; the generator path will set
+#   it to the catalog ID that produced the sample.
+# - `exercise_type` is filled in defensively in case a composer omits it.
+static func _stamp_meta(ex: Dictionary, seed: int, exercise_type: String) -> Dictionary:
+	if typeof(ex) != TYPE_DICTIONARY:
+		return ex
+	ex["seed"] = seed
+	if not ex.has("generator_id"):
+		ex["generator_id"] = ""
+	if not ex.has("exercise_type"):
+		ex["exercise_type"] = exercise_type
+	return ex
 
 
 static func _build_scale(pc: int, key_is_minor: bool, octaves: int, hand: String) -> Array:

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MusicEd / Clefira — Teacher Experience Roadmap</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --card: #ffffff;
+    --ink: #1d2025;
+    --ink-2: #4a4f57;
+    --muted: #757a82;
+    --accent: #1c5f8c;
+    --hl: #fff3a6;       /* highlight yellow */
+    --hl-strong: #ffd24a;
+    --tier1: #c14a3a;    /* critical red */
+    --tier1-bg: #fde7e3;
+    --tier2: #1f7a8c;    /* differentiator teal */
+    --tier2-bg: #def0f3;
+    --tier3: #6e4aa3;    /* depth purple */
+    --tier3-bg: #ede4f7;
+    --cross: #4a7a3a;    /* cross-cutting green */
+    --cross-bg: #e2f0d8;
+    --gold: #a87a14;
+    --gold-bg: #fdf2d0;
+    --code-bg: #f1efe8;
+    --border: #e5e2d8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header.page {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+  }
+  header.page h1 {
+    margin: 0 0 4px;
+    font-size: 32px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  header.page .sub {
+    color: var(--muted);
+    font-size: 15px;
+  }
+  header.page .meta {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  h2 {
+    margin: 56px 0 18px;
+    font-size: 24px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    margin: 22px 0 10px;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  mark {
+    background: var(--hl);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  mark.strong {
+    background: var(--hl-strong);
+    font-weight: 600;
+  }
+  code, .code {
+    font-family: "SF Mono", "Consolas", "Menlo", monospace;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #3b3b3b;
+  }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 28px 0 16px;
+    box-shadow: var(--shadow);
+  }
+  .toc h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .toc ol {
+    margin: 0;
+    padding-left: 22px;
+    columns: 2;
+    column-gap: 30px;
+    font-size: 14.5px;
+  }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .framing, .foundation, .observations {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    box-shadow: var(--shadow);
+    margin-bottom: 18px;
+  }
+  .foundation ul { padding-left: 22px; }
+  .foundation li { margin-bottom: 6px; }
+  .tier-label {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .tier1-label { color: var(--tier1); background: var(--tier1-bg); }
+  .tier2-label { color: var(--tier2); background: var(--tier2-bg); }
+  .tier3-label { color: var(--tier3); background: var(--tier3-bg); }
+  .cross-label { color: var(--cross); background: var(--cross-bg); }
+  .gold-label  { color: var(--gold);  background: var(--gold-bg);  }
+  .feature {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 14px 0;
+    box-shadow: var(--shadow);
+  }
+  .feature.tier1 { border-left-color: var(--tier1); }
+  .feature.tier2 { border-left-color: var(--tier2); }
+  .feature.tier3 { border-left-color: var(--tier3); }
+  .feature.cross { border-left-color: var(--cross); }
+  .feature.gold  { border-left-color: var(--gold);  background: var(--gold-bg); }
+  .feature .num {
+    display: inline-block;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-right: 8px;
+  }
+  .feature .title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    display: inline;
+  }
+  .feature p { margin: 10px 0 0; }
+  .feature .need {
+    font-size: 14px;
+    color: var(--muted);
+    font-style: italic;
+    margin: 8px 0 4px;
+  }
+  .feature .where {
+    margin-top: 10px;
+    font-size: 13.5px;
+    color: var(--muted);
+    background: #f8f6ef;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid #e0d8b8;
+  }
+  .feature .where strong { color: var(--ink-2); }
+  .top3-banner {
+    background: linear-gradient(135deg, #fdf2d0 0%, #fae6a3 100%);
+    border: 1px solid var(--hl-strong);
+    border-radius: 12px;
+    padding: 14px 22px;
+    margin: 32px 0 10px;
+  }
+  .top3-banner h2 {
+    margin: 0;
+    border: none;
+    color: var(--gold);
+    font-size: 22px;
+  }
+  .top3-banner .sub {
+    color: var(--ink-2);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+  .observations ul {
+    padding-left: 22px;
+    margin: 0;
+  }
+  .observations li {
+    margin-bottom: 8px;
+    color: var(--ink-2);
+  }
+  footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .toc ol { columns: 1; }
+    .wrap { padding: 28px 18px 60px; }
+    header.page h1 { font-size: 26px; }
+    h2 { font-size: 21px; }
+  }
+  @media print {
+    body { background: white; }
+    .wrap { padding: 24px; max-width: none; }
+    .feature, .framing, .foundation, .observations, .toc, .top3-banner {
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>MusicEd / Clefira — Teacher Experience Roadmap</h1>
+  <div class="sub">What it takes to make the app <strong>awesome and great</strong> for music teachers.</div>
+  <div class="meta">Strategic analysis · 2026-05-20 · Source: codebase walk-through (Practice Drills, Teacher Dashboard, Learning Mode, generator system, per-student data layer)</div>
+</header>
+
+<section class="framing">
+  <h3 style="margin-top:0;">Big-picture framing</h3>
+  <p>Right now MusicEd is <mark class="strong">a great practice app with a teacher dashboard bolted on</mark>. The most valuable version of it is something different: <mark>a piano teacher's studio in software</mark>, where the practice app is the most-used surface but only one part of the system.</p>
+  <p>Teachers don't just need more drills; they need their <strong>job</strong> easier — student visibility, parent communication, prep time, recital coordination, billing. The good news: you already have most of the bones (per-student data routing, lesson sessions, dashboard with five tabs, procedural exercise generation, learning curriculum). <mark>The path to "awesome" is mostly filling in the workflow layer</mark> that turns the existing practice content into a studio system.</p>
+</section>
+
+<section class="toc">
+  <h3>Jump to</h3>
+  <ol>
+    <li><a href="#foundation">What's already strong</a></li>
+    <li><a href="#tier1">Tier 1 — Critical (1–10)</a></li>
+    <li><a href="#tier2">Tier 2 — Big differentiators (11–18)</a></li>
+    <li><a href="#tier3">Tier 3 — Depth &amp; polish (19–24)</a></li>
+    <li><a href="#cross">Cross-cutting concerns (25–30)</a></li>
+    <li><a href="#top3">Top 3 picks</a></li>
+    <li><a href="#code">Code-level observations</a></li>
+  </ol>
+</section>
+
+<h2 id="foundation">What's already strong (the foundation)</h2>
+<section class="foundation">
+  <ul>
+    <li><strong>Per-student data architecture</strong> — <code>ActiveStudent</code>, per-student <code>user://students/&lt;id&gt;/</code> layout, lesson sessions. <mark>Table-stakes that competitors often fail at.</mark></li>
+    <li><strong>8-mode practice depth</strong> — Interval, Chord, Sight Notes/Chords/Grand Staff, Rhythm Flow, Note Chase, Progression, Scale/Mode, Cadence. Few apps have all of these.</li>
+    <li><strong>22-module Learning Mode</strong> — structured curriculum with stars, gating, review queue.</li>
+    <li><strong>Procedural exercise generation</strong> — Phases 1–8 of the generator system. <mark class="strong">Almost no competitor offers this; it is genuinely a moat.</mark></li>
+    <li><strong>Teacher Dashboard with Overview / Repertoire / Lesson Log / Assignments / Technique</strong> — most apps have one or two of these tabs, not all five.</li>
+    <li><strong>Practice Drills</strong> with MIDI keyboard support + <code>scripts/audio/pitch_detector.gd</code> (currently underused).</li>
+    <li><strong>End-of-lesson dialog</strong> that prompts a lesson log entry (Phase 3 work).</li>
+  </ul>
+  <p>That's a strong base. Build on it.</p>
+</section>
+
+<h2 id="tier1">Tier 1 — The items that move "good" to "great"</h2>
+
+<div class="feature tier1">
+  <span class="num">01</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Cloud sync</span>
+  <p class="need">Already on the roadmap as item #8. <mark class="strong">The single most blocking gap.</mark></p>
+  <p>A piano teacher uses a tablet in the studio and a laptop at home; without sync, the dashboard is fragmented. <mark>Everything else (favorites, parent portal, multi-teacher) depends on a sync layer.</mark> Bring this forward.</p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">02</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Practice journal — the "between-lessons" view</span>
+  <p class="need"><mark class="strong">The single highest-ROI feature for teacher experience.</mark></p>
+  <p>When a teacher opens the dashboard at lesson start, they should see at a glance: <em>"Sarah practiced 4 days since last lesson (28 min total), completed Hanon 3 + 4, accuracy on m6 intervals jumped from 42% → 71%."</em></p>
+  <p>The data is already being collected (<code>session_history</code>, per-student progress files); what's missing is a <strong>timeline view</strong> on the Overview tab — a sparkline of daily practice minutes + a feed of what happened. <mark>Turns the app into a window into the student's home life with the instrument.</mark></p>
+  <div class="where"><strong>Where:</strong> Extend the Overview tab in <code>teacher_dashboard.gd</code>; aggregate from per-student progress JSON.</div>
+</div>
+
+<div class="feature tier1">
+  <span class="num">03</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Personalized weakness-driven drills</span>
+  <p class="need">Phase 9 of the generator plan — already deferred but high impact.</p>
+  <p>The review queue tracks which intervals/notes/chords a student misses. Pipe that into <code>hanon_any_random</code> / <code>czerny_random</code> / a new <code>surprise_me</code> entry so each generated exercise targets what <em>this</em> student needs. <mark class="strong">Teachers will instantly notice this — "the app actually knows my student."</mark></p>
+  <p>Pair with <strong>★ Save Favorite</strong> (the 6-field tuple <code>(generator_id, key, level, hand, octaves, seed)</code> already plumbed through).</p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">04</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Auto-generated parent progress reports</span>
+  <p class="need">Parents pay tuition; they want to see results.</p>
+  <p>Once a week (or end-of-lesson), generate a clean PDF/HTML for parents: cover image, child's name, practice minutes, accuracy progression, what they're working on next. You already have <code>_save_printable_lesson_summary</code> writing HTML; extend it to a <strong>recurring weekly format</strong> with a shareable link.</p>
+  <p><mark>This is the feature that gets parents to keep paying — and tells them what they're paying for.</mark></p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">05</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Lesson plan templates + "Today's Agenda" card</span>
+  <p class="need">Most teachers reuse lesson patterns — opening warm-up, review pieces, new piece, ear training, assignments.</p>
+  <p>Build:</p>
+  <ul>
+    <li>A <strong>Lesson Plan</strong> templating area (dashboard sidebar) where teachers compose: <code>[Scale in 3 keys @120bpm] → [Hanon 1 in Cmaj] → [Ear training: minor 3rds] → [Sight reading: 10 bars]</code></li>
+    <li>A <strong>"Today's Agenda"</strong> card on Overview — loads the assigned template or auto-generates from the student's level + recent activity.</li>
+    <li><strong>One-tap "start each step"</strong> buttons that launch the right mode preconfigured.</li>
+  </ul>
+  <p><mark class="strong">This is what makes a teacher feel the app helps them teach</mark>, not just helps the student drill.</p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">06</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Recital / performance prep mode</span>
+  <p class="need"><mark>Recital prep is the most stressful part of a teacher's year — own this and you own teachers.</mark></p>
+  <p>Mark pieces as "for recital" with a date. Track BPM progression toward target. Run-through mode plays the full piece while the student plays along, recording via mic. <strong>Compare passes side-by-side</strong> over weeks.</p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">07</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Mic-based recording + playback</span>
+  <p class="need">Activates an unused asset already in the codebase.</p>
+  <p>You have <code>pitch_detector.gd</code> sitting in <code>scripts/audio/</code>. Tap into the mic for:</p>
+  <ul>
+    <li><strong>Sight-singing</strong> — show a melody on the staff, student sings it, app detects pitch and rates accuracy. <mark>There is no good sight-singing app on tablets right now.</mark></li>
+    <li><strong>Practice recordings</strong> — student records attempts; teacher reviews between lessons; both can hear progression over time.</li>
+    <li><strong>"Was that in tune?"</strong> — instant feedback on any single note or interval.</li>
+  </ul>
+</div>
+
+<div class="feature tier1">
+  <span class="num">08</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Multi-teacher mode</span>
+  <p class="need">Item #7 deferred. Studios with subs / multiple instructors need this.</p>
+  <p>A studio might have a primary teacher plus a sub. <em>"Mrs. Johnson is subbing today; she sees the same student dashboards plus my prep notes."</em> Add a <strong>Teachers</strong> entity sibling to Students, reassignable per session.</p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">09</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Per-student daily streak</span>
+  <p class="need">Item #4 deferred. Quick win given per-student folders are in place.</p>
+  <p>Currently device-wide. With per-student data routing already there, this is a small change for outsized engagement payoff. <strong>Streak Freeze</strong> (let a student skip one day without losing their streak) is a small gamification that meaningfully raises retention.</p>
+</div>
+
+<div class="feature tier1">
+  <span class="num">10</span>
+  <span class="tier-label tier1-label">Critical</span>
+  <span class="title">Group class mode</span>
+  <p class="need">An increasing share of teachers run small group lessons (4–8 kids).</p>
+  <p>2–4 students share one iPad and take turns, with a leaderboard; or each student on their own device joins a "studio session" the teacher controls. <mark>Even basic team scoring on a scale race lets group teachers replace whiteboard games.</mark></p>
+</div>
+
+<h2 id="tier2">Tier 2 — Big differentiators</h2>
+
+<div class="feature tier2">
+  <span class="num">11</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">AI lesson plan generator</span>
+  <p>Plug an LLM API into a dashboard button: <em>"Generate a 30-minute lesson for an intermediate student working on F# minor scales and Burgmuller op. 100 No. 5."</em> Outputs a structured agenda the teacher can edit. <mark>Real time-saver and a major marketing hook.</mark></p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">12</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">AI recording feedback</span>
+  <p>Student records a practice attempt; AI flags <em>"timing wavers in mm. 4–6"</em>, <em>"left hand softer than right"</em>, <em>"you sped up at the cadence"</em>. <mark>Tonara/Yousician's offerings here are weak — there's an opportunity to be sharper.</mark> Pair with the recording feature (#7).</p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">13</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">Detailed analytics dashboard with heatmaps</span>
+  <p>A 12×8 grid of <strong>interval × key</strong> colored by accuracy. A timeline of which modules took longest. A forgetting-curve view showing where this student needs review. <mark>Teachers love data when it's presented as actionable.</mark></p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">14</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">Calendar / scheduling integration</span>
+  <p>Recurring lesson slots, reschedule UI, parent reminders via SMS or email. Even a simple <strong>iCal export</strong> is a meaningful upgrade.</p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">15</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">Billing / invoicing</span>
+  <p>Track lesson minutes from lesson sessions (you already record start/end). Generate monthly invoices, mark paid/unpaid. <mark class="strong">Most piano teachers do this in Excel; pulling it into the app is a massive switching cost in your favor.</mark></p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">16</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">Parent portal (read-only)</span>
+  <p>A separate, password-shared view where parents see their child's practice log, recent recordings, teacher notes, next assignment. <strong>Mom doesn't need to install Teacher Edition</strong> — she just opens a link.</p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">17</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">Tablet UX polish</span>
+  <p>Two-page sheet music spread, pinch zoom, <strong>Apple Pencil annotations</strong> on the staff. <mark>Most piano teaching happens on an iPad now — this is your most important physical surface.</mark></p>
+</div>
+
+<div class="feature tier2">
+  <span class="num">18</span>
+  <span class="tier-label tier2-label">Differentiator</span>
+  <span class="title">Achievement system with real depth</span>
+  <p>"Maestro of Major Keys" — completed all 12 majors at 90%+. "Ear of Mozart" — 50-streak on advanced intervals. "Chord Sage" — 1000 chord IDs. Visible on home + dashboard. <mark>The current streak is too one-dimensional.</mark></p>
+</div>
+
+<h2 id="tier3">Tier 3 — Depth &amp; content moats</h2>
+
+<div class="feature tier3">
+  <span class="num">19</span>
+  <span class="tier-label tier3-label">Depth</span>
+  <span class="title">Theory beyond Learning Mode</span>
+  <p>Voice leading drills, Roman numeral analysis, melodic/rhythmic dictation, modulation exercises. <mark>The current Learning Mode caps out at the level a serious 4th-year student outgrows.</mark></p>
+</div>
+
+<div class="feature tier3">
+  <span class="num">20</span>
+  <span class="tier-label tier3-label">Depth</span>
+  <span class="title">Sheet music engraving polish</span>
+  <p>The D♭/E♭ bug we just fixed reveals the renderer is still rough. Add: proper beaming for 16ths and triplets, multi-voice notation, dynamics + articulations + slurs, ties spanning bar lines. <mark>The Practice Drills view feels homemade until this is polished.</mark></p>
+</div>
+
+<div class="feature tier3">
+  <span class="num">21</span>
+  <span class="tier-label tier3-label">Depth</span>
+  <span class="title">More technical-exercise traditions</span>
+  <p>Bartók Mikrokosmos, Burgmuller op. 100, Kabalevsky Op. 39, Beyer Op. 101. Each is public domain and well-defined — add as new composers alongside Hanon/Czerny/Scale. <strong>Becomes a real "technical library".</strong></p>
+</div>
+
+<div class="feature tier3">
+  <span class="num">22</span>
+  <span class="tier-label tier3-label">Depth</span>
+  <span class="title">Repertoire library with piece database</span>
+  <p>Search by composer/level. Mark pages, fingerings, problem spots per student. <strong>IMSLP integration</strong> to pull actual scores.</p>
+</div>
+
+<div class="feature tier3">
+  <span class="num">23</span>
+  <span class="tier-label tier3-label">Depth</span>
+  <span class="title">Multiple piano timbres + ensemble context</span>
+  <p>Bösendorfer, Steinway, Rhodes, Harpsichord, plus a string-quartet "context" for ear training (intervals in a more musical setting, not just a piano in isolation).</p>
+</div>
+
+<div class="feature tier3">
+  <span class="num">24</span>
+  <span class="tier-label tier3-label">Depth</span>
+  <span class="title">Customizable difficulty curves</span>
+  <p>Teacher overrides the level → tempo mapping for younger students. Save curve as a studio default. <mark>One-size-fits-all is the silent enemy of pedagogical apps.</mark></p>
+</div>
+
+<h2 id="cross">Cross-cutting concerns</h2>
+
+<div class="feature cross">
+  <span class="num">25</span>
+  <span class="tier-label cross-label">Cross-cutting</span>
+  <span class="title">Localization</span>
+  <p>Item #9 deferred. All UI strings are hardcoded English. <mark>Blocks non-English markets — and music is a global market.</mark> Start with Spanish + Mandarin + French.</p>
+</div>
+
+<div class="feature cross">
+  <span class="num">26</span>
+  <span class="tier-label cross-label">Cross-cutting</span>
+  <span class="title">Accessibility</span>
+  <p>Larger-font mode for older teachers (vision matters). Color-blind palette for the heatmap views you'll build. Screen reader support for any text content.</p>
+</div>
+
+<div class="feature cross">
+  <span class="num">27</span>
+  <span class="tier-label cross-label">Cross-cutting</span>
+  <span class="title">Offline-first</span>
+  <p>Many teachers work in school basements with weak WiFi. Cloud sync should be <strong>last-write-wins with conflict resolution</strong>, not strict online-only.</p>
+</div>
+
+<div class="feature cross">
+  <span class="num">28</span>
+  <span class="tier-label cross-label">Cross-cutting</span>
+  <span class="title">First-run teacher onboarding</span>
+  <p>A guided tour: add your first student → explore the dashboard → start your first lesson. Include a <strong>pre-populated sample student</strong> with realistic 3-month history so teachers can see what the dashboard looks like with real data, <mark>not an empty shell</mark>.</p>
+</div>
+
+<div class="feature cross">
+  <span class="num">29</span>
+  <span class="tier-label cross-label">Cross-cutting</span>
+  <span class="title">Studio-wide reports + benchmarks</span>
+  <p>"Your studio's average week-1 streak: 3.2 days." "75% of your students completed Hanon 1 by lesson 4." <mark>Useful for teachers thinking about their own pedagogy.</mark></p>
+</div>
+
+<div class="feature cross">
+  <span class="num">30</span>
+  <span class="tier-label cross-label">Cross-cutting</span>
+  <span class="title">In-app teacher community</span>
+  <p>Share lesson plan templates and custom exercise recipes with other teachers in the network. <mark class="strong">Long-tail growth play — your power users become content creators.</mark></p>
+</div>
+
+<div class="top3-banner" id="top3">
+  <h2 style="border:none; padding:0;">★ My Top 3 picks (if budget were finite)</h2>
+  <div class="sub">If running this product over the next quarter with limited resources, here's where the leverage is.</div>
+</div>
+
+<div class="feature gold">
+  <span class="num">★ 1</span>
+  <span class="tier-label gold-label">Top Pick</span>
+  <span class="title">Cloud sync + Practice journal</span>
+  <p>Combined, these <mark class="strong">turn the app from a single-device drill tool into a teacher's daily window into every student's progress</mark>. Everything else compounds off these two. Cloud sync is already on the roadmap; the journal is small additional work given the data is already collected.</p>
+</div>
+
+<div class="feature gold">
+  <span class="num">★ 2</span>
+  <span class="tier-label gold-label">Top Pick</span>
+  <span class="title">Auto parent reports + recording/playback</span>
+  <p><strong>Parents are who pay.</strong> Right now parents have zero visibility. A weekly auto-generated PDF report + a "listen to Sarah's latest practice attempt" link will dramatically raise teacher retention by raising parent satisfaction. <mark>Teachers love being able to point to evidence when a parent asks "is my kid actually learning?"</mark></p>
+</div>
+
+<div class="feature gold">
+  <span class="num">★ 3</span>
+  <span class="tier-label gold-label">Top Pick</span>
+  <span class="title">Lesson plan templates + AI-generated agenda</span>
+  <p>This is the feature that makes a teacher feel the app is <em>helping them teach</em>, not just being a drill machine for students. Most apps stop at "drills for kids"; <mark class="strong">this jumps you into "studio software for adults"</mark>. The AI angle is a strong marketing wedge — you're "the music teaching app with AI lesson planning".</p>
+</div>
+
+<p style="margin-top:14px; color: var(--ink-2);"><strong>Everything else is a multiplier on those three.</strong></p>
+
+<h2 id="code">Specific code-level observations</h2>
+<section class="observations">
+  <ul>
+    <li>The <strong>23k-line <code>interval_birds.gd</code> monolith</strong> is becoming a liability. Before adding much more, a refactor pass extracting clean modules (the way <code>scripts/learning/</code>, <code>scripts/exercises/</code>, <code>scripts/teacher/</code> already are) would pay back hugely. <mark>Candidates: ear-training session loop, sight-reading state machine, HUD/result-screen UI.</mark></li>
+    <li>The <strong>QA bot has 5 known intermittent failures</strong> — these are the kind of thing that erode confidence over time. Worth a targeted session.</li>
+    <li>The <strong>Learning Mode's "Practice Weak Notes" card</strong> is the obvious hook for Phase-9 personalization — that infrastructure exists.</li>
+    <li>The <strong>single-color-per-mode design</strong> (orange Practice Drills, teal Teacher Dashboard, etc.) is consistent and warm — <mark>a real strength worth defending against UI drift.</mark></li>
+  </ul>
+</section>
+
+<footer>
+  MusicEd / Clefira · Teacher Experience Roadmap · 2026-05-20 · For internal planning
+</footer>
+
+</div>
+</body>
+</html>

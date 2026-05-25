@@ -16,11 +16,17 @@ signal tech_added(student_id: String, item: Dictionary)
 signal tech_updated(student_id: String, idx: int, item: Dictionary)
 signal tech_removed(student_id: String, idx: int)
 signal data_changed
+# First-run onboarding signals. The main script handles persistence + bulk
+# demo-data creation; the dashboard just emits intent so it stays UI-only.
+signal onboarding_add_first_student
+signal onboarding_load_sample_studio
+signal onboarding_skipped
 
 const T = preload("res://scripts/teacher/teacher_dashboard_tokens.gd")
 const FONT_TITLE := preload("res://assets/fonts/Baloo2-SemiBold.ttf")
 const FONT_BODY := preload("res://assets/fonts/Nunito-Regular.ttf")
 const LessonSessionScript = preload("res://scripts/students/lesson_session.gd")
+const CloudSyncDialogScript = preload("res://scripts/sync/cloud_sync_dialog.gd")
 
 const TAB_OVERVIEW := 0
 const TAB_REPERTOIRE := 1
@@ -52,7 +58,13 @@ var _active_tab: int = TAB_OVERVIEW
 var _delete_confirm_id: String = ""
 var _delete_piece_confirm_idx: int = -1
 var _delete_tech_confirm_idx: int = -1
-var _export_overlay: ColorRect = null
+# Cloud Sync (Tier A). The SyncProvider is owned by interval_birds.gd (a single
+# instance per app run) and handed to us via set_sync_provider(). The dialog
+# itself is built lazily on first open. The top-bar button reference is kept so
+# we can update its label (e.g. add a "●" badge when a newer snapshot is pending).
+var _sync_provider: Node = null
+var _cloud_sync_dialog: Node = null
+var _cloud_sync_button: Button = null
 
 # Top-level containers
 var _sidebar_container: VBoxContainer
@@ -108,6 +120,22 @@ func refresh(teacher_data: Dictionary, module_progress_stats: Dictionary = {}) -
 	_rebuild_student_list()
 	_refresh_content()
 	_update_student_count()
+
+
+# Jump straight to a student's detail (Overview tab) — used when the dashboard
+# is opened mid-lesson so the teacher lands on the active student's page
+# instead of the unselected student list. Does NOT emit student_selected: the
+# student is already the active one, so no progress reload is needed.
+func open_to_student(student_id: String) -> void:
+	if student_id.is_empty():
+		return
+	_selected_student_id = student_id
+	_active_tab = TAB_OVERVIEW
+	_expanded_log_entries.clear()
+	_completed_section_expanded = false
+	_rebuild_student_list()
+	_refresh_tab_styles()
+	_refresh_content()
 
 
 # =============================================================================
@@ -198,16 +226,19 @@ func _build_top_bar() -> PanelContainer:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hbox.add_child(title)
 
-	# Export Report button
-	var export_btn := Button.new()
-	export_btn.text = "Export Report"
-	export_btn.add_theme_font_override("font", FONT_TITLE)
-	export_btn.add_theme_font_size_override("font_size", 14)
-	export_btn.add_theme_color_override("font_color", T.ACCENT_GOLD)
-	export_btn.add_theme_color_override("font_hover_color", T.ACCENT_GOLD.lightened(0.2))
-	_style_flat_button(export_btn)
-	export_btn.pressed.connect(func(): _on_export_report_pressed())
-	hbox.add_child(export_btn)
+	# Cloud Sync (Tier A — Supabase snapshot backup/restore). The button just
+	# opens the dialog; the SyncProvider is injected from interval_birds.gd via
+	# set_sync_provider() before the user gets here. Its label updates to
+	# "☁ Cloud Sync ●" when the provider has a pending newer snapshot.
+	_cloud_sync_button = Button.new()
+	_cloud_sync_button.text = "☁ Cloud Sync"
+	_cloud_sync_button.add_theme_font_override("font", FONT_TITLE)
+	_cloud_sync_button.add_theme_font_size_override("font_size", 14)
+	_cloud_sync_button.add_theme_color_override("font_color", T.ACCENT_TEAL)
+	_cloud_sync_button.add_theme_color_override("font_hover_color", T.ACCENT_TEAL.lightened(0.2))
+	_style_flat_button(_cloud_sync_button)
+	_cloud_sync_button.pressed.connect(func(): _on_cloud_sync_open_pressed())
+	hbox.add_child(_cloud_sync_button)
 
 	# Student count
 	_student_count_label = Label.new()
@@ -331,11 +362,17 @@ func _rebuild_student_list() -> void:
 	for child in _sidebar_container.get_children():
 		child.queue_free()
 
+	# First-run welcome banner: empty roster + not skipped/seen. Three options
+	# let the teacher choose how to start: solo, with sample data, or skip.
+	var students: Array = _data.get("students", [])
+	var onboarding_done: bool = bool(_data.get("teacher_onboarding_done", false))
+	if students.is_empty() and not onboarding_done:
+		_sidebar_container.add_child(_build_onboarding_welcome_card())
+
 	# Today's agenda + weekly workflow stats above the student list.
 	var summary := _build_sidebar_top_summary()
 	_sidebar_container.add_child(summary)
 
-	var students: Array = _data.get("students", [])
 	for student in students:
 		var sid: String = str(student.get("id", ""))
 		if sid == "":
@@ -603,6 +640,10 @@ func _build_tab_overview(student: Dictionary) -> void:
 	vbox.add_theme_constant_override("separation", T.SECTION_GAP)
 	margin.add_child(vbox)
 
+	# "Since Last Lesson" prep card — the 60-second pre-lesson snapshot:
+	# what the student practiced, weak now, open assignments, plan from last time.
+	_build_since_last_lesson_card(vbox, student)
+
 	# Info section card
 	var info_card := _build_content_card()
 	vbox.add_child(info_card)
@@ -618,6 +659,9 @@ func _build_tab_overview(student: Dictionary) -> void:
 	# Phase 3: bookended lesson sessions (Start Lesson → End Lesson) with per-round
 	# scores. Only shows when the selected student actually has recorded sessions.
 	_build_lesson_sessions_card(vbox, student)
+	# SS3 — Per-key sight reading accuracy bar chart. Only shows if the student
+	# has accumulated meaningful per-key data via the sight modes.
+	_build_per_key_radar_card(vbox, student)
 
 	info_vbox.add_child(_build_section_title("Student Information"))
 
@@ -1666,7 +1710,109 @@ func _request_delete_lesson_entry(entry_idx: int, entry_date: String) -> void:
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	dialog.close_requested.connect(func(): dialog.queue_free())
+	_apply_clefira_dialog_style(dialog)
 	dialog.popup_centered()
+
+
+# Mirror of interval_birds.gd::_apply_clefira_dialog_style — kept local so the
+# dashboard scene doesn't depend on the main script being already-loaded. Same
+# palette so the visual identity carries across all dialogs.
+func _apply_clefira_dialog_style(dlg: AcceptDialog) -> void:
+	if dlg == null:
+		return
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.10, 0.14, 0.20, 0.98)
+	sb.border_color = Color(0.475, 0.82, 0.80, 0.92)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 3
+	sb.corner_radius_top_left = 16
+	sb.corner_radius_top_right = 16
+	sb.corner_radius_bottom_left = 16
+	sb.corner_radius_bottom_right = 16
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	sb.shadow_size = 14
+	sb.shadow_offset = Vector2(0, 4)
+	sb.content_margin_left = 22
+	sb.content_margin_right = 22
+	sb.content_margin_top = 18
+	sb.content_margin_bottom = 18
+	dlg.add_theme_stylebox_override("panel", sb)
+	dlg.add_theme_color_override("title_color", Color(0.62, 0.95, 0.88, 1.0))
+	dlg.add_theme_font_size_override("title_font_size", 18)
+	var lbl: Label = dlg.get_label()
+	if lbl != null:
+		lbl.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98, 0.95))
+		lbl.add_theme_font_size_override("font_size", 14)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var ok_btn: Button = dlg.get_ok_button()
+	if ok_btn != null:
+		_style_branded_primary_button(ok_btn)
+		ok_btn.custom_minimum_size = Vector2(140, 38)
+	if dlg is ConfirmationDialog:
+		var cancel_btn: Button = (dlg as ConfirmationDialog).get_cancel_button()
+		if cancel_btn != null:
+			_style_branded_secondary_button(cancel_btn)
+			cancel_btn.custom_minimum_size = Vector2(120, 38)
+
+
+func _style_branded_primary_button(btn: Button) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.475, 0.82, 0.80, 0.92)
+	sb.border_color = Color(0.62, 0.95, 0.88, 1.0)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 10
+	sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10
+	sb.corner_radius_bottom_right = 10
+	sb.content_margin_left = 16
+	sb.content_margin_right = 16
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	sb.shadow_color = Color(0.475, 0.82, 0.80, 0.30)
+	sb.shadow_size = 4
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover: StyleBoxFlat = sb.duplicate()
+	hover.bg_color = Color(0.55, 0.92, 0.88, 0.96)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed: StyleBoxFlat = sb.duplicate()
+	pressed.bg_color = Color(0.40, 0.72, 0.70, 0.96)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_color_override("font_color", Color(0.10, 0.16, 0.22, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color(0.06, 0.10, 0.16, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(0.06, 0.10, 0.16, 1.0))
+
+
+func _style_branded_secondary_button(btn: Button) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.62, 0.86, 0.96, 0.10)
+	sb.border_color = Color(0.62, 0.86, 0.96, 0.80)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 10
+	sb.corner_radius_top_right = 10
+	sb.corner_radius_bottom_left = 10
+	sb.corner_radius_bottom_right = 10
+	sb.content_margin_left = 16
+	sb.content_margin_right = 16
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover: StyleBoxFlat = sb.duplicate()
+	hover.bg_color = Color(0.62, 0.86, 0.96, 0.20)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed: StyleBoxFlat = sb.duplicate()
+	pressed.bg_color = Color(0.62, 0.86, 0.96, 0.06)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_color_override("font_color", Color(0.85, 0.95, 1.0, 0.96))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(0.85, 0.95, 1.0, 0.96))
 
 
 func _on_confirm_delete_lesson_entry(entry_idx: int) -> void:
@@ -1936,10 +2082,273 @@ func _build_lesson_stats_card(parent: VBoxContainer, student: Dictionary) -> voi
 		vbox.add_child(_build_label("    ".join(detail_parts), T.FONT_SIZE_SMALL, T.TEXT_MUTED))
 
 
+# --- "Since Last Lesson" pre-lesson snapshot ---
+
+# Compute a summary of student activity since the most recent lesson_log entry.
+# Returns a dict: { has_last_lesson, last_lesson_date, days_since, sessions_count,
+#   total_correct, total_asked, avg_accuracy, modes_practiced, open_assignments,
+#   due_this_week, weak_items, next_focus, last_summary }.
+func _compute_since_last_lesson(student: Dictionary) -> Dictionary:
+	var out := {
+		"has_last_lesson": false,
+		"last_lesson_date": "",
+		"days_since": 0,
+		"sessions_count": 0,
+		"total_correct": 0,
+		"total_asked": 0,
+		"avg_accuracy": -1,
+		"modes_practiced": [],
+		"open_assignments": 0,
+		"due_this_week": 0,
+		"weak_items": [],
+		"next_focus": "",
+		"last_summary": "",
+	}
+	# Pick the most-recent lesson_log entry by date.
+	var log: Array = student.get("lesson_log", [])
+	var latest_unix: int = -1
+	var latest_entry: Dictionary = {}
+	for entry_any in log:
+		if typeof(entry_any) != TYPE_DICTIONARY:
+			continue
+		var u: int = _parse_iso_date_to_unix(str((entry_any as Dictionary).get("date", "")))
+		if u > latest_unix:
+			latest_unix = u
+			latest_entry = entry_any
+	if latest_unix > 0:
+		out["has_last_lesson"] = true
+		out["last_lesson_date"] = str(latest_entry.get("date", ""))
+		out["days_since"] = int(maxi(0, (_today_unix_start() - latest_unix) / 86400))
+		out["next_focus"] = str(latest_entry.get("next_focus", "")).strip_edges()
+		out["last_summary"] = str(latest_entry.get("summary", "")).strip_edges()
+
+	# Scope session_history to entries on/after the last lesson date. When there
+	# is no last lesson, fall back to last 14 days so the card still says
+	# something useful for brand-new students.
+	var cutoff_unix: int = latest_unix if latest_unix > 0 else (_today_unix_start() - 14 * 86400)
+	var sessions: Array = student.get("session_history", [])
+	var modes_seen: Dictionary = {}
+	var sum_acc: float = 0.0
+	var sum_acc_count: int = 0
+	for s_any in sessions:
+		if typeof(s_any) != TYPE_DICTIONARY:
+			continue
+		var s: Dictionary = s_any
+		var s_date: String = str(s.get("date", ""))
+		var s_unix: int = _parse_iso_date_to_unix(s_date)
+		if s_unix == 0 or s_unix < cutoff_unix:
+			continue
+		out["sessions_count"] = int(out["sessions_count"]) + 1
+		out["total_correct"] = int(out["total_correct"]) + int(s.get("correct", 0))
+		out["total_asked"] = int(out["total_asked"]) + int(s.get("asked", 0))
+		var acc_v = s.get("accuracy", -1)
+		if acc_v != null and int(acc_v) >= 0:
+			sum_acc += float(acc_v)
+			sum_acc_count += 1
+		var mode_label: String = str(s.get("mode", "")).strip_edges()
+		if mode_label != "":
+			modes_seen[mode_label] = true
+	if sum_acc_count > 0:
+		out["avg_accuracy"] = int(round(sum_acc / float(sum_acc_count)))
+	var modes_arr: Array = modes_seen.keys()
+	modes_arr.sort()
+	out["modes_practiced"] = modes_arr
+
+	# Assignments: count open + count due in next 7 days.
+	var assignments: Array = student.get("assignments", [])
+	var week_ahead_unix: int = _today_unix_start() + 7 * 86400
+	for a_any in assignments:
+		if typeof(a_any) != TYPE_DICTIONARY:
+			continue
+		var a: Dictionary = a_any
+		if bool(a.get("done", false)):
+			continue
+		out["open_assignments"] = int(out["open_assignments"]) + 1
+		var due_unix: int = _parse_iso_date_to_unix(str(a.get("due", "")))
+		if due_unix > 0 and due_unix <= week_ahead_unix:
+			out["due_this_week"] = int(out["due_this_week"]) + 1
+
+	# Weak items: pull current snapshot (top 3) from item_stats. Same heuristic
+	# as the "Needs Work" card below, but capped at 3 for the at-a-glance view.
+	var item_stats: Dictionary = student.get("item_stats", {})
+	var weak: Array = []
+	for category in item_stats:
+		var cat_stats_any = item_stats.get(category, {})
+		if typeof(cat_stats_any) != TYPE_DICTIONARY:
+			continue
+		var cat_stats: Dictionary = cat_stats_any
+		for item_key in cat_stats:
+			var entry_any = cat_stats.get(item_key, {})
+			if typeof(entry_any) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = entry_any
+			var asked := int(entry.get("asked", 0))
+			var correct := int(entry.get("correct", 0))
+			if asked < 3:
+				continue
+			var accuracy := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+			if accuracy < 70:
+				weak.append({"item": str(item_key), "category": str(category), "accuracy": accuracy})
+	weak.sort_custom(func(a, b): return int(a.accuracy) < int(b.accuracy))
+	if weak.size() > 3:
+		weak.resize(3)
+	out["weak_items"] = weak
+	return out
+
+
+func _build_since_last_lesson_card(parent: VBoxContainer, student: Dictionary) -> void:
+	var d: Dictionary = _compute_since_last_lesson(student)
+	var card := PanelContainer.new()
+	# Distinct visual treatment — teal left bar draws the eye to the prep card.
+	var sb := _build_card_style(T.BG_CARD, T.ACCENT_TEAL)
+	sb.border_width_left = 4
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.content_margin_left = 16
+	sb.content_margin_right = 16
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	card.add_theme_stylebox_override("panel", sb)
+	parent.add_child(card)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	card.add_child(v)
+
+	# Header line — "Since Last Lesson · 10 days ago · May 15" or "No lessons logged yet".
+	var header_text: String = ""
+	if bool(d.get("has_last_lesson", false)):
+		var days_i: int = int(d.get("days_since", 0))
+		var when_text := "today" if days_i == 0 else ("yesterday" if days_i == 1 else ("%d days ago" % days_i))
+		header_text = "Since Last Lesson  ·  %s  ·  %s" % [when_text, str(d.get("last_lesson_date", ""))]
+	else:
+		header_text = "Pre-Lesson Snapshot  ·  No lessons logged yet"
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 8)
+	v.add_child(header_row)
+	var header_lbl := _build_label(header_text, T.FONT_SIZE_HEADING, T.ACCENT_TEAL)
+	header_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(header_lbl)
+
+	# Practice activity row — chips for sessions / minutes-ish (via questions) / accuracy.
+	var act_row := HBoxContainer.new()
+	act_row.add_theme_constant_override("separation", 10)
+	v.add_child(act_row)
+	var n_sessions: int = int(d.get("sessions_count", 0))
+	if n_sessions == 0:
+		act_row.add_child(_build_label("Nothing recorded since then — gentle nudge!", T.FONT_SIZE_BODY, T.ACCENT_GOLD))
+	else:
+		act_row.add_child(_build_stat_chip("Sessions", str(n_sessions), T.ACCENT_BLUE))
+		var asked_n: int = int(d.get("total_asked", 0))
+		if asked_n > 0:
+			act_row.add_child(_build_stat_chip("Questions", str(asked_n), T.ACCENT_PURPLE))
+		var avg_acc: int = int(d.get("avg_accuracy", -1))
+		if avg_acc >= 0:
+			var acc_color: Color = T.ACCENT_GREEN if avg_acc >= 80 else (T.ACCENT_GOLD if avg_acc >= 60 else T.ACCENT_RED)
+			act_row.add_child(_build_stat_chip("Avg Accuracy", "%d%%" % avg_acc, acc_color))
+
+	# Modes practiced (chips).
+	var modes: Array = d.get("modes_practiced", [])
+	if modes.size() > 0:
+		var modes_row := HBoxContainer.new()
+		modes_row.add_theme_constant_override("separation", 6)
+		v.add_child(modes_row)
+		modes_row.add_child(_build_label("Modes:", T.FONT_SIZE_SMALL, T.TEXT_MUTED))
+		for m in modes:
+			modes_row.add_child(_build_label(str(m), T.FONT_SIZE_SMALL, T.TEXT_SECONDARY))
+
+	# Weak items right now (top 3).
+	var weak: Array = d.get("weak_items", [])
+	if weak.size() > 0:
+		var weak_row := HBoxContainer.new()
+		weak_row.add_theme_constant_override("separation", 8)
+		v.add_child(weak_row)
+		weak_row.add_child(_build_label("Focus on:", T.FONT_SIZE_SMALL, T.ACCENT_RED))
+		for w_any in weak:
+			var w: Dictionary = w_any
+			var w_text := "%s (%d%%)" % [str(w.get("item", "")), int(w.get("accuracy", 0))]
+			weak_row.add_child(_build_label(w_text, T.FONT_SIZE_SMALL, T.TEXT_PRIMARY))
+
+	# Open assignments line.
+	var open_n: int = int(d.get("open_assignments", 0))
+	if open_n > 0:
+		var due_n: int = int(d.get("due_this_week", 0))
+		var assign_text := "%d open assignment%s" % [open_n, "" if open_n == 1 else "s"]
+		if due_n > 0:
+			assign_text += "  ·  %d due this week" % due_n
+		v.add_child(_build_label(assign_text, T.FONT_SIZE_BODY, T.ACCENT_GOLD))
+
+	# Plan from last lesson — what the teacher said to focus on next time.
+	var next_focus: String = str(d.get("next_focus", "")).strip_edges()
+	if next_focus != "":
+		var plan_lbl := _build_label("Plan: %s" % next_focus, T.FONT_SIZE_BODY, T.TEXT_PRIMARY)
+		plan_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(plan_lbl)
+
+
 func set_per_student_stats_provider(fn: Callable) -> void:
 	_per_student_stats_provider = fn
 	if _content_container != null and _content_container.visible:
 		_refresh_content()
+
+
+# Cloud Sync wiring. The SyncProvider instance is owned by interval_birds.gd
+# and handed to us once per app run; we just remember it and forward to the
+# dialog when it gets built (or right away if the dialog already exists).
+# Also subscribes to provider signals so the top-bar button can show a "●"
+# badge whenever a newer snapshot is pending from another device.
+func set_sync_provider(provider: Node) -> void:
+	_sync_provider = provider
+	if _cloud_sync_dialog != null and is_instance_valid(_cloud_sync_dialog):
+		_cloud_sync_dialog.call("set_sync_provider", provider)
+	if _sync_provider != null:
+		# These signals are what affect the badge state. We connect with
+		# CONNECT_REFERENCE_COUNTED so multiple set_sync_provider() calls don't
+		# accidentally stack duplicate handlers.
+		var safe_connect := func(sig: String, cb: Callable) -> void:
+			if _sync_provider.has_signal(sig) and not _sync_provider.is_connected(sig, cb):
+				_sync_provider.connect(sig, cb)
+		safe_connect.call("newer_snapshot_available", Callable(self, "_on_cloud_sync_badge_changed_args3"))
+		safe_connect.call("snapshot_pushed", Callable(self, "_on_cloud_sync_badge_changed_args2"))
+		safe_connect.call("snapshot_pulled", Callable(self, "_on_cloud_sync_badge_changed_args3_dict"))
+		safe_connect.call("signed_out", Callable(self, "_refresh_cloud_sync_badge"))
+		safe_connect.call("session_restored", Callable(self, "_on_cloud_sync_badge_changed_args2"))
+		_refresh_cloud_sync_badge()
+
+
+# Single source of truth for the top-bar Cloud Sync button label.
+func _refresh_cloud_sync_badge() -> void:
+	if _cloud_sync_button == null:
+		return
+	var pending: bool = _sync_provider != null and _sync_provider.call("has_pending_newer_snapshot")
+	_cloud_sync_button.text = "☁ Cloud Sync ●" if pending else "☁ Cloud Sync"
+
+
+# Signal-handler shims — provider signals carry varying argument lists but we
+# only need to refresh the badge from any of them.
+func _on_cloud_sync_badge_changed_args2(_a, _b) -> void:
+	_refresh_cloud_sync_badge()
+
+
+func _on_cloud_sync_badge_changed_args3(_a, _b, _c) -> void:
+	_refresh_cloud_sync_badge()
+
+
+func _on_cloud_sync_badge_changed_args3_dict(_bundle: Dictionary, _created_at: String, _device_label: String) -> void:
+	_refresh_cloud_sync_badge()
+
+
+# Lazy-instantiates the dialog on first open. Subsequent opens just show it.
+# The dialog lives as a child of the dashboard so it z-orders correctly above
+# the dashboard content but below the global modal band.
+func _on_cloud_sync_open_pressed() -> void:
+	if _cloud_sync_dialog == null or not is_instance_valid(_cloud_sync_dialog):
+		_cloud_sync_dialog = CloudSyncDialogScript.new()
+		add_child(_cloud_sync_dialog)
+		if _sync_provider != null:
+			_cloud_sync_dialog.call("set_sync_provider", _sync_provider)
+	_cloud_sync_dialog.call("show_dialog")
 
 
 func _resolve_stats_for_current_student() -> Dictionary:
@@ -1950,6 +2359,73 @@ func _resolve_stats_for_current_student() -> Dictionary:
 		if typeof(stats) == TYPE_DICTIONARY:
 			return stats
 	return _module_progress_stats
+
+
+# SS3 — Per-key accuracy bar chart for one student. Mirrors the home-overview
+# radar but reads from this specific student's item_stats.sight_key. Hidden
+# when there are fewer than 5 attempts total (bars wouldn't be meaningful).
+func _build_per_key_radar_card(parent: VBoxContainer, student: Dictionary) -> void:
+	var item_stats: Dictionary = student.get("item_stats", {})
+	if typeof(item_stats) != TYPE_DICTIONARY:
+		return
+	var per_key: Dictionary = item_stats.get("sight_key", {}) if typeof(item_stats.get("sight_key", {})) == TYPE_DICTIONARY else {}
+	if per_key.is_empty():
+		return
+	# Sum attempts; suppress display under threshold.
+	var total_attempts: int = 0
+	for k in per_key.keys():
+		var entry_v: Variant = per_key[k]
+		if typeof(entry_v) == TYPE_DICTIONARY:
+			total_attempts += int((entry_v as Dictionary).get("asked", 0))
+	if total_attempts < 5:
+		return
+	var card := _build_content_card()
+	parent.add_child(card)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	card.add_child(v)
+	v.add_child(_build_section_title("Sight Reading Accuracy by Key"))
+	var key_order: Array[String] = ["C", "1#", "2#", "3#", "1b", "2b", "3b"]
+	for k in key_order:
+		var entry_any: Variant = per_key.get(k, null)
+		if typeof(entry_any) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_any
+		var asked: int = int(entry.get("asked", 0))
+		if asked == 0:
+			continue
+		var correct: int = int(entry.get("correct", 0))
+		var pct: int = int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		v.add_child(row)
+		var key_lbl := Label.new()
+		key_lbl.text = k.replace("#", char(0x266F)).replace("b", char(0x266D))
+		key_lbl.add_theme_font_size_override("font_size", T.FONT_SIZE_BODY)
+		key_lbl.add_theme_color_override("font_color", T.TEXT_PRIMARY)
+		key_lbl.custom_minimum_size = Vector2(40, 0)
+		row.add_child(key_lbl)
+		var bar_bg := PanelContainer.new()
+		bar_bg.custom_minimum_size = Vector2(260, 14)
+		var bg_sb := StyleBoxFlat.new()
+		bg_sb.bg_color = Color(0.10, 0.12, 0.16, 0.85)
+		bg_sb.corner_radius_top_left = 3
+		bg_sb.corner_radius_top_right = 3
+		bg_sb.corner_radius_bottom_left = 3
+		bg_sb.corner_radius_bottom_right = 3
+		bar_bg.add_theme_stylebox_override("panel", bg_sb)
+		row.add_child(bar_bg)
+		var fill := ColorRect.new()
+		var bar_color: Color = T.ACCENT_GREEN if pct >= 80 else (T.ACCENT_GOLD if pct >= 60 else T.ACCENT_RED)
+		fill.color = bar_color
+		fill.custom_minimum_size = Vector2(int(260.0 * (float(pct) / 100.0)), 14)
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar_bg.add_child(fill)
+		var stat_lbl := Label.new()
+		stat_lbl.text = "%d%%  (%d / %d)" % [pct, correct, asked]
+		stat_lbl.add_theme_font_size_override("font_size", T.FONT_SIZE_SMALL)
+		stat_lbl.add_theme_color_override("font_color", T.TEXT_MUTED)
+		row.add_child(stat_lbl)
 
 
 func _build_app_activity_card(parent: VBoxContainer) -> void:
@@ -2027,8 +2503,127 @@ func _build_lesson_sessions_card(parent: VBoxContainer, student: Dictionary) -> 
 		vbox.add_child(_build_label("…and %d earlier" % (sessions.size() - shown), T.FONT_SIZE_SMALL, T.TEXT_MUTED))
 
 
+# First-run welcome card for teachers with empty rosters. Three CTAs: add
+# the first real student, populate a sample studio for exploration, or skip.
+# All three set the teacher_onboarding_done flag via signals so this card
+# disappears on the next refresh.
+func _build_onboarding_welcome_card() -> PanelContainer:
+	var card := PanelContainer.new()
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.10, 0.22, 0.30, 0.95)
+	sb.border_color = T.ACCENT_TEAL
+	sb.border_width_left = 4
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
+	card.add_theme_stylebox_override("panel", sb)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	card.add_child(v)
+
+	var header := Label.new()
+	header.text = "Welcome to Clefira"
+	header.add_theme_font_override("font", FONT_TITLE)
+	header.add_theme_font_size_override("font_size", 18)
+	header.add_theme_color_override("font_color", T.ACCENT_TEAL)
+	v.add_child(header)
+
+	var body := Label.new()
+	body.text = "Your studio is empty. Start by adding your first student, or load a sample studio to explore the workflow."
+	body.add_theme_font_override("font", FONT_BODY)
+	body.add_theme_font_size_override("font_size", T.FONT_SIZE_SMALL)
+	body.add_theme_color_override("font_color", T.TEXT_SECONDARY)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(body)
+
+	var add_btn := _build_button("+ Add my first student", T.ACCENT_GREEN, func():
+		_on_onboarding_add_first_pressed()
+	)
+	add_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(add_btn)
+
+	var sample_btn := _build_button("Load sample studio (2 demo students)", T.ACCENT_TEAL, func():
+		_on_onboarding_load_sample_pressed()
+	)
+	sample_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(sample_btn)
+
+	var skip_btn := Button.new()
+	skip_btn.text = "Skip — I'll explore on my own"
+	skip_btn.flat = true
+	skip_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	skip_btn.add_theme_color_override("font_color", T.TEXT_MUTED)
+	skip_btn.add_theme_font_size_override("font_size", T.FONT_SIZE_SMALL)
+	skip_btn.pressed.connect(func(): _on_onboarding_skip_pressed())
+	v.add_child(skip_btn)
+
+	return card
+
+
+func _on_onboarding_add_first_pressed() -> void:
+	onboarding_add_first_student.emit()
+	_on_add_student_pressed()
+
+
+func _on_onboarding_load_sample_pressed() -> void:
+	onboarding_load_sample_studio.emit()
+	# The main script handles bulk creation + persistence + dashboard refresh.
+
+
+func _on_onboarding_skip_pressed() -> void:
+	onboarding_skipped.emit()
+	# Mirror locally so the card disappears immediately even before persistence
+	# lands; the main script will re-confirm on its next refresh() call.
+	_data["teacher_onboarding_done"] = true
+	_rebuild_student_list()
+
+
 # Build the "Today" agenda + workflow stats above the student list in the sidebar.
 # Hidden when there's nothing to show (empty roster or no next_focus anywhere).
+# SS1 — Top streak leaderboard. For each student, scan session_history for
+# entries in the last 7 days, find the max best_streak. Return top N sorted
+# desc. Skips students who never recorded a streak ≥3 (not noise-worthy).
+func _compute_streak_leaderboard(limit: int = 3) -> Array:
+	var week_ago: int = _today_unix_start() - 6 * 86400
+	var rows: Array = []
+	for s_any in _data.get("students", []):
+		if typeof(s_any) != TYPE_DICTIONARY:
+			continue
+		var s: Dictionary = s_any
+		var sname: String = str(s.get("name", "(unnamed)"))
+		var sessions: Array = s.get("session_history", [])
+		var best: int = 0
+		for sess_any in sessions:
+			if typeof(sess_any) != TYPE_DICTIONARY:
+				continue
+			var sess: Dictionary = sess_any
+			var date_s: String = str(sess.get("date", ""))
+			if date_s.length() < 10:
+				continue
+			var u: int = _parse_iso_date_to_unix(date_s.substr(0, 10))
+			if u == 0 or u < week_ago:
+				continue
+			var streak_v = sess.get("best_streak", 0)
+			if streak_v != null:
+				best = maxi(best, int(streak_v))
+		if best >= 3:
+			rows.append({"name": sname, "best_streak": best})
+	rows.sort_custom(func(a, b): return int(a.best_streak) > int(b.best_streak))
+	if rows.size() > limit:
+		rows.resize(limit)
+	return rows
+
+
 func _build_sidebar_top_summary() -> Control:
 	var wrap := PanelContainer.new()
 	wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2047,9 +2642,23 @@ func _build_sidebar_top_summary() -> Control:
 	var n_logs: int = int(workflow["logs_this_week"])
 	if n_logs > 0:
 		vbox.add_child(_build_label("%d log%s added this week" % [n_logs, "" if n_logs == 1 else "s"], T.FONT_SIZE_SMALL, T.ACCENT_TEAL))
+	# SS1 — Streak leaderboard. Top 3 students by best streak this week.
+	# Friendly competition; only shows when 2+ students have meaningful streaks.
+	var leaderboard: Array = _compute_streak_leaderboard(3)
+	if leaderboard.size() >= 2:
+		vbox.add_child(_build_label("%s  Top streaks this week" % char(0x1F525), T.FONT_SIZE_SMALL, T.ACCENT_GOLD))
+		var medals := [char(0x1F947), char(0x1F948), char(0x1F949)]
+		for i in leaderboard.size():
+			var entry: Dictionary = leaderboard[i]
+			var line := Label.new()
+			line.text = "%s  %s — streak %d" % [medals[i], str(entry.get("name", "")), int(entry.get("best_streak", 0))]
+			line.add_theme_font_override("font", FONT_BODY)
+			line.add_theme_font_size_override("font_size", T.FONT_SIZE_SMALL)
+			line.add_theme_color_override("font_color", T.TEXT_SECONDARY)
+			vbox.add_child(line)
 	# Agenda (#13)
 	var items: Array = _build_today_agenda_items(6)
-	if items.is_empty() and n_logs == 0:
+	if items.is_empty() and n_logs == 0 and leaderboard.size() < 2:
 		wrap.queue_free()
 		return Control.new()  # nothing to show — caller adds an empty placeholder
 	if not items.is_empty():
@@ -2690,207 +3299,6 @@ func _on_quick_note_save(card: PanelContainer) -> void:
 	lesson_added.emit(_selected_student_id, entry)
 	data_changed.emit()
 	_refresh_content()
-
-
-# =============================================================================
-# EXPORT REPORT
-# =============================================================================
-
-func _on_export_report_pressed() -> void:
-	var student := _get_selected_student()
-	if student.is_empty():
-		return
-	var report := _generate_student_report(student)
-	_show_export_overlay(report)
-
-
-func _generate_student_report(student: Dictionary) -> String:
-	var lines: Array[String] = []
-	lines.append("==== STUDENT REPORT ====")
-	lines.append("")
-	lines.append("Name: %s" % str(student.get("name", "Unnamed")))
-	lines.append("Level: %s" % str(student.get("level", "--")))
-	var instrument_str: String = str(student.get("instrument", ""))
-	if instrument_str != "":
-		lines.append("Instrument: %s" % instrument_str)
-	var lesson_day_str: String = str(student.get("lesson_day", ""))
-	if lesson_day_str != "":
-		lines.append("Lesson Day: %s  (%d min)" % [lesson_day_str, int(student.get("lesson_duration", 30))])
-	var book_data = student.get("current_book", {})
-	if book_data is Dictionary:
-		var book_name: String = str(book_data.get("name", ""))
-		var book_part: String = str(book_data.get("part", ""))
-		if book_name != "":
-			lines.append("Current Book: %s  %s" % [book_name, book_part])
-	lines.append("")
-
-	# Training Stats
-	var metrics: Dictionary = student.get("metrics", {})
-	if metrics.is_empty():
-		metrics = student.get("training_stats", {})
-	lines.append("---- Training Stats ----")
-	lines.append("Ear Accuracy: %s" % _format_pct(metrics.get("ear_accuracy", -1)))
-	lines.append("Sight Accuracy: %s" % _format_pct(metrics.get("sight_accuracy", -1)))
-	var total_s := int(metrics.get("ear_sessions", 0)) + int(metrics.get("sight_sessions", 0))
-	lines.append("Total Sessions: %d" % total_s)
-	lines.append("Last Session: %s" % str(metrics.get("last_session", "--")))
-	lines.append("")
-
-	# Current Pieces
-	var pieces: Array = student.get("current_pieces", [])
-	if pieces.size() > 0:
-		lines.append("---- Current Pieces ----")
-		for piece in pieces:
-			var p_title: String = str(piece.get("title", "Untitled"))
-			var p_status: String = str(piece.get("status", "assigned"))
-			var p_bpm: String = "%d/%d BPM" % [int(piece.get("current_bpm", 0)), int(piece.get("target_bpm", 0))]
-			lines.append("  - %s  [%s]  %s" % [p_title, p_status, p_bpm])
-		lines.append("")
-
-	# Technical items
-	var tech_items: Array = student.get("current_technical", [])
-	if tech_items.size() > 0:
-		lines.append("---- Technical Items ----")
-		for ti in tech_items:
-			var t_title: String = str(ti.get("title", ""))
-			var t_status: String = str(ti.get("status", "not_started"))
-			var t_bpm: String = "%d/%d BPM" % [int(ti.get("current_bpm", 0)), int(ti.get("target_bpm", 0))]
-			lines.append("  - %s  [%s]  %s" % [t_title, t_status.replace("_", " "), t_bpm])
-		lines.append("")
-
-	# Weak Areas
-	var item_stats: Dictionary = student.get("item_stats", {})
-	var weak_items: Array = []
-	for category in item_stats:
-		var cat_stats: Dictionary = item_stats.get(category, {})
-		if not cat_stats is Dictionary:
-			continue
-		for item_key in cat_stats:
-			var entry: Dictionary = cat_stats.get(item_key, {})
-			if not entry is Dictionary:
-				continue
-			var asked := int(entry.get("asked", 0))
-			var correct := int(entry.get("correct", 0))
-			if asked < 3:
-				continue
-			var accuracy := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
-			if accuracy < 70:
-				weak_items.append({"category": str(category), "item": str(item_key), "accuracy": accuracy})
-	weak_items.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("accuracy", 100)) < int(b.get("accuracy", 100)))
-	if weak_items.size() > 0:
-		lines.append("---- Weak Areas ----")
-		for w in weak_items:
-			lines.append("  - [%s] %s  (%d%%)" % [str(w.get("category", "")), str(w.get("item", "")), int(w.get("accuracy", 0))])
-		lines.append("")
-
-	# Recent Sessions
-	var history: Array = student.get("session_history", [])
-	if history.size() > 0:
-		lines.append("---- Recent Sessions ----")
-		var count := mini(history.size(), 10)
-		for i in range(history.size() - 1, history.size() - count - 1, -1):
-			if i < 0:
-				break
-			var entry: Dictionary = history[i]
-			var s_date: String = str(entry.get("date", ""))
-			var s_mode: String = str(entry.get("mode", ""))
-			var s_acc: String = _format_pct(entry.get("accuracy", -1))
-			lines.append("  %s  %s  %s" % [s_date, s_mode, s_acc])
-		lines.append("")
-
-	# Assignments
-	var assignments: Array = student.get("assignments", [])
-	var open_a: Array[String] = []
-	for a in assignments:
-		if not a.get("done", false):
-			var task_str: String = str(a.get("task", ""))
-			var due_str: String = str(a.get("due", ""))
-			open_a.append("  - %s%s" % [task_str, ("  (due: %s)" % due_str) if due_str != "" else ""])
-	if open_a.size() > 0:
-		lines.append("---- Open Assignments ----")
-		for l in open_a:
-			lines.append(l)
-		lines.append("")
-
-	lines.append("Report generated: %s" % _today_date())
-	return "\n".join(lines)
-
-
-func _show_export_overlay(report_text: String) -> void:
-	if _export_overlay != null and is_instance_valid(_export_overlay):
-		_export_overlay.queue_free()
-
-	_export_overlay = ColorRect.new()
-	_export_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_export_overlay.color = Color(0.0, 0.0, 0.0, 0.6)
-	_export_overlay.z_index = 100
-	add_child(_export_overlay)
-
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_export_overlay.add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(700, 500)
-	var panel_sb := _build_card_style(T.BG_SIDEBAR, T.ACCENT_TEAL)
-	panel_sb.border_width_left = 2
-	panel_sb.border_width_top = 2
-	panel_sb.border_width_right = 2
-	panel_sb.border_width_bottom = 2
-	panel_sb.content_margin_left = 20
-	panel_sb.content_margin_right = 20
-	panel_sb.content_margin_top = 16
-	panel_sb.content_margin_bottom = 16
-	panel.add_theme_stylebox_override("panel", panel_sb)
-	center.add_child(panel)
-
-	var panel_vbox := VBoxContainer.new()
-	panel_vbox.add_theme_constant_override("separation", 10)
-	panel.add_child(panel_vbox)
-
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 8)
-	panel_vbox.add_child(title_row)
-	var export_title := _build_label("Student Report", T.FONT_SIZE_TITLE, T.ACCENT_TEAL)
-	export_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(export_title)
-	var close_btn := _build_button("Close", T.ACCENT_RED, func():
-		if _export_overlay != null and is_instance_valid(_export_overlay):
-			_export_overlay.queue_free()
-			_export_overlay = null
-	)
-	title_row.add_child(close_btn)
-
-	var hint_lbl := _build_label("Select all text below and copy (Ctrl+A, Ctrl+C).", T.FONT_SIZE_SMALL, T.TEXT_MUTED)
-	panel_vbox.add_child(hint_lbl)
-
-	var text_edit := TextEdit.new()
-	text_edit.text = report_text
-	text_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_edit.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	text_edit.add_theme_font_override("font", FONT_BODY)
-	text_edit.add_theme_font_size_override("font_size", T.FONT_SIZE_BODY)
-	text_edit.add_theme_color_override("font_color", T.TEXT_PRIMARY)
-	var te_sb := StyleBoxFlat.new()
-	te_sb.bg_color = T.BG_INPUT
-	te_sb.corner_radius_top_left = 6
-	te_sb.corner_radius_top_right = 6
-	te_sb.corner_radius_bottom_left = 6
-	te_sb.corner_radius_bottom_right = 6
-	te_sb.border_color = T.BORDER_SUBTLE
-	te_sb.border_width_left = 1
-	te_sb.border_width_top = 1
-	te_sb.border_width_right = 1
-	te_sb.border_width_bottom = 1
-	te_sb.content_margin_left = 10
-	te_sb.content_margin_right = 10
-	te_sb.content_margin_top = 8
-	te_sb.content_margin_bottom = 8
-	text_edit.add_theme_stylebox_override("normal", te_sb)
-	var te_focus_sb: StyleBoxFlat = te_sb.duplicate()
-	te_focus_sb.border_color = T.ACCENT_TEAL
-	text_edit.add_theme_stylebox_override("focus", te_focus_sb)
-	panel_vbox.add_child(text_edit)
 
 
 # =============================================================================

@@ -1,7 +1,7 @@
-﻿# MusicEd Godot Project - Requirements and Current Context
+﻿# Clefira Godot Project - Requirements and Current Context
 
 ## 1. Project Overview
-- Project name: `MusicEd` (Godot 4.6).
+- Product name: `Clefira` (Godot 4.6). On-disk folder is still `musiced/` for backward continuity.
 - Goal: build a music education game with ear training and sight reading mini-games.
 - Current primary script: `scripts/interval_birds.gd`.
 - Theme direction: polished/pro UI with farm-style visual identity and a chicken guide character.

@@ -103,7 +103,27 @@ func _run() -> void:
 	print("QA SCREENSHOTS DIR: %s" % ProjectSettings.globalize_path(QA_SHOTS_DIR))
 	print("QA ISSUES PATH: %s" % ProjectSettings.globalize_path(QA_ISSUES_PATH))
 	print("QA SUGGESTIONS PATH: %s" % ProjectSettings.globalize_path(QA_SUGGESTIONS_PATH))
+	await _cleanup_before_quit()
 	get_tree().quit(0 if ok else 1)
+
+
+func _cleanup_before_quit() -> void:
+	if _bot != null and is_instance_valid(_bot):
+		_bot.queue_free()
+	_bot = null
+	for marker in _click_markers:
+		if marker != null and is_instance_valid(marker):
+			marker.queue_free()
+	_click_markers.clear()
+	if _overlay_layer != null and is_instance_valid(_overlay_layer):
+		_overlay_layer.queue_free()
+	_overlay_layer = null
+	_overlay_root = null
+	_overlay_title = null
+	_overlay_step = null
+	_overlay_mode = null
+	for _i in range(4):
+		await get_tree().process_frame
 
 
 func _parse_qa_scope() -> String:

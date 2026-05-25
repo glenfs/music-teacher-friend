@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MusicEd / Clefira — Cloud Sync Plan</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --card: #ffffff;
+    --ink: #1d2025;
+    --ink-2: #4a4f57;
+    --muted: #757a82;
+    --accent: #1c5f8c;
+    --hl: #fff3a6;
+    --hl-strong: #ffd24a;
+    --recommend: #2a7a4f;
+    --recommend-bg: #dff0e3;
+    --warn: #b56b1a;
+    --warn-bg: #fbedd6;
+    --decision: #6e4aa3;
+    --decision-bg: #ede4f7;
+    --code-bg: #f1efe8;
+    --border: #e5e2d8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+  }
+  header.page {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 36px;
+  }
+  header.page h1 {
+    margin: 0 0 4px;
+    font-size: 32px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  header.page .sub {
+    color: var(--muted);
+    font-size: 15px;
+  }
+  header.page .meta {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  h2 {
+    margin: 56px 0 18px;
+    font-size: 24px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    margin: 22px 0 10px;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  p { margin: 0 0 14px; color: var(--ink-2); }
+  mark {
+    background: var(--hl);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  mark.strong {
+    background: var(--hl-strong);
+    font-weight: 600;
+  }
+  code, .code {
+    font-family: "SF Mono", "Consolas", "Menlo", monospace;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: #3b3b3b;
+  }
+  .recommend-banner {
+    background: var(--recommend-bg);
+    border-left: 4px solid var(--recommend);
+    padding: 12px 18px;
+    border-radius: 8px;
+    margin: 14px 0;
+    color: var(--ink);
+  }
+  .recommend-banner strong { color: var(--recommend); }
+  .toc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 28px 0 16px;
+    box-shadow: var(--shadow);
+  }
+  .toc h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .toc ol {
+    margin: 0;
+    padding-left: 22px;
+    font-size: 14.5px;
+  }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .decision {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--decision);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 18px 0;
+    box-shadow: var(--shadow);
+  }
+  .decision .tag {
+    display: inline-block;
+    color: var(--decision);
+    background: var(--decision-bg);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .decision h3 { display: inline; font-size: 19px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 10px;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: #f3f1ea;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  tr.picked td {
+    background: var(--recommend-bg);
+  }
+  tr.picked td:first-child::after {
+    content: " ★";
+    color: var(--recommend);
+    font-weight: 700;
+  }
+  .checklist {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    box-shadow: var(--shadow);
+  }
+  .checklist ol {
+    padding-left: 22px;
+    margin: 6px 0 0;
+  }
+  .checklist li {
+    margin-bottom: 10px;
+    color: var(--ink-2);
+  }
+  .checklist li strong { color: var(--ink); }
+  .privacy {
+    background: var(--warn-bg);
+    border: 1px solid #f3d9a6;
+    border-left: 4px solid var(--warn);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 18px 0;
+  }
+  .privacy h3 {
+    margin-top: 0;
+    color: var(--warn);
+    font-size: 16px;
+  }
+  .privacy ul {
+    padding-left: 20px;
+    margin: 6px 0 0;
+  }
+  .privacy li {
+    margin-bottom: 6px;
+    color: var(--ink-2);
+  }
+  .architecture {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    box-shadow: var(--shadow);
+  }
+  .architecture pre {
+    background: var(--code-bg);
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    overflow-x: auto;
+    color: #333;
+    border: 1px solid #e4e1d4;
+  }
+  .ready-banner {
+    background: linear-gradient(135deg, #fdf2d0 0%, #fae6a3 100%);
+    border: 1px solid var(--hl-strong);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin: 36px 0 10px;
+  }
+  .ready-banner h2 {
+    margin: 0 0 6px;
+    border: none;
+    color: #a87a14;
+    font-size: 20px;
+  }
+  .ready-banner ul {
+    margin: 8px 0 0;
+    padding-left: 22px;
+  }
+  .ready-banner li { margin-bottom: 4px; }
+  footer {
+    margin-top: 56px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 28px 18px 60px; }
+    header.page h1 { font-size: 26px; }
+    h2 { font-size: 21px; }
+    table { font-size: 13.5px; }
+    th, td { padding: 8px 8px; }
+  }
+  @media print {
+    body { background: white; }
+    .wrap { padding: 24px; max-width: none; }
+    .decision, .checklist, .architecture, .privacy, .toc, .ready-banner, .recommend-banner {
+      box-shadow: none;
+      page-break-inside: avoid;
+    }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Cloud Sync Plan</h1>
+  <div class="sub">MusicEd / Clefira — replacing the removed file-based export/import with cloud-backed multi-device sync.</div>
+  <div class="meta">Planning doc · 2026-05-20 · References: <code>pre_launch_deferred.md</code> item #8 (the chosen path) · item #2 (removed import/export, this is the replacement)</div>
+</header>
+
+<section class="recommend-banner">
+  <p style="margin:0;"><strong>Status:</strong> groundwork is already in place — per-student folder layout (<code>user://students/&lt;id&gt;/</code>), <code>ActiveStudent</code> routing, lesson sessions, and the import/export removal. <mark class="strong">Ready to build the sync layer once three decisions are locked.</mark></p>
+</section>
+
+<section class="toc">
+  <h3>Jump to</h3>
+  <ol>
+    <li><a href="#forks">The three decisions that shape everything else</a></li>
+    <li><a href="#need">What I need from you to start</a></li>
+    <li><a href="#privacy">Privacy &amp; student-data notes</a></li>
+    <li><a href="#offline">Offline-first behavior</a></li>
+    <li><a href="#architecture">Proposed Tier A architecture</a></li>
+    <li><a href="#ready">Ready-to-start checklist</a></li>
+  </ol>
+</section>
+
+<h2 id="forks">The three decisions that shape everything else</h2>
+<p>Three forks where the answer changes the architecture. Smaller choices can be made as we go.</p>
+
+<!-- Decision 1 -->
+<div class="decision">
+  <span class="tag">Decision 1</span>
+  <h3>Backend choice</h3>
+  <table>
+    <thead>
+      <tr><th>Option</th><th>Pros</th><th>Cons</th></tr>
+    </thead>
+    <tbody>
+      <tr class="picked">
+        <td><strong>Supabase</strong></td>
+        <td>Postgres + auth + storage in one. Free tier covers thousands of teachers. REST + JS SDK callable from Godot via <code>HTTPRequest</code>. Built-in Google / email / magic-link sign-in. <mark>Row-Level Security for per-teacher data isolation.</mark> Self-hostable escape hatch.</td>
+        <td>One more vendor to depend on.</td>
+      </tr>
+      <tr>
+        <td>Google Drive (per-user)</td>
+        <td>Free for users (their own Drive quota). No backend to maintain. Teacher's Google account = their data.</td>
+        <td>File-based; awkward for queries and multi-device conflict resolution. Each teacher needs Google. Mobile OAuth flow is fiddly. <mark>Fights everything you'll want later</mark> (parent portal, real-time, analytics).</td>
+      </tr>
+      <tr>
+        <td>Firebase</td>
+        <td>Mature, Google-owned, real-time DB built in.</td>
+        <td>NoSQL forces denormalization for the relational data shape you have. Pricing gets steep at scale. Less ergonomic than Supabase for this app.</td>
+      </tr>
+      <tr>
+        <td>Custom backend (Node/Go on Render/Fly.io)</td>
+        <td>Total control.</td>
+        <td><mark>Now maintaining a server + DB + auth + backups.</mark> Big distraction from teaching features.</td>
+      </tr>
+      <tr>
+        <td>PocketBase (self-hosted single binary)</td>
+        <td>One binary, SQLite-backed, auth built in, very cheap to host. Minimum vendor lock-in.</td>
+        <td>Smaller community, you operate it yourself.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="recommend-banner"><strong>★ My pick:</strong> <mark class="strong">Supabase.</mark> Best fit for a solo dev shipping a relational-data app to teachers + students. Second choice if you want to avoid vendor risk: PocketBase.</div>
+</div>
+
+<!-- Decision 2 -->
+<div class="decision">
+  <span class="tag">Decision 2</span>
+  <h3>Sign-in model</h3>
+  <table>
+    <thead>
+      <tr><th>Option</th><th>When it fits</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Google OAuth</strong></td>
+        <td>Fastest UX, no passwords to forget. Required for "Sign in with Google" surfaces.</td>
+      </tr>
+      <tr class="picked">
+        <td><strong>Email + password</strong></td>
+        <td>Works without OAuth setup. Universally familiar.</td>
+      </tr>
+      <tr class="picked">
+        <td><strong>Magic link (passwordless)</strong></td>
+        <td>One-tap email link → signed in. Lovely UX. Supabase supports natively.</td>
+      </tr>
+      <tr>
+        <td>Apple Sign In</td>
+        <td><mark class="strong">Required by the App Store</mark> if you ever publish on iOS and offer any other social sign-in.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="recommend-banner"><strong>★ My pick for MVP:</strong> <mark class="strong">Email + password AND magic link</mark> (Supabase gives both for free). Add Google + Apple in a follow-up. Keeps the launch path simple.</div>
+</div>
+
+<!-- Decision 3 -->
+<div class="decision">
+  <span class="tag">Decision 3</span>
+  <h3>MVP scope — how ambitious for v1?</h3>
+  <table>
+    <thead>
+      <tr><th>Tier</th><th>What it does</th><th>Effort</th></tr>
+    </thead>
+    <tbody>
+      <tr class="picked">
+        <td><strong>A — Backup / Restore</strong></td>
+        <td>Teacher signs in, presses Sync, app pushes a snapshot bundle to cloud. On a second device, signs in → pulls down the snapshot. <mark>"Import/export over cloud" — covers the exact use case that motivated removing the file-based import/export.</mark></td>
+        <td>Small (~1–2 weeks)</td>
+      </tr>
+      <tr>
+        <td>B — Per-record sync</td>
+        <td>Each student / lesson-log / progress entry tracked individually. Last-write-wins per record on conflict. Multi-device "feels" continuous.</td>
+        <td>Medium</td>
+      </tr>
+      <tr>
+        <td>C — Real-time multi-device</td>
+        <td>Live updates across devices (teacher's tablet shows student's home practice within seconds). WebSocket subscriptions.</td>
+        <td>Larger</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="recommend-banner"><strong>★ My pick:</strong> <mark class="strong">Ship Tier A first.</mark> Get teachers using it for real backup. Evolve to Tier B once usage patterns are clear. Tier C is a phase-3 goal.</div>
+</div>
+
+<h2 id="need">What I need from you to start</h2>
+<section class="checklist">
+  <p style="margin-top:0;">In rough order of "blocks starting":</p>
+  <ol>
+    <li><strong>Backend choice</strong> — pick Supabase, or override the recommendation.</li>
+    <li><strong>A Supabase project</strong> (free): sign up at <code>supabase.com</code>, create a project, share the <strong>Project URL</strong> + <strong>anon (public) API key</strong>. <mark>I never need the service-role key — that stays with you.</mark> ~5 minutes to set up.</li>
+    <li><strong>Sign-in model for MVP</strong> — email/password + magic link recommended. Confirm or override.</li>
+    <li><strong>MVP scope</strong> — confirm Tier A (backup/restore) or pick another.</li>
+  </ol>
+  <h3 style="margin-top:20px;">Things I do <em>not</em> need yet</h3>
+  <ul>
+    <li>Pricing tier on Supabase (free is fine until usage actually grows).</li>
+    <li>Student-facing auth model (Tier A doesn't touch this — teacher account owns all student data).</li>
+    <li>Exact schema (I'll propose one).</li>
+    <li>Apple / Google OAuth setup (later).</li>
+  </ul>
+</section>
+
+<h2 id="privacy">Privacy &amp; student-data notes</h2>
+<section class="privacy">
+  <h3>Students are minors — even at MVP scale this matters</h3>
+  <ul>
+    <li>Data we sync is education-related, not PII-heavy (no addresses, no payment info), but it does include <strong>student names</strong>.</li>
+    <li>Recommended at first sign-in: a small <strong>privacy notice</strong> — <em>"Your students' practice data syncs to your private cloud storage. Only you have access."</em></li>
+    <li><strong>Delete-account path</strong> that wipes server-side data. <mark>Supabase RLS makes "only you have access" enforceable at the DB level.</mark></li>
+    <li>COPPA only kicks in for <em>direct-to-child</em> services. Teacher Edition is teacher-facing, so the legal surface is small — but build the delete + privacy notice anyway; it's table stakes.</li>
+  </ul>
+</section>
+
+<h2 id="offline">Offline-first behavior</h2>
+<p>App must keep working with <strong>no network</strong>. Sync is best-effort: queue writes, retry on reconnect, last-write-wins on conflict. <mark>The existing per-student JSON files become the source of truth locally; cloud is a synced shadow, never the source of truth at the device.</mark></p>
+<p><strong>Network in Godot:</strong> Godot 4.6's <code>HTTPRequest</code> handles all the REST calls cleanly. No external dependency, no plugin needed.</p>
+
+<h2 id="architecture">Proposed Tier A architecture</h2>
+<div class="architecture">
+  <h3 style="margin-top:0;">A new SyncProvider module</h3>
+  <p>Two files under a new <code>scripts/sync/</code> folder:</p>
+  <ul>
+    <li><code>sync_provider.gd</code> — the interface (so the backend is swappable later).</li>
+    <li><code>supabase_sync_provider.gd</code> — the implementation against Supabase REST.</li>
+  </ul>
+  <pre>SyncProvider:
+  sign_in(email, password|magic_link)  → user_id or error
+  sign_out()
+  push_snapshot()         # bundle everything, upload as one row per device
+  pull_snapshot()         # download latest snapshot, replace local files
+  list_devices()          # for "you have 3 devices syncing"
+  delete_account()        # GDPR / COPPA right-to-erase
+</pre>
+  <h3>One Supabase table to start: <code>sync_snapshots</code></h3>
+  <ul>
+    <li><code>id</code>, <code>user_id</code>, <code>device_label</code>, <code>created_at</code>, <code>payload_json</code> (the entire bundle).</li>
+    <li>RLS policy: <code>user_id = auth.uid()</code> — <mark>a teacher can only read/write their own rows.</mark></li>
+  </ul>
+  <h3>UI in dashboard sidebar</h3>
+  <ul>
+    <li>Sign-in / sign-out controls.</li>
+    <li><strong>"Sync Now"</strong> button (manual for Tier A).</li>
+    <li>"Last synced: 12 min ago" status text.</li>
+    <li>"Restore from cloud" with confirmation (replaces local — destructive, so guarded).</li>
+  </ul>
+  <h3>Existing architecture wins to lean on</h3>
+  <ul>
+    <li><code>scripts/students/active_student.gd</code> already routes data per student.</li>
+    <li>Per-student folders at <code>user://students/&lt;id&gt;/</code> — the natural unit to bundle.</li>
+    <li><code>pre_launch_deferred.md</code> item #2 (removed export/import) tells me <em>what NOT to bring back</em> as file-based.</li>
+    <li>The <code>_save_*</code> and <code>_load_*</code> functions in <code>interval_birds.gd</code> are where local writes happen; <strong>the sync layer hooks just below those</strong>.</li>
+  </ul>
+  <p style="margin-top:12px;">Once Tier A is in production for a few weeks and real failure modes surface, evolve into <strong>Tier B</strong> (per-record sync with last-write-wins).</p>
+</div>
+
+<div class="ready-banner" id="ready">
+  <h2 style="border:none; padding:0; margin:0;">★ Ready to start once I have:</h2>
+  <ul>
+    <li>Backend confirmation (Supabase, or override).</li>
+    <li>Supabase <strong>Project URL</strong> + <strong>anon API key</strong>.</li>
+    <li>MVP-scope confirmation (Tier A, or another).</li>
+    <li>Sign-in model confirmation (email/password + magic link, or another).</li>
+  </ul>
+</div>
+
+<footer>
+  MusicEd / Clefira · Cloud Sync Plan · 2026-05-20 · For internal planning
+</footer>
+
+</div>
+</body>
+</html>

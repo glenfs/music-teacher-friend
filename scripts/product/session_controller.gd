@@ -71,6 +71,7 @@ func apply_standard_start_state(host, mode_sight: int, mode_note_chase: int) -> 
 	host._xp = 0
 	host._last_interval_signature = ""
 	host._last_chord_signature = ""
+	host._last_pitch_match_signature = ""
 	host._last_sight_signature = ""
 	host._quiz_start_time = Time.get_ticks_msec() / 1000.0
 	host._quiz_active = true
@@ -106,6 +107,7 @@ func apply_restart_state(host, mode_note_chase: int) -> void:
 	host._xp = 0
 	host._last_interval_signature = ""
 	host._last_chord_signature = ""
+	host._last_pitch_match_signature = ""
 	host._last_sight_signature = ""
 	host._quiz_active = true
 
@@ -130,6 +132,7 @@ func _host_init_session_stats(host) -> void:
 		host,
 		host.MODE_INTERVAL,
 		host.MODE_CHORD,
+		host.MODE_PITCH_MATCH,
 		host.MODE_PROGRESSION,
 		host.MODE_SCALE_MODE,
 		host.MODE_CADENCE,
@@ -338,6 +341,7 @@ func begin_next_question(host, expected_token: int = -1) -> void:
 		host,
 		host.MODE_INTERVAL,
 		host.MODE_CHORD,
+		host.MODE_PITCH_MATCH,
 		host.MODE_PROGRESSION,
 		host.MODE_SCALE_MODE,
 		host.MODE_CADENCE
@@ -345,7 +349,7 @@ func begin_next_question(host, expected_token: int = -1) -> void:
 	var prompt_question_index: int = int(host._question_index)
 	var allow_answer_during_prompt: bool = host._selected_mode == host.MODE_SCALE_MODE or host._selected_mode == host.MODE_INTERVAL
 	if allow_answer_during_prompt:
-		host._status_label.text = "Pick the correct nest."
+		host._status_label.text = "Sing the highlighted melody." if host.has_method("_is_sight_singing_mode") and host._is_sight_singing_mode() else "Pick the correct nest."
 		host._set_answer_buttons_enabled(true)
 		host._accepting_answer = true
 		host._start_chicken_turn_hint_cycle()
@@ -361,7 +365,7 @@ func begin_next_question(host, expected_token: int = -1) -> void:
 	if not host._quiz_active:
 		return
 	if not allow_answer_during_prompt:
-		host._status_label.text = "Pick the correct nest."
+		host._status_label.text = "Sing the highlighted melody." if host.has_method("_is_sight_singing_mode") and host._is_sight_singing_mode() else "Pick the correct nest."
 		host._set_answer_buttons_enabled(true)
 		host._accepting_answer = true
 		host._start_chicken_turn_hint_cycle()
@@ -384,6 +388,7 @@ func finish_quiz(host, mode_sight: int) -> void:
 		host._xp,
 		host.MODE_INTERVAL,
 		host.MODE_CHORD,
+		host.MODE_PITCH_MATCH,
 		host.MODE_PROGRESSION,
 		host.MODE_SCALE_MODE,
 		host.MODE_CADENCE,
@@ -431,6 +436,7 @@ func handle_game_over(
 		host._xp,
 		host.MODE_INTERVAL,
 		host.MODE_CHORD,
+		host.MODE_PITCH_MATCH,
 		host.MODE_PROGRESSION,
 		host.MODE_SCALE_MODE,
 		host.MODE_CADENCE,
@@ -522,6 +528,7 @@ func init_session_stats(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int,
@@ -540,7 +547,7 @@ func init_session_stats(
 		for interval in host._active_intervals:
 			host._interval_stats_asked[interval] = 0
 			host._interval_stats_correct[interval] = 0
-	elif host._selected_mode == mode_chord or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		var keys: Array = chord_intervals.keys()
 		if host._selected_mode == mode_chord:
 			keys.sort()
@@ -575,13 +582,14 @@ func record_question_asked(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int
 ) -> void:
 	if host._selected_mode == mode_interval:
 		host._interval_stats_asked[host._current_interval_id] = int(host._interval_stats_asked.get(host._current_interval_id, 0)) + 1
-	elif host._selected_mode == mode_chord or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		var ear_key: String = host._current_chord_quality if host._selected_mode == mode_chord else host._current_ear_text_answer
 		host._chord_stats_asked[ear_key] = int(host._chord_stats_asked.get(ear_key, 0)) + 1
 	else:
@@ -593,13 +601,14 @@ func record_question_correct(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int
 ) -> void:
 	if host._selected_mode == mode_interval:
 		host._interval_stats_correct[host._current_interval_id] = int(host._interval_stats_correct.get(host._current_interval_id, 0)) + 1
-	elif host._selected_mode == mode_chord or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		var ear_key: String = host._current_chord_quality if host._selected_mode == mode_chord else host._current_ear_text_answer
 		host._chord_stats_correct[ear_key] = int(host._chord_stats_correct.get(ear_key, 0)) + 1
 	else:
@@ -611,6 +620,7 @@ func session_performance_summary(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int,
@@ -629,7 +639,7 @@ func session_performance_summary(
 			var acc: int = int(round((float(correct) / float(asked)) * 100.0))
 			var display_name: String = interval_display_name.call(str(key)) if interval_display_name.is_valid() else str(key)
 			parts.append("%s:%d%%" % [display_name, acc])
-	elif host._selected_mode == mode_chord or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		var chord_keys: Array = host._chord_stats_asked.keys()
 		chord_keys.sort()
 		for key in chord_keys:
@@ -669,6 +679,7 @@ func miss_summary_text(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int,
@@ -686,7 +697,7 @@ func miss_summary_text(
 		stats_asked = host._chord_stats_asked
 		stats_correct = host._chord_stats_correct
 		show_ratio = true
-	elif host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		stats_asked = host._chord_stats_asked
 		stats_correct = host._chord_stats_correct
 	else:
@@ -753,6 +764,7 @@ func final_quiz_result_text(
 	final_score: int,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int,
@@ -764,10 +776,10 @@ func final_quiz_result_text(
 	var elapsed: String = session_elapsed_text(host._quiz_start_time)
 	var time_part: String = ("   %s" % elapsed) if not elapsed.is_empty() else ""
 	var result := "%d%%  Accuracy   (%d/%d correct)%s" % [pct, total_correct, total_questions, time_part]
-	var weak_lines: String = result_weak_breakdown(host, mode_interval, mode_chord, mode_progression, mode_scale_mode, mode_cadence, interval_display_name)
+	var weak_lines: String = result_weak_breakdown(host, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, interval_display_name)
 	if not weak_lines.is_empty():
 		result += "\n\n%s" % weak_lines
-	var insight: String = session_insight_text(host, mode_interval, mode_chord, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, interval_display_name)
+	var insight: String = session_insight_text(host, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, interval_display_name)
 	if not insight.is_empty():
 		result += "\n\n%s" % insight
 	return result
@@ -777,6 +789,7 @@ func result_weak_breakdown(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int,
@@ -789,7 +802,7 @@ func result_weak_breakdown(
 		stats_asked = host._interval_stats_asked
 		stats_correct = host._interval_stats_correct
 		use_interval_display = true
-	elif host._selected_mode == mode_chord or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		stats_asked = host._chord_stats_asked
 		stats_correct = host._chord_stats_correct
 	else:
@@ -814,6 +827,7 @@ func session_insight_text(
 	host,
 	mode_interval: int,
 	mode_chord: int,
+	mode_pitch_match: int,
 	mode_progression: int,
 	mode_scale_mode: int,
 	mode_cadence: int,
@@ -828,7 +842,7 @@ func session_insight_text(
 		stats_asked = host._interval_stats_asked
 		stats_correct = host._interval_stats_correct
 		use_interval_display = true
-	elif host._selected_mode == mode_chord or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		stats_asked = host._chord_stats_asked
 		stats_correct = host._chord_stats_correct
 	elif host._selected_mode == mode_sight or host._selected_mode == mode_note_chase:

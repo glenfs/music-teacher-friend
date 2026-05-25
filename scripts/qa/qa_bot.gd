@@ -832,6 +832,7 @@ func _section_state_reset_and_persistence() -> void:
 
 
 func _section_ui_integrity() -> void:
+	await _check_home_horizontal_scroll_absent()
 	await _check_duplicate_labels_home_and_settings()
 	await _check_visible_controls_within_viewport()
 	await _check_sight_layout_overlap()
@@ -860,6 +861,27 @@ func _section_long_run_stability() -> void:
 		await wait_frames(2)
 	await _assert_no_orphan_ui("Long-run rapid mode switching")
 	pass_step("rapid_mode_switch_soak")
+
+
+func _check_home_horizontal_scroll_absent() -> void:
+	_call("_show_home")
+	await wait_frames(6)
+	var scroll_v: Variant = _member("_home_scroll")
+	if not (scroll_v is ScrollContainer):
+		fail("Home shell horizontal scroll check: _home_scroll missing")
+		return
+	var scroll := scroll_v as ScrollContainer
+	if scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+		fail("Home shell horizontal scroll check: horizontal scroll mode is not disabled")
+		return
+	if scroll.scroll_horizontal != 0:
+		fail("Home shell horizontal scroll check: scroll offset is %d" % scroll.scroll_horizontal)
+		return
+	var hbar := scroll.get_h_scroll_bar()
+	if hbar != null and hbar.visible:
+		fail("Home shell horizontal scroll check: horizontal scrollbar is visible")
+		return
+	pass_step("home_horizontal_scroll_absent")
 
 
 func _has_sight_submode(mode_name: String) -> bool:

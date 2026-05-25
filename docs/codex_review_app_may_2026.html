@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex App Review - May 2026</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5c6773;
+      --line: #d9e0e8;
+      --paper: #f6f8fb;
+      --card: #ffffff;
+      --accent: #275f8f;
+      --accent-2: #0f766e;
+      --danger: #a33232;
+      --warn: #96610d;
+      --ok: #23754d;
+      --soft-blue: #e8f1fa;
+      --soft-green: #e8f6ef;
+      --soft-red: #fbeaea;
+      --soft-yellow: #fff6df;
+      --soft-gray: #eef2f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 22px 56px;
+    }
+
+    header {
+      padding: 28px 28px 26px;
+      background: linear-gradient(135deg, #ffffff 0%, #eef5fb 100%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(24, 36, 50, 0.06);
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(30px, 4vw, 48px);
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-top: 36px;
+      padding-top: 4px;
+      font-size: 25px;
+      color: #173a58;
+    }
+
+    h3 {
+      margin-top: 24px;
+      font-size: 18px;
+      color: #24384a;
+    }
+
+    p {
+      margin: 10px 0 0;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #edf1f5;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.94em;
+    }
+
+    ul {
+      margin: 10px 0 0 22px;
+      padding: 0;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 14px;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      vertical-align: top;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+
+    th {
+      color: #21394f;
+      background: #edf3f8;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .deck {
+      max-width: 860px;
+      color: var(--muted);
+      font-size: 18px;
+      margin-top: 12px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #2f4557;
+      background: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      padding: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 8px 22px rgba(24, 36, 50, 0.04);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .callout {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-left: 5px solid var(--accent);
+      background: var(--soft-blue);
+      border-radius: 8px;
+    }
+
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: var(--soft-yellow);
+    }
+
+    .callout.danger {
+      border-left-color: var(--danger);
+      background: var(--soft-red);
+    }
+
+    .callout.ok {
+      border-left-color: var(--ok);
+      background: var(--soft-green);
+    }
+
+    .tag {
+      display: inline-block;
+      min-width: 44px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .p0 {
+      color: #7b1d1d;
+      background: #f7d8d8;
+    }
+
+    .p1 {
+      color: #6f4606;
+      background: #ffe8b8;
+    }
+
+    .p2 {
+      color: #245f42;
+      background: #d9f2e5;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mono-block {
+      margin-top: 10px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      color: #263747;
+      background: #edf1f5;
+      border: 1px solid #d5dde5;
+      border-radius: 8px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .score {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .score div {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #ffffff;
+    }
+
+    .score strong {
+      display: block;
+      font-size: 26px;
+      color: #173a58;
+    }
+
+    @media (max-width: 900px) {
+      .grid,
+      .grid.two,
+      .score {
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 18px 14px 40px;
+      }
+
+      header {
+        padding: 22px 18px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Codex App Review - May 2026</h1>
+    <p class="deck">
+      Deep product, game, UI, teacher workflow, student learning, architecture, and release-readiness review for the MusicEd / Clefira / Interval Birds Godot project.
+    </p>
+    <div class="meta">
+      <span class="pill">Review date: May 22, 2026</span>
+      <span class="pill">Project: Godot 4.6</span>
+      <span class="pill">Audience: teachers, students, piano/music classes</span>
+      <span class="pill">Target: professional paid app, 1K customers</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Executive Verdict</h2>
+    <div class="callout">
+      <strong>Short version:</strong> the project has enough substance to become a real teacher/student music platform, but it is not yet ready to feel like a polished paid professional app. The strongest parts are the breadth of practice modes, per-student data model, lesson-session concepts, teacher dashboard work, sync groundwork, and automated QA. The biggest gaps are release hardening, mobile/tablet layout polish, teacher workflow completeness, product positioning, licensing, and reducing the risk created by one very large central script.
+    </div>
+
+    <div class="score">
+      <div>
+        <strong>7/10</strong>
+        <span>Core learning/game substance</span>
+      </div>
+      <div>
+        <strong>5/10</strong>
+        <span>Professional UI polish</span>
+      </div>
+      <div>
+        <strong>6/10</strong>
+        <span>Teacher workflow readiness</span>
+      </div>
+      <div>
+        <strong>4/10</strong>
+        <span>Store/release readiness</span>
+      </div>
+    </div>
+
+    <p>
+      The current app already has the raw materials for a strong product: ear training, sight reading, chord work, note chasing, teacher/student state, per-student storage, lesson logs, cloud sync planning, and a memorable visual identity. The next phase should be less about adding another mode and more about making the experience coherent, trusted, stable, and useful every week for a real teacher.
+    </p>
+  </section>
+
+  <section>
+    <h2>Evidence Reviewed</h2>
+    <div class="grid two">
+      <div class="card">
+        <h3>Project Files And Docs</h3>
+        <ul>
+          <li>Godot project config, export presets, main scene, and UI entry flow.</li>
+          <li>Main app logic in <code>scripts/interval_birds.gd</code>.</li>
+          <li>Teacher modules: dashboard, store, active student, lesson session, sync provider, cloud dialog.</li>
+          <li>Learning modules, exercise generators, pitch detection, audio engine, and QA scripts.</li>
+          <li>Existing planning docs for teacher module audit, cloud sync, monetization, SKU strategy, and payment processing.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Automated And Visual Checks</h3>
+        <ul>
+          <li>Godot version confirmed: <code>4.6.stable.official.89cea1439</code>.</li>
+          <li>Exercise self-test: <code>3298 passed, 0 failed</code>.</li>
+          <li>Chord theory validator: <code>1850 passed / 1850 total</code>.</li>
+          <li>QA smoke, UI, and technical scopes passed in headless runs.</li>
+          <li>Windowed QA screenshot pass reviewed for home, practice, interval, chord, cadence, sight notes, sight chords, note chase, learn, and settings screens.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      The QA pass is a strong sign, but it is not the same as release readiness. The runs still reported resource-leak warnings at exit, and screenshots revealed visible UI polish issues that automated assertions did not catch.
+    </div>
+  </section>
+
+  <section>
+    <h2>Major Strengths</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Real Learning Surface</h3>
+        <p>
+          This is not a thin prototype. It includes ear training, chords, cadences, sight reading, note chase, pitch/singing work, learning content, exercise generation, and teacher practice flows. That breadth matters because teachers need variety across lessons and home practice.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Teacher Foundation</h3>
+        <p>
+          Per-student routing, lesson sessions, teacher dashboard tabs, assignments, lesson log concepts, repertoire, technique, and sync planning are already present. This puts the product closer to a studio tool than a simple game.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Automated QA</h3>
+        <p>
+          The project has meaningful QA scripts, screenshot capture, theory validators, and smoke tests. This is one of the best signs that the app can become maintainable if the architecture is brought under control.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Audio Direction</h3>
+        <p>
+          The numbered 88-key piano bank is the right source of truth, with <code>1.mp3</code> mapped to A0 and file <code>40.mp3</code> mapped to C4. That predictable mapping is a good base for ear training and piano class work.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Memorable Identity</h3>
+        <p>
+          The classroom/chicken visual system gives the app personality. With cleaner hierarchy and fewer competing controls, it can become a recognizable brand rather than a generic music trainer.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Commercial Direction</h3>
+        <p>
+          Existing docs already think about teacher experience, cloud sync, pricing, free/pro split, and payment options. That is useful groundwork for turning the app into a product instead of just a collection of modes.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Top Release Blockers</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>Issue</th>
+          <th>Why It Matters</th>
+          <th>Recommended Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Android export has <code>permissions/internet=false</code> while cloud sync is part of the product direction.</td>
+          <td>Supabase sync cannot work on Android without internet permission. This would look broken to paid users.</td>
+          <td>Enable Android internet permission before any cloud-enabled build. Add a startup/network capability check and clear offline copy.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Android export has <code>package/show_as_launcher_app=false</code>.</td>
+          <td>A normal distributed app should appear as a launcher app. If this is accidental, it is a store-readiness problem.</td>
+          <td>Set launcher visibility correctly for production builds, then test install/open behavior on a real Android device.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>License inventory is incomplete. <code>LICENSES.md</code> still has multiple <code>TBD</code> asset entries.</td>
+          <td>A paid product cannot ship with unclear piano audio, sound effect, image, icon, or background licensing.</td>
+          <td>Finalize source, license, author, URL, and attribution for every asset. Include required attribution in app/about/store pages.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Visible layout overflow on Sight Reading Notes setup.</td>
+          <td>The right MIDI panel is cropped and the practice keyboard overflows horizontally. This directly hurts trust and usability.</td>
+          <td>Fix responsive layout constraints for the setup surface. Treat this as a release blocker for tablet/laptop users.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Resource leaks reported after QA runs.</td>
+          <td>Leaked CanvasItem, texture/font RIDs, ObjectDB instances, and resources are not acceptable for long teacher sessions or repeated use.</td>
+          <td>Audit temporary controls, textures, dialogs, AudioStreamPlayers, and teardown paths. Add a long-run QA leak check.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Product naming is inconsistent across docs and export outputs: MusicEd, Clefira, Interval Birds, Note Catcher.</td>
+          <td>Customers, stores, teachers, parents, and students need one clear product identity.</td>
+          <td>Pick final product and SKU names. Update export filenames, package names, docs, splash, store copy, dashboard labels, and support docs.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>UI Review</h2>
+    <p>
+      The interface is functional and charming in places, but it still reads like a powerful prototype rather than a professional classroom app. The main pattern that needs work is visual hierarchy: teacher controls, mode navigation, setup panels, game surfaces, and background art often compete for attention at the same time.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Screen</th>
+          <th>What Works</th>
+          <th>Problems Found</th>
+          <th>Improvement</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Home</td>
+          <td>Strong visual identity. The classroom background and character make the app memorable.</td>
+          <td>A horizontal scrollbar is visible near the bottom. The right-side cards are warm/yellow and visually similar, which weakens hierarchy. The teacher chip and Start Lesson button are always present and compete with student entry.</td>
+          <td>Remove horizontal overflow. Make the main action clearer for student versus teacher. Use more controlled color roles instead of many similar warm cards.</td>
+        </tr>
+        <tr>
+          <td>Practice / Mode Hub</td>
+          <td>Mode cards are understandable and the app has a good range of activities.</td>
+          <td>The hub feels dense but not fully prioritized. Some modes are MVP-locked or not surfaced consistently, which can confuse a new user.</td>
+          <td>Group by teacher task and student skill: Ear, Sight Reading, Rhythm, Chords, Assignments, Learn. Hide locked modes or label them as coming soon only in beta builds.</td>
+        </tr>
+        <tr>
+          <td>Ear Training Setup</td>
+          <td>Core settings are present. The setup is usable and mode cards are clear enough.</td>
+          <td>Some small pills look disabled because of low contrast. Scrollbars are visible. Teacher controls remain prominent even when the student is configuring a drill.</td>
+          <td>Strengthen contrast for active choices. Keep setup panels within viewport. Collapse teacher session controls unless in a teacher-led lesson.</td>
+        </tr>
+        <tr>
+          <td>Ear Training Active</td>
+          <td>Answer buttons are clear and the screen supports focused listening.</td>
+          <td>The center has a lot of empty space. Disabled Replay appears like plain grey text, not a disabled button. Teacher chip and Start Lesson distract during the game.</td>
+          <td>Give the active prompt area a stronger state: listening, replay available, answered, explanation. Use a disabled button style that still looks like a control.</td>
+        </tr>
+        <tr>
+          <td>Chord Setup / Active</td>
+          <td>Chord mode is a valuable feature and answer flow is stable in QA.</td>
+          <td>The Triads header looks like a long grey bar/pill, which reads as an unfinished layout artifact. Active state has similar empty-space and disabled-control issues as ear training.</td>
+          <td>Normalize section headers and card sizing. Add compact explanation after each answer: chord quality, intervals, and listening cue.</td>
+        </tr>
+        <tr>
+          <td>Cadence Active</td>
+          <td>Cadence recognition is a strong differentiator for more advanced students.</td>
+          <td>The active game surface repeats the same sparse pattern and exposed teacher controls.</td>
+          <td>Use a richer feedback panel: tonic/key context, Roman numeral, sound cue, and replay controls with clear states.</td>
+        </tr>
+        <tr>
+          <td>Sight Reading Notes Setup</td>
+          <td>Notes mode and MIDI keyboard support are the right features for piano class practice.</td>
+          <td><strong>Real visibility issue:</strong> the right <code>MIDI Keyboard (Notes mode)</code> panel is cropped off-screen. The <code>Any Octave</code> toggle is cut, the no-device message trails/crops, and the practice keyboard causes horizontal scrolling.</td>
+          <td>Rebuild this layout with responsive constraints. On narrower screens, stack MIDI settings below the main setup or move them into a collapsible drawer.</td>
+        </tr>
+        <tr>
+          <td>Sight Reading Notes Active</td>
+          <td>The staff and piano interaction is one of the app's strongest learning surfaces.</td>
+          <td>Multiple-choice answers can show duplicate note names such as <code>C</code> without octave context. This is confusing when the underlying answer is octave-specific.</td>
+          <td>Label answers with octave when octave matters, for example <code>C4</code> and <code>C5</code>, or make the setting visibly "any octave" and avoid duplicate plain names.</td>
+        </tr>
+        <tr>
+          <td>Sight Reading Chords</td>
+          <td>Clean, useful staff plus piano view. This screen feels closer to a finished practice tool.</td>
+          <td>Still carries global teacher controls and would benefit from stronger post-answer teaching feedback.</td>
+          <td>Keep the core layout. Add explanation, voicing display, and student mistake tracking.</td>
+        </tr>
+        <tr>
+          <td>Note Chase</td>
+          <td>The mode has a playful idea and can work well for younger students.</td>
+          <td>A red vertical/rectangular strip appears under or near the active Note Chase tab in setup. In gameplay, a red square marker appears near the target area without enough explanation. These read like debug or unfinished state visuals.</td>
+          <td>Audit selected-tab/focus styling and target markers. Make every colored marker have clear learning meaning, or remove it.</td>
+        </tr>
+        <tr>
+          <td>Learn Modules</td>
+          <td>There are many learning modules in the codebase, and the staff lesson visuals can be useful.</td>
+          <td>The first module entry appears almost blank except for title and Continue. Learning mode is disabled in the main script, so the product promise is unclear.</td>
+          <td>Decide whether Learn is a launch feature. If yes, make module entry screens feel intentional with objective, preview, short lesson steps, and progress. If no, hide it from production navigation.</td>
+        </tr>
+        <tr>
+          <td>Settings</td>
+          <td>Simple and not overloaded.</td>
+          <td>Too sparse for a pro app. It needs clearer grouping for audio, MIDI, microphone, account, teacher data, sync, privacy, and reset/export options. Teacher controls still appear here.</td>
+          <td>Turn Settings into a utility screen for real support cases: audio test, mic test, MIDI device status, sync status, export data, delete data, reset tutorial, and version/build info.</td>
+        </tr>
+        <tr>
+          <td>Teacher Dashboard</td>
+          <td>The code indicates serious dashboard coverage: overview, repertoire, lesson log, assignments, technique, cloud sync, search, duplicate, undo, and per-student stats.</td>
+          <td>The teacher features are powerful but need a more opinionated daily workflow. Teachers should instantly know what to do before, during, and after a lesson.</td>
+          <td>Build the dashboard around a studio day: today's students, start lesson, current assignment, last lesson notes, next action, parent summary, and sync status.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout warn">
+      The QA overlay in screenshots is test-only and not counted as a production UI issue. The production issues are the actual overflow, always-visible teacher controls, ambiguous note labels, unexplained red markers, sparse lesson entry screens, weak disabled-control affordance, and inconsistent hierarchy.
+    </div>
+  </section>
+
+  <section>
+    <h2>Teacher Product Gaps</h2>
+    <p>
+      To reach 1K paying customers, the teacher side must solve weekly studio management, not just provide practice games. Teachers pay for saved time, visible student progress, parent communication, and lesson continuity.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Need</th>
+          <th>Current Direction</th>
+          <th>Gap</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Student management</td>
+          <td>Per-student storage and active student routing exist.</td>
+          <td>Need a polished add/import/archive flow, sample data, parent/contact fields, and quick switching.</td>
+          <td>Make "Add student" a first-run path. Include name, level, instrument, goals, lesson day, parent email, and archive status.</td>
+        </tr>
+        <tr>
+          <td>Lesson workflow</td>
+          <td>Start Lesson / End Lesson and lesson session storage exist.</td>
+          <td>The controls appear globally instead of feeling like a guided lesson workspace.</td>
+          <td>Create a teacher lesson mode: roster, start lesson, warmup, assigned drill, notes, homework, end lesson summary.</td>
+        </tr>
+        <tr>
+          <td>Assignments</td>
+          <td>Assignment concepts exist in teacher store/dashboard.</td>
+          <td>Need a clear loop from teacher assignment to student practice to teacher review.</td>
+          <td>Add due dates, target accuracy/time, assigned modes, required repeats, student completion status, and teacher comments.</td>
+        </tr>
+        <tr>
+          <td>Parent communication</td>
+          <td>Existing docs mention reports as a roadmap item.</td>
+          <td>This is not yet a central product feature.</td>
+          <td>Generate a simple weekly lesson/practice summary: pieces, skills, minutes, best streak, assignment, teacher note.</td>
+        </tr>
+        <tr>
+          <td>Progress analytics</td>
+          <td>Stats providers and practice data exist.</td>
+          <td>Teachers need skill-level insight, not just raw activity.</td>
+          <td>Show heatmaps by interval, note range, chord quality, rhythm pattern, sight reading accuracy, and trend over time.</td>
+        </tr>
+        <tr>
+          <td>Studio trust</td>
+          <td>Cloud sync planning exists.</td>
+          <td>Minor/student data requires visible privacy, deletion, export, and account controls.</td>
+          <td>Add privacy policy, data export, delete student, local backup, account sign-out, teacher PIN/lock, and clear sync state.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Student Learning Gaps</h2>
+    <div class="grid two">
+      <div class="card">
+        <h3>Adaptive Practice</h3>
+        <p>
+          Students should not have to choose every setting. The app should recommend the next drill from their weak skills: intervals they miss, note ranges they confuse, chord qualities they struggle with, and teacher-assigned goals.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Answer Explanations</h3>
+        <p>
+          A professional learning tool should teach after every answer. For example: "Correct: perfect fifth. Listen for the open, stable sound. Your previous answer was major sixth, which is wider." This matters more than only marking correct/incorrect.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Mastery Map</h3>
+        <p>
+          Give students a visible skill map: Notes, Intervals, Chords, Rhythm, Sight Reading, Ear, Singing. Show what is mastered, assigned, weak, and next. This also gives teachers a simple conversation tool.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Learning Path</h3>
+        <p>
+          The codebase contains many learning modules, but learning mode appears disabled in the main app. If mastery is a product promise, the learning path needs to be an intentional first-class screen, not hidden or half-present.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Practice Continuity</h3>
+        <p>
+          Students need "resume where I left off", daily goal, streak, assignment due, and last teacher note. This is more useful than a generic mode list after the first few sessions.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Recording And Review</h3>
+        <p>
+          For piano/music classes, recording short attempts and letting teachers review them would create a stronger paid value proposition, especially for home practice between lessons.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture And Maintainability</h2>
+    <div class="callout danger">
+      <strong>Main risk:</strong> <code>scripts/interval_birds.gd</code> is roughly 33,000 lines and owns too many responsibilities: navigation, UI construction, audio playback, game modes, teacher state, sight reading, rhythm, result overlays, and data glue. This is the biggest engineering risk for future polish.
+    </div>
+
+    <p>
+      The current monolithic shape makes every UI change more dangerous. It also makes it harder to polish one surface without accidentally changing another. Since Chord Explorer and Practice Drills are locked UI surfaces, the app needs clearer boundaries so protected screens can stay untouched while the rest of the product improves.
+    </p>
+
+    <h3>Recommended Extraction Order</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Extract</th>
+          <th>Why First</th>
+          <th>Suggested Boundary</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Navigation and screen registry</td>
+          <td>Global mode switching affects almost every screen.</td>
+          <td>A small screen manager that owns mode IDs, transitions, locked/MVP state, and current screen metadata.</td>
+        </tr>
+        <tr>
+          <td>Teacher session bar</td>
+          <td>The teacher chip and Start Lesson button currently affect many student screens.</td>
+          <td>A context-aware teacher HUD that can hide, collapse, or enter lesson mode based on user role and route.</td>
+        </tr>
+        <tr>
+          <td>Result and feedback overlay</td>
+          <td>Many modes need consistent answer feedback.</td>
+          <td>Reusable component for correct/incorrect, explanation, replay, next, streak, and teacher note capture.</td>
+        </tr>
+        <tr>
+          <td>Audio/sample manager</td>
+          <td>Playback, sample loading, and cleanup are core and likely related to leak warnings.</td>
+          <td>Central service for numbered piano bank, fallback bank, temporary players, and teardown.</td>
+        </tr>
+        <tr>
+          <td>Sight reading state machines</td>
+          <td>Sight Notes has the most visible layout and state complexity.</td>
+          <td>Separate setup state, active prompt state, MIDI state, answer checking, and staff/piano rendering.</td>
+        </tr>
+        <tr>
+          <td>Teacher data adapters</td>
+          <td>The teacher dashboard should not depend on game-screen internals.</td>
+          <td>Stable interfaces for student stats, assignments, lessons, sync state, and reports.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Data, Sync, Privacy, And Trust</h2>
+    <p>
+      The teacher store and Supabase snapshot-sync direction are good foundations. For a paid teacher app, the trust layer has to be as visible as the games.
+    </p>
+
+    <ul>
+      <li><strong>Cloud sync:</strong> Tier A snapshot sync is a reasonable first version, but users need backup-before-restore, clear conflict messaging, and reliable sync status.</li>
+      <li><strong>Android:</strong> internet permission must be enabled for cloud sync. Current export settings conflict with the sync direction.</li>
+      <li><strong>Privacy:</strong> student data is likely minor data. Add privacy policy, deletion, export, account removal, and minimum-data collection guidance.</li>
+      <li><strong>Teacher security:</strong> add a teacher dashboard lock or PIN, especially on shared family/student devices.</li>
+      <li><strong>Data durability:</strong> keep local backups and corruption handling visible. Teachers need confidence that lesson notes and assignments will not disappear.</li>
+      <li><strong>Offline mode:</strong> define what works offline, what queues, and what requires login. The app should not feel broken in a lesson room with weak Wi-Fi.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Release And Store Readiness</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Status</th>
+          <th>Needed For Professional Launch</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Branding</td>
+          <td>Inconsistent names across project/export/docs.</td>
+          <td>Choose final brand and SKU names. Remove stale "Note Catcher3" export naming if not final.</td>
+        </tr>
+        <tr>
+          <td>Android Export</td>
+          <td>Internet disabled, launcher disabled, record audio enabled.</td>
+          <td>Enable correct permissions, test install, test mic prompt, test launch icon, verify package name.</td>
+        </tr>
+        <tr>
+          <td>Windows Export</td>
+          <td>Export exists but metadata should be checked for final name and character encoding.</td>
+          <td>Verify file properties, icon, company, copyright, version, and installer/update strategy.</td>
+        </tr>
+        <tr>
+          <td>Web Export</td>
+          <td>Configured with stale output naming.</td>
+          <td>Decide whether web is a supported SKU. If yes, test audio latency, mic, MIDI, save data, and browser support.</td>
+        </tr>
+        <tr>
+          <td>Licensing</td>
+          <td>Incomplete asset license inventory.</td>
+          <td>No public paid release until every audio/image/font/icon license is documented and compatible.</td>
+        </tr>
+        <tr>
+          <td>Support</td>
+          <td>Not yet visible as a product system.</td>
+          <td>Add support contact, build/version page, export diagnostic bundle, FAQ, and known device setup docs.</td>
+        </tr>
+        <tr>
+          <td>Payments</td>
+          <td>Docs compare payment processors and monetization.</td>
+          <td>Before billing, finish account identity, entitlement checks, refund policy, privacy/TOS, and offline grace behavior.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>What Would Make It A 1K Customer App</h2>
+    <p>
+      The fastest path is to stop positioning it as only a game and make it the teacher's weekly command center, with the game modes as the practice engine. A practical paid positioning would be:
+    </p>
+
+    <div class="callout ok">
+      <strong>Recommended positioning:</strong> Clefira Teacher is a studio practice and lesson-management app for piano and music teachers, with student practice games, assignments, progress tracking, lesson notes, and parent-ready summaries.
+    </div>
+
+    <h3>Must-Have Value For Paying Teachers</h3>
+    <ul>
+      <li>Set up a student in under one minute.</li>
+      <li>Start a lesson, record notes, assign practice, and end with a summary.</li>
+      <li>Send or export a parent/student practice summary.</li>
+      <li>See what each student practiced, missed, improved, and ignored.</li>
+      <li>Assign drills directly from weak skills.</li>
+      <li>Trust that student data is backed up, private, exportable, and recoverable.</li>
+      <li>Use the app on a laptop/tablet without layout problems in front of a student.</li>
+    </ul>
+
+    <h3>1K Customer Business Checklist</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Requirement</th>
+          <th>Why It Converts</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Onboarding</td>
+          <td>Teacher first-run with sample studio, add student, start lesson, assign drill.</td>
+          <td>Teachers should understand the product in the first 5 minutes.</td>
+        </tr>
+        <tr>
+          <td>Retention</td>
+          <td>Weekly lesson loop, parent reports, student progress trends.</td>
+          <td>Recurring paid value comes from repeated studio use, not one-time novelty.</td>
+        </tr>
+        <tr>
+          <td>Trust</td>
+          <td>Licensing, privacy, backups, sync status, data export, support page.</td>
+          <td>Teachers will not put real students into a tool they do not trust.</td>
+        </tr>
+        <tr>
+          <td>Quality</td>
+          <td>No visible overflow, no confusing duplicate answers, no debug-looking markers, no stale branding.</td>
+          <td>Small polish issues make a paid app feel risky.</td>
+        </tr>
+        <tr>
+          <td>Distribution</td>
+          <td>Final SKU split, store pages, screenshots, icon, pricing, entitlement, update path.</td>
+          <td>A polished app still needs a clean buying and install experience.</td>
+        </tr>
+        <tr>
+          <td>Proof</td>
+          <td>Demo content, teacher testimonials, sample lesson reports, short class workflow videos.</td>
+          <td>Teachers need to see how it fits into their real lesson routine.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Recommended 90-Day Roadmap</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Phase</th>
+          <th>Goal</th>
+          <th>Work</th>
+          <th>Exit Criteria</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Weeks 1-2</td>
+          <td>Stabilize release blockers</td>
+          <td>Fix Sight Notes overflow, Android permissions, launcher setting, resource leaks, asset license inventory, stale export names.</td>
+          <td>Smoke/UI/technical QA pass with no obvious layout overflow and no unresolved store-blocking settings.</td>
+        </tr>
+        <tr>
+          <td>Weeks 3-4</td>
+          <td>Clarify product shape</td>
+          <td>Choose final brand/SKU, hide or label locked modes, decide Learn launch status, define teacher versus student home entry.</td>
+          <td>A new user can tell what the app is, who it is for, and what to do first.</td>
+        </tr>
+        <tr>
+          <td>Weeks 5-8</td>
+          <td>Build teacher retention loop</td>
+          <td>Teacher onboarding, add student, start lesson workspace, assign drill, end lesson summary, parent/export report.</td>
+          <td>A teacher can use the app for a real weekly lesson without notes outside the app.</td>
+        </tr>
+        <tr>
+          <td>Weeks 9-10</td>
+          <td>Improve student mastery</td>
+          <td>Adaptive next drill, mastery map, better answer explanations, assignment resume, duplicate note-name handling.</td>
+          <td>Students have a reason to return and know what to practice next.</td>
+        </tr>
+        <tr>
+          <td>Weeks 11-12</td>
+          <td>Prepare paid beta</td>
+          <td>Privacy/TOS, support page, account/sync status, export/delete data, installer/store metadata, beta feedback path.</td>
+          <td>Small paid beta can onboard real teachers without manual explanation from the developer.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Prioritized Backlog</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Priority</th>
+          <th>Item</th>
+          <th>Acceptance Criteria</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Fix Sight Notes setup overflow and cropped MIDI panel.</td>
+          <td>No horizontal scrollbar at common desktop/tablet widths. MIDI panel fully visible or intentionally collapsed.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Resolve export permission conflicts.</td>
+          <td>Android cloud-sync build has internet permission; launcher behavior is correct; mic prompt is tested.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Complete asset licensing.</td>
+          <td>No <code>TBD</code> assets remain in license inventory; attribution requirements are included in app/store docs.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p0">P0</span></td>
+          <td>Investigate Godot resource leaks.</td>
+          <td>QA exit logs are clean or every remaining warning is documented and accepted with reason.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Make teacher controls context-aware.</td>
+          <td>Teacher chip and Start Lesson controls are hidden/collapsed during student-only practice and prominent inside teacher lesson mode.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Fix ambiguous sight-reading answer labels.</td>
+          <td>Duplicate note names include octave or are avoided when "any octave" mode is active.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Clean debug-looking Note Chase markers.</td>
+          <td>No unexplained red strips/squares appear in setup or gameplay.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Finalize product naming.</td>
+          <td>One brand is used in splash, title, exports, package metadata, docs, support, and store copy.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>Teacher onboarding and sample studio.</td>
+          <td>First launch can create a real student or load demo data and start a sample lesson.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p1">P1</span></td>
+          <td>End lesson summary and parent report.</td>
+          <td>Teacher can finish a lesson with notes, assigned practice, and a shareable/exportable summary.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>Extract navigation and teacher HUD from main script.</td>
+          <td>At least navigation metadata and teacher session controls live outside <code>interval_birds.gd</code>.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>Add adaptive practice recommendations.</td>
+          <td>Student home shows "recommended next" based on assignments, weak skills, and recent activity.</td>
+        </tr>
+        <tr>
+          <td><span class="tag p2">P2</span></td>
+          <td>Upgrade Settings to support real troubleshooting.</td>
+          <td>Settings includes audio test, MIDI status, mic test, sync status, data export/delete, build version, and support link.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>QA Notes</h2>
+    <div class="mono-block">Godot version:
+4.6.stable.official.89cea1439
+
+Exercise self-test:
+3298 passed, 0 failed
+
+Chord theory validator:
+1850 passed / 1850 total
+
+QA scopes:
+smoke passed
+ui passed
+technical passed
+
+Windowed screenshot artifacts reviewed:
+C:\Users\Glen\AppData\Roaming\Godot\app_userdata\MusicEd - Interval Birds\qa_screenshots\01_home.png
+C:\Users\Glen\AppData\Roaming\Godot\app_userdata\MusicEd - Interval Birds\qa_screenshots\12_smoke_sight_notes_before.png
+C:\Users\Glen\AppData\Roaming\Godot\app_userdata\MusicEd - Interval Birds\qa_screenshots\18_note_chase_entry.png
+C:\Users\Glen\AppData\Roaming\Godot\app_userdata\MusicEd - Interval Birds\qa_screenshots\24_settings_after_toggle.png</div>
+
+    <p>
+      The automated QA harness is valuable and should stay. The next step is to make it stricter: viewport matrix checks, screenshot comparisons for major screens, teacher dashboard flow coverage, sync offline/conflict tests, microphone/MIDI tests, and long-session leak checks.
+    </p>
+  </section>
+
+  <section>
+    <h2>Bottom Line</h2>
+    <p>
+      The project has a strong enough base to become a serious music education product. The next important move is not adding more content breadth. It is making the app feel reliable, focused, and teacher-ready: clean layouts, clear roles, trustworthy data, polished export settings, complete licensing, and a weekly teacher workflow that saves time.
+    </p>
+    <p>
+      If the goal is 1K paying customers, the app should lead with teacher value and use the game modes as the engaging practice engine underneath. Fix the P0 release issues first, then build the teacher lesson loop and parent-report loop. That combination is what can turn this from a charming music game into a product teachers can justify paying for every month.
+    </p>
+  </section>
+</main>
+</body>
+</html>

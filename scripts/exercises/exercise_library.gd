@@ -16,7 +16,19 @@ class_name ExerciseLibrary
 #     "min_level": int,             # earliest level appropriate (1-10)
 #     "max_level": int,             # latest level (10 = always relevant)
 #     "two_hand_friendly": bool,    # rendering looks right in Grand staff mode
+#     "mode": String,               # OPTIONAL: MODE_TEMPLATE (deterministic, default)
+#                                   #           or MODE_GENERATOR (stochastic sampler)
+#     "style_profile": Dictionary,  # OPTIONAL (generators only): constraint dict the
+#                                   #           sampler walks within. Phase-7 territory.
 #   }
+
+# Two kinds of catalog entries can coexist downstream:
+#   "template"  → canonical, deterministic (current behavior). Same key/level always
+#                 yields the same exercise. All existing entries are templates.
+#   "generator" → stochastic sampler. Takes a seed; produces a fresh exercise that
+#                 satisfies the entry's style_profile each time. Added in Phase 7+.
+const MODE_TEMPLATE := "template"
+const MODE_GENERATOR := "generator"
 
 # Standardized skill vocabulary. Used for both tagging exercises and the user
 # focus selector. Keep this small — too many tags fragment the catalog.
@@ -209,9 +221,87 @@ const ENTRIES := {
 		"min_level": 4, "max_level": 10,
 		"two_hand_friendly": true,
 	},
+	# --- Generator entries (Phase 7) ---
+	# Each carries `mode: MODE_GENERATOR`, a `kind` that routes to the right
+	# composer in TechnicalExerciseGenerator.generate(), and a `style_profile`
+	# the composer's sampler walks within. Catalog mechanics (display order,
+	# skill/level filters) work identically to templates — the dropdown picks
+	# them up automatically.
+	"hanon_5_finger_random": {
+		"id": "hanon_5_finger_random",
+		"name": "Hanon — 5-Finger Variation",
+		"category": "hanon",
+		"skill_tags": ["independence", "evenness", "finger_strength"],
+		"min_level": 4, "max_level": 10,
+		"two_hand_friendly": true,
+		"mode": "generator",
+		"kind": "hanon",
+		"style_profile": {
+			"length": 8,
+			"start_degree": 1,
+			"degree_range": [1, 5],
+			"allowed_steps": [-2, -1, 1, 2],
+			"contour_rule": "free",
+			"ascending_positions": 8,
+		},
+	},
+	"hanon_alternating_random": {
+		"id": "hanon_alternating_random",
+		"name": "Hanon — Alternating Variation",
+		"category": "hanon",
+		"skill_tags": ["independence", "evenness"],
+		"min_level": 4, "max_level": 10,
+		"two_hand_friendly": true,
+		"mode": "generator",
+		"kind": "hanon",
+		"style_profile": {
+			"length": 8,
+			"start_degree": 1,
+			"degree_range": [1, 6],
+			"allowed_steps": [-3, -2, -1, 1, 2, 3],
+			"contour_rule": "alternating_step_skip",
+			"ascending_positions": 8,
+		},
+	},
+	"hanon_any_random": {
+		"id": "hanon_any_random",
+		"name": "Hanon (any) — Random Variation",
+		"category": "hanon",
+		"skill_tags": ["independence", "evenness"],
+		"min_level": 4, "max_level": 10,
+		"two_hand_friendly": true,
+		"mode": "generator",
+		"kind": "hanon_any",  # dispatcher picks 5-finger or alternating per roll
+		"style_profile": {},
+	},
+	"czerny_random": {
+		"id": "czerny_random",
+		"name": "Czerny — Random Variation",
+		"category": "czerny",
+		"skill_tags": ["velocity", "evenness", "hand_independence"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+		"mode": "generator",
+		"kind": "czerny",
+		"style_profile": {},
+	},
+	"scale_random": {
+		"id": "scale_random",
+		"name": "Scale — Random Variation",
+		"category": "scale",
+		"skill_tags": ["chord_voicing", "stretching", "evenness", "reading"],
+		"min_level": 4, "max_level": 10,
+		"two_hand_friendly": true,
+		"mode": "generator",
+		"kind": "scale",
+		"style_profile": {},
+	},
 }
 
-# Display order for the dropdown when no filter is active.
+# Display order for the dropdown when no filter is active. Generator entries
+# are appended to the END so the canonical templates remain the default UX —
+# users discover the "Random Variation" entries by scrolling, and Phase-8 polish
+# surfaces them via a "🎲 New Variation" button affordance.
 const DEFAULT_ORDER := [
 	"scale", "arpeggio", "five_finger",
 	"hanon_1", "hanon_2", "hanon_3", "hanon_4", "hanon_5",
@@ -220,6 +310,10 @@ const DEFAULT_ORDER := [
 	"hanon_16", "hanon_17", "hanon_18", "hanon_19", "hanon_20",
 	"scale_thirds", "scale_sixths", "scale_chromatic", "scale_contrary",
 	"czerny_velocity", "czerny_alberti", "czerny_sequence",
+	# --- Generators (Phase 7) ---
+	"hanon_5_finger_random", "hanon_alternating_random", "hanon_any_random",
+	"czerny_random",
+	"scale_random",
 ]
 
 
@@ -267,6 +361,26 @@ static func entry(id: String) -> Dictionary:
 
 static func display_name(id: String) -> String:
 	return str(ENTRIES.get(id, {}).get("name", id))
+
+
+# Returns the catalog entry's mode (template vs generator). Entries without an
+# explicit "mode" are templates — every existing entry falls under this default,
+# so adding generators later is purely additive.
+static func mode_for_id(id: String) -> String:
+	return str(ENTRIES.get(id, {}).get("mode", MODE_TEMPLATE))
+
+
+static func is_generator(id: String) -> bool:
+	return mode_for_id(id) == MODE_GENERATOR
+
+
+# Returns the style_profile dict for a generator entry (empty if template/missing).
+# Phase-7 generator entries will populate this; templates always return {}.
+static func style_profile_for_id(id: String) -> Dictionary:
+	var sp: Variant = ENTRIES.get(id, {}).get("style_profile", {})
+	if typeof(sp) == TYPE_DICTIONARY:
+		return sp
+	return {}
 
 
 # Returns an array of [skill_id, label] pairs in a presentation-ready order.

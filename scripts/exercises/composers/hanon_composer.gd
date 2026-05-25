@@ -17,6 +17,139 @@ class_name HanonComposer
 const PatternPrimitivesScript = preload("res://scripts/exercises/patterns/pattern_primitives.gd")
 const SequenceTransformsScript = preload("res://scripts/exercises/patterns/sequence_transforms.gd")
 const ScoreModelScript = preload("res://scripts/score_engine/score_model.gd")
+const ExerciseValidatorScript = preload("res://scripts/exercises/exercise_validator.gd")
+
+# =============================================================================
+# Phase 6 — Hanon-style stochastic sampler.
+# Pairs with the canonical templates above: each template encodes ONE specific
+# Op.60 motif; generate_random samples fresh motifs that respect the same
+# pedagogical constraints, then sequences them across scale positions like
+# Hanon does, producing a full exercise dict with the same shape as generate().
+# =============================================================================
+
+# Hanon No. 1 lives in the 5-finger position: degrees 1..5, stepwise + skip.
+const STYLE_5_FINGER := {
+	"length": 8,
+	"start_degree": 1,
+	"degree_range": [1, 5],
+	"allowed_steps": [-2, -1, 1, 2],
+	"contour_rule": "free",
+	"ascending_positions": 8,
+}
+
+# Hanon No. 2 zigzag style: alternating step ↔ skip across 6 degrees.
+const STYLE_ALTERNATING_FINGERS := {
+	"length": 8,
+	"start_degree": 1,
+	"degree_range": [1, 6],
+	"allowed_steps": [-3, -2, -1, 1, 2, 3],
+	"contour_rule": "alternating_step_skip",
+	"ascending_positions": 8,
+}
+
+# Stochastic variation recipes applied to the base motif. Plain is weighted
+# higher (listed twice) because the canonical templates themselves are plain.
+# Recipes that double motif length (broken_thirds/fifths) are intentionally
+# omitted — Hanon's sequence-up-the-scale structure assumes a fixed-length motif.
+const HANON_RECIPES := [
+	[],
+	[],
+	["retrograde"],
+	["invert(4)"],
+]
+
+const HANON_MAX_RESAMPLE_TRIES := 6
+
+
+# Sampler entry point. Returns the same dict shape as generate() (template path).
+# Resamples up to HANON_MAX_RESAMPLE_TRIES times if the validator rejects the
+# output; on full exhaustion falls back to canonical Hanon No. 1 (always valid)
+# and tags the result with the requesting `generator_id` so the caller can tell.
+static func generate_random(
+	style_profile: Dictionary,
+	key_pc: int,
+	key_is_minor: bool,
+	level: int,
+	tempo_bpm: int,
+	hand: String,
+	rng: RandomNumberGenerator,
+	generator_id: String = "hanon_random"
+) -> Dictionary:
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var scale: Array = PatternPrimitivesScript.NATURAL_MINOR_SCALE if key_is_minor else PatternPrimitivesScript.MAJOR_SCALE
+	var base_midi: int = 48 if hand == "left" else 60
+	var num_positions: int = int(style_profile.get("ascending_positions", 8))
+	var include_descending: bool = bool(style_profile.get("include_descending", false))
+	for attempt in range(HANON_MAX_RESAMPLE_TRIES):
+		var motif_dict: Dictionary = PatternPrimitivesScript.random_motif(rng, style_profile)
+		var degrees: Array = motif_dict.get("degrees", [])
+		if degrees.is_empty():
+			continue
+		# Stochastic variation recipe on top of the sampled motif.
+		var recipe: Array = HANON_RECIPES[rng.randi_range(0, HANON_RECIPES.size() - 1)]
+		var varied: Array = SequenceTransformsScript.apply_stack(degrees, recipe, rng)
+		# Sequence the motif up the scale, just like the canonical Hanon path.
+		var pitches: Array = SequenceTransformsScript.sequence_up_scale(varied, key_pc, scale, base_midi, num_positions)
+		if include_descending:
+			pitches = SequenceTransformsScript.append_reversed(pitches)
+		var notes: Array = SequenceTransformsScript.pitches_to_eighth_notes(pitches)
+		# Per-position fingering: replay the heuristic fingering once per motif length.
+		var fingering: Array = motif_dict.get("fingering", [])
+		if not fingering.is_empty():
+			var fl: int = fingering.size()
+			for i in range(notes.size()):
+				(notes[i] as Dictionary)["fingering"] = int(fingering[i % fl])
+		notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 0.5)
+		var ex := _wrap_random(notes, key_pc, key_is_minor, level, tempo_bpm, hand, motif_dict.get("constraints_used", {}), generator_id)
+		if ExerciseValidatorScript.ok(ex):
+			return ex
+	# Exhausted retries: degrade gracefully to canonical Hanon No. 1.
+	var fallback: Dictionary = generate(1, key_pc, key_is_minor, tempo_bpm, hand, false)
+	fallback["generator_id"] = generator_id
+	fallback["exercise_type"] = generator_id
+	fallback["title"] = "%s (fallback → Hanon No. 1)" % str(fallback.get("title", ""))
+	return fallback
+
+
+# Wraps the generated note list in the standard exercise dict shape, parallel
+# to the canonical generate()'s tail end.
+static func _wrap_random(
+	notes: Array,
+	key_pc: int,
+	key_is_minor: bool,
+	level: int,
+	tempo_bpm: int,
+	hand: String,
+	constraints_used: Dictionary,
+	generator_id: String
+) -> Dictionary:
+	var fifths: int = _key_to_fifths(key_pc, key_is_minor)
+	var key_letter: String = _spell_key_letter(key_pc, fifths)
+	var minor_label: String = "Minor" if key_is_minor else "Major"
+	var total_beats: float = 0.0
+	if not notes.is_empty():
+		var last: Dictionary = notes[notes.size() - 1]
+		total_beats = float(last["beat_offset"]) + float(last["duration_beats"])
+	return {
+		"title": "Hanon-style — %s %s (Level %d)" % [key_letter, minor_label, level],
+		"exercise_type": generator_id,
+		"key_pc": key_pc,
+		"key_is_minor": key_is_minor,
+		"key_letter": key_letter,
+		"level": level,
+		"tempo_bpm": tempo_bpm,
+		"time_sig_num": 4,
+		"time_sig_den": 4,
+		"octaves": 1,
+		"hand": hand,
+		"fifths": fifths,
+		"notes": notes,
+		"total_beats": total_beats,
+		"generator_id": generator_id,
+		"constraints_used": constraints_used,
+	}
 
 const NOTE_NAMES_SHARP := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 const NOTE_NAMES_FLAT := ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]

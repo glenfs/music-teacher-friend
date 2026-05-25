@@ -46,6 +46,31 @@ func _ready() -> void:
 	_start_sequence()
 
 
+func _exit_tree() -> void:
+	if _sequence_tween != null and is_instance_valid(_sequence_tween):
+		_sequence_tween.kill()
+	_sequence_tween = null
+	if _arpeggio_tween != null and is_instance_valid(_arpeggio_tween):
+		_arpeggio_tween.kill()
+	_arpeggio_tween = null
+	if _staff_glow_tween != null and is_instance_valid(_staff_glow_tween):
+		_staff_glow_tween.kill()
+	_staff_glow_tween = null
+	for player in _piano_players:
+		if player != null and is_instance_valid(player):
+			player.stop()
+			player.stream = null
+	if _background != null and is_instance_valid(_background):
+		_background.material = null
+	if _logo_text != null and is_instance_valid(_logo_text):
+		_logo_text.remove_theme_font_override("font")
+	if _tagline_text != null and is_instance_valid(_tagline_text):
+		_tagline_text.remove_theme_font_override("font")
+	if _version_text != null and is_instance_valid(_version_text):
+		_version_text.remove_theme_font_override("font")
+	_audio_engine = null
+
+
 func _input(event: InputEvent) -> void:
 	if _transitioned:
 		return

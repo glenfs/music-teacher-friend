@@ -50,12 +50,26 @@ var system_vertical_gap_spaces: float = 6.0
 # Extra page margin for ledger notes, fingerings, and 8va markings.
 var page_top_margin_spaces: float = 8.0
 var page_bottom_margin_spaces: float = 5.0
+var sight_feedback_colors: Dictionary = {
+	0: Color(0.36, 0.82, 0.46, 1.0),
+	1: Color(0.95, 0.84, 0.30, 1.0),
+	2: Color(0.95, 0.60, 0.22, 1.0),
+	3: Color(0.95, 0.30, 0.32, 1.0),
+	4: Color(0.42, 0.72, 0.95, 1.0),
+}
+var pitch_curve_color: Color = Color(0.18, 0.82, 1.0, 0.78)
+var pitch_curve_draw_under_staff: bool = true
 
 # --- Engraving-rule constants ---
 const SHARP_ORDER := ["F", "C", "G", "D", "A", "E", "B"]
 const FLAT_ORDER := ["B", "E", "A", "D", "G", "C", "F"]
 const LETTER_INDEX := {"C": 0, "D": 1, "E": 2, "F": 3, "G": 4, "A": 5, "B": 6}
 const PC_TO_NATURAL_LETTER := {0: "C", 1: "C", 2: "D", 3: "D", 4: "E", 5: "F", 6: "F", 7: "G", 8: "G", 9: "A", 10: "A", 11: "B"}
+# Set by _draw_score on every render; consulted by _pc_to_letter() below so
+# black keys are spelled in line with the active key signature. In flat keys
+# (e.g., G minor, key_fifths=-2) pc=3 (E♭/D♯) must land on the E line, not the
+# D line — otherwise an E♭ from a G-minor scale renders as "D♭" on the staff.
+var _active_key_fifths: int = 0
 # Optical spacing weights (Gould-ish approximation; relative widths per duration).
 const OPTICAL_WIDTH := {
 	4.0: 4.5,   # whole
@@ -308,6 +322,18 @@ func set_highlight_beat(beat_offset: float) -> void:
 	queue_redraw()
 
 
+func set_note_bands(bands: Dictionary) -> void:
+	if not score.is_empty():
+		score["note_bands"] = bands.duplicate()
+	queue_redraw()
+
+
+func set_pitch_curve_points(points: Array) -> void:
+	if not score.is_empty():
+		score["pitch_curve"] = points.duplicate(true)
+	queue_redraw()
+
+
 # --- Top-level draw ---
 
 func _draw() -> void:
@@ -339,6 +365,10 @@ func _draw_score(staves: Array) -> void:
 	var per_system_h: float = float(staff_count) * staff_height + float(maxi(0, staff_count - 1)) * inter_staff_gap
 	var system_gap: float = staff_space * system_vertical_gap_spaces
 	var key_fifths: int = int(score.get("key_fifths", 0))
+	# Capture the active key signature so the per-pitch spelling helpers downstream
+	# (_pc_to_letter, _midi_to_staff_y, _midi_letter_index, _accidental_for_pitch)
+	# can place black keys on the correct staff line.
+	_active_key_fifths = key_fifths
 	var time_num: int = int(score.get("time_sig_num", 4))
 	var time_den: int = int(score.get("time_sig_den", 4))
 
@@ -692,6 +722,7 @@ func _draw_staff_notes_subset(staff: Dictionary, staff_top: float, bar_x_positio
 			_assign_event_x_positions(events, bar_x, bar_w_actual, beats_per_bar, m)
 		_prepare_event_display(events, clef, display_state)
 		_draw_ottava_spans(events, staff_top, clef)
+		_draw_pitch_curve_subset(events, staff_top, clef, global_event_idx)
 		var beam_groups: Array = []
 		if not cluster_mode:
 			beam_groups = _collect_beam_groups(events)
@@ -699,7 +730,7 @@ func _draw_staff_notes_subset(staff: Dictionary, staff_top: float, bar_x_positio
 			var event: Dictionary = events[ev_idx]
 			var event_beat := float(event.get("beat_offset", 0.0))
 			var is_highlighted: bool = global_event_idx == highlight_index or (highlight_beat >= 0.0 and absf(event_beat - highlight_beat) <= 0.001)
-			_draw_event(event, clef, key_fifths, staff_top, is_highlighted)
+			_draw_event(event, clef, key_fifths, staff_top, is_highlighted, global_event_idx)
 			global_event_idx += 1
 		for bg in beam_groups:
 			_draw_beam_group(bg, events, clef, staff_top)
@@ -736,6 +767,7 @@ func _draw_staff_notes(staff: Dictionary, staff_top: float, bar_x_positions: Arr
 			_assign_event_x_positions(events, bar_x, bar_w_actual, beats_per_bar, m)
 		_prepare_event_display(events, clef, display_state)
 		_draw_ottava_spans(events, staff_top, clef)
+		_draw_pitch_curve_subset(events, staff_top, clef, global_event_idx)
 		# 3) Identify beam groups (consecutive eighths/sixteenths in the same beat group)
 		var beam_groups: Array = []
 		if not cluster_mode:
@@ -745,7 +777,7 @@ func _draw_staff_notes(staff: Dictionary, staff_top: float, bar_x_positions: Arr
 			var event: Dictionary = events[ev_idx]
 			var event_beat := float(event.get("beat_offset", 0.0))
 			var is_highlighted: bool = global_event_idx == highlight_index or (highlight_beat >= 0.0 and absf(event_beat - highlight_beat) <= 0.001)
-			_draw_event(event, clef, key_fifths, staff_top, is_highlighted)
+			_draw_event(event, clef, key_fifths, staff_top, is_highlighted, global_event_idx)
 			global_event_idx += 1
 		# 5) Draw beams (after events so they layer on top of stem ends)
 		for bg in beam_groups:
@@ -793,6 +825,80 @@ func _assign_event_x_positions(events: Array, bar_x: float, bar_w: float, beats_
 		var w: float = _optical_width_for(float(ev.get("duration_beats", 0.5))) / total_weight * usable
 		ev["x"] = cur_x + w * 0.5  # event center sits at midpoint of its slice
 		cur_x += w
+
+
+func _draw_pitch_curve_subset(events: Array, staff_top: float, clef: String, event_idx_start: int) -> void:
+	var points: Array = score.get("pitch_curve", [])
+	if points.size() < 2 or events.is_empty():
+		return
+	var filtered_points: Array = []
+	var local_points := PackedVector2Array()
+	var first_idx := event_idx_start
+	var last_idx := event_idx_start + events.size() - 1
+	var min_midi := 999
+	var max_midi := -999
+	for ev_any in events:
+		var ev: Dictionary = ev_any
+		var notes: Array = ev.get("notes", [])
+		for note_any in notes:
+			var note: Dictionary = note_any
+			if bool(note.get("rest", false)):
+				continue
+			var note_midi := int(note.get("midi", -1))
+			if note_midi >= 0:
+				min_midi = mini(min_midi, note_midi)
+				max_midi = maxi(max_midi, note_midi)
+	for point_any in points:
+		var point: Dictionary = point_any
+		var event_pos := float(point.get("event_pos", -1.0))
+		if event_pos < float(first_idx) - 0.001 or event_pos > float(last_idx) + 0.001:
+			continue
+		var curve_midi := int(point.get("midi", 60))
+		filtered_points.append({"event_pos": event_pos, "midi": curve_midi})
+		min_midi = mini(min_midi, curve_midi)
+		max_midi = maxi(max_midi, curve_midi)
+	if filtered_points.size() < 2:
+		return
+	if min_midi > max_midi:
+		min_midi = 60
+		max_midi = 72
+	if max_midi - min_midi < 4:
+		min_midi -= 2
+		max_midi += 2
+	var curve_guide_color := pitch_curve_color
+	curve_guide_color.a *= 0.28
+	var curve_lane_top := staff_top + staff_space * 5.15
+	var curve_lane_h := staff_space * 2.15
+	if pitch_curve_draw_under_staff:
+		draw_line(
+			Vector2(float(events[0].get("x", _content_x_start)), curve_lane_top + curve_lane_h * 0.5),
+			Vector2(float(events[events.size() - 1].get("x", _content_x_start)), curve_lane_top + curve_lane_h * 0.5),
+			curve_guide_color,
+			maxf(1.0, staff_space * 0.06),
+			true
+		)
+	for curve_point_any in filtered_points:
+		var curve_point: Dictionary = curve_point_any
+		var event_pos := float(curve_point.get("event_pos", -1.0))
+		var local_pos := clampf(event_pos - float(first_idx), 0.0, float(maxi(0, events.size() - 1)))
+		var idx := clampi(int(floor(local_pos)), 0, events.size() - 1)
+		var frac := local_pos - float(idx)
+		var ev_a: Dictionary = events[idx]
+		var ev_b: Dictionary = events[mini(idx + 1, events.size() - 1)]
+		var x := lerpf(float(ev_a.get("x", 0.0)), float(ev_b.get("x", 0.0)), frac)
+		var y: float
+		if pitch_curve_draw_under_staff:
+			var normalized := clampf((float(int(curve_point.get("midi", 60)) - min_midi)) / maxf(1.0, float(max_midi - min_midi)), 0.0, 1.0)
+			y = curve_lane_top + curve_lane_h - (normalized * curve_lane_h)
+		else:
+			var display_clef := str(ev_a.get("display_clef", clef))
+			var ottava_shift := int(ev_a.get("ottava_shift", 0))
+			y = _midi_to_staff_y(int(curve_point.get("midi", 60)) - ottava_shift, display_clef, staff_top)
+		local_points.append(Vector2(x, y))
+	if local_points.size() >= 2:
+		draw_polyline(local_points, pitch_curve_color, maxf(2.0, staff_space * 0.16), true)
+	for p in local_points:
+		draw_circle(p, maxf(1.6, staff_space * 0.13), pitch_curve_color)
 
 
 func _optical_width_for(dur_beats: float) -> float:
@@ -926,9 +1032,9 @@ func _ledger_count_for_display_midi(midi: int, clef: String) -> int:
 
 # --- Event drawing (single notes + chord clusters) ---
 
-func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: float, highlight: bool) -> void:
+func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: float, highlight: bool, event_index: int = -1) -> void:
 	var font := SMuFLFont.get_font()
-	var color := highlight_color if highlight else note_color
+	var color := _event_color(event_index, highlight)
 	var event_x: float = float(event.get("x", 0.0))
 	var dur_beats: float = float(event.get("duration_beats", 0.5))
 	var is_rest: bool = bool(event.get("rest", false))
@@ -997,6 +1103,17 @@ func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: fl
 	# Flag for unbeamed eighths/sixteenths (beams handled separately by beam group draw)
 	if dur_beats <= 0.5 and not is_beamed:
 		_draw_flag_for_event(event_x, note_layouts, stem_up, dur_beats, color)
+
+
+func _event_color(event_index: int, highlight: bool) -> Color:
+	if highlight:
+		return highlight_color
+	var bands: Dictionary = score.get("note_bands", {})
+	if event_index >= 0 and bands.has(event_index):
+		var band := int(bands[event_index])
+		var feedback_color: Variant = sight_feedback_colors.get(band, note_color)
+		return feedback_color if feedback_color is Color else note_color
+	return note_color
 
 
 func _draw_inline_clef_change(clef: String, x: float, staff_top: float) -> void:
@@ -1328,11 +1445,52 @@ func _draw_beam_group(group: Array, events: Array, clef: String, staff_top: floa
 
 # --- Ledger lines + Y-position math ---
 
+# Returns the natural letter for a pitch class, biased by _active_key_fifths.
+# White-key pitch classes are unambiguous (one diatonic letter). Black-key
+# pitch classes are spelled flat-of-upper in flat keys (Db, Eb, Gb, Ab, Bb)
+# and sharp-of-lower in sharp keys (C#, D#, F#, G#, A#). This mirrors the
+# spelling that TechnicalExerciseGenerator.midi_to_step_alter_octave already
+# uses for MusicXML export — the staff renderer now agrees with it.
+func _pc_to_letter(pc: int) -> String:
+	var pc_norm := ((pc % 12) + 12) % 12
+	var prefer_flats: bool = _active_key_fifths < 0
+	match pc_norm:
+		0:  return "C"
+		2:  return "D"
+		4:  return "E"
+		5:  return "F"
+		7:  return "G"
+		9:  return "A"
+		11: return "B"
+		1:  return "D" if prefer_flats else "C"   # Db / C#
+		3:  return "E" if prefer_flats else "D"   # Eb / D#
+		6:  return "G" if prefer_flats else "F"   # Gb / F#
+		8:  return "A" if prefer_flats else "G"   # Ab / G#
+		10: return "B" if prefer_flats else "A"   # Bb / A#
+	return "C"
+
+
+# Returns an integer offset to add to the natural octave when the spelling
+# straddles an octave boundary — e.g., MIDI 60 (pitch class 0) is C4, but in a
+# very-flat context the same MIDI may be spelled as B#3 (B-line of octave 3).
+# Equivalently, MIDI 71 (pc 11) is B4, but in a very-sharp context the same
+# MIDI spells Cb5 (C-line of octave 5). Without this correction, those edge
+# spellings render one full staff space off. White-key pitch classes never
+# need it; only the boundary-straddling spellings do, and those only apply
+# to the rare double-flat / double-sharp cases — included here for safety.
+func _octave_shift_for_letter(pc: int, letter: String) -> int:
+	if pc == 0 and letter == "B":
+		return -1   # Cb of next octave is actually B of previous octave letter-wise
+	if pc == 11 and letter == "C":
+		return 1
+	return 0
+
+
 func _midi_to_staff_y(midi: int, clef: String, staff_top: float) -> float:
 	var pc := ((midi % 12) + 12) % 12
 	var octave := int(floor(midi / 12.0)) - 1
-	var letter: String = PC_TO_NATURAL_LETTER[pc]
-	var letter_idx := octave * 7 + int(LETTER_INDEX[letter])
+	var letter: String = _pc_to_letter(pc)
+	var letter_idx := (octave + _octave_shift_for_letter(pc, letter)) * 7 + int(LETTER_INDEX[letter])
 	var ref_letter_idx: int = (5 * 7 + 3) if clef == "treble" else (3 * 7 + 5)
 	var diatonic_steps := ref_letter_idx - letter_idx
 	return staff_top + float(diatonic_steps) * (staff_space * 0.5)
@@ -1341,8 +1499,8 @@ func _midi_to_staff_y(midi: int, clef: String, staff_top: float) -> float:
 func _midi_letter_index(midi: int) -> int:
 	var pc := ((midi % 12) + 12) % 12
 	var octave := int(floor(midi / 12.0)) - 1
-	var letter: String = PC_TO_NATURAL_LETTER[pc]
-	return octave * 7 + int(LETTER_INDEX[letter])
+	var letter: String = _pc_to_letter(pc)
+	return (octave + _octave_shift_for_letter(pc, letter)) * 7 + int(LETTER_INDEX[letter])
 
 
 func _draw_ledgers(note_x: float, note_y: float, staff_top: float) -> void:
@@ -1373,7 +1531,10 @@ func _accidental_for_pitch(midi: int, key_fifths: int) -> String:
 	elif key_fifths < 0:
 		for i in range(mini(-key_fifths, 7)):
 			key_letters_with_accidental.append(FLAT_ORDER[i])
-	var letter: String = PC_TO_NATURAL_LETTER[pc]
+	# Use the context-aware letter so e.g. pc=3 spells as E in flat keys (and
+	# is therefore implied by a -2 key sig in G minor), not as D (which would
+	# always force a drawn accidental and turn Eb into "Db" on the staff).
+	var letter: String = _pc_to_letter(pc)
 	if letter in key_letters_with_accidental:
 		return ""
 	if key_fifths < 0:

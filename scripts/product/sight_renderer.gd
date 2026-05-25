@@ -376,12 +376,26 @@ func visual_staff_geometry(
 	var left := staff_left_x
 	var width := staff_line_width
 	if staff_area != null and selected_mode == mode_sight:
+		var area_w: float = staff_area.size.x
+		# Detect phone-class viewports (<560px). On those we drop the comfortable-
+		# min floor and let the staff shrink to fit; otherwise the grand staff
+		# clips off the right edge.
+		var is_phone: bool = area_w > 0.0 and area_w < 560.0
 		if sight_mode == "Continuous" or sight_mode == "Rhythm Flow":
-			width = maxf(720.0, staff_area.size.x - 44.0)
-			left = 22.0
+			# Scrolling modes always want every pixel — clip the right edge of
+			# the area to avoid spilling past it on phones.
+			var min_w: float = 280.0 if is_phone else 720.0
+			width = maxf(min_w, area_w - 44.0)
+			left = 22.0 if not is_phone else 12.0
 		else:
-			width = minf(staff_line_width, maxf(560.0, staff_area.size.x * 0.56))
-			left = clampf((staff_area.size.x - width) * 0.5 + 18.0, 18.0, staff_area.size.x - width - 10.0)
+			# Static-staff modes (Notes / Chords / grand staff). Center the staff
+			# within the available width. Floor dropped to 320 so phone profiles
+			# (375px portrait) still render without clipping.
+			var min_floor: float = 320.0 if is_phone else 560.0
+			width = minf(staff_line_width, maxf(min_floor, area_w * 0.86 if is_phone else area_w * 0.56))
+			# Tight left margin on phones (no room for a wide breathing edge).
+			var inset: float = 10.0 if is_phone else 18.0
+			left = clampf((area_w - width) * 0.5 + inset, inset, maxf(inset, area_w - width - 6.0))
 	return {"left": left, "width": width}
 
 

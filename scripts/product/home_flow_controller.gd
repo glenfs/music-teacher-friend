@@ -43,6 +43,8 @@ func sync_from_runtime(snapshot: Dictionary) -> void:
 		state.scale_selected_modes = _string_array_from_variant(scale_modes_any)
 	state.scale_asc_desc = bool(snapshot.get("scale_asc_desc", state.scale_asc_desc))
 	state.scale_tempo = int(snapshot.get("scale_tempo", state.scale_tempo))
+	state.pitch_match_key = str(snapshot.get("pitch_match_key", state.pitch_match_key))
+	state.pitch_match_scale = str(snapshot.get("pitch_match_scale", state.pitch_match_scale))
 	state.cadence_key = str(snapshot.get("cadence_key", state.cadence_key))
 	var cadence_selected_any: Variant = snapshot.get("cadence_selected", state.cadence_selected)
 	if typeof(cadence_selected_any) == TYPE_ARRAY:
@@ -80,6 +82,8 @@ func runtime_snapshot() -> Dictionary:
 		"scale_selected_modes": state.scale_selected_modes.duplicate(),
 		"scale_asc_desc": state.scale_asc_desc,
 		"scale_tempo": state.scale_tempo,
+		"pitch_match_key": state.pitch_match_key,
+		"pitch_match_scale": state.pitch_match_scale,
 		"cadence_key": state.cadence_key,
 		"cadence_selected": state.cadence_selected.duplicate(),
 		"cadence_broken": state.cadence_broken,
@@ -89,10 +93,10 @@ func runtime_snapshot() -> Dictionary:
 	}
 
 
-func visibility(mode_interval: int, mode_chord: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> Dictionary:
+func visibility(mode_interval: int, mode_chord: int, mode_pitch_match: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> Dictionary:
 	if state == null:
 		state = HomeMenuStateScript.new()
-	return state.visibility(mode_interval, mode_chord, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, mode_read)
+	return state.visibility(mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, mode_read)
 
 
 func on_mode_button_pressed(mode: int, mode_interval: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> void:
@@ -101,22 +105,22 @@ func on_mode_button_pressed(mode: int, mode_interval: int, mode_sight: int, mode
 	state.on_mode_button_pressed(mode, mode_interval, mode_sight, mode_note_chase, mode_read)
 
 
-func on_home_hub_pressed(hub_name: String, mode_interval: int, mode_chord: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> void:
+func on_home_hub_pressed(hub_name: String, mode_interval: int, mode_chord: int, mode_pitch_match: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> void:
 	if state == null:
 		state = HomeMenuStateScript.new()
-	state.on_home_hub_pressed(hub_name, mode_interval, mode_chord, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, mode_read)
+	state.on_home_hub_pressed(hub_name, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, mode_read)
 
 
-func on_ear_mode_pressed(mode: int, mode_interval: int, mode_chord: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int) -> void:
+func on_ear_mode_pressed(mode: int, mode_interval: int, mode_chord: int, mode_pitch_match: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int) -> void:
 	if state == null:
 		state = HomeMenuStateScript.new()
-	state.on_ear_mode_pressed(mode, mode_interval, mode_chord, mode_progression, mode_scale_mode, mode_cadence)
+	state.on_ear_mode_pressed(mode, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence)
 
 
-func disabled_reason_for_mode(mode: int, mode_interval: int, mode_chord: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> String:
+func disabled_reason_for_mode(mode: int, mode_interval: int, mode_chord: int, mode_pitch_match: int, mode_progression: int, mode_scale_mode: int, mode_cadence: int, mode_sight: int, mode_note_chase: int, mode_read: int) -> String:
 	if state == null:
 		state = HomeMenuStateScript.new()
-	return state.disabled_reason_for_mode(mode, mode_interval, mode_chord, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, mode_read)
+	return state.disabled_reason_for_mode(mode, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, mode_read)
 
 
 func _string_array_from_variant(value: Variant) -> Array[String]:

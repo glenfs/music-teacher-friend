@@ -9,9 +9,70 @@ class_name ScaleComposer
 
 const PatternPrimitivesScript = preload("res://scripts/exercises/patterns/pattern_primitives.gd")
 const SequenceTransformsScript = preload("res://scripts/exercises/patterns/sequence_transforms.gd")
+const ExerciseValidatorScript = preload("res://scripts/exercises/exercise_validator.gd")
 
 const NOTE_NAMES_SHARP := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 const NOTE_NAMES_FLAT := ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+
+# =============================================================================
+# Phase 6 — Scale-style stochastic sampler.
+# Picks one of the four scale variants (thirds / sixths / chromatic / contrary)
+# with light octave variation. Each variant is already fully procedural; the
+# generator simply chooses among them per roll. Validator gates each attempt;
+# falls back to generate_thirds if every retry is rejected.
+# =============================================================================
+
+const SCALE_VARIANTS := ["thirds", "sixths", "chromatic", "contrary"]
+const SCALE_MAX_RESAMPLE_TRIES := 4
+
+
+static func generate_random(
+	style_profile: Dictionary,
+	key_pc: int,
+	key_is_minor: bool,
+	level: int,
+	tempo_bpm: int,
+	hand: String,
+	octaves: int,
+	rng: RandomNumberGenerator,
+	generator_id: String = "scale_random"
+) -> Dictionary:
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var fixed_variant: String = str(style_profile.get("variant", ""))
+	for attempt in range(SCALE_MAX_RESAMPLE_TRIES):
+		var variant: String
+		if not fixed_variant.is_empty():
+			variant = fixed_variant
+		else:
+			variant = SCALE_VARIANTS[rng.randi_range(0, SCALE_VARIANTS.size() - 1)]
+		var oct: int = clampi(octaves + rng.randi_range(-1, 1), 1, 3)
+		var ex: Dictionary
+		match variant:
+			"thirds":
+				ex = generate_thirds(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			"sixths":
+				ex = generate_sixths(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			"chromatic":
+				ex = generate_chromatic(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			"contrary":
+				ex = generate_contrary(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			_:
+				ex = generate_thirds(key_pc, key_is_minor, oct, hand, tempo_bpm)
+		if not ex.is_empty() and ExerciseValidatorScript.ok(ex):
+			ex["generator_id"] = generator_id
+			ex["exercise_type"] = generator_id
+			ex["level"] = level
+			ex["title"] = "Scale-style %s — %s" % [variant, str(ex.get("title", ""))]
+			return ex
+	# Exhausted retries → fall back to plain scale in thirds.
+	var fallback := generate_thirds(key_pc, key_is_minor, clampi(octaves, 1, 3), hand, tempo_bpm)
+	fallback["generator_id"] = generator_id
+	fallback["exercise_type"] = generator_id
+	fallback["level"] = level
+	fallback["title"] = "Scale-style thirds (fallback) — %s" % str(fallback.get("title", ""))
+	return fallback
 
 
 # --- Scale in thirds ---

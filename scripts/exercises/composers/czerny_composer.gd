@@ -15,9 +15,70 @@ class_name CzernyComposer
 
 const PatternPrimitivesScript = preload("res://scripts/exercises/patterns/pattern_primitives.gd")
 const SequenceTransformsScript = preload("res://scripts/exercises/patterns/sequence_transforms.gd")
+const ExerciseValidatorScript = preload("res://scripts/exercises/exercise_validator.gd")
 
 const NOTE_NAMES_SHARP := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 const NOTE_NAMES_FLAT := ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+
+# =============================================================================
+# Phase 6 — Czerny-style stochastic sampler.
+# The three formulas (velocity_run, alberti_etude, scale_sequence) are already
+# procedural; "random" here means: pick one at random (or the variant named in
+# style_profile.variant), with light parameter variation on octave count, then
+# tag the output with the catalog generator_id so the UI can show the roll.
+# Validator gates each attempt; falls back to velocity_run on full exhaustion.
+# =============================================================================
+
+const CZERNY_VARIANTS := ["velocity_run", "alberti_etude", "scale_sequence"]
+const CZERNY_MAX_RESAMPLE_TRIES := 4
+
+
+static func generate_random(
+	style_profile: Dictionary,
+	key_pc: int,
+	key_is_minor: bool,
+	level: int,
+	tempo_bpm: int,
+	hand: String,
+	octaves: int,
+	rng: RandomNumberGenerator,
+	generator_id: String = "czerny_random"
+) -> Dictionary:
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	var fixed_variant: String = str(style_profile.get("variant", ""))
+	for attempt in range(CZERNY_MAX_RESAMPLE_TRIES):
+		var variant: String
+		if not fixed_variant.is_empty():
+			variant = fixed_variant
+		else:
+			variant = CZERNY_VARIANTS[rng.randi_range(0, CZERNY_VARIANTS.size() - 1)]
+		# Light parameter variation: octaves jitters ±1 within [1, 3].
+		var oct: int = clampi(octaves + rng.randi_range(-1, 1), 1, 3)
+		var ex: Dictionary
+		match variant:
+			"velocity_run":
+				ex = generate_velocity_run(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			"alberti_etude":
+				ex = generate_alberti_etude(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			"scale_sequence":
+				ex = generate_scale_sequence(key_pc, key_is_minor, oct, hand, tempo_bpm)
+			_:
+				ex = generate_velocity_run(key_pc, key_is_minor, oct, hand, tempo_bpm)
+		if not ex.is_empty() and ExerciseValidatorScript.ok(ex):
+			ex["generator_id"] = generator_id
+			ex["exercise_type"] = generator_id
+			ex["level"] = level
+			ex["title"] = "Czerny-style %s — %s" % [variant.replace("_", " "), str(ex.get("title", ""))]
+			return ex
+	# Exhausted retries: fall back to velocity_run unconditionally.
+	var fallback := generate_velocity_run(key_pc, key_is_minor, clampi(octaves, 1, 3), hand, tempo_bpm)
+	fallback["generator_id"] = generator_id
+	fallback["exercise_type"] = generator_id
+	fallback["level"] = level
+	fallback["title"] = "Czerny-style velocity (fallback) — %s" % str(fallback.get("title", ""))
+	return fallback
 
 
 # --- Velocity Run ---
