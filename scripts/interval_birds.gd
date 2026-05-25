@@ -99,6 +99,7 @@ const ChoiceBuilderScript = preload("res://scripts/exercises/choice_builder.gd")
 const RhythmFlowLibraryScript = preload("res://scripts/rhythm/rhythm_flow_library.gd")
 const LessonSummaryHtmlScript = preload("res://scripts/students/lesson_summary_html.gd")
 const LearningStepFactoryScript = preload("res://scripts/learning/learning_step_factory.gd")
+const ChordExplorerTheoryScript = preload("res://scripts/music_theory/chord_explorer_theory.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -25250,47 +25251,13 @@ func _chord_explorer_push_notes_to_renderer(pitches: Array[int]) -> void:
 			"rest": false,
 		})
 	# Pick fifths from current key (major/minor doesn't change fifths for our recognizer use).
-	var fifths: int = _chord_explorer_key_pc_to_fifths(_chord_explorer_key_pc, _chord_explorer_key_is_minor)
+	var fifths: int = ChordExplorerTheoryScript.key_pc_to_fifths(_chord_explorer_key_pc, _chord_explorer_key_is_minor)
 	var score_dict: Dictionary = ScoreModelScript.from_flat_notes_grand_staff(
 		flat_notes, 4, 4, fifths, _chord_explorer_key_is_minor, 80, "", 60
 	)
 	_chord_explorer_staff_area.set_score(score_dict)
 
 
-func _chord_explorer_key_pc_to_fifths(pc: int, is_minor: bool) -> int:
-	if is_minor:
-		var minor_map := {9: 0, 4: 1, 11: 2, 6: 3, 1: 4, 8: 5, 3: 6, 2: -1, 7: -2, 0: -3, 5: -4, 10: -5}
-		if minor_map.has(pc):
-			return int(minor_map[pc])
-		return 0
-	var sharp_map := {0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6}
-	var flat_map := {5: -1, 10: -2, 3: -3, 8: -4, 1: -5}
-	if sharp_map.has(pc):
-		return int(sharp_map[pc])
-	if flat_map.has(pc):
-		return int(flat_map[pc])
-	return 0
-
-
-# Compute per-pitch x-offset (in notehead widths) following standard notation:
-# notes a 2nd or closer apart alternate between two columns so noteheads don't collide.
-func _chord_explorer_notation_offsets(pitches: Array[int]) -> Dictionary:
-	var offsets: Dictionary = {}
-	if pitches.is_empty():
-		return offsets
-	var prev_letter_idx := -999
-	var current_col := 0
-	for p in pitches:
-		var letter_idx := _chord_explorer_natural_letter_index(int(p))
-		if prev_letter_idx == -999:
-			current_col = 0
-		elif (letter_idx - prev_letter_idx) <= 1:
-			current_col = 1 - current_col
-		else:
-			current_col = 0
-		offsets[int(p)] = current_col
-		prev_letter_idx = letter_idx
-	return offsets
 
 
 func _chord_explorer_refresh_display() -> void:
@@ -25388,7 +25355,7 @@ func _on_chord_explorer_staff_draw() -> void:
 	area.draw_string(clef_font, Vector2(staff_x + 8, treble_top - 8), key_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.36, 0.42, 0.55, 0.95))
 	# Notes — compute per-pitch column offsets for proper notation of seconds/clusters.
 	var pitches := _chord_explorer_active_pitches()
-	var offsets := _chord_explorer_notation_offsets(pitches)
+	var offsets := ChordExplorerTheoryScript.notation_offsets(pitches)
 	for pitch in pitches:
 		var col := int(offsets.get(int(pitch), 0))
 		_chord_explorer_draw_note(area, int(pitch), col, staff_x, treble_top, bass_top, gap, staff_w, ledger_color, line_color)
@@ -25399,7 +25366,7 @@ func _chord_explorer_draw_note(area: Control, pitch: int, column: int, staff_x: 
 	var on_treble := pitch >= 60
 	var anchor_y := treble_top if on_treble else bass_top
 	var ref_pitch := 77 if on_treble else 57
-	var diatonic_steps := _chord_explorer_diatonic_steps_between(pitch, ref_pitch)
+	var diatonic_steps := ChordExplorerTheoryScript.diatonic_steps_between(pitch, ref_pitch)
 	var note_y := anchor_y + diatonic_steps * (gap * 0.5)
 	# Column 0 = stem-side; column 1 = offset notehead-width to the RIGHT (per Gould "Behind Bars" — second-interval placement).
 	var notehead_rx := 8.5  # horizontal radius — wider
@@ -25422,35 +25389,6 @@ func _chord_explorer_draw_note(area: Control, pitch: int, column: int, staff_x: 
 		area.draw_string(fnt, Vector2(note_x - 18, note_y + 5), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, line_color)
 
 
-func _chord_explorer_pitch_to_step_y_only(pitch: int, treble_top: float, bass_top: float, gap: float) -> float:
-	var on_treble := pitch >= 60
-	var anchor_y := treble_top if on_treble else bass_top
-	var ref_pitch := 77 if on_treble else 57
-	var diatonic_steps := _chord_explorer_diatonic_steps_between(pitch, ref_pitch)
-	return anchor_y + diatonic_steps * (gap * 0.5)
-
-
-func _chord_explorer_pitch_to_step_y(pitch: int) -> float:
-	# Used for the duplicate detection helper; just returns a synthesized number.
-	return float(pitch)
-
-
-func _chord_explorer_diatonic_steps_between(pitch: int, ref_pitch: int) -> int:
-	# Returns the diatonic step distance (lines+spaces, half-gap each) from ref down to pitch.
-	# We use natural-letter index regardless of accidentals.
-	var pitch_letter_idx := _chord_explorer_natural_letter_index(pitch)
-	var ref_letter_idx := _chord_explorer_natural_letter_index(ref_pitch)
-	return ref_letter_idx - pitch_letter_idx
-
-
-func _chord_explorer_natural_letter_index(pitch: int) -> int:
-	# Maps every MIDI pitch to a "diatonic letter index" — counting natural letters only
-	# (so C4=23, D4=24, E4=25, F4=26, G4=27, A4=28, B4=29, C5=30, ...).
-	# Sharps/flats round to their natural letter (C#4 → C4 letter index = 23).
-	var letter_per_pc := {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5, 10: 5, 11: 6}
-	var pc := ((pitch % 12) + 12) % 12
-	var octave := int(floor(pitch / 12.0)) - 1  # MIDI 60 = C4 → octave 4
-	return octave * 7 + int(letter_per_pc[pc])
 
 
 func _draw_oval_notehead(area: Control, center: Vector2, rx: float, ry: float, fill: Color, outline: Color) -> void:
@@ -28602,17 +28540,11 @@ func _on_practice_daily_warmup_pressed() -> void:
 			suffix = "  ←  auto-focused on your weakest area"
 		_practice_status_label.text = "Daily Warmup: %s in %s %s%s" % [
 			ExerciseLibraryScript.display_name(ex_id),
-			_chord_explorer_key_pc_to_letter(key_pc),
+			ChordExplorerTheoryScript.key_pc_to_letter(key_pc),
 			"minor" if key_minor else "major",
 			suffix,
 		]
 	_on_practice_generate_pressed()
-
-
-func _chord_explorer_key_pc_to_letter(pc: int) -> String:
-	var sharps := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-	var pc_clamped := ((int(pc) % 12) + 12) % 12
-	return sharps[pc_clamped]
 
 
 func _on_practice_stop_pressed() -> void:
