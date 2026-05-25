@@ -105,6 +105,7 @@ const ChordExplorerPanelScript = preload("res://scripts/ui/chord_explorer_panel.
 const PracticeDrillsPanelScript = preload("res://scripts/ui/practice_drills_panel.gd")
 const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_dialog.gd")
 const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
+const TheoryQuestionGeneratorScript = preload("res://scripts/exercises/theory_question_generator.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -17048,56 +17049,19 @@ func _build_chord_choices(correct_name: String, pool: Array[String]) -> Array[St
 
 
 func _selected_progression_ids() -> Array[String]:
-	var out: Array[String] = []
-	for pid in _progression_selected:
-		var key := str(pid)
-		if PROGRESSION_DEFS.has(key) and not out.has(key):
-			out.append(key)
-	if out.is_empty():
-		out = ["IVviIV", "iiVI"]
-	return out
+	return TheoryQuestionGeneratorScript.selected_progression_ids(_progression_selected, PROGRESSION_DEFS)
 
 
 func _selected_scale_mode_ids() -> Array[String]:
-	var out: Array[String] = []
-	for mode_name in _scale_selected_modes:
-		var key := str(mode_name)
-		if SCALE_MODE_DEFS.has(key) and not out.has(key):
-			out.append(key)
-	if out.is_empty():
-		out = ["Major", "Natural Minor", "Dorian", "Mixolydian"]
-	return out
+	return TheoryQuestionGeneratorScript.selected_scale_mode_ids(_scale_selected_modes, SCALE_MODE_DEFS)
 
 
 func _selected_cadence_ids() -> Array[String]:
-	var out: Array[String] = []
-	for cadence_name in _cadence_selected:
-		var key := str(cadence_name)
-		if CADENCE_DEFS.has(key) and not out.has(key):
-			out.append(key)
-	if out.is_empty():
-		out = ["Perfect", "Plagal", "Half", "Deceptive"]
-	return out
+	return TheoryQuestionGeneratorScript.selected_cadence_ids(_cadence_selected, CADENCE_DEFS)
 
 
 func _selected_cadence_ids_for_current_round() -> Array[String]:
-	var selected := _selected_cadence_ids()
-	if _focus_missed_ids.is_empty():
-		return selected
-	var focused: Array[String] = []
-	for miss_any in _focus_missed_ids:
-		var miss := str(miss_any)
-		for key_any in CADENCE_DEFS.keys():
-			var key := str(key_any)
-			var def: Dictionary = CADENCE_DEFS.get(key, {})
-			var label := str(def.get("label", key))
-			if miss != key and miss != label:
-				continue
-			if not focused.has(key):
-				focused.append(key)
-	if focused.is_empty():
-		return selected
-	return focused
+	return TheoryQuestionGeneratorScript.selected_cadence_ids_for_current_round(_cadence_selected, CADENCE_DEFS, _focus_missed_ids)
 
 
 func _selected_ear_mode_choices() -> Array[String]:
@@ -17120,69 +17084,24 @@ func _selected_ear_mode_choices() -> Array[String]:
 
 func _build_theory_question_payload() -> Dictionary:
 	if _selected_mode == MODE_PROGRESSION:
-		var progression_ids := _selected_progression_ids()
-		var queue = _review_queue_for_mode(MODE_PROGRESSION)
-		var picked_id := str(queue.pick_next(progression_ids)) if queue != null else ""
-		if picked_id == "":
-			picked_id = progression_ids[_rng.randi_range(0, progression_ids.size() - 1)]
-		var prog_def: Dictionary = PROGRESSION_DEFS.get(picked_id, PROGRESSION_DEFS["IVviIV"])
-		var correct_label := str(prog_def.get("label", picked_id))
-		var progression_notes: Array = []
-		var steps: Array = prog_def.get("steps", [3, 5, 3])
-		for step in steps:
-			progression_notes.append(_diatonic_triad_notes(int(step), 48))
-		var progression_choices := _build_progression_label_choices(picked_id, progression_ids)
-		return {
-			"id": "progression:%s" % picked_id,
-			"item_id": picked_id,
-			"prompt": "Choose the progression:",
-			"correct": correct_label,
-			"choices": progression_choices,
-			"progression_notes": progression_notes
-		}
+		return TheoryQuestionGeneratorScript.build_progression_payload(
+			_progression_selected, PROGRESSION_DEFS, CHORD_INTERVALS,
+			_review_queue_for_mode(MODE_PROGRESSION), _rng
+		)
 	if _selected_mode == MODE_SCALE_MODE:
-		var selected_modes := _selected_scale_mode_ids()
-		var queue2 = _review_queue_for_mode(MODE_SCALE_MODE)
-		var picked_mode := str(queue2.pick_next(selected_modes)) if queue2 != null else ""
-		if picked_mode == "":
-			picked_mode = selected_modes[_rng.randi_range(0, selected_modes.size() - 1)]
-		var scale_notes: Array[int] = []
-		var scale_steps: Array = SCALE_MODE_DEFS.get(picked_mode, SCALE_MODE_DEFS["Major"])
-		for step in scale_steps:
-			scale_notes.append(60 + int(step))
-		return {
-			"id": "scale:%s" % picked_mode,
-			"item_id": picked_mode,
-			"prompt": "Choose the scale/mode:",
-			"correct": picked_mode,
-			"choices": _build_text_choices(picked_mode, selected_modes, 4),
-			"scale_notes": scale_notes
-		}
+		return TheoryQuestionGeneratorScript.build_scale_mode_payload(
+			_scale_selected_modes, SCALE_MODE_DEFS,
+			_review_queue_for_mode(MODE_SCALE_MODE), _rng
+		)
 	if _selected_mode == MODE_CADENCE:
-		var selected_cadences := _selected_cadence_ids_for_current_round()
-		var queue3 = _review_queue_for_mode(MODE_CADENCE)
-		var cadence_id := str(queue3.pick_next(selected_cadences)) if queue3 != null else ""
-		if cadence_id == "":
-			cadence_id = selected_cadences[_rng.randi_range(0, selected_cadences.size() - 1)]
-		var cadence_def: Dictionary = CADENCE_DEFS.get(cadence_id, CADENCE_DEFS["Perfect"])
-		var correct_cadence := str(cadence_def.get("label", cadence_id))
-		var cadence_notes: Array = []
-		var cadence_steps: Array = cadence_def.get("steps", [4, 0])
-		# Rotate key each question so players hear patterns, not just C-major chord shapes
-		_cadence_play_root = CADENCE_KEY_ROOTS[_rng.randi_range(0, CADENCE_KEY_ROOTS.size() - 1)]
-		for step in cadence_steps:
-			cadence_notes.append(_diatonic_triad_notes(int(step), _cadence_play_root))
-		var cadence_labels: Array[String] = []
-		for key in selected_cadences:
-			cadence_labels.append(str(CADENCE_DEFS[key]["label"]))
-		return {
-			"id": "cadence:%s" % cadence_id,
-			"item_id": cadence_id,
-			"prompt": "Choose the cadence:",
-			"correct": correct_cadence,
-			"choices": _build_text_choices(correct_cadence, cadence_labels, 4),
-			"cadence_notes": cadence_notes
-		}
+		var payload := TheoryQuestionGeneratorScript.build_cadence_payload(
+			_cadence_selected, CADENCE_DEFS, CHORD_INTERVALS, CADENCE_KEY_ROOTS,
+			_focus_missed_ids, _review_queue_for_mode(MODE_CADENCE), _rng
+		)
+		# Cadence generator returns the picked key root in `play_root` so callers
+		# can replay the cadence in the same key later in the round.
+		_cadence_play_root = int(payload.get("play_root", _cadence_play_root))
+		return payload
 	return {}
 
 
@@ -17240,18 +17159,7 @@ func _apply_interval_choice_texts(interval_ids: Array[String], use_interval_name
 
 
 func _diatonic_triad_notes(step_index: int, root_midi: int = 48) -> Array[int]:
-	var degree_steps := [0, 2, 4, 5, 7, 9, 11]
-	var triad_qualities := ["Major", "Minor", "Minor", "Major", "Major", "Minor", "Dim"]
-	var idx := clampi(step_index, 0, 6)
-	var triad_root := root_midi + int(degree_steps[idx])
-	var quality := str(triad_qualities[idx])
-	var intervals: Array[int] = []
-	for iv in CHORD_INTERVALS.get(quality, [0, 4, 7]):
-		intervals.append(int(iv))
-	var notes: Array[int] = []
-	for iv in intervals:
-		notes.append(triad_root + int(iv))
-	return notes
+	return TheoryQuestionGeneratorScript.diatonic_triad_notes(step_index, root_midi, CHORD_INTERVALS)
 
 
 func _play_chord_for_pattern(notes: Array[int], duration: float, broken: bool) -> void:
