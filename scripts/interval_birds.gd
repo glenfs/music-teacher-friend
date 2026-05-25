@@ -98,6 +98,7 @@ const DailyChallengeScript = preload("res://scripts/gamification/daily_challenge
 const ChoiceBuilderScript = preload("res://scripts/exercises/choice_builder.gd")
 const RhythmFlowLibraryScript = preload("res://scripts/rhythm/rhythm_flow_library.gd")
 const LessonSummaryHtmlScript = preload("res://scripts/students/lesson_summary_html.gd")
+const LearningStepFactoryScript = preload("res://scripts/learning/learning_step_factory.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -14111,7 +14112,7 @@ func _on_learning_test_out_selected(module_id: String) -> void:
 
 
 func _on_learning_placement_selected() -> void:
-	var module_data: Dictionary = _build_learning_placement_module()
+	var module_data: Dictionary = LearningStepFactoryScript.placement_module(LearningRegistryScript.get_all_modules())
 	if module_data.is_empty():
 		return
 	_play_ui_click_sfx()
@@ -14128,29 +14129,6 @@ func _on_learning_placement_selected() -> void:
 	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
 	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
 	_start_lesson_player_midi_if_enabled()
-
-
-func _build_learning_placement_module() -> Dictionary:
-	var LMD_Script = preload("res://scripts/learning/learning_module_data.gd")
-	var steps: Array[Dictionary] = []
-	for module_data in LearningRegistryScript.get_all_modules():
-		for step in module_data.get("steps", []):
-			if step is Dictionary:
-				steps.append((step as Dictionary).duplicate(true))
-	if steps.is_empty():
-		return {}
-	var placement_module: Dictionary = LMD_Script.create_module(
-		"_placement_assessment",
-		"Placement Check",
-		"Find the right starting point for your learning path.",
-		"",
-		steps,
-		5,
-		""
-	)
-	placement_module["placement_mode"] = true
-	placement_module["test_out_max_questions"] = 12
-	return placement_module
 
 
 func _on_learning_lesson_completed(_module_id: String) -> void:
@@ -14172,7 +14150,7 @@ func _on_learning_review_weak() -> void:
 	var review_items: Array = rq.get_review_items(8)
 	if review_items.is_empty():
 		return
-	var module_data: Dictionary = _build_learning_review_module(review_items)
+	var module_data: Dictionary = LearningStepFactoryScript.review_module(review_items, LearningRegistryScript.get_all_modules())
 	if module_data.is_empty():
 		return
 	_play_ui_click_sfx()
@@ -14189,182 +14167,6 @@ func _on_learning_review_weak() -> void:
 	_learning_lesson_player.lesson_completed.connect(_on_learning_lesson_completed)
 	_learning_lesson_player.back_to_map.connect(_on_learning_lesson_back_to_map)
 	_start_lesson_player_midi_if_enabled()
-
-
-func _build_learning_review_module(review_items: Array) -> Dictionary:
-	var LMD_Script = preload("res://scripts/learning/learning_module_data.gd")
-	var modules: Array = LearningRegistryScript.get_all_modules()
-	var steps: Array[Dictionary] = []
-	steps.append(LMD_Script.create_intro_step(
-		"Review Practice",
-		"Let's review the concepts that need the most support. Answer carefully and take your time.",
-		"Mixed review: notes, theory, listening, keyboard, and rhythm"
-	))
-	for concept_id_variant in review_items:
-		var review_step: Dictionary = _build_learning_review_step(str(concept_id_variant), modules, LMD_Script)
-		if not review_step.is_empty():
-			steps.append(review_step)
-	if steps.size() <= 1:
-		return {}
-	return LMD_Script.create_module(
-		"_review_practice",
-		"Review Practice",
-		"Practice your weak concepts",
-		"",
-		steps,
-		4,
-		""
-	)
-
-
-func _build_learning_review_step(concept_id: String, modules: Array, LMD_Script) -> Dictionary:
-	if concept_id.begins_with("treble:") or concept_id.begins_with("bass:"):
-		return _build_learning_note_review_step(concept_id, modules, LMD_Script)
-	if concept_id.begins_with("theory:"):
-		var theory_item: Dictionary = LMD_Script.find_theory_item_by_concept_id(concept_id)
-		if not theory_item.is_empty():
-			var quiz_step: Dictionary = LMD_Script.create_quiz_step(
-				str(theory_item.get("question", "")),
-				theory_item.get("choices", []),
-				int(theory_item.get("correct_index", 0)),
-				"Correct.",
-				"Not quite."
-			)
-			quiz_step["concept_id"] = concept_id
-			return quiz_step
-	if concept_id.begins_with("quiz:"):
-		for module_data in modules:
-			for step in module_data.get("steps", []):
-				if int(step.get("type", -1)) == 4 and ("quiz:" + str(step.get("question", "")).left(40)) == concept_id:
-					return step.duplicate(true)
-	if concept_id.begins_with("listening:"):
-		for module_data in modules:
-			for step in module_data.get("steps", []):
-				if int(step.get("type", -1)) != 10:
-					continue
-				for item in step.get("items", []):
-					if not (item is Dictionary):
-						continue
-					var item_dict: Dictionary = (item as Dictionary).duplicate(true)
-					var item_concept: String = str(item_dict.get("concept_id", _build_learning_listening_concept_id(item_dict)))
-					if item_concept == concept_id:
-						item_dict["concept_id"] = item_concept
-						return LMD_Script.create_listening_quiz_step(
-							"Listening Review",
-							"Listen once, then choose the best answer.",
-							[item_dict]
-						)
-	if concept_id.begins_with("keyboard:"):
-		for module_data in modules:
-			for step in module_data.get("steps", []):
-				if int(step.get("type", -1)) == 15 and _build_learning_keyboard_concept_id(step) == concept_id:
-					return step.duplicate(true)
-	if concept_id.begins_with("rhythm:"):
-		for module_data in modules:
-			for step in module_data.get("steps", []):
-				if int(step.get("type", -1)) == 12 and _build_learning_rhythm_concept_id(step) == concept_id:
-					return step.duplicate(true)
-	return {}
-
-
-func _build_learning_note_review_step(concept_id: String, modules: Array, LMD_Script) -> Dictionary:
-	var parts: PackedStringArray = concept_id.split(":")
-	if parts.size() < 2:
-		return {}
-	var clef: String = parts[0]
-	var note_id: String = parts[1]
-	var note_item: Dictionary = {}
-	var search_pool: Array = LMD_Script.treble_note_pool_full() if clef == "treble" else LMD_Script.bass_note_pool_full()
-	for entry in search_pool:
-		if str(entry.get("note_id", "")) == note_id:
-			note_item = entry.duplicate(true)
-			break
-	if note_item.is_empty():
-		for module_data in modules:
-			for step in module_data.get("steps", []):
-				var stype: int = int(step.get("type", -1))
-				if stype == 13 or stype == 14:
-					if str(step.get("clef", "")) == clef and str(step.get("target_note_id", "")) == note_id:
-						note_item = {
-							"clef": clef,
-							"note_name": note_id[0],
-							"note_step": int(step.get("target_step", 4)),
-							"note_id": note_id,
-						}
-						break
-			if not note_item.is_empty():
-				break
-	if note_item.is_empty():
-		return {}
-	var choice_data: Dictionary = _build_learning_note_choice_data(str(note_item.get("note_name", note_id[0])))
-	var quiz_step: Dictionary = LMD_Script.create_note_quiz_step(
-		clef,
-		str(note_item.get("note_name", note_id[0])),
-		int(note_item.get("note_step", 4)),
-		choice_data.get("choices", []),
-		int(choice_data.get("correct_index", 0)),
-		"Correct.",
-		"Not quite."
-	)
-	quiz_step["concept_id"] = concept_id
-	return quiz_step
-
-
-func _build_learning_note_choice_data(correct_letter: String) -> Dictionary:
-	var all_letters := ["C", "D", "E", "F", "G", "A", "B"]
-	var ci: int = all_letters.find(correct_letter)
-	var adjacent: Array[String] = []
-	var non_adjacent: Array[String] = []
-	for offset in [-1, 1]:
-		var didx: int = (ci + offset + 7) % 7
-		var d: String = all_letters[didx]
-		if d != correct_letter and not adjacent.has(d):
-			adjacent.append(d)
-	for offset in [-3, 3, -4, 4]:
-		var didx2: int = (ci + offset + 7) % 7
-		var d2: String = all_letters[didx2]
-		if d2 != correct_letter and not adjacent.has(d2) and not non_adjacent.has(d2):
-			non_adjacent.append(d2)
-		if non_adjacent.size() >= 2:
-			break
-	adjacent.shuffle()
-	non_adjacent.shuffle()
-	var distractors: Array[String] = []
-	if not adjacent.is_empty():
-		distractors.append(adjacent[0])
-	for d in non_adjacent:
-		distractors.append(d)
-		if distractors.size() >= 3:
-			break
-	if distractors.size() < 3 and adjacent.size() > 1:
-		distractors.append(adjacent[1])
-	var choices: Array[String] = [correct_letter]
-	for d in distractors:
-		choices.append(d)
-	choices.shuffle()
-	return {"choices": choices, "correct_index": choices.find(correct_letter)}
-
-
-func _build_learning_listening_concept_id(item: Dictionary) -> String:
-	var joined_ids := ""
-	for note_id in item.get("note_ids", []):
-		if joined_ids != "":
-			joined_ids += "_"
-		joined_ids += str(note_id)
-	return "listening:%s:%s" % [str(item.get("label", "item")), joined_ids]
-
-
-func _build_learning_keyboard_concept_id(step: Dictionary) -> String:
-	return "keyboard:%s" % str(step.get("target_note_id", ""))
-
-
-func _build_learning_rhythm_concept_id(step: Dictionary) -> String:
-	var pattern_text := ""
-	for beat in step.get("pattern", []):
-		if pattern_text != "":
-			pattern_text += "-"
-		pattern_text += str(beat)
-	return "rhythm:%s:%s" % [str(step.get("title", "pattern")), pattern_text]
 
 
 func _on_learning_back_to_home() -> void:
