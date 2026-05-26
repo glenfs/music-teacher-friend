@@ -231,6 +231,26 @@ const CHORD_INTERVALS := {
 	"Maj9": [0, 4, 7, 11, 14],
 	"Min9": [0, 3, 7, 10, 14],
 	"Add9": [0, 4, 7, 14],
+	# Minor add-9: pop / indie guitar staple ("Wonderwall"-ish color).
+	"Madd9": [0, 3, 7, 14],
+	# Extended dominants — full 11th/13th stacks (11 typically omitted on
+	# Dom13 because the natural 11 clashes with the major 3rd).
+	"Maj11": [0, 4, 7, 11, 14, 17],
+	"Dom11": [0, 4, 7, 10, 14, 17],
+	"Min11": [0, 3, 7, 10, 14, 17],
+	"Dom13": [0, 4, 7, 10, 14, 21],
+	"Maj7#11": [0, 4, 7, 11, 14, 18],
+	# Altered dominants — jazz / blues / rock vocabulary.
+	"7#9": [0, 4, 7, 10, 15],  # Hendrix chord
+	"7b9": [0, 4, 7, 10, 13],
+	"7b5": [0, 4, 6, 10],
+	# Augmented-sixth chords (classical theory). Sound enharmonically like
+	# dom7-family chords but spelled differently to indicate functional intent
+	# (resolve outward by half-step to V). Kept as distinct entries so theory
+	# students can identify them by name even though pitch sets overlap.
+	"It+6": [0, 4, 10],
+	"Fr+6": [0, 4, 6, 10],
+	"Ger+6": [0, 4, 7, 10],
 }
 const SIGHT_CHORD_DEFINITIONS := {
 	"Major": {"id": "Major", "label": "Major", "tier": 1, "intervals": [0, 4, 7], "degrees": [0, 2, 4]},
@@ -256,13 +276,28 @@ const SIGHT_CHORD_DEFINITIONS := {
 	"Maj9": {"id": "Maj9", "label": "Maj9", "tier": 5, "intervals": [0, 4, 7, 11, 14], "degrees": [0, 2, 4, 6, 8]},
 	"Min9": {"id": "Min9", "label": "Min9", "tier": 5, "intervals": [0, 3, 7, 10, 14], "degrees": [0, 2, 4, 6, 8]},
 	"Add9": {"id": "Add9", "label": "Add9", "tier": 5, "intervals": [0, 4, 7, 14], "degrees": [0, 2, 4, 8]},
+	"Madd9": {"id": "Madd9", "label": "Madd9", "tier": 5, "intervals": [0, 3, 7, 14], "degrees": [0, 2, 4, 8]},
+	"Maj11": {"id": "Maj11", "label": "Maj11", "tier": 6, "intervals": [0, 4, 7, 11, 14, 17], "degrees": [0, 2, 4, 6, 8, 10]},
+	"Dom11": {"id": "Dom11", "label": "Dom11", "tier": 6, "intervals": [0, 4, 7, 10, 14, 17], "degrees": [0, 2, 4, 6, 8, 10]},
+	"Min11": {"id": "Min11", "label": "Min11", "tier": 6, "intervals": [0, 3, 7, 10, 14, 17], "degrees": [0, 2, 4, 6, 8, 10]},
+	"Dom13": {"id": "Dom13", "label": "Dom13", "tier": 6, "intervals": [0, 4, 7, 10, 14, 21], "degrees": [0, 2, 4, 6, 8, 12]},
+	"Maj7#11": {"id": "Maj7#11", "label": "Maj7#11", "tier": 6, "intervals": [0, 4, 7, 11, 14, 18], "degrees": [0, 2, 4, 6, 8, 10]},
+	"7#9": {"id": "7#9", "label": "7#9", "tier": 7, "intervals": [0, 4, 7, 10, 15], "degrees": [0, 2, 4, 6, 8]},
+	"7b9": {"id": "7b9", "label": "7b9", "tier": 7, "intervals": [0, 4, 7, 10, 13], "degrees": [0, 2, 4, 6, 8]},
+	"7b5": {"id": "7b5", "label": "7b5", "tier": 7, "intervals": [0, 4, 6, 10], "degrees": [0, 2, 4, 6]},
+	"It+6": {"id": "It+6", "label": "It+6", "tier": 8, "intervals": [0, 4, 10], "degrees": [0, 2, 6]},
+	"Fr+6": {"id": "Fr+6", "label": "Fr+6", "tier": 8, "intervals": [0, 4, 6, 10], "degrees": [0, 2, 3, 6]},
+	"Ger+6": {"id": "Ger+6", "label": "Ger+6", "tier": 8, "intervals": [0, 4, 7, 10], "degrees": [0, 2, 4, 6]},
 }
 const SIGHT_CHORD_TIER_IDS := {
 	1: ["Major", "Minor"],
 	2: ["Major", "Minor", "Power", "Dim", "Aug", "Sus2", "Sus4"],
 	3: ["Maj7", "Dom7", "Min7", "Dim7", "Half-dim", "mMaj7", "Aug7", "AugMaj7", "7sus4"],
 	4: ["Maj6", "Min6", "6/9"],
-	5: ["Dom9", "Maj9", "Min9", "Add9"],
+	5: ["Dom9", "Maj9", "Min9", "Add9", "Madd9"],
+	6: ["Dom11", "Maj11", "Min11", "Dom13", "Maj7#11"],
+	7: ["7#9", "7b9", "7b5"],
+	8: ["It+6", "Fr+6", "Ger+6"],
 }
 const SIGHT_CHORD_TIER_NAMES := {
 	1: "Basic Triads",
@@ -270,19 +305,28 @@ const SIGHT_CHORD_TIER_NAMES := {
 	3: "7th Chords",
 	4: "6th Chords",
 	5: "Extensions",
+	6: "11ths & 13ths",
+	7: "Altered Dominants",
+	8: "Augmented Sixths",
 }
-const SIGHT_CHORD_MAX_TIER := 5
+const SIGHT_CHORD_MAX_TIER := 8
 const CHORD_TIER_TRIADS := ["Major", "Minor", "Power", "Dim", "Aug", "Sus2", "Sus4"]
 const CHORD_TIER_7THS := ["Maj7", "Dom7", "Min7", "Dim7", "Half-dim", "mMaj7", "Aug7", "AugMaj7", "7sus4"]
 const CHORD_TIER_6THS := ["Maj6", "Min6", "6/9"]
-const CHORD_TIER_EXTENSIONS := ["Dom9", "Maj9", "Min9", "Add9"]
+const CHORD_TIER_EXTENSIONS := ["Dom9", "Maj9", "Min9", "Add9", "Madd9"]
+const CHORD_TIER_UPPERS := ["Dom11", "Maj11", "Min11", "Dom13", "Maj7#11"]
+const CHORD_TIER_ALTERED := ["7#9", "7b9", "7b5"]
+const CHORD_TIER_AUGSIXTHS := ["It+6", "Fr+6", "Ger+6"]
 const CHORD_TIERS := {
 	"Triads": CHORD_TIER_TRIADS,
 	"7th Chords": CHORD_TIER_7THS,
 	"6th Chords": CHORD_TIER_6THS,
 	"Extensions": CHORD_TIER_EXTENSIONS,
+	"11ths & 13ths": CHORD_TIER_UPPERS,
+	"Altered Dominants": CHORD_TIER_ALTERED,
+	"Augmented Sixths": CHORD_TIER_AUGSIXTHS,
 }
-const CHORD_TIER_ORDER := ["Triads", "7th Chords", "6th Chords", "Extensions"]
+const CHORD_TIER_ORDER := ["Triads", "7th Chords", "6th Chords", "Extensions", "11ths & 13ths", "Altered Dominants", "Augmented Sixths"]
 const CHORD_DEFAULT_SELECTED := ["Major", "Minor"]
 const PROGRESSION_DEFS := {
 	"IVviIV": {"label": "IV-vi-IV", "steps": [3, 5, 3]},
@@ -1187,12 +1231,16 @@ var _chord_grid: GridContainer = null
 var _compare_bar: HBoxContainer = null
 var _compare_your_btn: Button = null
 var _compare_correct_play_btn: Button = null
+var _compare_next_btn: Button = null
 var _compare_chosen_root: int = 0
 var _compare_chosen_second: int = 0
 var _compare_chosen_mode: int = -1
 var _compare_chosen_answer := ""
 var _compare_chosen_notes: Array[int] = []
 var _compare_chosen_chords: Array[Array] = []
+var _manual_next_pending := false
+var _manual_next_token := -1
+var _manual_next_question_index := -1
 var _cadence_roman_label: Label = null
 var _chord_recent_results: Array[bool] = []
 # Parallel rolling-accuracy window for Interval mode — drives mid-session
@@ -2457,6 +2505,7 @@ func _prepare_for_shutdown() -> void:
 	_home_ambient_run_id += 1
 	if _compare_bar != null:
 		_compare_bar.visible = false
+	_clear_manual_next_gate()
 	if _sight_singing_take_audio_player != null:
 		_sight_singing_take_audio_player.stop()
 
@@ -3603,6 +3652,8 @@ func _apply_home_layout_profile(profile: Dictionary) -> void:
 	_home_mode_buttons_row = _home_menu_ui.ensure_grid_layout(_home_mode_buttons_row, int(profile.get("columns_modes", 2)), _home_tokens.SPACING["grid_h_gap"], _home_tokens.SPACING["grid_v_gap"])
 	var ear_mode_cols := 2 if compact_profile else 6
 	_ear_mode_row = _home_menu_ui.ensure_grid_layout(_ear_mode_row, ear_mode_cols, _home_tokens.SPACING["grid_h_gap"], _home_tokens.SPACING["grid_v_gap"])
+	if _ear_mode_row != null:
+		_ear_mode_row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	var ear_card_size := Vector2(164, 80) if compact_profile else Vector2(190, 86)
 	var ear_title_size := 16 if compact_profile else 19
 	var ear_subtitle_size := 11 if compact_profile else 12
@@ -7180,6 +7231,14 @@ func _build_ui_game_panel() -> void:
 	_compare_correct_play_btn.pressed.connect(_on_compare_correct_pressed)
 	_compare_bar.add_child(_compare_correct_play_btn)
 
+	_compare_next_btn = Button.new()
+	_compare_next_btn.text = "Next"
+	_compare_next_btn.custom_minimum_size = Vector2(132, 44)
+	_compare_next_btn.visible = false
+	_compare_next_btn.pressed.connect(_on_compare_next_pressed)
+	_style_button(_compare_next_btn)
+	_compare_bar.add_child(_compare_next_btn)
+
 	# Cadence Roman numeral label — shown after answer reveal
 	_cadence_roman_label = Label.new()
 	_cadence_roman_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -9381,7 +9440,7 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 	var cyan := MENU_CARD_LEARNING_ACCENT
 	var accent: Color = cyan
 	var normal_bg := Color(0.0588, 0.1529, 0.2510, 0.78)
-	var selected_bg := Color(0.1020, 0.2471, 0.3569, 0.95)
+	var selected_bg := Color(0.064, 0.166, 0.276, 0.88)
 	var normal_border := Color(cyan.r, cyan.g, cyan.b, 0.24)
 	var selected_border := Color(gold.r, gold.g, gold.b, 0.94)
 	var card_size_v: Variant = btn.get_meta("ear_mode_card_size", Vector2(190, 86))
@@ -9409,7 +9468,7 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 
 	var title_lbl := btn.get_meta("ear_mode_title_label", null) as Label
 	if title_lbl != null and is_instance_valid(title_lbl):
-		title_lbl.add_theme_color_override("font_color", Color(1.0, 0.88, 0.43, 1.0) if selected else SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+		title_lbl.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 		title_lbl.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.22))
 		title_lbl.add_theme_constant_override("shadow_offset_x", 0)
 		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
@@ -9418,11 +9477,11 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 		subtitle_lbl.add_theme_color_override("font_color", Color(0.78, 0.92, 0.96, 0.96) if selected else Color(0.68, 0.78, 0.88, 0.92))
 	var icon := btn.get_meta("ear_mode_icon", null) as TextureRect
 	if icon != null and is_instance_valid(icon):
-		icon.modulate = Color(gold.r, gold.g, gold.b, 1.0) if selected else Color(accent.r, accent.g, accent.b, 0.95)
+		icon.modulate = Color(accent.r, accent.g, accent.b, 1.0 if selected else 0.95)
 	var icon_shell := btn.get_meta("ear_mode_icon_shell", null) as PanelContainer
 	if icon_shell != null and is_instance_valid(icon_shell):
 		var shell := StyleBoxFlat.new()
-		shell.bg_color = Color(0.03, 0.10, 0.18, 0.66) if not selected else Color(0.91, 0.63, 0.13, 0.18)
+		shell.bg_color = Color(0.03, 0.10, 0.18, 0.66)
 		shell.border_color = Color(accent.r, accent.g, accent.b, 0.52 if not selected else 0.84)
 		shell.border_width_left = 1
 		shell.border_width_top = 1
@@ -9435,7 +9494,7 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 		icon_shell.add_theme_stylebox_override("panel", shell)
 	var accent_bar := btn.get_meta("mode_card_accent_bar", null) as ColorRect
 	if accent_bar != null and is_instance_valid(accent_bar):
-		accent_bar.color = Color(gold.r, gold.g, gold.b, 0.96) if selected else Color(accent.r, accent.g, accent.b, 0.68)
+		accent_bar.color = Color(accent.r, accent.g, accent.b, 0.86 if selected else 0.68)
 		accent_bar.offset_right = 5.0 if selected else 4.0
 	if not btn.has_meta("_hover_feedback_connected"):
 		btn.set_meta("_hover_feedback_connected", true)
@@ -9939,10 +9998,10 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 			_sight_notes_tabs_shell.add_theme_stylebox_override("panel", _sight_notes_tab_shell_empty_cached)
 	if _home_sight_mode_row is HBoxContainer:
 		var tabs_row := _home_sight_mode_row as HBoxContainer
-		tabs_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+		tabs_row.alignment = BoxContainer.ALIGNMENT_CENTER
 		tabs_row.add_theme_constant_override("separation", 8 if active else 12)
 	if _sight_mode_layout != null:
-		_sight_mode_layout.alignment = BoxContainer.ALIGNMENT_BEGIN
+		_sight_mode_layout.alignment = BoxContainer.ALIGNMENT_CENTER
 		_sight_mode_layout.add_theme_constant_override("separation", 18 if active else 12)
 	for key in _sight_mode_buttons.keys():
 		var tab_btn := _sight_mode_buttons[key] as Button
@@ -9962,10 +10021,10 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 	_set_sight_notes_setup_card_style(_sight_notes_range_card, active, true)
 	_set_sight_notes_setup_card_style(_sight_midi_card, active, true)
 	if _sight_notes_setup_group != null:
-		_sight_notes_setup_group.alignment = BoxContainer.ALIGNMENT_BEGIN
+		_sight_notes_setup_group.alignment = BoxContainer.ALIGNMENT_CENTER
 		_sight_notes_setup_group.add_theme_constant_override("separation", 8 if active else 8)
 	if _sight_notes_range_group != null:
-		_sight_notes_range_group.alignment = BoxContainer.ALIGNMENT_BEGIN
+		_sight_notes_range_group.alignment = BoxContainer.ALIGNMENT_CENTER
 		_sight_notes_range_group.add_theme_constant_override("separation", 12 if active else 4)
 	if _sight_range_container != null:
 		_sight_range_container.add_theme_constant_override("separation", 12 if active else 4)
@@ -10465,11 +10524,13 @@ func _refresh_practice_setup_theme() -> void:
 	if _is_ear_training_mode():
 		if _ear_mode_row is GridContainer:
 			var erow_grid := _ear_mode_row as GridContainer
+			erow_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			erow_grid.add_theme_constant_override("h_separation", 8)
 			erow_grid.add_theme_constant_override("v_separation", 8)
 		elif _ear_mode_row is BoxContainer:
 			var erow_box := _ear_mode_row as BoxContainer
 			erow_box.alignment = BoxContainer.ALIGNMENT_CENTER
+			erow_box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			erow_box.add_theme_constant_override("separation", 8)
 		for key in _ear_mode_buttons.keys():
 			var ebtn := _ear_mode_buttons[key] as Button
@@ -12581,7 +12642,7 @@ func _bump_quiz_run_token() -> void:
 
 
 func _should_advance_after_delay(expected_token: int) -> bool:
-	return _quiz_active and expected_token == _quiz_run_token and not _awaiting_round_start
+	return _quiz_active and expected_token == _quiz_run_token and not _awaiting_round_start and not _manual_next_pending
 
 
 func _on_any_ui_button_pressed() -> void:
@@ -12622,7 +12683,7 @@ func _cancel_chicken_turn_hint_cycle(hide_bubble: bool) -> void:
 
 
 func _chicken_nudge_disabled_for_current_mode() -> bool:
-	if _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE:
+	if _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE or _selected_mode == MODE_PITCH_MATCH:
 		return true
 	if _selected_mode == MODE_SIGHT:
 		return _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"
@@ -13056,7 +13117,7 @@ func _provide_chicken_hint(clear_hint: bool) -> void:
 		if _is_prompt_playing:
 			return
 		_is_prompt_playing = true
-		await _play_chord(_current_chord_notes, _current_note_duration())
+		await _play_ear_chord_prompt(_current_chord_notes, _current_note_duration())
 		_is_prompt_playing = false
 		return
 	if _selected_mode == MODE_PROGRESSION:
@@ -14485,6 +14546,7 @@ func _on_mode_selected() -> void:
 		# flagged as competing with the in-mode controls.
 		_sight_settings_button.visible = show_overview and not _first_run_assessment_pending
 	_apply_top_hud_nav_button_skin()
+	_refresh_home_badges_card()
 	if _home_sight_mode_row != null:
 		var show_sight_row := not sight_in_more_settings
 		if _first_run_assessment_pending:
@@ -17706,6 +17768,7 @@ func _reset_game_hud_for_pre_round() -> void:
 		_set_sight_progress_ratio(0.0, false)
 	if _compare_bar != null:
 		_compare_bar.visible = false
+	_clear_manual_next_gate()
 	if _cadence_roman_label != null:
 		_cadence_roman_label.visible = false
 
@@ -18143,6 +18206,7 @@ func _apply_answer_mode() -> void:
 	var continuous_compact_layout := vp.y < 1040.0
 	var continuous_very_compact_layout := vp.y < 980.0
 	var continuous_ultra_compact_layout := vp.y < 900.0
+	var ear_review_active := _manual_next_pending and (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD or _selected_mode == MODE_CADENCE)
 	var anchor_sight_bottom_controls := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous")
 	var compact_sight_bottom_controls := _selected_mode == MODE_SIGHT and continuous_compact_layout and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous")
 	var show_grand_staff_chord_replay := _is_sight_chords_grand_staff_mode() and not _awaiting_round_start and _quiz_active
@@ -18283,21 +18347,25 @@ func _apply_answer_mode() -> void:
 		if btn == null:
 			continue
 		var uses_interval_choice_row := _selected_mode == MODE_INTERVAL or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE
-		var is_active := uses_interval_choice_row and not gate_choices_for_round_start and i < mini(_ear_choice_count, _current_ear_text_choices.size())
+		var is_active := uses_interval_choice_row and not ear_review_active and not gate_choices_for_round_start and i < mini(_ear_choice_count, _current_ear_text_choices.size())
 		btn.visible = is_active
 		btn.disabled = not is_active
+	if _interval_choices_row != null:
+		_interval_choices_row.visible = (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE) and not ear_review_active and not gate_choices_for_round_start
 
 	var visible_chord_count := 0
 	for chord_name in CHORD_INTERVALS.keys():
 		if _chord_buttons.has(chord_name):
 			var chord_btn: Button = _chord_buttons[chord_name]
-			var show := _selected_mode == MODE_CHORD and _current_chord_choices.has(chord_name) and not gate_choices_for_round_start
+			var show := _selected_mode == MODE_CHORD and not ear_review_active and _current_chord_choices.has(chord_name) and not gate_choices_for_round_start
 			chord_btn.visible = show
 			chord_btn.disabled = not show
 			if show:
 				visible_chord_count += 1
 	if _chord_grid != null and visible_chord_count > 0:
 		_chord_grid.columns = mini(4, maxi(2, ceili(float(visible_chord_count) / 2.0)))
+	if _chord_grid != null:
+		_chord_grid.visible = _selected_mode == MODE_CHORD and not ear_review_active and visible_chord_count > 0
 	if _pitch_match_keyboard_scroll != null:
 		var show_pitch_match_keyboard := _selected_mode == MODE_PITCH_MATCH and _quiz_active and not _awaiting_round_start
 		_pitch_match_keyboard_scroll.visible = show_pitch_match_keyboard
@@ -18588,7 +18656,7 @@ func _apply_answer_mode() -> void:
 		_sight_bottom_spacer.custom_minimum_size = Vector2(0, 0)
 		_sight_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL if anchor_sight_bottom_controls else Control.SIZE_SHRINK_BEGIN
 	if _bird_sprite != null:
-		var hide_chicken := _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow" or _sight_mode == "Sight Singing"))
+		var hide_chicken := _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE or _selected_mode == MODE_PITCH_MATCH or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow" or _sight_mode == "Sight Singing"))
 		_bird_sprite.visible = not hide_chicken
 		if hide_chicken:
 			_hide_chicken_bubble()
@@ -18678,6 +18746,7 @@ func _show_home() -> void:
 	_accepting_answer = false
 	_awaiting_round_start = false
 	_is_prompt_playing = false
+	_clear_manual_next_gate()
 	_score = 0
 	_question_index = 0
 	_streak = 0
@@ -18965,6 +19034,12 @@ func _show_game() -> void:
 	if _bird_sprite != null and (_selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"))):
 		if _bird_sprite.visible:
 			_bird_sprite.visible = false
+		_hide_chicken_bubble()
+	if _selected_mode == MODE_PITCH_MATCH:
+		if _bird_sprite != null and _bird_sprite.visible:
+			_bird_sprite.visible = false
+		if _tutorial_chicken != null and _tutorial_chicken.visible:
+			_tutorial_chicken.visible = false
 		_hide_chicken_bubble()
 	if _is_rhythm_flow_mode() and _tutorial_chicken != null:
 		if _tutorial_chicken.visible:
@@ -20964,6 +21039,7 @@ func _finish_quiz() -> void:
 
 
 func _generate_round() -> void:
+	_clear_manual_next_gate()
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords"):
 		_clear_sight_answer_keyboard_feedback()
 	if _selected_mode == MODE_PITCH_MATCH:
@@ -21151,11 +21227,11 @@ func _play_current_prompt() -> void:
 	if _qa_enabled and _selected_mode != MODE_NOTE_CHASE:
 		await get_tree().create_timer(0.02).timeout
 		return
+	var ear_context_played := false
 	if _is_ear_training_mode():
-		await _play_ear_count_in_and_context()
+		ear_context_played = await _play_ear_count_in_and_context()
 	if _selected_mode == MODE_CHORD:
-		await _play_chord(_current_chord_notes, _current_note_duration())
-		await _push_silence(0.05)
+		await _play_ear_chord_prompt(_current_chord_notes, _current_note_duration())
 		return
 	if _selected_mode == MODE_PITCH_MATCH:
 		# Optional I-IV-V-I cadence at the very start of the session — grounds
@@ -21173,8 +21249,8 @@ func _play_current_prompt() -> void:
 		# Tonic triad before each target — primary fix for non-AP students.
 		# Toggle exposed in setup so advanced students can turn it off.
 		if _pitch_match_play_tonic_before:
-			await _play_chord_block(_pitch_match_tonic_triad(), 0.36)
-			await _push_silence(0.08)
+			await _play_chord_block_with_fade(_pitch_match_tonic_triad(), 0.68, 0.14)
+			await _push_silence(0.42)
 		await _play_note(_current_pitch_match_midi, 0.62)
 		await _push_silence(0.05)
 		return
@@ -21226,12 +21302,13 @@ func _play_current_prompt() -> void:
 		await get_tree().create_timer(0.05).timeout
 		return
 
-	await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
+	await _play_interval_prompt_async(_current_root_midi, _current_second_midi, ear_context_played)
 
 
-func _play_ear_count_in_and_context() -> void:
+func _play_ear_count_in_and_context() -> bool:
 	if _qa_enabled:
-		return
+		return false
+	var played_tonal_context := false
 	# Audible 4-beat metronome at the current ear tempo. Drives the student's
 	# internal pulse before the prompt; also the foundation of tempo training.
 	if _ear_metronome_enabled:
@@ -21247,19 +21324,21 @@ func _play_ear_count_in_and_context() -> void:
 			await _play_note(84, 0.045)
 			await _push_silence(0.12)
 	if _ear_context_tonic_enabled:
-		if _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD:
-			await _play_note(_current_root_midi, 0.22)
-			await _push_silence(0.08)
+		if _selected_mode == MODE_INTERVAL:
+			await _play_note(_current_root_midi, 0.38)
+			await _push_silence(0.48)
+			played_tonal_context = true
+		elif _selected_mode == MODE_CHORD:
+			await _play_note(_current_root_midi, 0.54)
+			await _push_silence(0.52)
+			played_tonal_context = true
 		elif _selected_mode == MODE_PROGRESSION:
 			await _play_chord_block(_diatonic_triad_notes(1, _ear_key_root_midi(_progression_key, 48)), 0.30)
 			await _push_silence(0.08)
 		elif _selected_mode == MODE_SCALE_MODE:
 			await _play_note(_ear_key_root_midi(_scale_root, 60), 0.22)
 			await _push_silence(0.08)
-		elif _selected_mode == MODE_CADENCE:
-			await _play_chord_block(_diatonic_triad_notes(1, _cadence_play_root), 0.44)
-			await _push_silence(0.32)
-	if _ear_melodic_context_enabled:
+	if _ear_melodic_context_enabled and _selected_mode != MODE_CADENCE:
 		var root := _current_root_midi
 		if _selected_mode == MODE_PROGRESSION:
 			root = _ear_key_root_midi(_progression_key, 60)
@@ -21271,11 +21350,16 @@ func _play_ear_count_in_and_context() -> void:
 			await _play_note(root + int(step), 0.11)
 			await _push_silence(0.025)
 		await _push_silence(0.08)
+	return played_tonal_context
 
 
-func _play_interval_prompt_async(root_midi: int, other_midi: int) -> void:
+func _play_interval_prompt_async(root_midi: int, other_midi: int, tonal_context_played: bool = false) -> void:
 	if _use_harmonic_intervals:
 		await _play_harmonic_interval_async(root_midi, other_midi)
+		return
+	if tonal_context_played:
+		await _play_note(other_midi, _current_note_duration())
+		await _push_silence(0.05)
 		return
 	if _use_descending_intervals:
 		await _play_two_notes_async(other_midi, root_midi)
@@ -21368,6 +21452,8 @@ func _show_streak_toast(msg: String) -> void:
 
 
 func _on_chicken_combo_correct() -> bool:
+	if _selected_mode == MODE_PITCH_MATCH:
+		return false
 	if _selected_mode == MODE_NOTE_CHASE:
 		return false
 	if _is_continuous_flow_sight_mode():
@@ -21384,6 +21470,8 @@ func _on_chicken_combo_correct() -> bool:
 
 
 func _consume_chicken_shield_on_wrong() -> bool:
+	if _selected_mode == MODE_PITCH_MATCH:
+		return false
 	if _selected_mode == MODE_NOTE_CHASE:
 		return false
 	if _is_continuous_flow_sight_mode():
@@ -21478,7 +21566,7 @@ func _play_chord_block(notes: Array[int], duration: float) -> void:
 	await _push_silence(0.14)
 
 
-func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_seconds: float) -> void:
+func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_seconds: float, gain_db: float = 0.0) -> void:
 	if notes.is_empty():
 		return
 	var sample_map := _sample_map_for_current_mode()
@@ -21499,7 +21587,7 @@ func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_second
 	# _play_chord_block. The -6 dB baseline is layered on top so the
 	# arpeggiated chords retain their softer "rolled" character.
 	var voice_normalize_db: float = _voice_normalize_db(notes.size())
-	var base_vol_db := float(_ear_prompt_volume_db) - 6.0 + voice_normalize_db
+	var base_vol_db := float(_ear_prompt_volume_db) - 6.0 + gain_db + voice_normalize_db
 	var roll_gap := 0.025  # 25ms stagger between notes for gentle rolled feel
 	for i in notes.size():
 		var midi_note := notes[i]
@@ -21585,7 +21673,10 @@ func _play_chord_sequence(chords: Array, tempo_bpm: int, play_style: String) -> 
 		if chord.is_empty():
 			continue
 		if block and not broken:
-			await _play_chord_block(chord, chord_duration)
+			if _selected_mode == MODE_CADENCE:
+				await _play_chord_block_with_fade(chord, chord_duration, minf(0.18, chord_duration * 0.22))
+			else:
+				await _play_chord_block(chord, chord_duration)
 		elif broken and not block:
 			await _play_chord_broken(chord, chord_duration)
 		else:
@@ -21646,6 +21737,14 @@ func _play_broken_chord(notes: Array[int], duration: float) -> void:
 		else:
 			await _play_note(midi_note, step_duration)
 		await _push_silence(0.03)
+
+
+func _play_ear_chord_prompt(notes: Array[int], duration: float) -> void:
+	if notes.is_empty():
+		return
+	var musical_duration := maxf(0.88, duration * 1.22)
+	await _play_chord_block_with_fade(notes, musical_duration, minf(0.18, musical_duration * 0.24), 4.0)
+	await _push_silence(0.12)
 
 
 func _progression_id_from_label(label: String) -> String:
@@ -21722,8 +21821,74 @@ func _setup_ear_compare(chosen_answer: String, correct_answer: String) -> void:
 	if _compare_your_btn != null:
 		_compare_your_btn.text = "Play yours: %s" % chosen_label
 	if _compare_correct_play_btn != null:
-		_compare_correct_play_btn.text = "Play correct: %s" % correct_label
+		_compare_correct_play_btn.text = "Play actual: %s" % correct_label
+	if _compare_next_btn != null:
+		_compare_next_btn.visible = _manual_next_pending
+		_compare_next_btn.disabled = not _manual_next_pending
 	_compare_bar.visible = true
+
+
+func _clear_manual_next_gate() -> void:
+	_manual_next_pending = false
+	_manual_next_token = -1
+	_manual_next_question_index = -1
+	if _compare_next_btn != null:
+		_compare_next_btn.visible = false
+		_compare_next_btn.disabled = true
+	_set_ear_review_answer_options_hidden(false)
+
+
+func _arm_manual_next_gate(quiz_token: int, question_index: int) -> void:
+	_manual_next_pending = true
+	_manual_next_token = quiz_token
+	_manual_next_question_index = question_index
+	_set_ear_review_answer_options_hidden(true)
+	if _compare_next_btn != null:
+		_compare_next_btn.visible = true
+		_compare_next_btn.disabled = false
+	if _restart_button != null:
+		_restart_button.disabled = false
+	if _replay_button != null:
+		_replay_button.disabled = false
+
+
+func _set_ear_review_answer_options_hidden(hidden: bool) -> void:
+	var hide_interval_row := hidden and (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_CADENCE)
+	var hide_chord_grid := hidden and _selected_mode == MODE_CHORD
+	if _interval_choices_row != null and hide_interval_row:
+		_interval_choices_row.visible = false
+	for btn in _interval_choice_buttons:
+		if btn != null and hide_interval_row:
+			btn.visible = false
+			btn.disabled = true
+	if _chord_grid != null and hide_chord_grid:
+		_chord_grid.visible = false
+	for chord_name in _chord_buttons.keys():
+		var chord_btn: Button = _chord_buttons[chord_name]
+		if chord_btn != null and hide_chord_grid:
+			chord_btn.visible = false
+			chord_btn.disabled = true
+
+
+func _on_compare_next_pressed() -> void:
+	if not _manual_next_pending:
+		return
+	if _is_prompt_playing:
+		return
+	var token := _manual_next_token
+	var asked_count := _manual_next_question_index
+	_clear_manual_next_gate()
+	if _compare_bar != null:
+		_compare_bar.visible = false
+	if not _quiz_active or token != _quiz_run_token:
+		return
+	var controller = _ensure_session_controller()
+	if _lives <= 0:
+		await controller.handle_game_over(self, asked_count, MODE_SIGHT)
+	elif asked_count >= _total_questions:
+		await controller.finish_quiz(self, MODE_SIGHT)
+	else:
+		await controller.begin_next_question(self, token)
 
 
 func _on_interval_choice_index(choice_idx: int) -> void:
@@ -21815,6 +21980,8 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			_status_label.text = "Shield blocked the miss. Correct answer: %s." % shield_text
 		await _blink_answer_feedback(chosen_btn, correct_btn, 3)
 		await _play_fail_sfx()
+		if not _qa_enabled and (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_CADENCE):
+			_set_ear_review_answer_options_hidden(true)
 
 	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
 	_refresh_meta_ui()
@@ -21853,6 +22020,11 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if not hint_line.is_empty():
 				teach_lines.append("%s  %s" % [char(0x1F4A1), hint_line])
 			_status_label.text = "\n".join(teach_lines)
+			if not _qa_enabled:
+				_arm_manual_next_gate(quiz_token, _question_index)
+				_setup_ear_compare(choice_id, expected_choice)
+				_status_label.text += "\nUse the play buttons, then press Next when ready."
+				return
 			if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
 				return
 		elif _selected_mode == MODE_SCALE_MODE:
@@ -21875,6 +22047,11 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if not cd_hint.is_empty():
 				cd_lines.append("%s  %s" % [char(0x1F4A1), cd_hint])
 			_status_label.text = "\n".join(cd_lines)
+			if not _qa_enabled:
+				_arm_manual_next_gate(quiz_token, _question_index)
+				_setup_ear_compare(choice_id, expected_choice)
+				_status_label.text += "\nUse the play buttons, then press Next when ready."
+				return
 			if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
 				return
 		elif _selected_mode == MODE_PROGRESSION:
@@ -21911,6 +22088,10 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if _compare_bar != null:
 				_compare_bar.visible = true
 		_setup_ear_compare(choice_id, expected_choice)
+		if not _qa_enabled and (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_CADENCE):
+			_arm_manual_next_gate(quiz_token, _question_index)
+			_status_label.text += "\nUse the play buttons, then press Next when ready."
+			return
 
 	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
@@ -22014,7 +22195,7 @@ func _on_compare_your_pressed() -> void:
 		await _push_silence(g)
 		await _play_note(_compare_chosen_second, d)
 	elif _compare_chosen_mode == MODE_CHORD:
-		await _play_chord(_compare_chosen_notes, _current_note_duration())
+		await _play_ear_chord_prompt(_compare_chosen_notes, _current_note_duration())
 	elif _compare_chosen_mode == MODE_PROGRESSION:
 		await _play_chord_sequence(_compare_chosen_chords, _progression_tempo, "broken" if _progression_broken else "block")
 	elif _compare_chosen_mode == MODE_SCALE_MODE:
@@ -22030,6 +22211,16 @@ func _on_compare_correct_pressed() -> void:
 	_is_prompt_playing = true
 	if _compare_chosen_mode == MODE_INTERVAL:
 		await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
+	elif _compare_chosen_mode == MODE_CHORD:
+		await _play_ear_chord_prompt(_current_chord_notes, _current_note_duration())
+	elif _compare_chosen_mode == MODE_CADENCE:
+		var cadence_chords := _cadence_chords_for_id(_current_theory_item_id)
+		await _play_chord_sequence(cadence_chords, _cadence_tempo, "broken" if _cadence_broken else "block")
+	elif _compare_chosen_mode == MODE_PROGRESSION:
+		var progression_chords := _progression_chords_for_id(_current_theory_item_id)
+		await _play_chord_sequence(progression_chords, _progression_tempo, "broken" if _progression_broken else "block")
+	elif _compare_chosen_mode == MODE_SCALE_MODE:
+		await _play_scale(_scale_notes_for_mode(_current_theory_item_id), _scale_tempo)
 	else:
 		await _play_current_prompt()
 	_is_prompt_playing = false
@@ -22092,6 +22283,8 @@ func _on_chord_chosen(choice_quality: String) -> void:
 			_status_label.text = "Shield blocked the miss. Correct answer: %s." % _current_chord_quality
 		await _blink_answer_feedback(chosen_btn, correct_btn, 3)
 		await _play_fail_sfx()
+		if not _qa_enabled:
+			_set_ear_review_answer_options_hidden(true)
 
 	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
 	_refresh_meta_ui()
@@ -22114,6 +22307,11 @@ func _on_chord_chosen(choice_quality: String) -> void:
 		if not _chord_auto_hint.is_empty():
 			chord_teach_lines.append("%s  %s" % [char(0x1F4A1), _chord_auto_hint])
 		_status_label.text = "\n".join(chord_teach_lines)
+		if not _qa_enabled:
+			_arm_manual_next_gate(quiz_token, _question_index)
+			_setup_ear_compare(choice_quality, _current_chord_quality)
+			_status_label.text += "\nUse the play buttons, then press Next when ready."
+			return
 		if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
 			return
 		_status_label.text = "%s  Listen again..." % char(0x1F3B5)
@@ -22126,6 +22324,10 @@ func _on_chord_chosen(choice_quality: String) -> void:
 			return
 		await _play_hungry_reaction()
 		_setup_ear_compare(choice_quality, _current_chord_quality)
+		if not _qa_enabled:
+			_arm_manual_next_gate(quiz_token, _question_index)
+			_status_label.text += "\nUse the play buttons, then press Next when ready."
+			return
 
 	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
@@ -22712,16 +22914,13 @@ func _refresh_active_student_chip() -> void:
 		_active_student_chip.visible = false
 		return
 	_active_student_chip.visible = true
-	if _practice_drills_active:
-		_active_student_chip.offset_left = -284
-		_active_student_chip.offset_right = -24
-		_active_student_chip.offset_top = 20
-		_active_student_chip.offset_bottom = 64
-	else:
-		_active_student_chip.offset_left = -240
-		_active_student_chip.offset_right = -16
-		_active_student_chip.offset_top = 104
-		_active_student_chip.offset_bottom = 144
+	# The chip is in the top HUD's right-side HBox, immediately before the
+	# settings gear. Clear the old overlay offsets so the container can keep it
+	# high in the nav row instead of drifting down the menu screen.
+	_active_student_chip.offset_left = 0
+	_active_student_chip.offset_right = 0
+	_active_student_chip.offset_top = 0
+	_active_student_chip.offset_bottom = 0
 	var name_text: String = "(pick a student)"
 	var color: Color = MENU_TITLE_TEXT
 	var bg: Color = Color(0.10, 0.16, 0.26, 0.92)
@@ -32651,6 +32850,11 @@ func _compute_bird_home_global_position() -> Vector2:
 func _refresh_bird_perch_from_layout(reset_now: bool) -> void:
 	if _bird_sprite == null or _selected_mode == MODE_READ:
 		return
+	if _selected_mode == MODE_PITCH_MATCH:
+		_bird_sprite.visible = false
+		_hide_food_token()
+		_hide_chicken_bubble()
+		return
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"):
 		_bird_sprite.visible = false
 		_hide_food_token()
@@ -32667,6 +32871,11 @@ func _refresh_bird_perch_from_layout(reset_now: bool) -> void:
 
 func _ensure_bird_visible_in_gameplay() -> void:
 	if _bird_sprite == null or _selected_mode == MODE_READ:
+		return
+	if _selected_mode == MODE_PITCH_MATCH:
+		_bird_sprite.visible = false
+		_hide_food_token()
+		_hide_chicken_bubble()
 		return
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"):
 		_bird_sprite.visible = false
@@ -32699,7 +32908,7 @@ func _ensure_bird_visible_in_gameplay() -> void:
 func _reset_bird_position() -> void:
 	if _bird_sprite == null:
 		return
-	if _is_sight_singing_mode():
+	if _is_sight_singing_mode() or _selected_mode == MODE_PITCH_MATCH:
 		_bird_sprite.visible = false
 		_hide_food_token()
 		_hide_chicken_bubble()
@@ -32717,6 +32926,9 @@ func _reset_bird_position() -> void:
 
 func _show_food_at_target(target_button: Control) -> void:
 	if _food_token == null or target_button == null:
+		return
+	if _selected_mode == MODE_PITCH_MATCH:
+		_food_token.visible = false
 		return
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"):
 		_food_token.visible = false
@@ -32739,6 +32951,9 @@ func _feed_chicken_at_target(target_button: Control) -> void:
 	if _food_token == null:
 		return
 	if _qa_enabled:
+		_hide_food_token()
+		return
+	if _selected_mode == MODE_PITCH_MATCH:
 		_hide_food_token()
 		return
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"):
@@ -32782,6 +32997,9 @@ func _play_hungry_reaction() -> void:
 	if _bird_sprite == null:
 		return
 	if _qa_enabled:
+		_hide_food_token()
+		return
+	if _selected_mode == MODE_PITCH_MATCH:
 		_hide_food_token()
 		return
 	_hide_food_token()

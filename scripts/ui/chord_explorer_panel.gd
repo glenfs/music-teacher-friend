@@ -86,6 +86,47 @@ var _clear_button: Button = null
 var _play_button: Button = null
 var _window_bar: ProgressBar = null
 var _keyboard_keys: Dictionary = {}       # pitch -> Button
+var _inversions_row: HBoxContainer = null
+var _presets_row: HBoxContainer = null
+
+# Built-in teacher presets — chord+key setups ready to load. Loading a preset
+# clears the played notes, picks the key, and plays the first chord. Teachers
+# can extend this dict via saved presets (TODO: persist user-saved presets in
+# user://chord_explorer_presets.json once the load/save UI lands).
+const BUILT_IN_PRESETS: Array[Dictionary] = [
+	{
+		"id": "ii_V_I_C",
+		"label": "ii-V-I in C",
+		"key_pc": 0, "is_minor": false,
+		# Each chord: [root_pc, quality_id] — quality must match CHORD_INTERVALS keys.
+		"chords": [[2, "Min7"], [7, "Dom7"], [0, "Maj7"]],
+	},
+	{
+		"id": "modal_mix_C",
+		"label": "Modal mixture in C",
+		"key_pc": 0, "is_minor": false,
+		# bVII, bIII, bVI — classic borrowed-chord palette from C minor.
+		"chords": [[10, "Major"], [3, "Major"], [8, "Major"]],
+	},
+	{
+		"id": "neapolitan_C",
+		"label": "Neapolitan (bII) in C",
+		"key_pc": 0, "is_minor": false,
+		"chords": [[1, "Major"], [7, "Dom7"], [0, "Major"]],
+	},
+	{
+		"id": "blues_C",
+		"label": "12-bar blues in C",
+		"key_pc": 0, "is_minor": false,
+		"chords": [[0, "Dom7"], [5, "Dom7"], [7, "Dom7"]],
+	},
+	{
+		"id": "jazz_color_C",
+		"label": "Jazz color (Maj7#11)",
+		"key_pc": 0, "is_minor": false,
+		"chords": [[0, "Maj7#11"], [5, "Maj7#11"], [10, "Maj7#11"]],
+	},
+]
 
 
 # --- Public lifecycle ---
@@ -106,10 +147,11 @@ func setup(
 	_sample_map_callable = sample_map_fn
 	_nearest_sample_callable = nearest_sample_fn
 	_score_font_picker_builder = score_font_picker_builder
-	set_anchors_preset(PRESET_FULL_RECT)
+	_force_fullscreen_rect()
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	z_as_relative = false
-	z_index = 200
+	z_index = 780
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.06, 0.11, 0.19, 1.0)
 	add_theme_stylebox_override("panel", panel_style)
@@ -120,7 +162,9 @@ func setup(
 func present() -> void:
 	_recent_notes.clear()
 	_window_expires_at = -1.0
+	_force_fullscreen_rect()
 	visible = true
+	move_to_front()
 	_refresh_display()
 	presented.emit()
 
@@ -151,6 +195,10 @@ func tick(_delta: float) -> void:
 	_window_bar.modulate.a = lerpf(0.55, 1.0, progress)
 
 
+func _force_fullscreen_rect() -> void:
+	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+
+
 # Parent forwards MIDI / keyboard note-on events here.
 # click_source=true uses the longer CLICK_WINDOW_SEC so users can build chords slowly.
 func handle_note_on(pitch: int, click_source: bool = false) -> void:
@@ -178,7 +226,12 @@ func handle_note_off(_pitch: int) -> void:
 func _build_ui() -> void:
 	var root_vbox := VBoxContainer.new()
 	root_vbox.add_theme_constant_override("separation", 18)
+	root_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var root_margin := MarginContainer.new()
+	root_margin.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	root_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_margin.add_theme_constant_override("margin_left", 22)
 	root_margin.add_theme_constant_override("margin_right", 22)
 	root_margin.add_theme_constant_override("margin_top", 22)
@@ -367,6 +420,23 @@ func _build_ui() -> void:
 	_full_name_label.add_theme_font_size_override("font_size", 18)
 	_full_name_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	name_inner.add_child(_full_name_label)
+
+	# Inversions row — shows the currently-identified chord with each chord
+	# tone as bass (C, C/E, C/G ...). Click a button to play that voicing
+	# so the student hears how the chord changes when its bass moves.
+	_inversions_row = HBoxContainer.new()
+	_inversions_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_inversions_row.add_theme_constant_override("separation", 8)
+	_inversions_row.visible = false
+	name_inner.add_child(_inversions_row)
+
+	# Teacher presets row — saved chord+key setups the teacher can load with
+	# one click ("Modal mixture in C", "ii-V-I cycle", etc.).
+	_presets_row = HBoxContainer.new()
+	_presets_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_presets_row.add_theme_constant_override("separation", 6)
+	name_inner.add_child(_presets_row)
+	_build_presets_row()
 
 	_build_keyboard(chord_body)
 
@@ -637,6 +707,190 @@ func _play_note_soft(pitch: int, sample_map: Dictionary) -> void:
 # --- Display refresh ---
 
 
+# --- Inversions row ---
+
+
+func _refresh_inversions_row() -> void:
+	if _inversions_row == null:
+		return
+	# Clear previous buttons.
+	for child in _inversions_row.get_children():
+		child.queue_free()
+	# Only show inversions for proper chords (3+ tones).
+	if _last_info.is_empty():
+		_inversions_row.visible = false
+		return
+	var quality := str(_last_info.get("quality", ""))
+	if quality == "" or quality == "single" or quality == "interval" or quality == "cluster":
+		_inversions_row.visible = false
+		return
+	var intervals_v: Variant = _last_info.get("intervals_from_root", null)
+	if typeof(intervals_v) != TYPE_ARRAY:
+		_inversions_row.visible = false
+		return
+	var intervals: Array = intervals_v
+	if intervals.size() < 2:
+		_inversions_row.visible = false
+		return
+	var root_pc: int = int(_last_info.get("root_pc", 0))
+	var root_letter: String = str(_last_info.get("root_letter", ""))
+	var current_bass_pc: int = int(_last_info.get("bass_pc", root_pc))
+	# Base root MIDI anchored near middle of the keyboard so inversions land
+	# in a comfortable listening range (C4 = 60).
+	var base_root_midi: int = 60 + ((root_pc - 0 + 12) % 12)
+	if base_root_midi >= 72:
+		base_root_midi -= 12
+	# Build a button per chord-tone-as-bass.
+	for i in intervals.size():
+		var iv: int = int(intervals[i])
+		var bass_pc: int = ((root_pc + iv) % 12 + 12) % 12
+		var bass_letter: String = NOTE_NAMES_SHARP[bass_pc]
+		var label_text: String
+		if i == 0:
+			label_text = "%s (root)" % root_letter
+		else:
+			label_text = "%s/%s" % [_chord_short_name(), bass_letter]
+		var btn := Button.new()
+		btn.text = label_text
+		btn.custom_minimum_size = Vector2(110, 32)
+		btn.add_theme_font_size_override("font_size", 13)
+		_apply_inversion_button_style(btn, bass_pc == current_bass_pc)
+		var captured_idx := i
+		btn.pressed.connect(func(): _play_inversion(base_root_midi, intervals, captured_idx))
+		_inversions_row.add_child(btn)
+	_inversions_row.visible = true
+
+
+func _chord_short_name() -> String:
+	# Returns just the chord-quality portion of the short_name, dropping any
+	# "/<bass>" suffix the recognizer added for the currently-played voicing.
+	var name := str(_last_info.get("short_name", ""))
+	var slash := name.find("/")
+	if slash >= 0:
+		return name.substr(0, slash)
+	return name
+
+
+func _apply_inversion_button_style(btn: Button, is_current: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	var accent := MENU_PRIMARY_ACCENT if is_current else Color(0.36, 0.78, 1.00, 1.0)
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.18 if is_current else 0.10)
+	sb.border_color = Color(accent.r, accent.g, accent.b, 0.85 if is_current else 0.50)
+	sb.border_width_left = 2 if is_current else 1
+	sb.border_width_right = 2 if is_current else 1
+	sb.border_width_top = 2 if is_current else 1
+	sb.border_width_bottom = 2 if is_current else 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(accent.r, accent.g, accent.b, 0.26)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+
+
+# Plays the chord with the chord-tone at `bass_index` as the lowest voice.
+# Rotates intervals: the chosen tone moves to position 0, everything below it
+# gets +12 semitones to keep the chord intact.
+func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> void:
+	if not _play_note_callable.is_valid():
+		return
+	if bass_index < 0 or bass_index >= intervals.size():
+		return
+	var rotated: Array[int] = []
+	for i in range(bass_index, intervals.size()):
+		rotated.append(int(intervals[i]))
+	for i in range(0, bass_index):
+		rotated.append(int(intervals[i]) + 12)
+	for offset in rotated:
+		_play_note_callable.call(base_root_midi + offset, 1.6)
+
+
+# --- Teacher presets row ---
+
+
+func _build_presets_row() -> void:
+	if _presets_row == null:
+		return
+	for child in _presets_row.get_children():
+		child.queue_free()
+	var label := Label.new()
+	label.text = "Quick presets:"
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.82))
+	_presets_row.add_child(label)
+	for preset in BUILT_IN_PRESETS:
+		var btn := Button.new()
+		btn.text = str(preset.get("label", "Preset"))
+		btn.custom_minimum_size = Vector2(140, 30)
+		btn.add_theme_font_size_override("font_size", 12)
+		var captured := preset
+		btn.pressed.connect(func(): _load_preset(captured))
+		_presets_row.add_child(btn)
+
+
+func _load_preset(preset: Dictionary) -> void:
+	var key_pc: int = int(preset.get("key_pc", 0))
+	var is_minor: bool = bool(preset.get("is_minor", false))
+	_key_pc = key_pc
+	_key_is_minor = is_minor
+	if _key_option != null:
+		for i in range(_key_option.item_count):
+			if int(_key_option.get_item_metadata(i)) == key_pc:
+				_key_option.select(i)
+				break
+	if _minor_check != null:
+		_minor_check.set_pressed_no_signal(is_minor)
+	# Stage the FIRST chord in the preset so the student sees something
+	# immediately. The remaining chords are surfaced via the preset's
+	# implicit "play these in sequence" — caller can extend later.
+	var chords_v: Variant = preset.get("chords", null)
+	if typeof(chords_v) != TYPE_ARRAY or (chords_v as Array).is_empty():
+		_refresh_display()
+		return
+	var first: Array = (chords_v as Array)[0]
+	if first.size() < 2:
+		return
+	var root_pc: int = int(first[0])
+	var quality: String = str(first[1])
+	# Stage virtual notes — the recognizer will pick this up via _refresh_display.
+	var base_root_midi: int = 60 + root_pc
+	if base_root_midi >= 72:
+		base_root_midi -= 12
+	_recent_notes.clear()
+	# Load intervals from the parent's CHORD_INTERVALS via the chord-explorer
+	# theory module so we don't need to hard-code them here.
+	var intervals: Array = _intervals_for_quality(quality)
+	if intervals.is_empty():
+		return
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	for iv in intervals:
+		_recent_notes[base_root_midi + int(iv)] = now
+	_window_expires_at = now + CLICK_WINDOW_SEC
+	_refresh_display()
+	# Audition the chord so the teacher / student hear it immediately.
+	if _play_note_callable.is_valid():
+		for iv in intervals:
+			_play_note_callable.call(base_root_midi + int(iv), 1.6)
+
+
+# Resolves a quality id to its semitone interval array. Local table covers
+# every quality used by the built-in presets; extend here when adding new
+# preset entries that reference qualities not listed below.
+func _intervals_for_quality(quality: String) -> Array:
+	var table := {
+		"Major": [0, 4, 7],
+		"Minor": [0, 3, 7],
+		"Dom7": [0, 4, 7, 10],
+		"Min7": [0, 3, 7, 10],
+		"Maj7": [0, 4, 7, 11],
+		"Maj7#11": [0, 4, 7, 11, 14, 18],
+	}
+	return table.get(quality, [])
+
+
 func _active_pitches() -> Array[int]:
 	var arr: Array[int] = []
 	for k in _recent_notes.keys():
@@ -662,6 +916,7 @@ func _refresh_display() -> void:
 			_window_bar.modulate.a = 0.0
 		_last_info = {}
 		_refresh_keyboard_lighting()
+		_refresh_inversions_row()
 		return
 	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _key_pc, _key_is_minor)
 	_last_info = info
@@ -687,6 +942,7 @@ func _refresh_display() -> void:
 		_set_chip(_intervals_label, "[%s]" % " ".join(iv_strs))
 	else:
 		_set_chip(_intervals_label, "")
+	_refresh_inversions_row()
 
 
 func _push_notes_to_renderer(pitches: Array[int]) -> void:

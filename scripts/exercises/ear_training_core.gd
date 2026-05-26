@@ -26,8 +26,14 @@ const CHORD_DIFFICULTY_RANK := {
 	"Major": 0, "Minor": 1, "Power": 2, "Sus2": 3, "Sus4": 3,
 	"Dom7": 4, "Maj7": 5, "Min7": 6, "Dim": 7, "Aug": 8,
 	"Half-dim": 9, "Dim7": 10, "mMaj7": 11, "Aug7": 12, "AugMaj7": 13,
-	"7sus4": 9, "Maj6": 6, "Min6": 7, "6-9": 12,
-	"Dom9": 10, "Maj9": 11, "Min9": 11, "Add9": 8,
+	"7sus4": 9, "Maj6": 6, "Min6": 7, "6-9": 12, "6/9": 12,
+	"Dom9": 10, "Maj9": 11, "Min9": 11, "Add9": 8, "Madd9": 9,
+	# 11ths/13ths - top of extension stack
+	"Dom11": 14, "Maj11": 15, "Min11": 15, "Dom13": 16, "Maj7#11": 16,
+	# Altered dominants - hard by ear, very distinct color
+	"7#9": 13, "7b9": 13, "7b5": 12,
+	# Augmented sixths - classical theory specialty
+	"It+6": 17, "Fr+6": 17, "Ger+6": 17,
 }
 
 
