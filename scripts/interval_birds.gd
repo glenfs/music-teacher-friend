@@ -105,6 +105,7 @@ const ChordExplorerPanelScript = preload("res://scripts/ui/chord_explorer_panel.
 const PracticeDrillsPanelScript = preload("res://scripts/ui/practice_drills_panel.gd")
 const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_dialog.gd")
 const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
+const PerKeyRadarScript = preload("res://scripts/ui/per_key_radar.gd")
 const TheoryQuestionGeneratorScript = preload("res://scripts/exercises/theory_question_generator.gd")
 const PitchMatchTheoryScript = preload("res://scripts/exercises/pitch_match_theory.gd")
 const MusicHelpersScript = preload("res://scripts/music_theory/music_helpers.gd")
@@ -6337,15 +6338,7 @@ func _build_ui_game_panel() -> void:
 	_rhythm_flow_exercise_select.z_index = 21
 	for i in range(12):
 		var lvl := i + 1
-		var label := "Level %d" % [lvl]
-		if lvl == 4:
-			label += " (dotted half)"
-		elif lvl == 8:
-			label += " (dotted quarter)"
-		elif lvl == 10:
-			label += " (t8 triplets)"
-		elif lvl >= 11:
-			label += " (t4 triplets)"
+		var label := "L%d · %s" % [lvl, RhythmFlowLibraryScript.level_description(lvl)]
 		_rhythm_flow_exercise_select.add_item(label, lvl)
 	_rhythm_flow_exercise_select.selected = _rhythm_flow_runtime.difficulty_level - 1
 	_rhythm_flow_exercise_select.item_selected.connect(_on_rhythm_flow_exercise_selected)
@@ -21964,7 +21957,20 @@ func _refresh_home_key_radar_card() -> void:
 	header.add_theme_color_override("font_color", Color(0.85, 0.78, 0.96, 0.96))
 	_home_key_radar_vbox.add_child(header)
 
-	# Display canonical key order (C first, then sharps, then flats).
+	var per_key_dict: Dictionary = {}
+	for k in _sight_per_key_asked.keys():
+		per_key_dict[str(k)] = {
+			"asked": int(_sight_per_key_asked.get(k, 0)),
+			"correct": int(_sight_per_key_correct.get(k, 0)),
+		}
+	var radar := PerKeyRadarScript.new()
+	radar.custom_minimum_size = Vector2(280, 220)
+	_home_key_radar_vbox.add_child(radar)
+	radar.set_data(per_key_dict)
+	var summary_row := HBoxContainer.new()
+	summary_row.add_theme_constant_override("separation", 10)
+	summary_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_home_key_radar_vbox.add_child(summary_row)
 	var key_order: Array[String] = ["C", "1#", "2#", "3#", "1b", "2b", "3b"]
 	for k in key_order:
 		var asked: int = int(_sight_per_key_asked.get(k, 0))
@@ -21972,39 +21978,13 @@ func _refresh_home_key_radar_card() -> void:
 			continue
 		var correct: int = int(_sight_per_key_correct.get(k, 0))
 		var pct: int = int(round(float(correct) / float(maxi(1, asked)) * 100.0))
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		_home_key_radar_vbox.add_child(row)
-		var key_lbl := Label.new()
-		# Substitute musical sharp/flat glyphs for readability.
 		var display_key: String = k.replace("#", char(0x266F)).replace("b", char(0x266D))
-		key_lbl.text = display_key
-		key_lbl.add_theme_font_size_override("font_size", 13)
-		key_lbl.add_theme_color_override("font_color", Color(0.92, 0.92, 0.96, 0.95))
-		key_lbl.custom_minimum_size = Vector2(40, 0)
-		row.add_child(key_lbl)
-		# Bar — total width 240, colored by accuracy tier.
-		var bar_bg := PanelContainer.new()
-		bar_bg.custom_minimum_size = Vector2(240, 14)
-		var bg_sb := StyleBoxFlat.new()
-		bg_sb.bg_color = Color(0.10, 0.08, 0.14, 0.85)
-		bg_sb.corner_radius_top_left = 3
-		bg_sb.corner_radius_top_right = 3
-		bg_sb.corner_radius_bottom_left = 3
-		bg_sb.corner_radius_bottom_right = 3
-		bar_bg.add_theme_stylebox_override("panel", bg_sb)
-		row.add_child(bar_bg)
-		var fill := ColorRect.new()
-		var bar_color: Color = Color(0.55, 0.92, 0.68, 1.0) if pct >= 80 else (Color(0.96, 0.80, 0.42, 1.0) if pct >= 60 else Color(0.92, 0.55, 0.50, 1.0))
-		fill.color = bar_color
-		fill.custom_minimum_size = Vector2(int(240.0 * (float(pct) / 100.0)), 14)
-		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bar_bg.add_child(fill)
-		var stat_lbl := Label.new()
-		stat_lbl.text = "%d%%  (%d / %d)" % [pct, correct, asked]
-		stat_lbl.add_theme_font_size_override("font_size", 11)
-		stat_lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.92, 0.78))
-		row.add_child(stat_lbl)
+		var chip := Label.new()
+		chip.text = "%s %d%%" % [display_key, pct]
+		chip.add_theme_font_size_override("font_size", 11)
+		var chip_color: Color = Color(0.55, 0.92, 0.68, 0.95) if pct >= 80 else (Color(0.96, 0.80, 0.42, 0.95) if pct >= 60 else Color(0.92, 0.55, 0.50, 0.95))
+		chip.add_theme_color_override("font_color", chip_color)
+		summary_row.add_child(chip)
 
 
 # --- Home sync-status pill ---

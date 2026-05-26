@@ -27,6 +27,7 @@ const FONT_TITLE := preload("res://assets/fonts/Baloo2-SemiBold.ttf")
 const FONT_BODY := preload("res://assets/fonts/Nunito-Regular.ttf")
 const LessonSessionScript = preload("res://scripts/students/lesson_session.gd")
 const CloudSyncDialogScript = preload("res://scripts/sync/cloud_sync_dialog.gd")
+const PerKeyRadarScript = preload("res://scripts/ui/per_key_radar.gd")
 
 const TAB_OVERVIEW := 0
 const TAB_REPERTOIRE := 1
@@ -2382,9 +2383,17 @@ func _build_per_key_radar_card(parent: VBoxContainer, student: Dictionary) -> vo
 	var card := _build_content_card()
 	parent.add_child(card)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 4)
+	v.add_theme_constant_override("separation", 6)
 	card.add_child(v)
 	v.add_child(_build_section_title("Sight Reading Accuracy by Key"))
+	var radar := PerKeyRadarScript.new()
+	radar.custom_minimum_size = Vector2(300, 240)
+	v.add_child(radar)
+	radar.set_data(per_key)
+	var summary_row := HBoxContainer.new()
+	summary_row.add_theme_constant_override("separation", 10)
+	summary_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(summary_row)
 	var key_order: Array[String] = ["C", "1#", "2#", "3#", "1b", "2b", "3b"]
 	for k in key_order:
 		var entry_any: Variant = per_key.get(k, null)
@@ -2396,36 +2405,12 @@ func _build_per_key_radar_card(parent: VBoxContainer, student: Dictionary) -> vo
 			continue
 		var correct: int = int(entry.get("correct", 0))
 		var pct: int = int(round(float(correct) / float(maxi(1, asked)) * 100.0))
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		v.add_child(row)
-		var key_lbl := Label.new()
-		key_lbl.text = k.replace("#", char(0x266F)).replace("b", char(0x266D))
-		key_lbl.add_theme_font_size_override("font_size", T.FONT_SIZE_BODY)
-		key_lbl.add_theme_color_override("font_color", T.TEXT_PRIMARY)
-		key_lbl.custom_minimum_size = Vector2(40, 0)
-		row.add_child(key_lbl)
-		var bar_bg := PanelContainer.new()
-		bar_bg.custom_minimum_size = Vector2(260, 14)
-		var bg_sb := StyleBoxFlat.new()
-		bg_sb.bg_color = Color(0.10, 0.12, 0.16, 0.85)
-		bg_sb.corner_radius_top_left = 3
-		bg_sb.corner_radius_top_right = 3
-		bg_sb.corner_radius_bottom_left = 3
-		bg_sb.corner_radius_bottom_right = 3
-		bar_bg.add_theme_stylebox_override("panel", bg_sb)
-		row.add_child(bar_bg)
-		var fill := ColorRect.new()
-		var bar_color: Color = T.ACCENT_GREEN if pct >= 80 else (T.ACCENT_GOLD if pct >= 60 else T.ACCENT_RED)
-		fill.color = bar_color
-		fill.custom_minimum_size = Vector2(int(260.0 * (float(pct) / 100.0)), 14)
-		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bar_bg.add_child(fill)
-		var stat_lbl := Label.new()
-		stat_lbl.text = "%d%%  (%d / %d)" % [pct, correct, asked]
-		stat_lbl.add_theme_font_size_override("font_size", T.FONT_SIZE_SMALL)
-		stat_lbl.add_theme_color_override("font_color", T.TEXT_MUTED)
-		row.add_child(stat_lbl)
+		var chip := Label.new()
+		chip.text = "%s %d%%" % [k.replace("#", char(0x266F)).replace("b", char(0x266D)), pct]
+		chip.add_theme_font_size_override("font_size", T.FONT_SIZE_SMALL)
+		var chip_color: Color = T.ACCENT_GREEN if pct >= 80 else (T.ACCENT_GOLD if pct >= 60 else T.ACCENT_RED)
+		chip.add_theme_color_override("font_color", chip_color)
+		summary_row.add_child(chip)
 
 
 func _build_app_activity_card(parent: VBoxContainer) -> void:

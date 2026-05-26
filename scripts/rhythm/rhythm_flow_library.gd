@@ -54,6 +54,25 @@ static func seconds_per_beat(bpm: int) -> float:
 	return 60.0 / float(maxi(1, bpm))
 
 
+# One-line description of what a difficulty level adds. Shown in the
+# Rhythm Flow setup dropdown so users know what they're choosing.
+static func level_description(level: int) -> String:
+	match level:
+		1: return "Quarter notes"
+		2: return "Quarter notes + rests"
+		3: return "+ half notes"
+		4: return "+ dotted halves"
+		5: return "+ eighth pairs"
+		6: return "+ eighth pairs + rests"
+		7: return "+ dotted quarters"
+		8: return "+ syncopated dotted quarters"
+		9: return "+ sixteenth notes"
+		10: return "+ eighth triplets"
+		11: return "+ quarter triplets"
+		12: return "All values · mixed"
+		_: return "Advanced mix"
+
+
 # Triplet snap window: how close a tap has to be to a triplet subdivision
 # for the snapping assist to engage. Wider for quarter-note triplets.
 static func triplet_snap_window_sec(evt: Dictionary, seconds_per_beat_value: float) -> float:
