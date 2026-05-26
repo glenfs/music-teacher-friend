@@ -24378,7 +24378,8 @@ func _layout_sight_big_piano() -> void:
 			btn.size = Vector2(black_w, black_h)
 
 	# Scale the white-key letter font down on narrow keys so text fits
-	# (clamped 10-16pt). Buttons render their own text via the Godot theme.
+	# (clamped 10-16pt). Then reapply persistent label styling so the deep
+	# navy color + bottom-of-key position stick after any layout shuffle.
 	var font_size: int = clampi(int(white_w * 0.42), 10, 16)
 	for pitch in _sight_big_piano_keys.keys():
 		if _ce_pitch_is_black(int(pitch)):
@@ -24387,6 +24388,7 @@ func _layout_sight_big_piano() -> void:
 		if btn == null or btn.text.is_empty():
 			continue
 		btn.add_theme_font_size_override("font_size", font_size)
+		_reapply_sight_key_label_style(btn)
 
 
 func _bias_button_text_to_bottom(btn: Button) -> void:
@@ -24394,16 +24396,19 @@ func _bias_button_text_to_bottom(btn: Button) -> void:
 	# bottom of the key (like real piano key labels), clone every StyleBoxFlat
 	# state override on the button and bias content_margin_top so the button
 	# treats its top as much taller than reality — text drops to the bottom.
-	var keys: Array[String] = ["normal", "hover", "pressed", "focus", "disabled"]
-	for state_key in keys:
+	# Using ~82% of key height as the top margin puts the letter ~10% from the
+	# key bottom regardless of how small the key is rendered.
+	var key_h: float = maxf(btn.size.y, SIGHT_BIG_PIANO_WHITE_H)
+	var top_margin: float = key_h * 0.78
+	var bottom_margin: float = maxf(4.0, key_h * 0.04)
+	var states: Array[String] = ["normal", "hover", "pressed", "focus", "disabled"]
+	for state_key in states:
 		var sb_v: Variant = btn.get_theme_stylebox(state_key)
 		if not (sb_v is StyleBoxFlat):
 			continue
 		var sb := (sb_v as StyleBoxFlat).duplicate() as StyleBoxFlat
-		# Aggressive top margin: pushes text content way down. The numbers
-		# here are pixels in button-local space (button is ~138px tall).
-		sb.content_margin_top = 90.0
-		sb.content_margin_bottom = 4.0
+		sb.content_margin_top = top_margin
+		sb.content_margin_bottom = bottom_margin
 		btn.add_theme_stylebox_override(state_key, sb)
 
 
@@ -24606,6 +24611,25 @@ func _sight_big_piano_apply_feedback_style(pitch: int) -> void:
 		_chord_explorer_apply_black_style(btn, tint)
 	else:
 		_chord_explorer_apply_white_style(btn, tint)
+		# Re-apply the letter color + bottom-bias overrides — `apply_white_style`
+		# replaces the StyleBoxFlats which wipes our content-margin push.
+		_reapply_sight_key_label_style(btn)
+
+
+# Applies the persistent letter-label styling (deep navy text + white outline
+# + bottom-of-key vertical position) on top of whatever StyleBoxFlat the
+# feedback path just installed. Idempotent — safe to call repeatedly.
+func _reapply_sight_key_label_style(btn: Button) -> void:
+	if btn == null or btn.text.is_empty():
+		return
+	var label_color := Color(0.0392, 0.1725, 0.4196, 1.0)  # #0A2C6B
+	btn.add_theme_color_override("font_color", label_color)
+	btn.add_theme_color_override("font_hover_color", label_color)
+	btn.add_theme_color_override("font_pressed_color", label_color)
+	btn.add_theme_color_override("font_focus_color", label_color)
+	btn.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.add_theme_constant_override("outline_size", 4)
+	_bias_button_text_to_bottom(btn)
 
 
 func _refresh_sight_chord_feedback_keyboard_visibility() -> void:
