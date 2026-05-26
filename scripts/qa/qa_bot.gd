@@ -925,7 +925,7 @@ func _smoke_sight_submode(mode_name: String, tag: String) -> void:
 		fail("Sight %s smoke: failed to start round" % mode_name)
 		return
 	if mode_name == "Continuous":
-		await _wait_flag("_continuous_sight_active", true, 240)
+		await _wait_flag("_continuous_sight_runtime.active", true, 240)
 	else:
 		if mode_name != "Placement" and not await _wait_for_accepting_answer(480):
 			fail("Sight %s smoke: prompt not ready" % mode_name)
@@ -1394,9 +1394,9 @@ func _sight_continuous_coverage() -> void:
 	if not await _start_round_from_home():
 		fail("Sight Continuous: failed to start")
 		return
-	await _wait_flag("_continuous_sight_active", true, 240)
+	await _wait_flag("_continuous_sight_runtime.active", true, 240)
 	# Ensure the continuous flow leaves "tap to start" waiting state before we probe hits.
-	if _member_bool("_continuous_sight_waiting_start", false):
+	if _member_bool("_continuous_sight_runtime.waiting_start", false):
 		if _app.has_method("_start_continuous_flow_after_waiting"):
 			_call("_start_continuous_flow_after_waiting")
 		else:
@@ -1405,20 +1405,20 @@ func _sight_continuous_coverage() -> void:
 	if _member_bool("_awaiting_round_start", false):
 		_call("_on_round_start_pressed")
 		await wait_frames(10)
-	var start_hits := _member_int("_continuous_sight_total_hits", 0)
+	var start_hits := _member_int("_continuous_sight_runtime.total_hits", 0)
 	var hit_registered := false
 	for _i in range(300):
-		if _member_bool("_continuous_sight_waiting_start", false):
+		if _member_bool("_continuous_sight_runtime.waiting_start", false):
 			if _app.has_method("_start_continuous_flow_after_waiting"):
 				_call("_start_continuous_flow_after_waiting")
 			await get_tree().process_frame
 			continue
 		_try_hit_continuous_active_note()
-		if _member_int("_continuous_sight_total_hits", 0) > start_hits:
+		if _member_int("_continuous_sight_runtime.total_hits", 0) > start_hits:
 			hit_registered = true
 			break
 		await get_tree().process_frame
-	var end_hits := _member_int("_continuous_sight_total_hits", 0)
+	var end_hits := _member_int("_continuous_sight_runtime.total_hits", 0)
 	if not hit_registered and end_hits <= start_hits:
 		warn_step("Sight Continuous: no hit/miss events detected during timed session")
 	pass_step("sight_continuous_timed_session")
@@ -1434,7 +1434,7 @@ func _try_hit_continuous_active_note() -> bool:
 		idx = int(_app.call("_continuous_active_note_index"))
 	if idx < 0:
 		return false
-	var notes_v: Variant = _member("_continuous_sight_notes")
+	var notes_v: Variant = _member("_continuous_sight_runtime.notes")
 	if not (notes_v is Array):
 		return false
 	var notes: Array = notes_v as Array
@@ -1795,7 +1795,7 @@ func _assert_no_orphan_ui(context: String) -> void:
 
 
 func _assert_continuous_notes_cleared() -> void:
-	var notes_v: Variant = _member("_continuous_sight_notes")
+	var notes_v: Variant = _member("_continuous_sight_runtime.notes")
 	if notes_v is Array and (notes_v as Array).size() > 0:
 		warn_step("Continuous notes array not empty after exit")
 	else:
@@ -2343,7 +2343,7 @@ func _wait_for_note_chase_note(max_frames: int) -> bool:
 
 func _wait_flag(flag_name: String, expected: bool, max_frames: int) -> bool:
 	for _i in range(max_frames):
-		if bool(_app.get(flag_name)) == expected:
+		if bool(_member(flag_name)) == expected:
 			return true
 		await get_tree().process_frame
 	return false
@@ -2594,6 +2594,17 @@ func _seed_suggestions() -> void:
 func _member(member_name: String) -> Variant:
 	if _app == null:
 		return null
+	# Support dotted paths like "_continuous_sight_runtime.active" so tests
+	# can reach into the per-mode runtime containers without each call site
+	# having to do the two-step lookup.
+	if member_name.find(".") >= 0:
+		var parts := member_name.split(".", false)
+		var obj: Variant = _app
+		for part in parts:
+			if obj == null:
+				return null
+			obj = obj.get(part)
+		return obj
 	return _app.get(member_name)
 
 

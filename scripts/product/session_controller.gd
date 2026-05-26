@@ -80,8 +80,8 @@ func apply_standard_start_state(host, mode_sight: int, mode_note_chase: int) -> 
 
 func apply_end_state(host) -> void:
 	host._grand_staff_active = false
-	host._continuous_sight_active = false
-	host._continuous_sight_waiting_start = false
+	host._continuous_sight_runtime.active = false
+	host._continuous_sight_runtime.waiting_start = false
 	host._in_tutorial = false
 	host._quiz_active = false
 	host._accepting_answer = false
@@ -461,8 +461,8 @@ func handle_game_over(
 
 func finish_continuous_sight_reading(host, result_title: String = "Complete") -> void:
 	var was_rhythm_demo: bool = host._is_rhythm_flow_mode() and host._rhythm_flow_runtime.session_mode == host.RHYTHM_FLOW_SESSION_DEMO
-	host._continuous_sight_active = false
-	host._continuous_sight_waiting_start = false
+	host._continuous_sight_runtime.active = false
+	host._continuous_sight_runtime.waiting_start = false
 	host._quiz_active = false
 	host._accepting_answer = false
 	host._rhythm_flow_runtime.paused = false
@@ -474,19 +474,19 @@ func finish_continuous_sight_reading(host, result_title: String = "Complete") ->
 	host._rhythm_triplet_guide_last_tick_idx = -1
 	host._rhythm_triplet_guide_flash_dot = -1
 	host._rhythm_triplet_guide_flash_until_sec = -1.0
-	var acc := int(round((float(host._continuous_sight_correct_hits) / float(maxi(1, host._continuous_sight_total_hits))) * 100.0))
+	var acc := int(round((float(host._continuous_sight_runtime.correct_hits) / float(maxi(1, host._continuous_sight_runtime.total_hits))) * 100.0))
 	var avg_rt_ms := 0.0
-	if host._continuous_sight_reaction_count > 0:
-		avg_rt_ms = (host._continuous_sight_reaction_sum / float(host._continuous_sight_reaction_count)) * 1000.0
+	if host._continuous_sight_runtime.reaction_count > 0:
+		avg_rt_ms = (host._continuous_sight_runtime.reaction_sum / float(host._continuous_sight_runtime.reaction_count)) * 1000.0
 	var summary := ""
 	if host._is_rhythm_flow_mode():
 		if was_rhythm_demo:
 			summary = "Listening and learning run finished | BPM %d\nScoring was paused." % [host._rhythm_flow_runtime.bpm]
 		else:
-			var perfect_pct := int(round((float(host._continuous_sight_perfect_hits) / float(maxi(1, host._continuous_sight_total_hits))) * 100.0))
-			summary = "Rhythm Flow | BPM %d | Score %d | Accuracy %d%% | Perfect %d%%\nPerfect %d  Good %d  OK %d  Miss %d | Longest Streak %d" % [host._rhythm_flow_runtime.bpm, host._score, acc, perfect_pct, host._continuous_sight_perfect_hits, host._continuous_sight_good_hits, host._rhythm_flow_runtime.ok_hits, host._continuous_sight_miss_hits, host._continuous_sight_best_combo]
+			var perfect_pct := int(round((float(host._continuous_sight_runtime.perfect_hits) / float(maxi(1, host._continuous_sight_runtime.total_hits))) * 100.0))
+			summary = "Rhythm Flow | BPM %d | Score %d | Accuracy %d%% | Perfect %d%%\nPerfect %d  Good %d  OK %d  Miss %d | Longest Streak %d" % [host._rhythm_flow_runtime.bpm, host._score, acc, perfect_pct, host._continuous_sight_runtime.perfect_hits, host._continuous_sight_runtime.good_hits, host._rhythm_flow_runtime.ok_hits, host._continuous_sight_runtime.miss_hits, host._continuous_sight_runtime.best_combo]
 	else:
-		summary = "Level %d | Score %d | Accuracy %d%% | Avg RT %.0fms\nPerfect %d  Good %d  Miss %d | Best Combo %d" % [host._continuous_sight_level, host._score, acc, avg_rt_ms, host._continuous_sight_perfect_hits, host._continuous_sight_good_hits, host._continuous_sight_miss_hits, host._continuous_sight_best_combo]
+		summary = "Level %d | Score %d | Accuracy %d%% | Avg RT %.0fms\nPerfect %d  Good %d  Miss %d | Best Combo %d" % [host._continuous_sight_runtime.level, host._score, acc, avg_rt_ms, host._continuous_sight_runtime.perfect_hits, host._continuous_sight_runtime.good_hits, host._continuous_sight_runtime.miss_hits, host._continuous_sight_runtime.best_combo]
 		var problem_summary: String = host._continuous_problem_area_summary()
 		if not problem_summary.is_empty():
 			summary += "\n" + problem_summary

@@ -116,6 +116,7 @@ const NoteChasePhysicsScript = preload("res://scripts/exercises/note_chase_physi
 const NoteChaseRuntimeScript = preload("res://scripts/exercises/note_chase_runtime.gd")
 const RhythmFlowRuntimeScript = preload("res://scripts/rhythm/rhythm_flow_runtime.gd")
 const SightSingingRuntimeScript = preload("res://scripts/sight_singing/sight_singing_runtime.gd")
+const ContinuousSightRuntimeScript = preload("res://scripts/exercises/continuous_sight_runtime.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -827,34 +828,10 @@ var _home_chase_note_row: Control
 var _home_chase_clef_row: Control
 var _home_mode_detail_active := false
 var _sight_settings_screen_active := false
-var _continuous_sight_active := false
-var _continuous_sight_duration := 30.0
-var _continuous_sight_elapsed := 0.0
-var _continuous_sight_spawn_timer := 0.0
-var _continuous_sight_notes: Array[Dictionary] = []
+# Continuous Sight runtime — owns the 27 runtime state vars + notes Array.
+# Same RefCounted pattern as the other Runtime modules.
+var _continuous_sight_runtime: RefCounted = ContinuousSightRuntimeScript.new()
 var _continuous_sight_play_line: ColorRect
-var _continuous_sight_bpm := 80
-var _continuous_sight_speed := 70.0
-var _continuous_sight_base_speed := 70.0
-var _continuous_sight_hit_window := 24.0
-var _continuous_sight_hit_window_base := 24.0
-var _continuous_sight_zone_width := 64.0
-var _continuous_sight_zone_width_base := 64.0
-var _continuous_sight_early_window_mult := 1.35
-var _continuous_sight_early_window_mult_base := 1.35
-var _continuous_sight_total_hits := 0
-var _continuous_sight_correct_hits := 0
-var _continuous_sight_combo := 0
-var _continuous_sight_best_combo := 0
-var _continuous_sight_waiting_start := false
-var _continuous_sight_perfect_hits := 0
-var _continuous_sight_good_hits := 0
-var _continuous_sight_miss_hits := 0
-var _continuous_sight_reaction_sum := 0.0
-var _continuous_sight_reaction_count := 0
-var _continuous_sight_level := 1
-var _continuous_sight_level_bounds := Vector2i(6, 10)
-var _continuous_sight_allow_accidentals := false
 var _continuous_testing_no_life_loss := true
 var _continuous_spawn_queue: Array[Dictionary] = []
 var _continuous_bar_accidentals: Dictionary = {}
@@ -2558,13 +2535,13 @@ func _clear_gameplay_transient_visuals() -> void:
 	_pitch_match_clear_keyboard_feedback()
 	if _pitch_match_keyboard_scroll != null:
 		_pitch_match_keyboard_scroll.visible = false
-	if not _quiz_active and not _continuous_sight_active and not _note_chase_runtime.running:
+	if not _quiz_active and not _continuous_sight_runtime.active and not _note_chase_runtime.running:
 		return
 	_continuous_touch_suppress_note = ""
 	_continuous_touch_suppress_until_sec = 0.0
 	_continuous_touch_suppress_any_until_sec = 0.0
-	_continuous_sight_active = false
-	_continuous_sight_waiting_start = false
+	_continuous_sight_runtime.active = false
+	_continuous_sight_runtime.waiting_start = false
 	_clear_continuous_sight_notes()
 	_set_continuous_rest_symbol_visible(false)
 	if _continuous_sight_play_line != null:
@@ -2654,13 +2631,13 @@ func _handle_app_backgrounded() -> void:
 	# Stop active gameplay and clear visuals so no Note Flow/Rhythm Flow runs behind menus.
 	if _game_panel == null or not _game_panel.visible:
 		return
-	if not (_quiz_active or _continuous_sight_active or _note_chase_runtime.running):
+	if not (_quiz_active or _continuous_sight_runtime.active or _note_chase_runtime.running):
 		return
 	_bump_quiz_run_token()
 	_invalidate_audio_sequence_schedule()
 	_clear_gameplay_transient_visuals()
-	_continuous_sight_active = false
-	_continuous_sight_waiting_start = false
+	_continuous_sight_runtime.active = false
+	_continuous_sight_runtime.waiting_start = false
 	_quiz_active = false
 	_accepting_answer = false
 	_awaiting_round_start = false
@@ -11001,7 +10978,7 @@ func _refresh_sight_lives_feed_shield_ui() -> void:
 		if _sight_lives_title_label != null:
 			_sight_lives_title_label.text = "COMBO"
 		if _sight_lives_hearts_label != null:
-			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+			_sight_lives_hearts_label.text = str(_continuous_sight_runtime.combo)
 		if _sight_feed_chip != null:
 			_sight_feed_chip.visible = false
 		if _sight_shield_chip != null:
@@ -11057,14 +11034,14 @@ func _refresh_sight_streak_panel_ui() -> void:
 		if _sight_streak_value_label != null:
 			_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm)
 		if _sight_streak_score_label != null:
-			var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
+			var acc: int = int(round((float(_continuous_sight_runtime.correct_hits) / float(maxi(1, _continuous_sight_runtime.total_hits))) * 100.0))
 			_sight_streak_score_label.text = "ACC %d%%" % acc
 		return
 	if _sight_streak_title_label != null:
 		_sight_streak_title_label.text = "STREAK"
 	if _sight_mode == "Continuous":
 		if _sight_streak_value_label != null:
-			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_combo]
+			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_runtime.combo]
 		if _sight_streak_score_label != null:
 			_sight_streak_score_label.text = "Score: %d" % _score
 		return
@@ -11418,7 +11395,7 @@ func _apply_continuous_sight_skin() -> void:
 			_sight_lives_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
 		if _sight_lives_hearts_label != null:
 			if is_rhythm:
-				_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+				_sight_lives_hearts_label.text = str(_continuous_sight_runtime.combo)
 				_sight_lives_hearts_label.add_theme_color_override("font_color", Color(0.44, 0.96, 1.0, 1.0))
 				_sight_lives_hearts_label.add_theme_color_override("font_outline_color", Color(0.04, 0.14, 0.22, 0.76))
 				_sight_lives_hearts_label.add_theme_color_override("font_shadow_color", Color(0.20, 0.86, 1.0, icon_glow_alpha))
@@ -11456,7 +11433,7 @@ func _apply_continuous_sight_skin() -> void:
 		_sight_streak_title_label.text = "BPM" if is_rhythm else "STREAK"
 		_sight_streak_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
 	if _sight_streak_value_label != null:
-		_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm) if is_rhythm else ("%s %d" % [char(0x1F525), _continuous_sight_combo])
+		_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm) if is_rhythm else ("%s %d" % [char(0x1F525), _continuous_sight_runtime.combo])
 		_sight_streak_value_label.add_theme_color_override("font_color", Color(1.0, 0.76, 0.30, 0.99))
 		_sight_streak_value_label.add_theme_color_override("font_outline_color", Color(0.18, 0.10, 0.02, 0.80))
 		_sight_streak_value_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.66, 0.20, icon_glow_alpha))
@@ -11464,7 +11441,7 @@ func _apply_continuous_sight_skin() -> void:
 		_sight_streak_value_label.add_theme_constant_override("shadow_offset_x", 0)
 		_sight_streak_value_label.add_theme_constant_override("shadow_offset_y", 0)
 	if _sight_streak_score_label != null:
-		_sight_streak_score_label.text = "ACC %d%%" % int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0)) if is_rhythm else ("Score: %d" % _score)
+		_sight_streak_score_label.text = "ACC %d%%" % int(round((float(_continuous_sight_runtime.correct_hits) / float(maxi(1, _continuous_sight_runtime.total_hits))) * 100.0)) if is_rhythm else ("Score: %d" % _score)
 		_sight_streak_score_label.add_theme_color_override("font_color", Color(0.98, 0.86, 0.54, 0.98))
 	# Center box labels
 	if _lives_label != null:
@@ -16112,18 +16089,18 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		_rhythm_flow_settings_row_3.visible = rhythm_flow_selected
 	if _rhythm_bpm_spin != null:
 		_rhythm_bpm_spin.visible = rhythm_flow_selected and not in_rhythm_menu
-		_rhythm_bpm_spin.editable = not (rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active)
+		_rhythm_bpm_spin.editable = not (rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active)
 	if _rhythm_flow_bpm_label != null:
 		_rhythm_flow_bpm_label.visible = rhythm_flow_selected and not in_rhythm_menu
 	if _rhythm_flow_exercise_select != null:
 		_rhythm_flow_exercise_select.visible = rhythm_flow_selected
-		_rhythm_flow_exercise_select.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active
+		_rhythm_flow_exercise_select.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active
 	if _rhythm_flow_seed_spin != null:
 		_rhythm_flow_seed_spin.visible = rhythm_flow_selected
-		_rhythm_flow_seed_spin.editable = not (rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active)
+		_rhythm_flow_seed_spin.editable = not (rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active)
 	if _rhythm_flow_next_button != null:
 		_rhythm_flow_next_button.visible = rhythm_flow_selected
-		_rhythm_flow_next_button.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active
+		_rhythm_flow_next_button.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active
 	if _rhythm_flow_save_button_menu != null:
 		_rhythm_flow_save_button_menu.visible = rhythm_flow_selected and not in_rhythm_menu
 		_rhythm_flow_save_button_menu.disabled = not _rhythm_flow_has_current_bars()
@@ -16132,7 +16109,7 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		_rhythm_flow_load_button_menu.disabled = false
 	if _rhythm_flow_test_button != null:
 		_rhythm_flow_test_button.visible = rhythm_flow_selected
-		_rhythm_flow_test_button.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active
+		_rhythm_flow_test_button.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active
 	if _rhythm_flow_metronome_check != null:
 		_rhythm_flow_metronome_check.visible = rhythm_flow_selected and not in_rhythm_menu
 		_rhythm_flow_metronome_check.set_pressed_no_signal(_rhythm_flow_runtime.metronome_enabled)
@@ -16717,7 +16694,7 @@ func _on_game_home_pressed() -> void:
 	_sync_home_state_from_runtime()
 	# Home from gameplay must fully end any active run (especially Note Flow/Rhythm Flow),
 	# otherwise continuous sessions can keep updating behind menus on some devices.
-	if (_game_panel != null and _game_panel.visible) or _quiz_active or _continuous_sight_active or _note_chase_runtime.running:
+	if (_game_panel != null and _game_panel.visible) or _quiz_active or _continuous_sight_runtime.active or _note_chase_runtime.running:
 		_on_end_quiz_pressed()
 		return
 	_show_home()
@@ -17153,7 +17130,7 @@ func _apply_answer_mode() -> void:
 		for kb in _continuous_key_buttons:
 			if kb == null:
 				continue
-			kb.disabled = not _continuous_sight_active or _continuous_sight_waiting_start
+			kb.disabled = not _continuous_sight_runtime.active or _continuous_sight_runtime.waiting_start
 			if not in_continuous:
 				kb.visible = false
 			kb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -17164,7 +17141,7 @@ func _apply_answer_mode() -> void:
 		for bb in _continuous_black_key_buttons:
 			if bb == null:
 				continue
-			bb.disabled = not _continuous_sight_active or _continuous_sight_waiting_start
+			bb.disabled = not _continuous_sight_runtime.active or _continuous_sight_runtime.waiting_start
 			if not in_continuous:
 				bb.visible = false
 			_style_virtual_black_key_button(bb)
@@ -17174,7 +17151,7 @@ func _apply_answer_mode() -> void:
 	if _rhythm_tap_button != null:
 		var show_rhythm_tap := _selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow"
 		_rhythm_tap_button.visible = show_rhythm_tap
-		_rhythm_tap_button.disabled = not show_rhythm_tap or not _continuous_sight_active or _continuous_sight_waiting_start or _rhythm_flow_runtime.paused
+		_rhythm_tap_button.disabled = not show_rhythm_tap or not _continuous_sight_runtime.active or _continuous_sight_runtime.waiting_start or _rhythm_flow_runtime.paused
 	var show_rhythm_ingame_controls := _selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow" and _game_panel != null and _game_panel.visible
 	if _rhythm_bpm_label_ingame != null:
 		_rhythm_bpm_label_ingame.visible = show_rhythm_ingame_controls
@@ -17194,9 +17171,9 @@ func _apply_answer_mode() -> void:
 	if _rhythm_flow_save_button_ingame != null:
 		_rhythm_flow_save_button_ingame.visible = show_rhythm_ingame_controls
 		_rhythm_flow_save_button_ingame.disabled = not _rhythm_flow_has_current_bars()
-	if _rhythm_play_pause_button != null and not (_selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow" and _continuous_sight_active and _quiz_active and not _continuous_sight_waiting_start):
+	if _rhythm_play_pause_button != null and not (_selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow" and _continuous_sight_runtime.active and _quiz_active and not _continuous_sight_runtime.waiting_start):
 		_rhythm_play_pause_button.visible = false
-	if _rhythm_center_action_row != null and not (_selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow" and _continuous_sight_active and _quiz_active and not _continuous_sight_waiting_start):
+	if _rhythm_center_action_row != null and not (_selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow" and _continuous_sight_runtime.active and _quiz_active and not _continuous_sight_runtime.waiting_start):
 		_rhythm_center_action_row.visible = false
 	_refresh_rhythm_flow_aux_overlay_row()
 	_refresh_rhythm_flow_play_pause_button()
@@ -17209,7 +17186,7 @@ func _apply_answer_mode() -> void:
 		_rhythm_flow_settings_row_2.visible = show_rhythm_flow_settings
 	if _rhythm_flow_settings_row_3 != null:
 		_rhythm_flow_settings_row_3.visible = show_rhythm_flow_settings
-	var lock_rhythm_flow_options := show_rhythm_flow_settings and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active
+	var lock_rhythm_flow_options: bool = show_rhythm_flow_settings and _game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active
 	if _rhythm_bpm_spin != null:
 		_rhythm_bpm_spin.editable = not lock_rhythm_flow_options
 		_rhythm_bpm_spin.visible = show_rhythm_flow_settings and not in_rhythm_menu
@@ -17469,8 +17446,8 @@ func _show_home() -> void:
 	_clear_gameplay_transient_visuals()
 	_play_transition_whoosh_sfx()
 	_cancel_chicken_turn_hint_cycle(true)
-	_continuous_sight_active = false
-	_continuous_sight_waiting_start = false
+	_continuous_sight_runtime.active = false
+	_continuous_sight_runtime.waiting_start = false
 	_clear_continuous_sight_notes()
 	if _continuous_sight_play_line != null:
 		_continuous_sight_play_line.visible = false
@@ -17792,7 +17769,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if gameplay_input_active and allow_global_touch_key_route and st_any.pressed and _try_handle_continuous_touch_key(st_any.position):
 			get_viewport().set_input_as_handled()
 			return
-	if gameplay_input_active and _is_continuous_flow_sight_mode() and _continuous_sight_active and _continuous_sight_waiting_start:
+	if gameplay_input_active and _is_continuous_flow_sight_mode() and _continuous_sight_runtime.active and _continuous_sight_runtime.waiting_start:
 		if event is InputEventScreenTouch:
 			var st_start := event as InputEventScreenTouch
 			if st_start.pressed:
@@ -17818,7 +17795,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_round_start_pressed()
 				get_viewport().set_input_as_handled()
 				return
-	if gameplay_input_active and _is_rhythm_flow_mode() and _continuous_sight_active and not _continuous_sight_waiting_start:
+	if gameplay_input_active and _is_rhythm_flow_mode() and _continuous_sight_runtime.active and not _continuous_sight_runtime.waiting_start:
 		if event is InputEventScreenTouch:
 			var st_tap := event as InputEventScreenTouch
 			if st_tap.pressed:
@@ -19620,8 +19597,8 @@ func _note_chase_realign_staff_frame() -> void:
 		var frame_bounds := _get_sight_step_bounds()
 		if _sight_mode == "Notes":
 			frame_bounds = _effective_sight_step_bounds()
-		elif _sight_mode == "Continuous" and _continuous_sight_active:
-			frame_bounds = _continuous_sight_level_bounds
+		elif _sight_mode == "Continuous" and _continuous_sight_runtime.active:
+			frame_bounds = _continuous_sight_runtime.level_bounds
 		var top_step := mini(-4, frame_bounds.x)
 		var bottom_step := maxi(12, frame_bounds.y)
 		var top_pad_s := 30.0
@@ -25214,10 +25191,10 @@ func _flow_live_prompt_text() -> String:
 func _start_continuous_flow_after_waiting() -> void:
 	if not _is_continuous_flow_sight_mode():
 		return
-	if not _continuous_sight_active or not _continuous_sight_waiting_start:
+	if not _continuous_sight_runtime.active or not _continuous_sight_runtime.waiting_start:
 		return
-	_continuous_sight_waiting_start = false
-	_continuous_sight_spawn_timer = 0.0
+	_continuous_sight_runtime.waiting_start = false
+	_continuous_sight_runtime.spawn_timer = 0.0
 	if _is_rhythm_flow_mode():
 		_status_label.text = "Count-in: 1"
 		_rhythm_flow_runtime.count_in_announced = 0
@@ -25283,7 +25260,7 @@ func _refresh_continuous_keyboard_range() -> void:
 func _try_handle_continuous_touch_key(global_pos: Vector2) -> bool:
 	if _selected_mode != MODE_SIGHT or _sight_mode != "Continuous":
 		return false
-	if not _continuous_sight_active or _continuous_sight_waiting_start:
+	if not _continuous_sight_runtime.active or _continuous_sight_runtime.waiting_start:
 		return false
 	# Prioritize black keys because they visually overlap white keys.
 	var use_global_rect := bool(_device_profile.get("use_global_touch_rect", true))
@@ -25355,7 +25332,7 @@ func _continuous_compound_level_config(clef_name: String, reading_level: int, ti
 	var read_cfg := _continuous_level_config(clef_name, reading_level)
 	var time_cfg := _continuous_level_config(clef_name, timing_level)
 	var zone_mult := 1.0
-	var early_mult := _continuous_sight_early_window_mult_base
+	var early_mult: float = _continuous_sight_runtime.early_window_mult_base
 	# Default values match existing behavior; timing axis can override in future.
 	return {
 		"reading": {
@@ -25445,7 +25422,7 @@ func _continuous_build_next_bar_queue(bounds: Vector2i) -> void:
 		var effective_acc := prior_acc
 		var explicit_symbol := ""
 		var explicit_token := ""
-		if _continuous_sight_allow_accidentals:
+		if _continuous_sight_runtime.allow_accidentals:
 			if prior_acc != "" and _rng.randf() < _continuous_natural_probability:
 				effective_acc = ""
 				explicit_symbol = char(0x266E)
@@ -25485,21 +25462,21 @@ func _continuous_take_next_note_spec(bounds: Vector2i) -> Dictionary:
 
 
 func _apply_continuous_level_profile() -> void:
-	var reading_lv := clampi(_continuous_sight_level + _continuous_reading_difficulty_bias, 1, 6)
-	var timing_lv := clampi(_continuous_sight_level + _continuous_timing_difficulty_bias, 1, 6)
+	var reading_lv: int = clampi(_continuous_sight_runtime.level + _continuous_reading_difficulty_bias, 1, 6)
+	var timing_lv: int = clampi(_continuous_sight_runtime.level + _continuous_timing_difficulty_bias, 1, 6)
 	_continuous_reading_level = reading_lv
 	_continuous_timing_level = timing_lv
 	var cfg := _continuous_compound_level_config(_selected_clef, reading_lv, timing_lv)
 	var read_cfg: Dictionary = cfg.get("reading", {})
 	var time_cfg: Dictionary = cfg.get("timing", {})
-	_continuous_sight_level_bounds = read_cfg.get("bounds", Vector2i(-4, 12))
-	_continuous_sight_allow_accidentals = bool(read_cfg.get("accidentals", false))
-	_continuous_sight_speed = _continuous_sight_base_speed * float(time_cfg.get("speed_mult", 1.0))
-	_continuous_sight_hit_window = _continuous_sight_hit_window_base * float(time_cfg.get("zone_width_mult", 1.0))
-	_continuous_sight_zone_width = _continuous_sight_zone_width_base * float(time_cfg.get("zone_width_mult", 1.0))
-	_continuous_sight_early_window_mult = float(time_cfg.get("early_window_mult", _continuous_sight_early_window_mult_base))
-	_continuous_accidental_probability = 0.08 if _continuous_sight_level >= 4 else 0.0
-	_continuous_natural_probability = 0.20 if _continuous_sight_level >= 4 else 0.0
+	_continuous_sight_runtime.level_bounds = read_cfg.get("bounds", Vector2i(-4, 12))
+	_continuous_sight_runtime.allow_accidentals = bool(read_cfg.get("accidentals", false))
+	_continuous_sight_runtime.speed = _continuous_sight_runtime.base_speed * float(time_cfg.get("speed_mult", 1.0))
+	_continuous_sight_runtime.hit_window = _continuous_sight_runtime.hit_window_base * float(time_cfg.get("zone_width_mult", 1.0))
+	_continuous_sight_runtime.zone_width = _continuous_sight_runtime.zone_width_base * float(time_cfg.get("zone_width_mult", 1.0))
+	_continuous_sight_runtime.early_window_mult = float(time_cfg.get("early_window_mult", _continuous_sight_runtime.early_window_mult_base))
+	_continuous_accidental_probability = 0.08 if _continuous_sight_runtime.level >= 4 else 0.0
+	_continuous_natural_probability = 0.20 if _continuous_sight_runtime.level >= 4 else 0.0
 	_continuous_apply_assist_modifiers()
 
 
@@ -25510,13 +25487,13 @@ func _continuous_required_correct_for_level(level: int) -> int:
 
 func _continuous_try_level_up() -> void:
 	var leveled := false
-	while _continuous_sight_level < 6 and _continuous_sight_correct_hits >= _continuous_required_correct_for_level(_continuous_sight_level + 1):
-		_continuous_sight_level += 1
+	while _continuous_sight_runtime.level < 6 and _continuous_sight_runtime.correct_hits >= _continuous_required_correct_for_level(_continuous_sight_runtime.level + 1):
+		_continuous_sight_runtime.level += 1
 		_lives += 1
 		leveled = true
 	if leveled:
 		_apply_continuous_level_profile()
-		_status_label.text = "Level %d unlocked (+1 Life)" % _continuous_sight_level
+		_status_label.text = "Level %d unlocked (+1 Life)" % _continuous_sight_runtime.level
 		# Keep Note Flow continuous across level-ups; existing notes remain on screen.
 		_continuous_rest_bar_active = false
 		_continuous_rest_bar_timer = 0.0
@@ -25533,11 +25510,11 @@ func _continuous_apply_assist_modifiers() -> void:
 	var slow_mult := 0.94 if assist == 1 else 0.88
 	var zone_mult := 1.10 if assist == 1 else 1.20
 	var early_mult := 1.08 if assist == 1 else 1.16
-	_continuous_sight_speed *= slow_mult
+	_continuous_sight_runtime.speed *= slow_mult
 	# Scale the already-applied timing profile so custom timing-axis config remains intact.
-	_continuous_sight_hit_window *= zone_mult
-	_continuous_sight_zone_width *= zone_mult
-	_continuous_sight_early_window_mult *= early_mult
+	_continuous_sight_runtime.hit_window *= zone_mult
+	_continuous_sight_runtime.zone_width *= zone_mult
+	_continuous_sight_runtime.early_window_mult *= early_mult
 
 
 func _continuous_note_ledger_depth(step: int) -> int:
@@ -25561,7 +25538,7 @@ func _continuous_append_miss_log(reason: String, note_name: String, step: int) -
 	if clean_reason.is_empty():
 		clean_reason = "Miss"
 	_continuous_miss_log.append({
-		"t": _continuous_sight_elapsed,
+		"t": _continuous_sight_runtime.elapsed,
 		"r": clean_reason,
 		"n": note_name,
 		"s": step,
@@ -25574,10 +25551,10 @@ func _continuous_append_miss_log(reason: String, note_name: String, step: int) -
 	_continuous_miss_note_counts[note_name] = int(_continuous_miss_note_counts.get(note_name, 0)) + 1
 	_continuous_miss_step_counts[step] = int(_continuous_miss_step_counts.get(step, 0)) + 1
 	_continuous_miss_ledger_depth_counts[ledger_depth] = int(_continuous_miss_ledger_depth_counts.get(ledger_depth, 0)) + 1
-	_continuous_recent_miss_times.append(_continuous_sight_elapsed)
+	_continuous_recent_miss_times.append(_continuous_sight_runtime.elapsed)
 	while _continuous_recent_miss_times.size() > 8:
 		_continuous_recent_miss_times.remove_at(0)
-	while not _continuous_recent_miss_times.is_empty() and (_continuous_sight_elapsed - float(_continuous_recent_miss_times[0])) > 3.0:
+	while not _continuous_recent_miss_times.is_empty() and (_continuous_sight_runtime.elapsed - float(_continuous_recent_miss_times[0])) > 3.0:
 		_continuous_recent_miss_times.remove_at(0)
 	if _continuous_adaptive_assist_enabled and _continuous_recent_miss_times.size() >= 3:
 		var newest := float(_continuous_recent_miss_times[_continuous_recent_miss_times.size() - 1])
@@ -25686,13 +25663,13 @@ func _hide_continuous_visual_aids() -> void:
 func _continuous_preview_note_index_after(target_idx: int) -> int:
 	if target_idx < 0:
 		return -1
-	var target_seq := int(_continuous_sight_notes[target_idx].get("seq", -1))
+	var target_seq: int = int(_continuous_sight_runtime.notes[target_idx].get("seq", -1))
 	var best_idx := -1
 	var best_seq := 999999999
-	for i in range(_continuous_sight_notes.size()):
+	for i in range(_continuous_sight_runtime.notes.size()):
 		if i == target_idx:
 			continue
-		var n := _continuous_sight_notes[i]
+		var n: Dictionary = _continuous_sight_runtime.notes[i]
 		if bool(n.get("answered", false)):
 			continue
 		var seq_i := int(n.get("seq", 999999999))
@@ -25708,18 +25685,18 @@ func _update_continuous_visual_aids() -> void:
 	if _staff_area == null or _selected_mode != MODE_SIGHT or _sight_mode != "Continuous":
 		_hide_continuous_visual_aids()
 		return
-	var beginner_aids_active := _continuous_sight_level <= 2 or _continuous_assist_level > 0
-	if not _continuous_sight_active or _continuous_sight_waiting_start or not _continuous_note_flow_aids_enabled or not beginner_aids_active:
+	var beginner_aids_active: bool = _continuous_sight_runtime.level <= 2 or _continuous_assist_level > 0
+	if not _continuous_sight_runtime.active or _continuous_sight_runtime.waiting_start or not _continuous_note_flow_aids_enabled or not beginner_aids_active:
 		_hide_continuous_visual_aids()
 		return
 	_ensure_continuous_aid_nodes()
 	var target_idx := _continuous_active_note_index()
 	if target_idx < 0:
 		target_idx = _continuous_next_note_index()
-	if target_idx < 0 or target_idx >= _continuous_sight_notes.size():
+	if target_idx < 0 or target_idx >= _continuous_sight_runtime.notes.size():
 		_hide_continuous_visual_aids()
 		return
-	var target := _continuous_sight_notes[target_idx]
+	var target: Dictionary = _continuous_sight_runtime.notes[target_idx]
 	var target_panel_v: Variant = target.get("panel", null)
 	if target_panel_v == null or not is_instance_valid(target_panel_v):
 		_hide_continuous_visual_aids()
@@ -25747,7 +25724,7 @@ func _update_continuous_visual_aids() -> void:
 			if led != null and is_instance_valid(led):
 				led.visible = false
 		return
-	var preview := _continuous_sight_notes[preview_idx]
+	var preview: Dictionary = _continuous_sight_runtime.notes[preview_idx]
 	var preview_panel_v: Variant = preview.get("panel", null)
 	if preview_panel_v == null or not is_instance_valid(preview_panel_v):
 		_hide_continuous_visual_aids()
@@ -25784,10 +25761,10 @@ func _update_continuous_visual_aids() -> void:
 
 
 func _continuous_register_miss(play_sfx: bool = true, custom_status: String = "Miss", reason: String = "Too Late", note_name: String = "", step: int = 0) -> void:
-	_continuous_sight_miss_hits += 1
+	_continuous_sight_runtime.miss_hits += 1
 	_score -= 2
 	_xp += 2
-	_continuous_sight_combo = 0
+	_continuous_sight_runtime.combo = 0
 	_streak = 0
 	_continuous_append_miss_log(reason, note_name, step)
 	if not _continuous_testing_no_life_loss and not _practice_mode_enabled:
@@ -25802,10 +25779,10 @@ func _continuous_register_miss(play_sfx: bool = true, custom_status: String = "M
 
 func _continuous_register_click_miss(custom_status: String = "Miss", reason: String = "Wrong Pitch", note_name: String = "", step: int = 0) -> void:
 	# Wrong key clicks count as a miss for score/combo, but do not remove lives.
-	_continuous_sight_miss_hits += 1
+	_continuous_sight_runtime.miss_hits += 1
 	_score -= 2
 	_xp += 2
-	_continuous_sight_combo = 0
+	_continuous_sight_runtime.combo = 0
 	_streak = 0
 	_continuous_append_miss_log(reason, note_name, step)
 	_status_label.text = custom_status if custom_status != "Miss" else str(reason)
@@ -25813,7 +25790,7 @@ func _continuous_register_click_miss(custom_status: String = "Miss", reason: Str
 
 
 func _clear_continuous_sight_notes() -> void:
-	for n in _continuous_sight_notes:
+	for n in _continuous_sight_runtime.notes:
 		var p_v: Variant = n.get("panel", null)
 		var p := p_v as Panel
 		if p != null and is_instance_valid(p):
@@ -25835,7 +25812,7 @@ func _clear_continuous_sight_notes() -> void:
 				if ledger is CanvasItem:
 					(ledger as CanvasItem).visible = false
 				ledger.queue_free()
-	_continuous_sight_notes.clear()
+	_continuous_sight_runtime.clear_notes()
 	_hide_continuous_visual_aids()
 	_clear_continuous_empty_bar_visual()
 
@@ -25843,14 +25820,14 @@ func _clear_continuous_sight_notes() -> void:
 func _setup_continuous_play_line() -> void:
 	if _continuous_sight_play_line == null or _staff_area == null:
 		return
-	_continuous_sight_play_line.visible = _continuous_sight_active
+	_continuous_sight_play_line.visible = _continuous_sight_runtime.active
 	var top := 20.0
 	var h := _staff_area.size.y - 40.0
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
 		top = _note_chase_staff_frame.position.y + 10.0
 		h = _note_chase_staff_frame.size.y - 20.0
-	_continuous_sight_play_line.position = Vector2(_continuous_play_line_x() - (_continuous_sight_zone_width * 0.5), top)
-	_continuous_sight_play_line.size = Vector2(_continuous_sight_zone_width, h)
+	_continuous_sight_play_line.position = Vector2(_continuous_play_line_x() - (_continuous_sight_runtime.zone_width * 0.5), top)
+	_continuous_sight_play_line.size = Vector2(_continuous_sight_runtime.zone_width, h)
 	# Clear green answer-zone patch for timing guidance.
 	_continuous_sight_play_line.color = Color(0.35, 0.95, 0.55, 0.24)
 	# Keep the gap bar visually empty (no whole-rest symbol overlay).
@@ -25896,10 +25873,10 @@ func _spawn_continuous_empty_bar_visual() -> void:
 	_clear_continuous_empty_bar_visual()
 	var top := (_note_chase_staff_frame.position.y + 10.0) if _note_chase_staff_frame != null and _note_chase_staff_frame.visible else 20.0
 	var height := (_note_chase_staff_frame.size.y - 20.0) if _note_chase_staff_frame != null and _note_chase_staff_frame.visible else (_staff_area.size.y - 40.0)
-	var beat_duration := 60.0 / float(maxi(1, _continuous_sight_bpm))
-	var beat_width_px := _continuous_sight_speed * beat_duration
-	var bar_duration := (60.0 / float(maxi(1, _continuous_sight_bpm))) * 4.0
-	var bar_width_px := _continuous_sight_speed * bar_duration
+	var beat_duration: float = 60.0 / float(maxi(1, _continuous_sight_runtime.bpm))
+	var beat_width_px: float = _continuous_sight_runtime.speed * beat_duration
+	var bar_duration: float = (60.0 / float(maxi(1, _continuous_sight_runtime.bpm))) * 4.0
+	var bar_width_px: float = _continuous_sight_runtime.speed * bar_duration
 	# Align exactly to the next measure boundary so bars before/after remain 4 notes each.
 	var start_x := (_continuous_spawn_x() - 52.0) + beat_width_px
 	for x_v in [start_x, start_x + bar_width_px]:
@@ -25945,7 +25922,7 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 	# Runtime Note Flow spawning must respect gap constraints to avoid occasional overlap/double-note artifacts.
 	if is_nan(center_x_override) and not _continuous_can_spawn_note():
 		return
-	var bounds := _continuous_sight_level_bounds if _continuous_sight_active else _effective_sight_step_bounds()
+	var bounds: Vector2i = _continuous_sight_runtime.level_bounds if _continuous_sight_runtime.active else _effective_sight_step_bounds()
 	var note_spec := _continuous_take_next_note_spec(bounds)
 	var step := int(note_spec.get("step", _rng.randi_range(bounds.x, bounds.y)))
 	var note_name := str(note_spec.get("name", _staff_step_name_for_clef(step, _selected_clef)))
@@ -26000,7 +25977,7 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 		ledger.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_staff_area.add_child(ledger)
 		ledgers.append(ledger)
-	_continuous_sight_notes.append({
+	_continuous_sight_runtime.add_note({
 		"panel": p,
 		"name": note_name,
 		"display_name": display_name,
@@ -26011,7 +25988,7 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 		"zone_enter_time": -1.0,
 		"bar_line": bar_line,
 		"acc_label": acc_label,
-		"ledgers": ledgers
+		"ledgers": ledgers,
 	})
 	_continuous_spawn_seq += 1
 
@@ -26036,7 +26013,7 @@ func _seed_continuous_stream_near_line(seed_count: int = 17) -> void:
 
 func _continuous_zone_bounds() -> Vector2:
 	var line_x := _continuous_play_line_x()
-	var half_w := _continuous_sight_zone_width * 0.5
+	var half_w: float = _continuous_sight_runtime.zone_width * 0.5
 	return Vector2(line_x - half_w, line_x + half_w)
 
 
@@ -26054,8 +26031,8 @@ func _continuous_note_in_ready_zone(p: Panel) -> bool:
 		return false
 	var bounds := _continuous_zone_bounds()
 	var note_center_x := p.position.x + (p.size.x * 0.5)
-	var configured_early_span := _continuous_sight_zone_width * maxf(0.0, _continuous_sight_early_window_mult)
-	var ready_span := minf(configured_early_span, _continuous_sight_zone_width * 0.55)
+	var configured_early_span: float = _continuous_sight_runtime.zone_width * maxf(0.0, _continuous_sight_runtime.early_window_mult)
+	var ready_span: float = minf(configured_early_span, _continuous_sight_runtime.zone_width * 0.55)
 	return note_center_x > bounds.y and note_center_x <= (bounds.y + ready_span)
 
 
@@ -26098,9 +26075,9 @@ func _continuous_note_matches_input(expected_token: String, pressed_token: Strin
 
 
 func _continuous_streak_multiplier() -> int:
-	if _continuous_sight_combo < 3:
+	if _continuous_sight_runtime.combo < 3:
 		return 1
-	return _continuous_sight_combo - 1
+	return _continuous_sight_runtime.combo - 1
 
 
 func _continuous_active_note() -> Dictionary:
@@ -26108,7 +26085,7 @@ func _continuous_active_note() -> Dictionary:
 	var center_x := (bounds.x + bounds.y) * 0.5
 	var best: Dictionary = {}
 	var best_dist := INF
-	for n in _continuous_sight_notes:
+	for n in _continuous_sight_runtime.notes:
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
 			continue
@@ -26132,8 +26109,8 @@ func _continuous_active_note_index() -> int:
 	var center_x := (bounds.x + bounds.y) * 0.5
 	var best_idx := -1
 	var best_dist := INF
-	for i in range(_continuous_sight_notes.size()):
-		var n := _continuous_sight_notes[i]
+	for i in range(_continuous_sight_runtime.notes.size()):
+		var n: Dictionary = _continuous_sight_runtime.notes[i]
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
 			continue
@@ -26155,7 +26132,7 @@ func _continuous_active_note_index() -> int:
 func _continuous_next_note_in_sequence() -> Dictionary:
 	var best: Dictionary = {}
 	var best_seq := 999999999
-	for n in _continuous_sight_notes:
+	for n in _continuous_sight_runtime.notes:
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
 			continue
@@ -26174,8 +26151,8 @@ func _continuous_next_note_in_sequence() -> Dictionary:
 func _continuous_next_note_index() -> int:
 	var best_idx := -1
 	var best_seq := 999999999
-	for i in range(_continuous_sight_notes.size()):
-		var n := _continuous_sight_notes[i]
+	for i in range(_continuous_sight_runtime.notes.size()):
+		var n: Dictionary = _continuous_sight_runtime.notes[i]
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
 			continue
@@ -26193,7 +26170,7 @@ func _continuous_next_note_index() -> int:
 
 func _continuous_rightmost_note_center_x() -> float:
 	var rightmost_center_x := -INF
-	for n in _continuous_sight_notes:
+	for n in _continuous_sight_runtime.notes:
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
 			continue
@@ -26208,7 +26185,7 @@ func _continuous_rightmost_note_center_x() -> float:
 
 
 func _continuous_can_spawn_note() -> bool:
-	if _continuous_sight_notes.is_empty():
+	if _continuous_sight_runtime.notes.is_empty():
 		return true
 	var rightmost_center_x := _continuous_rightmost_note_center_x()
 	if rightmost_center_x == -INF:
@@ -26221,7 +26198,7 @@ func _continuous_can_spawn_note() -> bool:
 	# This avoids accidental near-overlap/double-note stacks when the game hitches.
 	if rightmost_center_x > (spawn_x + 2.0):
 		return false
-	return gap >= 24.0 and (_continuous_sight_elapsed - _continuous_last_spawn_elapsed) >= 1.6
+	return gap >= 24.0 and (_continuous_sight_runtime.elapsed - _continuous_last_spawn_elapsed) >= 1.6
 
 
 func _rhythm_flow_pattern_library() -> Array[Array]:
@@ -26256,13 +26233,13 @@ func _rhythm_flow_triplet_guides_active_near_head() -> bool:
 		return false
 	if not _is_rhythm_flow_mode():
 		return false
-	if not (_game_panel != null and _game_panel.visible and _continuous_sight_active):
+	if not (_game_panel != null and _game_panel.visible and _continuous_sight_runtime.active):
 		return false
 	for evt_v in _rhythm_flow_runtime.events:
 		var evt: Dictionary = evt_v
 		if not bool(evt.get("triplet", false)):
 			continue
-		var dt := float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_elapsed
+		var dt: float = float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_runtime.elapsed
 		if dt < -0.35:
 			continue
 		if dt > 2.6:
@@ -26280,7 +26257,7 @@ func _set_rhythm_triplet_guides_visible(visible_state: bool) -> void:
 func _update_rhythm_triplet_guide_pulses(delta: float) -> void:
 	if _staff_area == null or _continuous_sight_play_line == null:
 		return
-	var show: bool = _rhythm_flow_triplet_guides_active_near_head() and _continuous_sight_play_line.visible and not _continuous_sight_waiting_start and _continuous_sight_elapsed >= _rhythm_flow_runtime.count_in_seconds
+	var show: bool = _rhythm_flow_triplet_guides_active_near_head() and _continuous_sight_play_line.visible and not _continuous_sight_runtime.waiting_start and _continuous_sight_runtime.elapsed >= _rhythm_flow_runtime.count_in_seconds
 	if not show:
 		_set_rhythm_triplet_guides_visible(false)
 		_rhythm_triplet_guide_last_tick_idx = -1
@@ -26299,14 +26276,14 @@ func _update_rhythm_triplet_guide_pulses(delta: float) -> void:
 	if step_sec <= 0.0:
 		_set_rhythm_triplet_guides_visible(false)
 		return
-	var tick_idx := int(floor(((_continuous_sight_elapsed - _rhythm_flow_runtime.count_in_seconds) / step_sec) + 0.0001))
+	var tick_idx: int = int(floor(((_continuous_sight_runtime.elapsed - _rhythm_flow_runtime.count_in_seconds) / step_sec) + 0.0001))
 	var tick_mod := ((tick_idx % 3) + 3) % 3
 	if not _rhythm_flow_runtime.paused and tick_idx != _rhythm_triplet_guide_last_tick_idx:
 		if _rhythm_triplet_guide_last_tick_idx != -1:
 			_rhythm_triplet_guide_flash_dot = tick_mod
-			_rhythm_triplet_guide_flash_until_sec = _continuous_sight_elapsed + maxf(0.05, minf(0.12, step_sec * 0.75))
+			_rhythm_triplet_guide_flash_until_sec = _continuous_sight_runtime.elapsed + maxf(0.05, minf(0.12, step_sec * 0.75))
 		_rhythm_triplet_guide_last_tick_idx = tick_idx
-	var flash_active := _rhythm_triplet_guide_flash_dot >= 0 and _continuous_sight_elapsed <= _rhythm_triplet_guide_flash_until_sec
+	var flash_active: bool = _rhythm_triplet_guide_flash_dot >= 0 and _continuous_sight_runtime.elapsed <= _rhythm_triplet_guide_flash_until_sec
 	for i in range(_rhythm_triplet_guide_dots.size()):
 		var dot_v := _rhythm_triplet_guide_dots[i]
 		if dot_v == null or not is_instance_valid(dot_v):
@@ -26314,7 +26291,7 @@ func _update_rhythm_triplet_guide_pulses(delta: float) -> void:
 		var dot := dot_v as Panel
 		if dot == null:
 			continue
-		var is_flash := flash_active and i == _rhythm_triplet_guide_flash_dot
+		var is_flash: bool = flash_active and i == _rhythm_triplet_guide_flash_dot
 		var is_phase := i == tick_mod
 		var size_px := 10.0
 		var alpha := 0.18
@@ -26486,7 +26463,7 @@ func _on_rhythm_flow_run_generator_test_pressed() -> void:
 func _restart_rhythm_flow_current_session_for_bpm_change() -> void:
 	if not _is_rhythm_flow_mode():
 		return
-	if not (_game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active):
+	if not (_game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active):
 		return
 	var was_demo := _rhythm_flow_demo_running()
 	_result_box_hide()
@@ -26658,7 +26635,7 @@ func _on_rhythm_flow_slot_button_pressed(slot_idx: int) -> void:
 
 
 func _rhythm_flow_demo_running() -> bool:
-	return _is_rhythm_flow_mode() and _continuous_sight_active and _quiz_active and _rhythm_flow_runtime.session_mode == RHYTHM_FLOW_SESSION_DEMO
+	return _is_rhythm_flow_mode() and _continuous_sight_runtime.active and _quiz_active and _rhythm_flow_runtime.session_mode == RHYTHM_FLOW_SESSION_DEMO
 
 
 func _refresh_rhythm_flow_demo_buttons() -> void:
@@ -26697,7 +26674,7 @@ func _on_rhythm_flow_demo_pressed() -> void:
 func _on_rhythm_flow_play_pause_pressed() -> void:
 	if not _is_rhythm_flow_mode():
 		return
-	if not (_game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active):
+	if not (_game_panel != null and _game_panel.visible and _continuous_sight_runtime.active and _quiz_active):
 		return
 	_rhythm_flow_runtime.paused = not _rhythm_flow_runtime.paused
 	if _rhythm_flow_runtime.paused and _rhythm_metronome_player != null and _rhythm_metronome_player.playing:
@@ -26741,27 +26718,27 @@ func _rhythm_update_scrub_status_label() -> void:
 	if _rhythm_pause_scrub_label == null:
 		return
 	var spb := _rhythm_flow_seconds_per_beat()
-	var beat_float := _continuous_sight_elapsed / maxf(0.001, spb)
+	var beat_float: float = _continuous_sight_runtime.elapsed / maxf(0.001, spb)
 	var musical_beat_float := maxf(0.0, beat_float - float(_rhythm_flow_runtime.count_in_beats))
 	var bar_idx := int(floor(musical_beat_float / 4.0)) + 1
 	var beat_in_bar := fmod(musical_beat_float, 4.0) + 1.0
 	var mode_text := "Practice paused" if _rhythm_is_practice else "Paused"
-	_rhythm_pause_scrub_label.text = "%s  |  Bar %d  Beat %.2f  |  %.2fs" % [mode_text, maxi(1, bar_idx), beat_in_bar, _continuous_sight_elapsed]
+	_rhythm_pause_scrub_label.text = "%s  |  Bar %d  Beat %.2f  |  %.2fs" % [mode_text, maxi(1, bar_idx), beat_in_bar, _continuous_sight_runtime.elapsed]
 
 
 func _rhythm_seek_to_time(t: float) -> void:
 	var total := _rhythm_total_duration_sec()
-	_continuous_sight_elapsed = clampf(t, 0.0, maxf(0.0, total))
+	_continuous_sight_runtime.elapsed = clampf(t, 0.0, maxf(0.0, total))
 	var spb := _rhythm_flow_seconds_per_beat()
-	_rhythm_flow_runtime.last_click_beat_index = int(floor(_continuous_sight_elapsed / maxf(0.001, spb))) - 1
-	_rhythm_flow_runtime.demo_next_event_idx = _rhythm_first_unprocessed_hit_idx_at_time(_continuous_sight_elapsed)
-	_rhythm_flow_runtime.next_spawn_idx = _rhythm_first_unprocessed_event_idx_at_time(_continuous_sight_elapsed)
+	_rhythm_flow_runtime.last_click_beat_index = int(floor(_continuous_sight_runtime.elapsed / maxf(0.001, spb))) - 1
+	_rhythm_flow_runtime.demo_next_event_idx = _rhythm_first_unprocessed_hit_idx_at_time(_continuous_sight_runtime.elapsed)
+	_rhythm_flow_runtime.next_spawn_idx = _rhythm_first_unprocessed_event_idx_at_time(_continuous_sight_runtime.elapsed)
 	_rhythm_triplet_guide_last_tick_idx = -1
 	_rhythm_triplet_guide_flash_dot = -1
 	_rhythm_triplet_guide_flash_until_sec = -1.0
 	_rhythm_update_scrub_status_label()
 	if OS.is_debug_build():
-		print("Rhythm scrub -> t=%.3f, next_hit=%d, next_spawn=%d" % [_continuous_sight_elapsed, _rhythm_flow_runtime.demo_next_event_idx, _rhythm_flow_runtime.next_spawn_idx])
+		print("Rhythm scrub -> t=%.3f, next_hit=%d, next_spawn=%d" % [_continuous_sight_runtime.elapsed, _rhythm_flow_runtime.demo_next_event_idx, _rhythm_flow_runtime.next_spawn_idx])
 
 
 func _rhythm_flow_spawn_visual_for_seek(event_idx: int) -> void:
@@ -26778,7 +26755,7 @@ func _rhythm_rebuild_visible_notation() -> void:
 	var future_window_sec := maxf(6.0, _rhythm_flow_visible_lead_seconds())
 	for i in range(_rhythm_flow_runtime.events.size()):
 		var evt: Dictionary = _rhythm_flow_runtime.events[i]
-		var dt := float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_elapsed
+		var dt: float = float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_runtime.elapsed
 		if dt < -past_window_sec:
 			continue
 		if dt > future_window_sec:
@@ -26804,13 +26781,13 @@ func _rhythm_reset_attempt_stats() -> void:
 	_score = 0
 	_streak = 0
 	_lives = 5
-	_continuous_sight_total_hits = 0
-	_continuous_sight_correct_hits = 0
-	_continuous_sight_combo = 0
-	_continuous_sight_best_combo = 0
-	_continuous_sight_perfect_hits = 0
-	_continuous_sight_good_hits = 0
-	_continuous_sight_miss_hits = 0
+	_continuous_sight_runtime.total_hits = 0
+	_continuous_sight_runtime.correct_hits = 0
+	_continuous_sight_runtime.combo = 0
+	_continuous_sight_runtime.best_combo = 0
+	_continuous_sight_runtime.perfect_hits = 0
+	_continuous_sight_runtime.good_hits = 0
+	_continuous_sight_runtime.miss_hits = 0
 	_rhythm_flow_runtime.ok_hits = 0
 	_rhythm_flow_runtime.wrong_taps = 0
 	_refresh_meta_ui()
@@ -26819,7 +26796,7 @@ func _rhythm_reset_attempt_stats() -> void:
 func _rhythm_practice_play_from_here() -> void:
 	if not _is_rhythm_flow_mode():
 		return
-	var start_time := _continuous_sight_elapsed
+	var start_time: float = _continuous_sight_runtime.elapsed
 	_start_rhythm_flow_session_from_current_pattern(true)
 	_rhythm_is_practice = true
 	_rhythm_flow_runtime.scoring_enabled = false
@@ -26828,7 +26805,7 @@ func _rhythm_practice_play_from_here() -> void:
 	_rhythm_reset_event_runtime_flags()
 	_quiz_active = true
 	_accepting_answer = true
-	_continuous_sight_waiting_start = false
+	_continuous_sight_runtime.waiting_start = false
 	_awaiting_round_start = false
 	_rhythm_flow_runtime.paused = false
 	_result_box_hide()
@@ -26872,7 +26849,7 @@ func _on_rhythm_flow_pause_scrub_close_pressed() -> void:
 func _refresh_rhythm_flow_practice_scrub_overlay() -> void:
 	if _rhythm_pause_scrub_panel == null or _staff_area == null:
 		return
-	var show: bool = _is_rhythm_flow_mode() and _rhythm_is_practice and _rhythm_flow_runtime.paused and _game_panel != null and _game_panel.visible and (_continuous_sight_active or (_result_overlay != null and _result_overlay.visible))
+	var show: bool = _is_rhythm_flow_mode() and _rhythm_is_practice and _rhythm_flow_runtime.paused and _game_panel != null and _game_panel.visible and (_continuous_sight_runtime.active or (_result_overlay != null and _result_overlay.visible))
 	_rhythm_pause_scrub_panel.visible = show
 	if not show:
 		return
@@ -26883,7 +26860,7 @@ func _refresh_rhythm_flow_practice_scrub_overlay() -> void:
 		_rhythm_pause_scrub_slider.min_value = 0.0
 		_rhythm_pause_scrub_slider.max_value = total
 		_rhythm_pause_scrub_slider.step = maxf(0.01, spb / 12.0)
-		_rhythm_pause_scrub_slider.value = clampf(_continuous_sight_elapsed, 0.0, total)
+		_rhythm_pause_scrub_slider.value = clampf(_continuous_sight_runtime.elapsed, 0.0, total)
 	_rhythm_pause_scrub_ui_syncing = false
 	_rhythm_update_scrub_status_label()
 	var panel_w := 560.0
@@ -26902,11 +26879,11 @@ func _refresh_rhythm_flow_practice_scrub_overlay() -> void:
 func _refresh_rhythm_flow_play_pause_button() -> void:
 	if _rhythm_play_pause_button == null or _staff_area == null:
 		return
-	var show := _is_rhythm_flow_mode() \
+	var show: bool = _is_rhythm_flow_mode() \
 		and _game_panel != null and _game_panel.visible \
-		and _continuous_sight_active and _quiz_active \
+		and _continuous_sight_runtime.active and _quiz_active \
 		and not _awaiting_round_start \
-		and not _continuous_sight_waiting_start
+		and not _continuous_sight_runtime.waiting_start
 	# Avoid the first-frame jump before the staff frame gets its real layout.
 	if show and _note_chase_staff_frame != null and _note_chase_staff_frame.visible and _note_chase_staff_frame.size.x < 120.0:
 		_rhythm_play_pause_button.visible = false
@@ -26949,7 +26926,7 @@ func _refresh_rhythm_flow_aux_overlay_row() -> void:
 	if _rhythm_aux_overlay_row_right != null:
 		_rhythm_aux_overlay_row_right.visible = show
 	if _rhythm_center_action_row != null:
-		_rhythm_center_action_row.visible = show and _continuous_sight_active and _quiz_active and not _continuous_sight_waiting_start
+		_rhythm_center_action_row.visible = show and _continuous_sight_runtime.active and _quiz_active and not _continuous_sight_runtime.waiting_start
 	if not show:
 		return
 	var x := 16.0
@@ -27024,13 +27001,13 @@ func _start_rhythm_flow_demo_session() -> void:
 func _rhythm_flow_update_demo_scheduler() -> void:
 	if not _rhythm_flow_demo_running():
 		return
-	if _continuous_sight_waiting_start:
+	if _continuous_sight_runtime.waiting_start:
 		return
 	var eps := 0.008
 	while _rhythm_flow_runtime.demo_next_event_idx < _rhythm_flow_runtime.events.size():
 		var evt: Dictionary = _rhythm_flow_runtime.events[_rhythm_flow_runtime.demo_next_event_idx]
 		var expected_t := float(evt.get("expected_time_sec", 0.0))
-		if (_continuous_sight_elapsed + eps) < expected_t:
+		if (_continuous_sight_runtime.elapsed + eps) < expected_t:
 			break
 		if str(evt.get("type", "")) == "hit" and not bool(evt.get("matched", false)) and not bool(evt.get("missed", false)):
 			_play_rhythm_flow_tap_sfx(_rhythm_flow_runtime.demo_next_event_idx)
@@ -27085,7 +27062,7 @@ func _ensure_rhythm_flow_beat_labels(min_count: int = 4) -> void:
 func _update_rhythm_flow_beat_labels() -> void:
 	if _staff_area == null:
 		return
-	var visible := _is_rhythm_flow_mode() and _continuous_sight_active and not _continuous_sight_waiting_start
+	var visible: bool = _is_rhythm_flow_mode() and _continuous_sight_runtime.active and not _continuous_sight_runtime.waiting_start
 	if not visible:
 		for lbl in _rhythm_flow_beat_labels:
 			if lbl != null:
@@ -27097,7 +27074,7 @@ func _update_rhythm_flow_beat_labels() -> void:
 			if bar != null:
 				bar.visible = false
 		return
-	var beat_w := _continuous_sight_speed * _rhythm_flow_seconds_per_beat()
+	var beat_w: float = _continuous_sight_runtime.speed * _rhythm_flow_seconds_per_beat()
 	var lane_w := 900.0
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
 		lane_w = _note_chase_staff_frame.size.x
@@ -27106,8 +27083,8 @@ func _update_rhythm_flow_beat_labels() -> void:
 	var line_x := _continuous_play_line_x()
 	var top_y := (_note_chase_staff_frame.position.y + 10.0) if _note_chase_staff_frame != null and _note_chase_staff_frame.visible else 18.0
 	var spb := _rhythm_flow_seconds_per_beat()
-	var next_beat_idx := int(ceil(_continuous_sight_elapsed / maxf(0.001, spb)))
-	var x0 := line_x + (_continuous_sight_speed * ((float(next_beat_idx) * spb) - _continuous_sight_elapsed))
+	var next_beat_idx: int = int(ceil(_continuous_sight_runtime.elapsed / maxf(0.001, spb)))
+	var x0: float = line_x + (_continuous_sight_runtime.speed * ((float(next_beat_idx) * spb) - _continuous_sight_runtime.elapsed))
 	for i in range(_rhythm_flow_beat_labels.size()):
 		var lbl := _rhythm_flow_beat_labels[i]
 		if lbl == null:
@@ -27157,7 +27134,7 @@ func _update_rhythm_flow_beat_labels() -> void:
 
 
 func _rhythm_flow_visible_lead_seconds() -> float:
-	return maxf(0.10, (_continuous_spawn_x() - _continuous_play_line_x()) / maxf(1.0, _continuous_sight_speed))
+	return maxf(0.10, (_continuous_spawn_x() - _continuous_play_line_x()) / maxf(1.0, _continuous_sight_runtime.speed))
 
 
 func _rhythm_flow_rebuild_events_from_patterns() -> void:
@@ -27227,7 +27204,7 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 	var start_t := float(evt.get("expected_time_sec", 0.0))
 	var dur_sec := float(evt.get("duration_sec", _rhythm_flow_seconds_per_beat()))
 	var center_y := _staff_center_y_for_step(4)
-	var center_x := _continuous_play_line_x() + (_continuous_sight_speed * (start_t - _continuous_sight_elapsed))
+	var center_x: float = _continuous_play_line_x() + (_continuous_sight_runtime.speed * (start_t - _continuous_sight_runtime.elapsed))
 	var p: Panel = null
 	if RhythmGlyphScene != null:
 		var glyph_v := RhythmGlyphScene.instantiate()
@@ -27251,7 +27228,7 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 				var step_beats := evt_dur
 				var glyph_scale := 2.35
 				var stem_local_x := 32.0 # note center x (24) + stem offset (8) in glyph local coords
-				var stem_world_x := center_x + (8.0 * glyph_scale)
+				var stem_world_x: float = center_x + (8.0 * glyph_scale)
 				if event_idx > 0:
 					var prev_evt: Dictionary = _rhythm_flow_runtime.events[event_idx - 1]
 					if str(prev_evt.get("type", "")) == "hit" and is_equal_approx(float(prev_evt.get("duration_beats", 0.0)), step_beats) and bool(prev_evt.get("triplet", false)) == is_triplet:
@@ -27259,8 +27236,8 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 						if is_equal_approx(prev_start + step_beats, start_beat):
 							beam_left = true
 							var prev_t := float(prev_evt.get("expected_time_sec", 0.0))
-							var prev_center_x := _continuous_play_line_x() + (_continuous_sight_speed * (prev_t - _continuous_sight_elapsed))
-							var prev_stem_world_x := prev_center_x + (8.0 * glyph_scale)
+							var prev_center_x: float = _continuous_play_line_x() + (_continuous_sight_runtime.speed * (prev_t - _continuous_sight_runtime.elapsed))
+							var prev_stem_world_x: float = prev_center_x + (8.0 * glyph_scale)
 							beam_left_len = clampf((stem_world_x - prev_stem_world_x) / glyph_scale, 6.0, 40.0)
 				if event_idx + 1 < _rhythm_flow_runtime.events.size():
 					var next_evt: Dictionary = _rhythm_flow_runtime.events[event_idx + 1]
@@ -27269,8 +27246,8 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 						if is_equal_approx(start_beat + step_beats, next_start):
 							beam_right = true
 							var next_t := float(next_evt.get("expected_time_sec", 0.0))
-							var next_center_x := _continuous_play_line_x() + (_continuous_sight_speed * (next_t - _continuous_sight_elapsed))
-							var next_stem_world_x := next_center_x + (8.0 * glyph_scale)
+							var next_center_x: float = _continuous_play_line_x() + (_continuous_sight_runtime.speed * (next_t - _continuous_sight_runtime.elapsed))
+							var next_stem_world_x: float = next_center_x + (8.0 * glyph_scale)
 							beam_right_len = clampf((next_stem_world_x - stem_world_x) / glyph_scale, 6.0, 40.0)
 				evt_for_glyph["beam_left"] = beam_left
 				evt_for_glyph["beam_right"] = beam_right
@@ -27320,8 +27297,8 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 					var last_evt: Dictionary = _rhythm_flow_runtime.events[subgroup_end_idx]
 					var first_t := float(first_evt.get("expected_time_sec", 0.0))
 					var last_t := float(last_evt.get("expected_time_sec", 0.0))
-					var first_center_x := _continuous_play_line_x() + (_continuous_sight_speed * (first_t - _continuous_sight_elapsed))
-					var last_center_x := _continuous_play_line_x() + (_continuous_sight_speed * (last_t - _continuous_sight_elapsed))
+					var first_center_x: float = _continuous_play_line_x() + (_continuous_sight_runtime.speed * (first_t - _continuous_sight_runtime.elapsed))
+					var last_center_x: float = _continuous_play_line_x() + (_continuous_sight_runtime.speed * (last_t - _continuous_sight_runtime.elapsed))
 					var first_stem_world_x := first_center_x + (8.0 * glyph_scale)
 					var last_stem_world_x := last_center_x + (8.0 * glyph_scale)
 					evt_for_glyph["triplet_span_left_len"] = clampf((stem_world_x - first_stem_world_x) / glyph_scale, 0.0, 120.0)
@@ -27340,7 +27317,7 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 	if p == null:
 		# Fallback if prefab fails to load: preserve gameplay with a simple block.
 		var block_h := 22.0
-		var block_w := clampf((_continuous_sight_speed * dur_sec) - 6.0, 22.0, 220.0)
+		var block_w: float = clampf((_continuous_sight_runtime.speed * dur_sec) - 6.0, 22.0, 220.0)
 		p = Panel.new()
 		p.custom_minimum_size = Vector2(block_w, block_h)
 		p.size = p.custom_minimum_size
@@ -27360,7 +27337,7 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 		p.add_theme_stylebox_override("panel", sb)
 		p.position = Vector2(center_x - (block_w * 0.5), center_y - (block_h * 0.5))
 	_staff_area.add_child(p)
-	_continuous_sight_notes.append({
+	_continuous_sight_runtime.add_note({
 		"panel": p,
 		"name": "RF",
 		"display_name": "Rhythm" if str(evt.get("type", "hit")) == "hit" else "Rest",
@@ -27376,7 +27353,7 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 		"rhythm_event_type": str(evt.get("type", "hit")),
 		"rhythm_expected_time_sec": start_t,
 		"rhythm_duration_sec": dur_sec,
-		"rhythm_feedback_until": -1.0
+		"rhythm_feedback_until": -1.0,
 	})
 	_continuous_spawn_seq += 1
 	_rhythm_flow_runtime.events[event_idx]["spawned"] = true
@@ -27392,7 +27369,7 @@ func _rhythm_flow_try_spawn_events() -> void:
 			_rhythm_flow_runtime.next_spawn_idx += 1
 			continue
 		var start_t := float(evt.get("expected_time_sec", 0.0))
-		if (start_t - _continuous_sight_elapsed) > lead_sec:
+		if (start_t - _continuous_sight_runtime.elapsed) > lead_sec:
 			break
 		_rhythm_flow_spawn_hit_visual(_rhythm_flow_runtime.next_spawn_idx)
 		_rhythm_flow_runtime.next_spawn_idx += 1
@@ -27400,7 +27377,7 @@ func _rhythm_flow_try_spawn_events() -> void:
 
 func _rhythm_flow_status_count_in() -> void:
 	var spb := _rhythm_flow_seconds_per_beat()
-	var beats_remaining := int(ceil(maxf(0.0, _rhythm_flow_runtime.count_in_seconds - _continuous_sight_elapsed) / spb))
+	var beats_remaining: int = int(ceil(maxf(0.0, _rhythm_flow_runtime.count_in_seconds - _continuous_sight_runtime.elapsed) / spb))
 	if beats_remaining <= 0:
 		return
 	var beat_num: int = (_rhythm_flow_runtime.count_in_beats - beats_remaining) + 1
@@ -27417,7 +27394,7 @@ func _rhythm_flow_play_metronome_clicks() -> void:
 	var spb := _rhythm_flow_seconds_per_beat()
 	if spb <= 0.0:
 		return
-	var beat_idx := int(floor(_continuous_sight_elapsed / spb))
+	var beat_idx: int = int(floor(_continuous_sight_runtime.elapsed / spb))
 	if beat_idx <= _rhythm_flow_runtime.last_click_beat_index:
 		return
 	for i in range(_rhythm_flow_runtime.last_click_beat_index + 1, beat_idx + 1):
@@ -27435,8 +27412,8 @@ func _rhythm_flow_play_metronome_clicks() -> void:
 
 
 func _rhythm_flow_find_live_note_for_event(event_idx: int) -> int:
-	for i in range(_continuous_sight_notes.size()):
-		var n := _continuous_sight_notes[i]
+	for i in range(_continuous_sight_runtime.notes.size()):
+		var n: Dictionary = _continuous_sight_runtime.notes[i]
 		if int(n.get("rhythm_event_idx", -1)) == event_idx:
 			return i
 	return -1
@@ -27454,30 +27431,30 @@ func _rhythm_flow_apply_judgement(event_idx: int, judgement: String, tap_time_se
 	_rhythm_flow_runtime.events[event_idx]["judgement"] = judgement
 	_rhythm_flow_runtime.events[event_idx]["tap_time_sec"] = tap_time_sec
 	if _rhythm_flow_runtime.scoring_enabled:
-		_continuous_sight_total_hits += 1
-		_continuous_sight_correct_hits += 1
-		_continuous_sight_combo += 1
-		_continuous_sight_best_combo = maxi(_continuous_sight_best_combo, _continuous_sight_combo)
-		_streak = _continuous_sight_combo
+		_continuous_sight_runtime.total_hits += 1
+		_continuous_sight_runtime.correct_hits += 1
+		_continuous_sight_runtime.combo += 1
+		_continuous_sight_runtime.best_combo = maxi(_continuous_sight_runtime.best_combo, _continuous_sight_runtime.combo)
+		_streak = _continuous_sight_runtime.combo
 		match judgement:
 			"Perfect":
-				_continuous_sight_perfect_hits += 1
+				_continuous_sight_runtime.perfect_hits += 1
 				_score += 100
 			"Good":
-				_continuous_sight_good_hits += 1
+				_continuous_sight_runtime.good_hits += 1
 				_score += 70
 			"OK":
 				_rhythm_flow_runtime.ok_hits += 1
 				_score += 35
 		var pts_awarded := 100 if judgement == "Perfect" else (70 if judgement == "Good" else 35)
-		_status_label.text = "%s! +%d  Combo x%d" % [judgement, pts_awarded, _continuous_sight_combo]
+		_status_label.text = "%s! +%d  Combo x%d" % [judgement, pts_awarded, _continuous_sight_runtime.combo]
 	else:
 		_status_label.text = "Listening and learning mode..."
 	var li := _rhythm_flow_find_live_note_for_event(event_idx)
-	if li >= 0 and li < _continuous_sight_notes.size():
-		_continuous_sight_notes[li]["answered"] = true
-		_continuous_sight_notes[li]["rhythm_feedback_until"] = _continuous_sight_elapsed + 0.18
-		var note := _continuous_sight_notes[li]
+	if li >= 0 and li < _continuous_sight_runtime.notes.size():
+		_continuous_sight_runtime.notes[li]["answered"] = true
+		_continuous_sight_runtime.notes[li]["rhythm_feedback_until"] = _continuous_sight_runtime.elapsed + 0.18
+		var note: Dictionary = _continuous_sight_runtime.notes[li]
 		var p_v: Variant = note.get("panel", null)
 		if p_v != null and is_instance_valid(p_v):
 			var p := p_v as Panel
@@ -27495,9 +27472,9 @@ func _rhythm_flow_apply_judgement(event_idx: int, judgement: String, tap_time_se
 func _rhythm_flow_apply_miss(custom_status: String = "Miss", wrong_tap: bool = false) -> void:
 	if not _rhythm_flow_runtime.scoring_enabled:
 		return
-	_continuous_sight_total_hits += 1
-	_continuous_sight_miss_hits += 1
-	_continuous_sight_combo = 0
+	_continuous_sight_runtime.total_hits += 1
+	_continuous_sight_runtime.miss_hits += 1
+	_continuous_sight_runtime.combo = 0
 	_streak = 0
 	if wrong_tap:
 		_rhythm_flow_runtime.wrong_taps += 1
@@ -27519,26 +27496,26 @@ func _rhythm_flow_mark_passed_misses() -> void:
 			continue
 		var expected_t := float(evt.get("expected_time_sec", 0.0))
 		win_ok = float(_rhythm_flow_timing_windows_for_event(evt).get("ok", win_ok))
-		if _continuous_sight_elapsed <= (expected_t + win_ok):
+		if _continuous_sight_runtime.elapsed <= (expected_t + win_ok):
 			continue
 		_rhythm_flow_runtime.events[i]["missed"] = true
 		_rhythm_flow_apply_miss("Miss")
 		var li := _rhythm_flow_find_live_note_for_event(i)
-		if li >= 0 and li < _continuous_sight_notes.size():
-			_continuous_sight_notes[li]["answered"] = true
-			_continuous_sight_notes[li]["rhythm_feedback_until"] = _continuous_sight_elapsed + 0.22
-			var note := _continuous_sight_notes[li]
+		if li >= 0 and li < _continuous_sight_runtime.notes.size():
+			_continuous_sight_runtime.notes[li]["answered"] = true
+			_continuous_sight_runtime.notes[li]["rhythm_feedback_until"] = _continuous_sight_runtime.elapsed + 0.22
+			var note: Dictionary = _continuous_sight_runtime.notes[li]
 			var p_v: Variant = note.get("panel", null)
 			if p_v != null and is_instance_valid(p_v):
 				var p := p_v as Panel
 				if p != null and p.has_method("mark_miss"):
 					p.call("mark_miss")
-		if not _continuous_sight_active:
+		if not _continuous_sight_runtime.active:
 			return
 
 
 func _rhythm_flow_try_finish_if_complete() -> void:
-	if not _continuous_sight_active:
+	if not _continuous_sight_runtime.active:
 		return
 	for evt in _rhythm_flow_runtime.events:
 		if str(evt.get("type", "")) != "hit":
@@ -27546,14 +27523,14 @@ func _rhythm_flow_try_finish_if_complete() -> void:
 		if not bool(evt.get("matched", false)) and not bool(evt.get("missed", false)):
 			return
 	# Let visuals clear for a moment, then finish.
-	if _continuous_sight_notes.is_empty():
+	if _continuous_sight_runtime.notes.is_empty():
 		_finish_continuous_sight_reading("Complete")
 
 
 func _on_rhythm_flow_tap() -> void:
 	if not _is_rhythm_flow_mode():
 		return
-	if not _continuous_sight_active or not _quiz_active:
+	if not _continuous_sight_runtime.active or not _quiz_active:
 		return
 	if _rhythm_flow_runtime.paused:
 		_status_label.text = "Paused. Press Play to continue."
@@ -27561,10 +27538,10 @@ func _on_rhythm_flow_tap() -> void:
 	if not _rhythm_flow_runtime.input_enabled:
 		_status_label.text = "Demo is playing. Scoring is paused."
 		return
-	if _continuous_sight_waiting_start:
+	if _continuous_sight_runtime.waiting_start:
 		_start_continuous_flow_after_waiting()
 		return
-	var tap_t_raw := _continuous_sight_elapsed - _rhythm_flow_tap_latency_sec()
+	var tap_t_raw: float = _continuous_sight_runtime.elapsed - _rhythm_flow_tap_latency_sec()
 	if tap_t_raw < _rhythm_flow_runtime.count_in_seconds:
 		_status_label.text = "Count-in..."
 		return
@@ -27608,14 +27585,14 @@ func _on_rhythm_flow_tap_pressed() -> void:
 func _rhythm_flow_update_count_in_and_spawns() -> void:
 	_rhythm_flow_play_metronome_clicks()
 	_rhythm_flow_try_spawn_events()
-	if _continuous_sight_elapsed < _rhythm_flow_runtime.count_in_seconds:
+	if _continuous_sight_runtime.elapsed < _rhythm_flow_runtime.count_in_seconds:
 		_rhythm_flow_status_count_in()
 	else:
 		if _status_label.text.begins_with("Count-in:"):
 			_status_label.text = _flow_live_prompt_text()
 
 func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhythm_pattern: bool = false) -> void:
-	_continuous_sight_active = true
+	_continuous_sight_runtime.active = true
 	# Phase 3 lesson session: continuous flows don't enter through the standard
 	# quiz path, so record the activity start here.
 	if not demo_mode:
@@ -27623,19 +27600,19 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 	_continuous_touch_suppress_note = ""
 	_continuous_touch_suppress_until_sec = 0.0
 	_continuous_touch_suppress_any_until_sec = 0.0
-	_continuous_sight_waiting_start = true
-	_continuous_sight_elapsed = 0.0
+	_continuous_sight_runtime.waiting_start = true
+	_continuous_sight_runtime.elapsed = 0.0
 	_rhythm_triplet_guide_last_tick_idx = -1
 	_rhythm_triplet_guide_flash_dot = -1
 	_rhythm_triplet_guide_flash_until_sec = -1.0
-	_continuous_sight_spawn_timer = 0.0
-	_continuous_sight_total_hits = 0
-	_continuous_sight_correct_hits = 0
-	_continuous_sight_combo = 0
-	_continuous_sight_best_combo = 0
-	_continuous_sight_perfect_hits = 0
-	_continuous_sight_good_hits = 0
-	_continuous_sight_miss_hits = 0
+	_continuous_sight_runtime.spawn_timer = 0.0
+	_continuous_sight_runtime.total_hits = 0
+	_continuous_sight_runtime.correct_hits = 0
+	_continuous_sight_runtime.combo = 0
+	_continuous_sight_runtime.best_combo = 0
+	_continuous_sight_runtime.perfect_hits = 0
+	_continuous_sight_runtime.good_hits = 0
+	_continuous_sight_runtime.miss_hits = 0
 	_continuous_miss_log.clear()
 	_continuous_recent_miss_times.clear()
 	_continuous_miss_reason_counts["Too Early"] = 0
@@ -27646,9 +27623,9 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 	_continuous_miss_ledger_depth_counts.clear()
 	_continuous_assist_level = 0
 	_continuous_assist_recovery_hits = 0
-	_continuous_sight_reaction_sum = 0.0
-	_continuous_sight_reaction_count = 0
-	_continuous_sight_level = 1
+	_continuous_sight_runtime.reaction_sum = 0.0
+	_continuous_sight_runtime.reaction_count = 0
+	_continuous_sight_runtime.level = 1
 	_rhythm_flow_runtime.ok_hits = 0
 	_rhythm_flow_runtime.wrong_taps = 0
 	_rhythm_flow_runtime.count_in_announced = -1
@@ -27673,7 +27650,7 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 		_rhythm_flow_runtime.scoring_enabled = not demo_mode
 		_rhythm_flow_runtime.input_enabled = not demo_mode
 		_rhythm_flow_runtime.last_start_demo_mode = demo_mode
-		_continuous_sight_bpm = _rhythm_flow_runtime.bpm
+		_continuous_sight_runtime.bpm = _rhythm_flow_runtime.bpm
 		# Increase pixels-per-beat for readability; keep timing tied to expected_time_sec.
 		var rhythm_speed_mult := 1.42 # quarter/half focused levels
 		if _rhythm_flow_runtime.difficulty_level >= 5:
@@ -27683,10 +27660,10 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 		# Keep pixels-per-beat visually stable across BPM changes by scaling scroll speed with BPM.
 		# (Spacing ~= speed * seconds_per_beat, so speed must scale up when BPM increases.)
 		var rhythm_bpm_scale := float(maxi(1, _rhythm_flow_runtime.bpm)) / 44.0
-		_continuous_sight_speed = _continuous_sight_base_speed * rhythm_speed_mult * rhythm_bpm_scale
-		_continuous_sight_zone_width = _continuous_sight_zone_width_base * 1.75
-		_continuous_sight_hit_window = _continuous_sight_hit_window_base
-		_continuous_sight_early_window_mult = _continuous_sight_early_window_mult_base
+		_continuous_sight_runtime.speed = _continuous_sight_runtime.base_speed * rhythm_speed_mult * rhythm_bpm_scale
+		_continuous_sight_runtime.zone_width = _continuous_sight_runtime.zone_width_base * 1.75
+		_continuous_sight_runtime.hit_window = _continuous_sight_runtime.hit_window_base
+		_continuous_sight_runtime.early_window_mult = _continuous_sight_runtime.early_window_mult_base
 		if demo_mode or reuse_current_rhythm_pattern:
 			if _rhythm_flow_runtime.patterns.is_empty() and not _rhythm_flow_runtime.generated_bars.is_empty():
 				_rhythm_flow_runtime.set_patterns(_rhythm_flow_patterns_from_generated_bars())
@@ -27718,25 +27695,25 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 
 func _finish_continuous_sight_reading(result_title: String = "Complete") -> void:
 	# Phase 3 lesson session: capture rhythm/continuous totals before the controller
-	# tears down state. _continuous_sight_correct_hits / _total_hits live for the
+	# tears down state. _continuous_sight_runtime.correct_hits / _total_hits live for the
 	# lifetime of the run.
-	var c_score: int = int(_continuous_sight_correct_hits)
-	var c_total: int = int(_continuous_sight_total_hits)
+	var c_score: int = int(_continuous_sight_runtime.correct_hits)
+	var c_total: int = int(_continuous_sight_runtime.total_hits)
 	_lesson_session_record_activity_end(c_score, c_total)
 	_ensure_session_controller().finish_continuous_sight_reading(self, result_title)
 
 
 func _on_continuous_sight_key_pressed(note_name: String) -> void:
-	if not _continuous_sight_active or not _quiz_active:
+	if not _continuous_sight_runtime.active or not _quiz_active:
 		return
 	_play_sight_answer_click_sfx()
 	# Prefer the note currently in the hit zone (more resilient on mobile/tablet FPS jitter).
 	var target_idx := _continuous_active_note_index()
 	if target_idx < 0:
 		target_idx = _continuous_next_note_index()
-	if target_idx < 0 or target_idx >= _continuous_sight_notes.size():
+	if target_idx < 0 or target_idx >= _continuous_sight_runtime.notes.size():
 		return
-	var target := _continuous_sight_notes[target_idx]
+	var target: Dictionary = _continuous_sight_runtime.notes[target_idx]
 	var target_panel_v: Variant = target.get("panel", null)
 	if target_panel_v == null or not is_instance_valid(target_panel_v):
 		return
@@ -27747,7 +27724,7 @@ func _on_continuous_sight_key_pressed(note_name: String) -> void:
 	var in_window := _continuous_note_in_zone(target_panel)
 	target_x = target_panel.position.x + (target_panel.size.x * 0.5)
 	var zone_bounds := _continuous_zone_bounds()
-	var early_max_x := zone_bounds.y + (_continuous_sight_zone_width * _continuous_sight_early_window_mult)
+	var early_max_x: float = zone_bounds.y + (_continuous_sight_runtime.zone_width * _continuous_sight_runtime.early_window_mult)
 	var early_window := target_x > zone_bounds.y and target_x <= early_max_x
 	var did_hit_note := false
 	if not in_window and not early_window:
@@ -27763,27 +27740,27 @@ func _on_continuous_sight_key_pressed(note_name: String) -> void:
 		_note_chase_spawn_pop_effect(miss_pop_center, Color(0.95, 0.36, 0.36, 1.0))
 		_note_chase_spawn_note_name_text(miss_pop_center, miss_reason, Color(1.0, 0.78, 0.78, 1.0))
 		return
-	_continuous_sight_total_hits += 1
+	_continuous_sight_runtime.total_hits += 1
 	if (in_window or early_window) and _continuous_note_matches_input(str(target.get("name", "")), note_name):
 		did_hit_note = true
 		var grade := "Good" if early_window and not in_window else _continuous_grade_for_x(target_x)
 		var entered_t := float(target.get("zone_enter_time", -1.0))
 		if entered_t >= 0.0:
-			_continuous_sight_reaction_sum += maxf(0.0, _continuous_sight_elapsed - entered_t)
-			_continuous_sight_reaction_count += 1
-		_continuous_sight_correct_hits += 1
-		_continuous_sight_combo += 1
-		_continuous_sight_best_combo = maxi(_continuous_sight_best_combo, _continuous_sight_combo)
-		_streak = _continuous_sight_combo
+			_continuous_sight_runtime.reaction_sum += maxf(0.0, _continuous_sight_runtime.elapsed - entered_t)
+			_continuous_sight_runtime.reaction_count += 1
+		_continuous_sight_runtime.correct_hits += 1
+		_continuous_sight_runtime.combo += 1
+		_continuous_sight_runtime.best_combo = maxi(_continuous_sight_runtime.best_combo, _continuous_sight_runtime.combo)
+		_streak = _continuous_sight_runtime.combo
 		var mult := _continuous_streak_multiplier()
 		var base_points := 10 if grade == "Perfect" else 5
 		_score += base_points * mult
 		_xp += mult
 		if grade == "Perfect":
-			_continuous_sight_perfect_hits += 1
+			_continuous_sight_runtime.perfect_hits += 1
 		else:
-			_continuous_sight_good_hits += 1
-		_continuous_sight_notes[target_idx]["answered"] = true
+			_continuous_sight_runtime.good_hits += 1
+		_continuous_sight_runtime.notes[target_idx]["answered"] = true
 		var pop_center := Vector2(target_x, target_panel.position.y + (target_panel.size.y * 0.5))
 		_note_chase_spawn_pop_effect(pop_center, Color(0.72, 1.0, 0.20, 1.0))
 		_note_chase_spawn_note_name_text(pop_center, note_name, Color(1.0, 0.96, 0.86, 1.0))
@@ -27877,17 +27854,17 @@ func _update_rhythm_flow(delta: float) -> void:
 	var remove_x := -40.0
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
 		remove_x = _note_chase_staff_frame.position.x - 40.0
-	for i in range(_continuous_sight_notes.size() - 1, -1, -1):
-		var n := _continuous_sight_notes[i]
+	for i in range(_continuous_sight_runtime.notes.size() - 1, -1, -1):
+		var n: Dictionary = _continuous_sight_runtime.notes[i]
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
-			_continuous_sight_notes.remove_at(i)
+			_continuous_sight_runtime.notes.remove_at(i)
 			continue
 		var p := p_v as Panel
 		if p == null:
-			_continuous_sight_notes.remove_at(i)
+			_continuous_sight_runtime.notes.remove_at(i)
 			continue
-		p.position.x -= _continuous_sight_speed * delta
+		p.position.x -= _continuous_sight_runtime.speed * delta
 		var center_x := p.position.x + (p.size.x * 0.5)
 		var evt_idx := int(n.get("rhythm_event_idx", -1))
 		if evt_idx >= 0 and evt_idx < _rhythm_flow_runtime.events.size():
@@ -27897,7 +27874,7 @@ func _update_rhythm_flow(delta: float) -> void:
 			else:
 				var wins := _rhythm_flow_timing_windows_for_event(evt)
 				var ok_win := float(wins.get("ok", 0.2))
-				var dt_to_hit := float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_elapsed
+				var dt_to_hit: float = float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_runtime.elapsed
 				if absf(dt_to_hit) <= ok_win:
 					p.self_modulate = Color(1.0, 0.98, 0.78, 1.0)
 				elif dt_to_hit > 0.0 and dt_to_hit <= (ok_win * 2.0):
@@ -27910,33 +27887,33 @@ func _update_rhythm_flow(delta: float) -> void:
 			p.modulate = Color(1, 1, 1, clampf(p.modulate.a - (delta * 1.8), 0.0, 1.0))
 		var answered := bool(n.get("answered", false))
 		var feedback_until := float(n.get("rhythm_feedback_until", -1.0))
-		var feedback_done := feedback_until < 0.0 or _continuous_sight_elapsed >= feedback_until
+		var feedback_done: bool = feedback_until < 0.0 or _continuous_sight_runtime.elapsed >= feedback_until
 		var passed_hit_line := center_x < (_continuous_play_line_x() - 6.0)
 		var can_remove_answered := answered and feedback_done and passed_hit_line and (center_x < remove_x or p.modulate.a <= 0.02)
 		if (not answered and (center_x < remove_x or p.modulate.a <= 0.02)) or can_remove_answered:
 			p.queue_free()
-			_continuous_sight_notes.remove_at(i)
+			_continuous_sight_runtime.notes.remove_at(i)
 	_rhythm_flow_update_demo_scheduler()
 	_rhythm_flow_mark_passed_misses()
-	if not _continuous_sight_active:
+	if not _continuous_sight_runtime.active:
 		return
 	_rhythm_flow_try_finish_if_complete()
-	if not _continuous_sight_active:
+	if not _continuous_sight_runtime.active:
 		return
-	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
+	var acc := int(round((float(_continuous_sight_runtime.correct_hits) / float(maxi(1, _continuous_sight_runtime.total_hits))) * 100.0))
 	if _rhythm_flow_runtime.session_mode == RHYTHM_FLOW_SESSION_DEMO:
 		var demo_text := "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_runtime.bpm]
 		if _progress_label.text != demo_text:
 			_progress_label.text = demo_text
 	else:
-		var rhythm_text := "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_runtime.ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+		var rhythm_text: String = "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_runtime.perfect_hits, _continuous_sight_runtime.good_hits, _rhythm_flow_runtime.ok_hits, _continuous_sight_runtime.miss_hits, _continuous_sight_runtime.combo]
 		if _progress_label.text != rhythm_text:
 			_progress_label.text = rhythm_text
 	_score_label.text = "Score: %d" % _score
 	if _continuous_sight_skin_active:
-		if _sight_lives_hearts_label != null and _hud_combo_displayed != _continuous_sight_combo:
-			_hud_combo_displayed = _continuous_sight_combo
-			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
+		if _sight_lives_hearts_label != null and _hud_combo_displayed != _continuous_sight_runtime.combo:
+			_hud_combo_displayed = _continuous_sight_runtime.combo
+			_sight_lives_hearts_label.text = str(_continuous_sight_runtime.combo)
 		if _sight_streak_value_label != null and _hud_level_displayed != _rhythm_flow_runtime.bpm:
 			_hud_level_displayed = _rhythm_flow_runtime.bpm
 			_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm)
@@ -27946,26 +27923,26 @@ func _update_rhythm_flow(delta: float) -> void:
 
 
 func _update_continuous_sight(delta: float) -> void:
-	if not _continuous_sight_active:
+	if not _continuous_sight_runtime.active:
 		return
 	if _staff_area == null or not _is_continuous_flow_sight_mode() or not _game_panel.visible:
 		return
-	if _continuous_sight_waiting_start:
+	if _continuous_sight_runtime.waiting_start:
 		return
 	var rhythm_paused: bool = _is_rhythm_flow_mode() and _rhythm_flow_runtime.paused
 	if not rhythm_paused:
-		_continuous_sight_elapsed += delta
+		_continuous_sight_runtime.elapsed += delta
 	_setup_continuous_play_line()
 	if _is_rhythm_flow_mode():
 		_hide_continuous_visual_aids()
 		_update_rhythm_flow(0.0 if rhythm_paused else delta)
 		return
 	_update_continuous_visual_aids()
-	_continuous_sight_spawn_timer -= delta
-	if _continuous_sight_spawn_timer <= 0.0 and _continuous_can_spawn_note():
+	_continuous_sight_runtime.spawn_timer -= delta
+	if _continuous_sight_runtime.spawn_timer <= 0.0 and _continuous_can_spawn_note():
 		_spawn_continuous_sight_note()
-		_continuous_last_spawn_elapsed = _continuous_sight_elapsed
-		_continuous_sight_spawn_timer = 60.0 / float(maxi(1, _continuous_sight_bpm))
+		_continuous_last_spawn_elapsed = _continuous_sight_runtime.elapsed
+		_continuous_sight_runtime.spawn_timer = 60.0 / float(maxi(1, _continuous_sight_runtime.bpm))
 	var line_x := _continuous_play_line_x()
 	var remove_x := -40.0
 	var zone_bounds := _continuous_zone_bounds()
@@ -27973,8 +27950,8 @@ func _update_continuous_sight(delta: float) -> void:
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
 		remove_x = _note_chase_staff_frame.position.x - 40.0
 	var _surviving_notes: Array[Dictionary] = []
-	for i in range(_continuous_sight_notes.size()):
-		var n := _continuous_sight_notes[i]
+	for i in range(_continuous_sight_runtime.notes.size()):
+		var n: Dictionary = _continuous_sight_runtime.notes[i]
 		var p_v: Variant = n.get("panel", null)
 		if p_v == null or not is_instance_valid(p_v):
 			continue
@@ -27984,10 +27961,10 @@ func _update_continuous_sight(delta: float) -> void:
 		var note_step := int(n.get("step", 0))
 		var target_center_y := _continuous_note_center_y_for_step(note_step)
 		p.position.y = roundf(target_center_y - (p.size.y * 0.5))
-		p.position.x -= _continuous_sight_speed * delta
+		p.position.x -= _continuous_sight_runtime.speed * delta
 		var center_x := p.position.x + (p.size.x * 0.5)
 		if float(n.get("zone_enter_time", -1.0)) < 0.0 and center_x <= zone_bounds.y:
-			n["zone_enter_time"] = _continuous_sight_elapsed
+			n["zone_enter_time"] = _continuous_sight_runtime.elapsed
 		var note_ledgers: Array = n.get("ledgers", [])
 		var acc_v: Variant = n.get("acc_label", null)
 		var acc_label := acc_v as Label
@@ -28036,23 +28013,23 @@ func _update_continuous_sight(delta: float) -> void:
 			p.queue_free()
 		else:
 			_surviving_notes.append(n)
-	_continuous_sight_notes = _surviving_notes
+	_continuous_sight_runtime.notes = _surviving_notes
 	var next_idx := _continuous_next_note_index()
-	if next_idx >= 0 and next_idx < _continuous_sight_notes.size():
-		var next_note := _continuous_sight_notes[next_idx]
+	if next_idx >= 0 and next_idx < _continuous_sight_runtime.notes.size():
+		var next_note: Dictionary = _continuous_sight_runtime.notes[next_idx]
 		var next_panel_v: Variant = next_note.get("panel", null)
 		if next_panel_v != null and is_instance_valid(next_panel_v):
 			var next_panel := next_panel_v as Panel
 			if next_panel != null:
 				var next_x := next_panel.position.x + (next_panel.size.x * 0.5)
 				if next_x < zone_bounds.x:
-					_continuous_sight_notes[next_idx]["answered"] = true
-					_continuous_sight_total_hits += 1
+					_continuous_sight_runtime.notes[next_idx]["answered"] = true
+					_continuous_sight_runtime.total_hits += 1
 					_continuous_register_miss(true, "Too Late", "Too Late", str(next_note.get("name", "")), int(next_note.get("step", 0)))
-					if not _continuous_sight_active:
+					if not _continuous_sight_runtime.active:
 						return
-	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
-	var new_progress_text := "LV:%d  ACC:%d%%  P:%d G:%d M:%d  COMBO:%d" % [_continuous_sight_level, acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+	var acc := int(round((float(_continuous_sight_runtime.correct_hits) / float(maxi(1, _continuous_sight_runtime.total_hits))) * 100.0))
+	var new_progress_text: String = "LV:%d  ACC:%d%%  P:%d G:%d M:%d  COMBO:%d" % [_continuous_sight_runtime.level, acc, _continuous_sight_runtime.perfect_hits, _continuous_sight_runtime.good_hits, _continuous_sight_runtime.miss_hits, _continuous_sight_runtime.combo]
 	if _progress_label.text != new_progress_text:
 		_progress_label.text = new_progress_text
 	_score_label.text = "Score: %d" % _score
@@ -28060,9 +28037,9 @@ func _update_continuous_sight(delta: float) -> void:
 		if _sight_lives_hearts_label != null and _hud_combo_displayed != _lives:
 			_hud_combo_displayed = _lives
 			_sight_lives_hearts_label.text = "%s %d" % [char(0x2764), _lives]
-		if _sight_streak_value_label != null and _hud_level_displayed != _continuous_sight_combo:
-			_hud_level_displayed = _continuous_sight_combo
-			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_combo]
+		if _sight_streak_value_label != null and _hud_level_displayed != _continuous_sight_runtime.combo:
+			_hud_level_displayed = _continuous_sight_runtime.combo
+			_sight_streak_value_label.text = "%s %d" % [char(0x1F525), _continuous_sight_runtime.combo]
 		if _sight_streak_score_label != null and _hud_acc_displayed != _score:
 			_hud_acc_displayed = _score
 			_sight_streak_score_label.text = "Score: %d" % _score
@@ -28243,7 +28220,7 @@ func _on_staff_area_gui_input(event: InputEvent) -> void:
 				_on_round_start_pressed()
 				accept_event()
 				return
-	if _is_continuous_flow_sight_mode() and _continuous_sight_active and _continuous_sight_waiting_start:
+	if _is_continuous_flow_sight_mode() and _continuous_sight_runtime.active and _continuous_sight_runtime.waiting_start:
 		if event is InputEventScreenTouch:
 			var st_start := event as InputEventScreenTouch
 			if st_start.pressed:
@@ -28256,7 +28233,7 @@ func _on_staff_area_gui_input(event: InputEvent) -> void:
 				_start_continuous_flow_after_waiting()
 				accept_event()
 				return
-	if _is_rhythm_flow_mode() and _continuous_sight_active and not _continuous_sight_waiting_start:
+	if _is_rhythm_flow_mode() and _continuous_sight_runtime.active and not _continuous_sight_runtime.waiting_start:
 		if event is InputEventScreenTouch:
 			var st_tap := event as InputEventScreenTouch
 			if st_tap.pressed:
@@ -28640,8 +28617,8 @@ func _active_staff_line_gap_y() -> float:
 			var bounds := _get_sight_step_bounds()
 			if _sight_mode == "Notes":
 				bounds = _effective_sight_step_bounds()
-			elif _sight_mode == "Continuous" and _continuous_sight_active:
-				bounds = _continuous_sight_level_bounds
+			elif _sight_mode == "Continuous" and _continuous_sight_runtime.active:
+				bounds = _continuous_sight_runtime.level_bounds
 			var top_step := mini(-4, bounds.x)
 			var bottom_step := maxi(12, bounds.y)
 			var top_dist := float(4 - top_step) * 0.5
@@ -28876,7 +28853,7 @@ func _set_staff_highlight_none() -> void:
 
 
 func _ensure_staff_base_lines_visible() -> void:
-	var rhythm_single_line := _is_rhythm_flow_mode() and _continuous_sight_active
+	var rhythm_single_line: bool = _is_rhythm_flow_mode() and _continuous_sight_runtime.active
 	var single_idx := 2
 	for i in _staff_lines.size():
 		var line := _staff_lines[i]
@@ -28901,15 +28878,15 @@ func _ensure_staff_base_lines_visible() -> void:
 	for beat_lbl in _rhythm_flow_beat_labels:
 		if beat_lbl == null:
 			continue
-		beat_lbl.visible = rhythm_single_line and _continuous_sight_active and not _continuous_sight_waiting_start
+		beat_lbl.visible = rhythm_single_line and _continuous_sight_runtime.active and not _continuous_sight_runtime.waiting_start
 	for ts_lbl in _rhythm_flow_time_sig_labels:
 		if ts_lbl == null:
 			continue
-		ts_lbl.visible = rhythm_single_line and _continuous_sight_active and not _continuous_sight_waiting_start
+		ts_lbl.visible = rhythm_single_line and _continuous_sight_runtime.active and not _continuous_sight_runtime.waiting_start
 	for perc_bar in _rhythm_flow_perc_clef_bars:
 		if perc_bar == null:
 			continue
-		perc_bar.visible = rhythm_single_line and _continuous_sight_active and not _continuous_sight_waiting_start
+		perc_bar.visible = rhythm_single_line and _continuous_sight_runtime.active and not _continuous_sight_runtime.waiting_start
 	if rhythm_single_line:
 		if _staff_clef_label != null:
 			_staff_clef_label.visible = false
@@ -29623,8 +29600,8 @@ func _nearest_ledger_step_from_visual_note_center_y(note_center_y: float) -> int
 	if _selected_mode == MODE_SIGHT:
 		if _sight_mode == "Notes":
 			bounds = _effective_sight_step_bounds()
-		elif _sight_mode == "Continuous" and _continuous_sight_active:
-			bounds = _continuous_sight_level_bounds
+		elif _sight_mode == "Continuous" and _continuous_sight_runtime.active:
+			bounds = _continuous_sight_runtime.level_bounds
 	var min_step := bounds.x - 4
 	var max_step := bounds.y + 4
 	var approx_step := int(round((note_center_y - _active_staff_top_y()) / _active_staff_step_y()))
