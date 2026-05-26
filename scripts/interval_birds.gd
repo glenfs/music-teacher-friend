@@ -110,6 +110,7 @@ const PitchMatchTheoryScript = preload("res://scripts/exercises/pitch_match_theo
 const MusicHelpersScript = preload("res://scripts/music_theory/music_helpers.gd")
 const NoteChaseDifficultyScript = preload("res://scripts/exercises/note_chase_difficulty.gd")
 const NoteChaseEffectsScript = preload("res://scripts/exercises/note_chase_effects.gd")
+const SightSingingTheoryScript = preload("res://scripts/sight_singing/sight_singing_theory.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -1350,10 +1351,10 @@ var _sight_singing_phrase_result: Dictionary = {}
 var _sight_singing_take_segments: Array = []
 var _sight_singing_take_curve: Array = []
 var _sight_singing_pitch_candidates: Array = []
-const SIGHT_SINGING_END_SILENCE_SEC := 1.15
-const SIGHT_SINGING_MIN_PHRASE_SEC := 1.0
-const SIGHT_SINGING_SECONDS_PER_NOTE_LIMIT := 1.45
-const SIGHT_SINGING_REFERENCE_SECONDS_PER_BEAT := 0.42
+const SIGHT_SINGING_END_SILENCE_SEC := SightSingingTheoryScript.END_SILENCE_SEC
+const SIGHT_SINGING_MIN_PHRASE_SEC := SightSingingTheoryScript.MIN_PHRASE_SEC
+const SIGHT_SINGING_SECONDS_PER_NOTE_LIMIT := SightSingingTheoryScript.SECONDS_PER_NOTE_LIMIT
+const SIGHT_SINGING_REFERENCE_SECONDS_PER_BEAT := SightSingingTheoryScript.REFERENCE_SECONDS_PER_BEAT
 # Tracks whether the bird/chicken sprites were visible before the sight-singing
 # round so we can restore them when the round ends. Sight Singing targets a
 # more adult user — the kid-friendly mascot decorations are out of place there.
@@ -24099,126 +24100,51 @@ func _sight_singing_sync_rhythm_level_options() -> void:
 
 
 func _sight_singing_key_pc() -> int:
-	match _sight_key_signature:
-		"C":  return 0
-		"1#": return 7   # G major
-		"2#": return 2   # D major
-		"3#": return 9   # A major
-		"1b": return 5   # F major
-		"2b": return 10  # Bb major
-		"3b": return 3   # Eb major
-	return 0
+	return SightSingingTheoryScript.key_pc(_sight_key_signature)
 
 
 func _sight_singing_tonic_midi() -> int:
-	# C4 + pitch-class offset. Centers melodies around the middle of the staff.
-	return 60 + _sight_singing_key_pc()
+	return SightSingingTheoryScript.tonic_midi(_sight_key_signature)
 
 
 func _sight_singing_tonic_triad() -> Array[int]:
-	var t := _sight_singing_tonic_midi()
-	# Explicit Array[int] — _play_chord_block strictly type-checks its arg.
-	var triad: Array[int] = [t, t + 4, t + 7]  # v1: major only
-	return triad
+	return SightSingingTheoryScript.tonic_triad(_sight_key_signature)
 
 
-# I-IV-V-I in the active key. V is always major for the classic cadence sound,
-# regardless of mode (parallel to _pitch_match_cadence_chords). Each inner
-# chord is explicitly Array[int] so _play_chord_block accepts it without the
-# "Array does not have the same element type as the expected typed array" error.
 func _sight_singing_cadence_chords() -> Array:
-	var t := _sight_singing_tonic_midi()
-	var i_chord: Array[int] = [t, t + 4, t + 7]
-	var iv_chord: Array[int] = [t + 5, t + 5 + 4, t + 5 + 7]
-	var v_chord: Array[int] = [t + 7, t + 7 + 4, t + 7 + 7]  # major V
-	return [i_chord, iv_chord, v_chord, i_chord]
+	return SightSingingTheoryScript.cadence_chords(_sight_key_signature)
 
 
-# Returns the MusicXML-style fifths count for the active sight-singing key.
-# v1 maps the seven sight key-signature buttons to their major-key tonics.
 func _sight_singing_fifths() -> int:
-	var pc: int = _sight_singing_key_pc()
-	var sharp_map := {0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6}
-	var flat_map := {5: -1, 10: -2, 3: -3, 8: -4, 1: -5}
-	if sharp_map.has(pc):
-		return int(sharp_map[pc])
-	if flat_map.has(pc):
-		return int(flat_map[pc])
-	return 0
+	return SightSingingTheoryScript.fifths(_sight_key_signature)
 
 
 func _sight_singing_rhythm_templates(level: int) -> Array:
-	match clampi(level, 1, 3):
-		1:
-			return [[1.0, 1.0, 1.0, 1.0, 1.0]]
-		2:
-			return [
-				[1.0, 1.0, 1.0, 1.0, 2.0],
-				[2.0, 1.0, 1.0, 2.0, 1.0],
-				[1.0, 2.0, 1.0, 2.0, 1.0],
-				[2.0, 2.0, 1.0, 1.0, 2.0],
-				[1.0, 1.0, 2.0, 1.0, 4.0],
-			]
-		_:
-			return [
-				[0.5, 0.5, 1.0, 1.0, 2.0],
-				[1.0, 0.5, 0.5, 1.0, 2.0],
-				[0.5, 0.5, 0.5, 0.5, 2.0],
-				[1.0, 1.0, 0.5, 0.5, 1.0],
-				[2.0, 0.5, 0.5, 1.0, 1.0],
-				[0.5, 0.5, 1.0, 2.0, 4.0],
-			]
+	return SightSingingTheoryScript.rhythm_templates(level)
 
 
 func _sight_singing_generate_durations(note_count: int) -> Array[float]:
-	var durations: Array[float] = []
-	if note_count <= 0:
-		return durations
-	var templates := _sight_singing_rhythm_templates(_sight_singing_rhythm_level)
-	var picked: Array = []
-	if not templates.is_empty():
-		picked = templates[_sight_singing_rng.randi_range(0, templates.size() - 1)]
-	for i in range(note_count):
-		var dur := 1.0
-		if i < picked.size():
-			dur = maxf(0.5, float(picked[i]))
-		durations.append(dur)
-	return durations
+	return SightSingingTheoryScript.generate_durations(note_count, _sight_singing_rhythm_level, _sight_singing_rng)
 
 
 func _sight_singing_duration_at(index: int) -> float:
-	if index >= 0 and index < _sight_singing_durations.size():
-		return maxf(0.5, float(_sight_singing_durations[index]))
-	return 1.0
+	return SightSingingTheoryScript.duration_at(_sight_singing_durations, index)
 
 
 func _sight_singing_total_beats() -> float:
-	var total := 0.0
-	for dur in _sight_singing_durations:
-		total += maxf(0.5, float(dur))
-	if total <= 0.0:
-		total = float(maxi(1, _sight_singing_melody.size()))
-	return total
+	return SightSingingTheoryScript.total_beats(_sight_singing_durations, _sight_singing_melody)
 
 
 func _sight_singing_duration_prefix(end_exclusive: int) -> float:
-	var total := 0.0
-	for i in range(clampi(end_exclusive, 0, _sight_singing_melody.size())):
-		total += _sight_singing_duration_at(i)
-	return total
+	return SightSingingTheoryScript.duration_prefix(_sight_singing_durations, _sight_singing_melody, end_exclusive)
 
 
 func _sight_singing_uses_varied_rhythm() -> bool:
-	if _sight_singing_rhythm_level >= 2:
-		return true
-	for dur in _sight_singing_durations:
-		if absf(float(dur) - 1.0) > 0.05:
-			return true
-	return false
+	return SightSingingTheoryScript.uses_varied_rhythm(_sight_singing_durations, _sight_singing_rhythm_level)
 
 
 func _sight_singing_note_seconds(duration_beats: float) -> float:
-	return clampf(maxf(0.5, duration_beats) * SIGHT_SINGING_REFERENCE_SECONDS_PER_BEAT, 0.22, 1.85)
+	return SightSingingTheoryScript.note_seconds(duration_beats)
 
 
 # Builds a StaffRenderer score dict from the current sight-singing melody.
