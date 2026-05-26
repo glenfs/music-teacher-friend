@@ -24285,11 +24285,12 @@ func _build_sight_big_piano() -> void:
 		lbl.add_theme_font_size_override("font_size", 14)
 		if _ui_font != null:
 			lbl.add_theme_font_override("font", _ui_font)
-		# Strong contrast on any background: dark text + bright outline.
-		# Works on default cream key, lit blue key, red wrong-key feedback, etc.
-		lbl.add_theme_color_override("font_color", Color(0.08, 0.10, 0.16, 1.0))
-		lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
-		lbl.add_theme_constant_override("outline_size", 4)
+		# Dark navy blue ties into the app's navy palette (MENU_SETUP_TINT
+		# #0F2740) and gives strong contrast on the cream key color. Subtle
+		# white outline keeps it legible when the key is lit blue/red/green.
+		lbl.add_theme_color_override("font_color", Color(0.039, 0.184, 0.361, 1.0))  # #0A2F5C
+		lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.95))
+		lbl.add_theme_constant_override("outline_size", 3)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		lbl.z_index = 50
 		_sight_big_piano_keys_root.add_child(lbl)

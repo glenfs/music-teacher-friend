@@ -271,9 +271,11 @@ func _build_keyboard() -> void:
 			else:
 				lbl.text = letter
 			lbl.add_theme_font_size_override("font_size", 11)
-			lbl.add_theme_color_override("font_color", Color(0.08, 0.10, 0.16, 1.0))
-			lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
-			lbl.add_theme_constant_override("outline_size", 3)
+			# Dark navy blue — matches the parent app's MENU_SETUP_TINT palette
+			# (#0F2740) and contrasts strongly with the cream white-key color.
+			lbl.add_theme_color_override("font_color", Color(0.039, 0.184, 0.361, 1.0))  # #0A2F5C
+			lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.95))
+			lbl.add_theme_constant_override("outline_size", 2)
 			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 			lbl.position = Vector2(white_x, WHITE_H - 18.0)
