@@ -594,6 +594,11 @@ var _earned_badges: Array[String] = []
 var _badge_lifetime_correct_sight: int = 0
 var _badge_lifetime_correct_chord: int = 0
 var _badge_daily_completed_dates: Array[String] = []  # for daily_3
+# Per-item mastery streaks. Keyed "<category>:<item_id>" → consecutive correct
+# count. Earning the mastery badge for an item at MASTERY_STREAK_THRESHOLD
+# (8 in a row) triggers a toast and a permanent "mastered_<cat>_<id>" entry
+# in _earned_badges. Persisted in ear_settings.json.
+var _item_correct_streaks: Dictionary = {}
 # Per-student badge state. Keyed by student_id → Dict of badge fields. The
 # in-memory `_earned_badges` (and lifetime counters) reflects the active
 # student. On student switch we snapshot-and-restore these vars from this map.
@@ -1190,6 +1195,12 @@ var _compare_chosen_notes: Array[int] = []
 var _compare_chosen_chords: Array[Array] = []
 var _cadence_roman_label: Label = null
 var _chord_recent_results: Array[bool] = []
+# Parallel rolling-accuracy window for Interval mode — drives mid-session
+# adaptive difficulty escalation (expand pool on >=85%, contract on <=40%).
+var _interval_recent_results: Array[bool] = []
+# Status-line message scheduled after the next answer to surface a difficulty
+# change to the player ("Added M7 to the pool — you've got this.")
+var _adaptive_difficulty_note: String = ""
 var _interval_choices_top_spacer: Control
 var _interval_choices_row: HBoxContainer
 var _sight_side_controls: VBoxContainer
@@ -1310,7 +1321,11 @@ var _ear_replay_limit := 3
 var _ear_replays_used := 0
 var _ear_free_replay_for_wrong := true
 var _ear_register_variation_enabled := true
+var _ear_prompt_volume_db := 0
+var _ear_sfx_volume_db := -2
 var _ear_tempo_spin: SpinBox = null
+var _ear_prompt_volume_spin: SpinBox = null
+var _ear_sfx_volume_spin: SpinBox = null
 var _ear_count_in_toggle: CheckButton = null
 var _ear_metronome_toggle: CheckButton = null
 var _ear_context_tonic_toggle: CheckButton = null
@@ -1392,6 +1407,7 @@ var _xp := 0
 var _is_prompt_playing := false
 var _quiz_run_token := 0
 var _accepting_answer := false
+var _shutdown_requested := false
 var _awaiting_round_start := false
 # Note Chase runtime — owns the 26 runtime state vars + active_notes array.
 # Strict-typed RefCounted ref (NOT Node-based) so Godot 4.6's typed property
@@ -1423,6 +1439,11 @@ var _interval_stats_asked: Dictionary = {}
 var _interval_stats_correct: Dictionary = {}
 var _chord_stats_asked: Dictionary = {}
 var _chord_stats_correct: Dictionary = {}
+# Parallel "correct WITHOUT hint" tallies — same key shape as the regular
+# correct dicts. Used to distinguish real mastery from hint-assisted answers
+# in the result screen + future teacher dashboard.
+var _interval_stats_correct_unaided: Dictionary = {}
+var _chord_stats_correct_unaided: Dictionary = {}
 var _ear_confusion_stats: Dictionary = {}
 var _sight_stats_asked: Dictionary = {}
 var _sight_stats_correct: Dictionary = {}
@@ -1493,6 +1514,12 @@ var _practice_mode_enabled: bool = true
 var _home_practice_toggle: Button = null
 # Fix 9: Focus Misses — interval/chord IDs to restrict next session to
 var _focus_missed_ids: Array[String] = []
+# Confusion drill state: when true, the next session is restricted to items
+# from the student's top confused pairs. Cleared at session end so subsequent
+# sessions go back to normal pool.
+var _confusion_drill_active: bool = false
+const CONFUSION_DRILL_QUESTION_COUNT := 8
+const CONFUSION_DRILL_TOP_PAIRS := 3
 # Item 10: First-run ear intro
 var _ear_intro_seen: bool = false
 var _first_run_onboarding_done: bool = false
@@ -1516,6 +1543,7 @@ const SESSION_LOG_LIVE_PATH := "user://session.log"
 const SESSION_LOGS_DIR := "user://logs"
 var _profile_prompt_overlay: ColorRect = null
 var _quick_practice_button: Button = null
+var _confusion_drill_button: Button = null
 # Difficulty presets
 var _interval_difficulty_preset: String = "beginner"
 var _chord_difficulty_preset: String = "beginner"
@@ -2375,6 +2403,7 @@ func _sight_renderer_config() -> Dictionary:
 
 
 func _exit_tree() -> void:
+	_prepare_for_shutdown()
 	_cleanup_runtime_shutdown_refs()
 	_invalidate_audio_sequence_schedule()
 	if _practice_drills_panel != null and is_instance_valid(_practice_drills_panel):
@@ -2394,6 +2423,37 @@ func _exit_tree() -> void:
 		_shield_sfx_player.stop()
 	if _audio_player != null:
 		_audio_player.stop()
+
+
+func _qa_prepare_for_quit() -> void:
+	_prepare_for_shutdown()
+
+
+func _prepare_for_shutdown() -> void:
+	_shutdown_requested = true
+	_bump_quiz_run_token()
+	_invalidate_audio_sequence_schedule()
+	_is_prompt_playing = false
+	_quiz_active = false
+	_accepting_answer = false
+	_awaiting_round_start = false
+	_ear_replays_used = 0
+	_stop_prompt_audio_playback()
+	_cancel_chicken_turn_hint_cycle(true)
+	_stop_mic_listening()
+	_stop_midi_listening()
+	_stop_pitch_match_drone()
+	_stop_sight_singing()
+	_stop_note_chase_music()
+	_continuous_sight_runtime.active = false
+	_continuous_sight_runtime.waiting_start = false
+	_note_chase_runtime.running = false
+	_rhythm_flow_runtime.paused = false
+	_home_ambient_run_id += 1
+	if _compare_bar != null:
+		_compare_bar.visible = false
+	if _sight_singing_take_audio_player != null:
+		_sight_singing_take_audio_player.stop()
 
 
 func _cleanup_runtime_shutdown_refs() -> void:
@@ -2617,6 +2677,22 @@ func _stop_prompt_audio_playback() -> void:
 	# (or waiting indefinitely for free frames on some devices).
 
 
+func _wait_or_shutdown(seconds: float, expected_token: int = -1, audio_run_id: int = -1) -> bool:
+	var duration := maxf(0.0, seconds)
+	if duration <= 0.0:
+		return not _shutdown_requested
+	var deadline := (float(Time.get_ticks_msec()) / 1000.0) + duration
+	while float(Time.get_ticks_msec()) / 1000.0 < deadline:
+		if _shutdown_requested:
+			return false
+		if expected_token >= 0 and expected_token != _quiz_run_token:
+			return false
+		if audio_run_id >= 0 and audio_run_id != _audio_sequence_run_id:
+			return false
+		await get_tree().process_frame
+	return not _shutdown_requested
+
+
 func _clear_gameplay_transient_visuals() -> void:
 	# Clear visual/audio leftovers when switching modes/submodes or returning home.
 	_stop_prompt_audio_playback()
@@ -2774,6 +2850,7 @@ func _handle_app_close_requested() -> void:
 		# Already trying to close — second close request from the user means
 		# "really, just quit now". Bail out of the wait.
 		_close_session_log_clean()
+		_prepare_for_shutdown()
 		get_tree().quit()
 		return
 	# Quit-during-lesson guard: if a lesson is being recorded, ask the teacher
@@ -2786,6 +2863,7 @@ func _handle_app_close_requested() -> void:
 	# Mark the session as a clean shutdown so the next launch doesn't classify
 	# it as a crash. Done BEFORE the (possibly slow) cloud-push wait.
 	_close_session_log_clean()
+	_prepare_for_shutdown()
 	if _sync_provider == null or not _sync_provider.call("is_signed_in"):
 		get_tree().quit()
 		return
@@ -4278,6 +4356,39 @@ func _build_ui() -> void:
 	_style_practice_setup_input_control(_ear_replay_limit_spin)
 	replay_row.add_child(_ear_replay_limit_spin)
 
+	var volume_row := HBoxContainer.new()
+	volume_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	volume_row.add_theme_constant_override("separation", 10)
+	_ear_settings_more_panel.add_child(volume_row)
+	var prompt_volume_label := Label.new()
+	prompt_volume_label.text = "Prompt dB"
+	prompt_volume_label.set_meta("settings_small_label", true)
+	volume_row.add_child(prompt_volume_label)
+	_ear_prompt_volume_spin = SpinBox.new()
+	_ear_prompt_volume_spin.min_value = -18
+	_ear_prompt_volume_spin.max_value = 6
+	_ear_prompt_volume_spin.step = 1
+	_ear_prompt_volume_spin.value = _ear_prompt_volume_db
+	_ear_prompt_volume_spin.custom_minimum_size = Vector2(74, 36)
+	_ear_prompt_volume_spin.tooltip_text = "Adjusts question playback level."
+	_ear_prompt_volume_spin.value_changed.connect(_on_ear_prompt_volume_changed)
+	_style_practice_setup_input_control(_ear_prompt_volume_spin)
+	volume_row.add_child(_ear_prompt_volume_spin)
+	var sfx_volume_label := Label.new()
+	sfx_volume_label.text = "FX dB"
+	sfx_volume_label.set_meta("settings_small_label", true)
+	volume_row.add_child(sfx_volume_label)
+	_ear_sfx_volume_spin = SpinBox.new()
+	_ear_sfx_volume_spin.min_value = -24
+	_ear_sfx_volume_spin.max_value = 6
+	_ear_sfx_volume_spin.step = 1
+	_ear_sfx_volume_spin.value = _ear_sfx_volume_db
+	_ear_sfx_volume_spin.custom_minimum_size = Vector2(74, 36)
+	_ear_sfx_volume_spin.tooltip_text = "Adjusts correct/wrong feedback level."
+	_ear_sfx_volume_spin.value_changed.connect(_on_ear_sfx_volume_changed)
+	_style_practice_setup_input_control(_ear_sfx_volume_spin)
+	volume_row.add_child(_ear_sfx_volume_spin)
+
 	# Practice mode toggle lives on the home page footer button
 
 	# Diagnostics section — Codex P2 review item: Settings needs to be useful
@@ -5408,6 +5519,18 @@ func _build_ui() -> void:
 	_how_to_play_button.pressed.connect(_on_how_to_play_pressed)
 	_home_start_action_row.add_child(_how_to_play_button)
 	_home_material_buttons.append(_how_to_play_button)
+
+	# Confusion Drill — visible only when the student has recorded confused
+	# pairs for the active mode. Restricts the next session to items from the
+	# top N pairs (e.g. M3 vs m3, Perfect vs Plagal).
+	_confusion_drill_button = Button.new()
+	_confusion_drill_button.text = "%s Confusion Drill" % char(0x1F9E0)  # brain emoji
+	_confusion_drill_button.custom_minimum_size = Vector2(180, 42)
+	_confusion_drill_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_confusion_drill_button.visible = false
+	_confusion_drill_button.pressed.connect(_on_confusion_drill_pressed)
+	_home_start_action_row.add_child(_confusion_drill_button)
+	_home_material_buttons.append(_confusion_drill_button)
 
 	_home_practice_toggle = Button.new()
 	_home_practice_toggle.text = "Practice Mode on" if _practice_mode_enabled else "Game Mode on"
@@ -12193,6 +12316,144 @@ func _on_result_action_focus_pressed() -> void:
 	_on_restart_quiz_pressed()
 
 
+# Confusion drill: builds an item pool from the student's top N confused pairs
+# in the current mode's confusion category, then runs a short focused round.
+func _confusion_category_for_mode(mode: int) -> String:
+	if mode == MODE_INTERVAL:
+		return "interval"
+	if mode == MODE_CHORD:
+		return "chord"
+	if mode == MODE_PROGRESSION:
+		return "progression"
+	if mode == MODE_SCALE_MODE:
+		return "scale_mode"
+	if mode == MODE_CADENCE:
+		return "cadence"
+	if mode == MODE_PITCH_MATCH:
+		return "pitch_match"
+	return ""
+
+
+# Returns [{correct: X, chosen: Y, count: N}] sorted by count desc, capped at N.
+func _top_confusion_pairs(category: String, top_n: int) -> Array:
+	var pairs: Array = []
+	var cat_map_v: Variant = _ear_confusion_stats.get(category, null)
+	if typeof(cat_map_v) != TYPE_DICTIONARY:
+		return pairs
+	var cat_map: Dictionary = cat_map_v
+	for correct_id_v in cat_map.keys():
+		var inner_v: Variant = cat_map[correct_id_v]
+		if typeof(inner_v) != TYPE_DICTIONARY:
+			continue
+		var inner: Dictionary = inner_v
+		for chosen_id_v in inner.keys():
+			pairs.append({
+				"correct": str(correct_id_v),
+				"chosen": str(chosen_id_v),
+				"count": int(inner[chosen_id_v]),
+			})
+	pairs.sort_custom(func(a, b): return int(a["count"]) > int(b["count"]))
+	return pairs.slice(0, top_n)
+
+
+# Unique-item list pulled from the top confused pairs (both correct AND chosen
+# sides — the student needs to discriminate between them).
+func _compute_confusion_drill_ids(mode: int) -> Array[String]:
+	var category := _confusion_category_for_mode(mode)
+	if category.is_empty():
+		return []
+	var pairs := _top_confusion_pairs(category, CONFUSION_DRILL_TOP_PAIRS)
+	var out: Array[String] = []
+	for p in pairs:
+		var c := str(p["correct"])
+		var x := str(p["chosen"])
+		if not out.has(c):
+			out.append(c)
+		if not out.has(x):
+			out.append(x)
+	return out
+
+
+func _on_confusion_drill_pressed() -> void:
+	_play_ui_click_sfx()
+	var drill_ids := _compute_confusion_drill_ids(_selected_mode)
+	if drill_ids.is_empty():
+		if _status_label != null:
+			_status_label.text = "No confusion data yet — play a round first."
+		return
+	_focus_missed_ids = drill_ids
+	_confusion_drill_active = true
+	if _question_spin != null:
+		_suppress_round_count_save = true
+		_question_spin.value = CONFUSION_DRILL_QUESTION_COUNT
+		_suppress_round_count_save = false
+	# Surface what we're drilling so the student knows what to expect.
+	if _status_label != null:
+		var preview := ", ".join(drill_ids.slice(0, mini(4, drill_ids.size())))
+		_status_label.text = "%s Confusion drill: %s" % [char(0x1F9E0), preview]
+	_on_start_quiz_pressed()
+
+
+# Per-item mastery: bump the streak for (category, item_id). When a streak
+# crosses MASTERY_STREAK_THRESHOLD AND the badge isn't already earned, grant
+# it + toast. Wrong answers reset the streak to 0. Idempotent.
+func _record_item_mastery_attempt(category: String, item_id: String, is_correct: bool) -> void:
+	if category.is_empty() or item_id.is_empty():
+		return
+	var key := "%s:%s" % [category, item_id]
+	if not is_correct:
+		_item_correct_streaks[key] = 0
+		return
+	var streak: int = int(_item_correct_streaks.get(key, 0)) + 1
+	_item_correct_streaks[key] = streak
+	if streak < BadgeSystemScript.MASTERY_STREAK_THRESHOLD:
+		return
+	var badge_id := BadgeSystemScript.mastery_badge_id(category, item_id)
+	if _earned_badges.has(badge_id):
+		return
+	_earned_badges.append(badge_id)
+	_show_badge_earned_toast(badge_id)
+	_save_ear_settings()
+	_refresh_home_badges_card()
+
+
+# Called at session end after a confusion drill — if the student got >=80%,
+# wipe the drilled pairs from the confusion log so the next round suggestion
+# is based on what's still actually confusing them.
+func _clear_drilled_confusion_pairs_if_mastered() -> void:
+	if _total_questions < 1:
+		return
+	var accuracy: float = float(_score) / float(_total_questions)
+	if accuracy < 0.80:
+		return
+	var category := _confusion_category_for_mode(_selected_mode)
+	if category.is_empty():
+		return
+	# Drop all confusion entries WHOSE correct-side appears in the drill pool.
+	# Keeps the user from re-drilling something they just mastered.
+	var cat_map_v: Variant = _ear_confusion_stats.get(category, null)
+	if typeof(cat_map_v) != TYPE_DICTIONARY:
+		return
+	var cat_map: Dictionary = cat_map_v
+	for correct_id in _focus_missed_ids:
+		cat_map.erase(correct_id)
+	_ear_confusion_stats[category] = cat_map
+
+
+# Surface the drill button only when (a) selected mode supports it AND (b) the
+# student actually has confusion data for that mode. Call from places that
+# refresh the home menu visibility.
+func _refresh_confusion_drill_button_visibility() -> void:
+	if _confusion_drill_button == null:
+		return
+	var mode_ok: bool = _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE, MODE_PITCH_MATCH]
+	if not mode_ok:
+		_confusion_drill_button.visible = false
+		return
+	var pairs := _top_confusion_pairs(_confusion_category_for_mode(_selected_mode), 1)
+	_confusion_drill_button.visible = not pairs.is_empty() and _home_mode_detail_active
+
+
 func _compute_missed_ids() -> Array[String]:
 	var stats_asked: Dictionary
 	var stats_correct: Dictionary
@@ -12865,6 +13126,25 @@ func _setup_audio_players() -> void:
 	_audio_stream = players.get("audio_stream", null) as AudioStreamGenerator
 	_audio_player = players.get("audio_player", null) as AudioStreamPlayer
 	_playback = players.get("playback", null) as AudioStreamGeneratorPlayback
+	_apply_ear_audio_levels()
+
+
+func _apply_ear_audio_levels() -> void:
+	var prompt_db := float(clampi(_ear_prompt_volume_db, -18, 6))
+	var sfx_db := float(clampi(_ear_sfx_volume_db, -24, 6))
+	if _piano_player != null:
+		_piano_player.volume_db = prompt_db
+	for p in _chord_players:
+		if p != null:
+			p.volume_db = prompt_db
+	if _audio_player != null:
+		_audio_player.volume_db = prompt_db
+	if _rhythm_metronome_player != null:
+		_rhythm_metronome_player.volume_db = prompt_db
+	if _sfx_player != null:
+		_sfx_player.volume_db = sfx_db
+	if _shield_sfx_player != null:
+		_shield_sfx_player.volume_db = sfx_db
 
 
 func _load_audio_assets_deferred() -> void:
@@ -12937,6 +13217,8 @@ func _load_ear_settings() -> void:
 	_ear_metronome_enabled = false
 	_ear_replay_limit_enabled = false
 	_ear_replay_limit = 3
+	_ear_prompt_volume_db = 0
+	_ear_sfx_volume_db = -2
 	_practice_mode_enabled = true
 	_rhythm_flow_runtime.clear_saved_maps()
 	_rhythm_flow_runtime.tap_latency_ms = 0
@@ -12989,6 +13271,10 @@ func _load_ear_settings() -> void:
 		_ear_replay_limit_enabled = bool(d["ear_replay_limit_enabled"])
 	if d.has("ear_replay_limit"):
 		_ear_replay_limit = clampi(int(d["ear_replay_limit"]), 1, 10)
+	if d.has("ear_prompt_volume_db"):
+		_ear_prompt_volume_db = clampi(int(d["ear_prompt_volume_db"]), -18, 6)
+	if d.has("ear_sfx_volume_db"):
+		_ear_sfx_volume_db = clampi(int(d["ear_sfx_volume_db"]), -24, 6)
 	if d.has("rhythm_flow_saved_maps") and d["rhythm_flow_saved_maps"] is Array:
 		for item in (d["rhythm_flow_saved_maps"] as Array):
 			if typeof(item) == TYPE_DICTIONARY:
@@ -13035,6 +13321,8 @@ func _load_ear_settings() -> void:
 			_earned_badges.append(str(b))
 	if d.has("per_student_badge_state") and typeof(d["per_student_badge_state"]) == TYPE_DICTIONARY:
 		_per_student_badge_state = (d["per_student_badge_state"] as Dictionary).duplicate(true)
+	if d.has("item_correct_streaks") and typeof(d["item_correct_streaks"]) == TYPE_DICTIONARY:
+		_item_correct_streaks = (d["item_correct_streaks"] as Dictionary).duplicate(true)
 	if d.has("badge_lifetime_correct_sight"):
 		_badge_lifetime_correct_sight = int(d["badge_lifetime_correct_sight"])
 	if d.has("badge_lifetime_correct_chord"):
@@ -13156,6 +13444,8 @@ func _save_ear_settings() -> void:
 		"recent_accuracy_window": _recent_accuracy_window,
 		"ear_replay_limit_enabled": _ear_replay_limit_enabled,
 		"ear_replay_limit": _ear_replay_limit,
+		"ear_prompt_volume_db": _ear_prompt_volume_db,
+		"ear_sfx_volume_db": _ear_sfx_volume_db,
 		"rhythm_flow_saved_maps": _rhythm_flow_runtime.saved_maps,
 		"rhythm_flow_tap_latency_ms": _rhythm_flow_runtime.tap_latency_ms,
 		"streak_count": _streak_count,
@@ -13178,6 +13468,7 @@ func _save_ear_settings() -> void:
 		"badge_lifetime_correct_sight": _badge_lifetime_correct_sight,
 		"badge_lifetime_correct_chord": _badge_lifetime_correct_chord,
 		"badge_daily_completed_dates": _badge_daily_completed_dates,
+		"item_correct_streaks": _item_correct_streaks,
 		"per_student_badge_state": _per_student_badge_state_for_save(),
 		"interval_preset": _interval_difficulty_preset,
 		"chord_preset": _chord_difficulty_preset,
@@ -13939,6 +14230,10 @@ func _refresh_ear_settings_ui() -> void:
 	if _ear_replay_limit_spin != null:
 		_ear_replay_limit_spin.value = _ear_replay_limit
 		_ear_replay_limit_spin.editable = _ear_replay_limit_enabled
+	if _ear_prompt_volume_spin != null:
+		_ear_prompt_volume_spin.value = _ear_prompt_volume_db
+	if _ear_sfx_volume_spin != null:
+		_ear_sfx_volume_spin.value = _ear_sfx_volume_db
 	_refresh_pitch_match_setup_controls()
 	_refresh_progression_setup_controls()
 	_refresh_scale_mode_setup_controls()
@@ -14140,6 +14435,7 @@ func _on_mode_selected() -> void:
 	if _how_to_play_button != null:
 		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_SIGHT, MODE_NOTE_CHASE, MODE_CADENCE]
 		_how_to_play_button.visible = has_intro
+	_refresh_confusion_drill_button_visibility()
 	if _mic_toggle_button != null:
 		_mic_toggle_button.visible = show_detail and _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
 	if _home_footer_bar != null:
@@ -15635,6 +15931,18 @@ func _on_ear_replay_limit_toggled(enabled: bool) -> void:
 
 func _on_ear_replay_limit_changed(value: float) -> void:
 	_ear_replay_limit = clampi(int(round(value)), 1, 10)
+	_save_ear_settings()
+
+
+func _on_ear_prompt_volume_changed(value: float) -> void:
+	_ear_prompt_volume_db = clampi(int(round(value)), -18, 6)
+	_apply_ear_audio_levels()
+	_save_ear_settings()
+
+
+func _on_ear_sfx_volume_changed(value: float) -> void:
+	_ear_sfx_volume_db = clampi(int(round(value)), -24, 6)
+	_apply_ear_audio_levels()
 	_save_ear_settings()
 
 
@@ -17463,6 +17771,59 @@ func _on_restart_quiz_pressed() -> void:
 
 func _build_interval_pool_for_settings() -> Array[String]:
 	return EarTrainingCoreScript.build_interval_pool(_get_selected_degrees(), _include_minor_intervals, DEGREE_INTERVALS)
+
+
+# Mid-session adaptive difficulty. After each answer, look at the rolling
+# 5-question accuracy and expand the active pool (>=85%) or contract it
+# (<=40%). Caps respected: never drop below 2 items; never expand past the
+# full configured pool. Sets _adaptive_difficulty_note for the status line.
+func _adapt_difficulty_after_answer(mode: int) -> void:
+	# Always-on; user gets to feel the round responding to them.
+	# Need at least 4 results for the window to be meaningful.
+	if mode == MODE_INTERVAL:
+		var acc: float = EarTrainingCoreScript.rolling_accuracy(_interval_recent_results, 4)
+		if acc < 0.0:
+			return
+		var full_pool: Array[String] = _build_interval_pool_for_settings()
+		if acc >= 0.85:
+			var add_id: String = EarTrainingCoreScript.next_item_to_add(
+				_active_intervals, full_pool, EarTrainingCoreScript.INTERVAL_DIFFICULTY_RANK)
+			if not add_id.is_empty():
+				_active_intervals.append(add_id)
+				_adaptive_difficulty_note = "%s Added %s — you've got this." % [char(0x2728), _interval_display_name(add_id)]
+				_interval_recent_results.clear()
+		elif acc <= 0.40:
+			# Protect the just-asked interval so we don't drop it mid-stream.
+			var protect: Dictionary = {_current_interval_id: true}
+			var drop_id: String = EarTrainingCoreScript.hardest_item_to_drop(
+				_active_intervals, EarTrainingCoreScript.INTERVAL_DIFFICULTY_RANK, protect, 2)
+			if not drop_id.is_empty():
+				_active_intervals.erase(drop_id)
+				_adaptive_difficulty_note = "%s Easing back — dropped %s for now." % [char(0x2935), _interval_display_name(drop_id)]
+				_interval_recent_results.clear()
+	elif mode == MODE_CHORD:
+		var acc: float = EarTrainingCoreScript.rolling_accuracy(_chord_recent_results, 4)
+		if acc < 0.0:
+			return
+		# Full chord pool = the user's selected chord types (the configured cap).
+		var full_pool: Array[String] = []
+		for c in _selected_chord_types:
+			full_pool.append(str(c))
+		if acc >= 0.85:
+			var add_id: String = EarTrainingCoreScript.next_item_to_add(
+				_current_available_chord_types, full_pool, EarTrainingCoreScript.CHORD_DIFFICULTY_RANK)
+			if not add_id.is_empty():
+				_current_available_chord_types.append(add_id)
+				_adaptive_difficulty_note = "%s Added %s — you've got this." % [char(0x2728), add_id]
+				_chord_recent_results.clear()
+		elif acc <= 0.40:
+			var protect: Dictionary = {_current_chord_quality: true}
+			var drop_id: String = EarTrainingCoreScript.hardest_item_to_drop(
+				_current_available_chord_types, EarTrainingCoreScript.CHORD_DIFFICULTY_RANK, protect, 2)
+			if not drop_id.is_empty():
+				_current_available_chord_types.erase(drop_id)
+				_adaptive_difficulty_note = "%s Easing back — dropped %s for now." % [char(0x2935), drop_id]
+				_chord_recent_results.clear()
 
 
 func _build_interval_choices(correct_id: String, pool: Array[String]) -> Array[String]:
@@ -20504,6 +20865,11 @@ func _begin_next_question(expected_token: int = -1) -> void:
 	_clear_sight_answer_keyboard_feedback()
 	if _midi_active and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
 		_midi_piano_viz_clear_all()
+	# Surface any pending adaptive-difficulty change so the student sees the
+	# round responding to their accuracy. Consumed on first display.
+	if not _adaptive_difficulty_note.is_empty() and _status_label != null:
+		_status_label.text = _adaptive_difficulty_note
+		_adaptive_difficulty_note = ""
 	await _ensure_session_controller().begin_next_question(self, expected_token)
 
 
@@ -20970,13 +21336,26 @@ func _play_chord(notes: Array[int], duration: float) -> void:
 		player.stop()
 		player.stream = stream
 		player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+		player.volume_db = float(_ear_prompt_volume_db)
 		player.play()
 
-	await get_tree().create_timer(duration).timeout
+	await _wait_or_shutdown(duration, -1, _audio_sequence_run_id)
 	for p in _chord_players:
 		p.stop()
 	await _push_silence(0.14)
 	await _play_broken_chord(notes, duration)
+
+
+# Per-voice attenuation to keep total perceived loudness constant across
+# different chord sizes. Formula: -3 * log2(voice_count) dB per voice means
+# a 1-note "chord" stays at 0 dB, a 2-note interval gets -3 dB per voice
+# (sum ≈ original loudness), a 4-note chord gets -6 dB per voice, etc.
+# Single notes are unchanged (0 dB) so non-chord playback paths aren't
+# affected.
+func _voice_normalize_db(voice_count: int) -> float:
+	if voice_count <= 1:
+		return 0.0
+	return -3.0 * log(float(voice_count)) / log(2.0)
 
 
 func _play_chord_block(notes: Array[int], duration: float) -> void:
@@ -20992,6 +21371,11 @@ func _play_chord_block(notes: Array[int], duration: float) -> void:
 		await get_tree().create_timer(duration).timeout
 		await _push_silence(0.14)
 		return
+	# Voice normalization: per-note volume is attenuated by -3*log2(voice_count)
+	# so a 4-note chord and a single note feel equally loud. Without this, the
+	# student perceives chords as louder than intervals just from voice count,
+	# masking the timbral differences they're being trained to hear.
+	var voice_normalize_db: float = _voice_normalize_db(notes.size())
 	for i in notes.size():
 		var midi_note := notes[i]
 		var nearest := _nearest_sample_cached(midi_note, sample_map)
@@ -21000,8 +21384,9 @@ func _play_chord_block(notes: Array[int], duration: float) -> void:
 		player.stop()
 		player.stream = stream
 		player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+		player.volume_db = float(_ear_prompt_volume_db) + voice_normalize_db
 		player.play()
-	await get_tree().create_timer(duration).timeout
+	await _wait_or_shutdown(duration, -1, _audio_sequence_run_id)
 	for p in _chord_players:
 		p.stop()
 	await _push_silence(0.14)
@@ -21017,13 +21402,18 @@ func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_second
 			_logged_chord_player_shortage = true
 		for midi_note in notes:
 			await _play_note(midi_note, 0.08)
-		await get_tree().create_timer(maxf(0.04, duration)).timeout
+		await _wait_or_shutdown(maxf(0.04, duration), -1, _audio_sequence_run_id)
 		await _push_silence(0.10)
 		return
 	var used_players: Array[AudioStreamPlayer] = []
 	# Piano-like dynamics: bass notes slightly louder, upper voices softer.
 	# Slight roll (stagger) between notes for a natural feel.
-	var base_vol_db := -6.0  # softer baseline than raw 0 dB
+	# Voice normalization keeps total loudness constant across chord sizes
+	# (1, 2, 3, 4+ notes all feel equally loud) — same rationale as
+	# _play_chord_block. The -6 dB baseline is layered on top so the
+	# arpeggiated chords retain their softer "rolled" character.
+	var voice_normalize_db: float = _voice_normalize_db(notes.size())
+	var base_vol_db := float(_ear_prompt_volume_db) - 6.0 + voice_normalize_db
 	var roll_gap := 0.025  # 25ms stagger between notes for gentle rolled feel
 	for i in notes.size():
 		var midi_note := notes[i]
@@ -21039,17 +21429,31 @@ func _play_chord_block_with_fade(notes: Array[int], duration: float, fade_second
 		player.play()
 		used_players.append(player)
 		if i < notes.size() - 1:
-			await get_tree().create_timer(roll_gap).timeout
+			if not (await _wait_or_shutdown(roll_gap, -1, _audio_sequence_run_id)):
+				for used in used_players:
+					used.stop()
+					used.volume_db = float(_ear_prompt_volume_db)
+				return
 	var fade := clampf(fade_seconds, 0.06, maxf(0.06, duration - 0.02))
 	var hold := maxf(0.02, duration - fade)
-	await get_tree().create_timer(hold).timeout
+	if not (await _wait_or_shutdown(hold, -1, _audio_sequence_run_id)):
+		for used in used_players:
+			used.stop()
+			used.volume_db = float(_ear_prompt_volume_db)
+		return
 	var fade_tween := create_tween()
 	for p in used_players:
 		fade_tween.parallel().tween_property(p, "volume_db", -42.0, fade).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	await fade_tween.finished
+	if not (await _wait_or_shutdown(fade + 0.04, -1, _audio_sequence_run_id)):
+		if fade_tween != null and is_instance_valid(fade_tween):
+			fade_tween.kill()
+		for used in used_players:
+			used.stop()
+			used.volume_db = float(_ear_prompt_volume_db)
+		return
 	for p in used_players:
 		p.stop()
-		p.volume_db = 0.0
+		p.volume_db = float(_ear_prompt_volume_db)
 	await _push_silence(0.10)
 
 
@@ -21143,8 +21547,11 @@ func _play_broken_chord(notes: Array[int], duration: float) -> void:
 				player.stop()
 				player.stream = stream
 				player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+				player.volume_db = float(_ear_prompt_volume_db)
 				player.play()
-				await get_tree().create_timer(step_duration).timeout
+				if not (await _wait_or_shutdown(step_duration, -1, _audio_sequence_run_id)):
+					player.stop()
+					return
 				player.stop()
 			else:
 				await _play_note(midi_note, step_duration)
@@ -21266,6 +21673,18 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 		var rq_i = _review_queue_for_mode(MODE_INTERVAL)
 		if rq_i != null:
 			rq_i.record_result(_current_interval_id, is_correct)
+		# Mid-session adaptive difficulty: track rolling 5-question accuracy.
+		_interval_recent_results.append(is_correct)
+		if _interval_recent_results.size() > 5:
+			_interval_recent_results.pop_front()
+		_adapt_difficulty_after_answer(MODE_INTERVAL)
+		_record_item_mastery_attempt("interval", _current_interval_id, is_correct)
+	elif _selected_mode == MODE_PROGRESSION:
+		_record_item_mastery_attempt("progression", _current_theory_item_id, is_correct)
+	elif _selected_mode == MODE_SCALE_MODE:
+		_record_item_mastery_attempt("scale_mode", _current_theory_item_id, is_correct)
+	elif _selected_mode == MODE_CADENCE:
+		_record_item_mastery_attempt("cadence", _current_theory_item_id, is_correct)
 	var chosen_btn: Button = choice_btn
 	var correct_btn: Button = _get_button_for_interval(expected_choice)
 	if is_correct:
@@ -21318,9 +21737,14 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			_cadence_roman_label.text = str(cdef.get("label", _current_theory_item_id))
 			_cadence_roman_label.visible = true
 
+	if _qa_enabled and is_correct:
+		await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
+		return
+
 	if is_correct and correct_btn != null:
 		await _feed_chicken_at_target(correct_btn)
-		await get_tree().create_timer(0.12).timeout
+		if not _qa_enabled:
+			await get_tree().create_timer(0.12).timeout
 		await _fly_bird_to_start()
 	else:
 		# Structured post-answer teaching panel — three lines so the student
@@ -21341,7 +21765,8 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if not hint_line.is_empty():
 				teach_lines.append("%s  %s" % [char(0x1F4A1), hint_line])
 			_status_label.text = "\n".join(teach_lines)
-			await get_tree().create_timer(2.6).timeout
+			if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
+				return
 		elif _selected_mode == MODE_SCALE_MODE:
 			var sm_lines: Array[String] = []
 			sm_lines.append("%s  Correct: %s   ·   You picked: %s" % [char(0x2717), expected_choice, choice_id])
@@ -21351,7 +21776,8 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if not sm_hint.is_empty():
 				sm_lines.append("%s  %s" % [char(0x1F4A1), sm_hint])
 			_status_label.text = "\n".join(sm_lines)
-			await get_tree().create_timer(2.6).timeout
+			if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
+				return
 		elif _selected_mode == MODE_CADENCE:
 			var cd_lines: Array[String] = []
 			cd_lines.append("%s  Correct: %s   ·   You picked: %s" % [char(0x2717), expected_choice, choice_id])
@@ -21361,7 +21787,8 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if not cd_hint.is_empty():
 				cd_lines.append("%s  %s" % [char(0x1F4A1), cd_hint])
 			_status_label.text = "\n".join(cd_lines)
-			await get_tree().create_timer(2.6).timeout
+			if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
+				return
 		elif _selected_mode == MODE_PROGRESSION:
 			var pg_lines: Array[String] = []
 			pg_lines.append("%s  Correct: %s   ·   You picked: %s" % [char(0x2717), expected_choice, choice_id])
@@ -21371,15 +21798,18 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 			if not pg_hint.is_empty():
 				pg_lines.append("%s  %s" % [char(0x1F4A1), pg_hint])
 			_status_label.text = "\n".join(pg_lines)
-			await get_tree().create_timer(2.6).timeout
+			if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
+				return
 		_status_label.text = "%s  Listen again..." % char(0x1F3B5)
-		await get_tree().create_timer(0.35).timeout
+		if not (await _wait_or_shutdown(0.35, quiz_token, -1)):
+			return
 		var replay_name := _interval_display_name(expected_choice) if _selected_mode == MODE_INTERVAL else expected_choice
 		var _r_note := _midi_pitch_class_name(_current_root_midi) + str(_current_root_midi / 12 - 1)
 		var _t_note := _midi_pitch_class_name(_current_second_midi) + str(_current_second_midi / 12 - 1)
 		_status_label.text = "Correct: %s  (%s  \u2192  %s)" % [replay_name, _r_note, _t_note]
 		await _play_current_prompt()
-		await get_tree().create_timer(0.15).timeout
+		if not (await _wait_or_shutdown(0.15, quiz_token, -1)):
+			return
 		await _play_hungry_reaction()
 		# A/B compare bar — lets player replay their choice vs the correct interval
 		if _selected_mode == MODE_INTERVAL and not _qa_enabled:
@@ -21464,15 +21894,22 @@ func _on_pitch_match_key_pressed(pitch: int) -> void:
 	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
 	_refresh_meta_ui()
 
+	if _qa_enabled and is_correct:
+		await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
+		return
+
 	if is_correct and correct_btn != null:
 		await _feed_chicken_at_target(correct_btn)
-		await get_tree().create_timer(0.12).timeout
+		if not _qa_enabled:
+			await get_tree().create_timer(0.12).timeout
 		await _fly_bird_to_start()
 	else:
-		await get_tree().create_timer(0.25).timeout
+		if not _qa_enabled:
+			await get_tree().create_timer(0.25).timeout
 		_status_label.text = "Correct: %s  (%s %s)." % [_pitch_match_display_label_for_midi(_current_pitch_match_midi), _pitch_match_key, _pitch_match_scale]
 		await _play_note(_current_pitch_match_midi, 0.48)
-		await get_tree().create_timer(0.15).timeout
+		if not _qa_enabled:
+			await get_tree().create_timer(0.15).timeout
 		await _play_hungry_reaction()
 
 	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
@@ -21533,6 +21970,8 @@ func _on_chord_chosen(choice_quality: String) -> void:
 	_chord_recent_results.append(is_correct)
 	if _chord_recent_results.size() > 5:
 		_chord_recent_results.pop_front()
+	_adapt_difficulty_after_answer(MODE_CHORD)
+	_record_item_mastery_attempt("chord", _current_chord_quality, is_correct)
 	if is_correct:
 		_score += 1
 		_streak += 1
@@ -21571,7 +22010,8 @@ func _on_chord_chosen(choice_quality: String) -> void:
 
 	if is_correct and correct_btn != null:
 		await _feed_chicken_at_target(correct_btn)
-		await get_tree().create_timer(0.12).timeout
+		if not _qa_enabled:
+			await get_tree().create_timer(0.12).timeout
 		await _fly_bird_to_start()
 	else:
 		# Structured post-answer teaching panel for chords — mirrors the
@@ -21586,13 +22026,16 @@ func _on_chord_chosen(choice_quality: String) -> void:
 		if not _chord_auto_hint.is_empty():
 			chord_teach_lines.append("%s  %s" % [char(0x1F4A1), _chord_auto_hint])
 		_status_label.text = "\n".join(chord_teach_lines)
-		await get_tree().create_timer(2.6).timeout
+		if not (await _wait_or_shutdown(2.6, quiz_token, -1)):
+			return
 		_status_label.text = "%s  Listen again..." % char(0x1F3B5)
-		await get_tree().create_timer(0.35).timeout
+		if not (await _wait_or_shutdown(0.35, quiz_token, -1)):
+			return
 		var _cr_note := _midi_pitch_class_name(_current_root_midi) + str(_current_root_midi / 12 - 1)
 		_status_label.text = "Correct: %s  (root: %s)" % [_current_chord_quality, _cr_note]
 		await _play_current_prompt()
-		await get_tree().create_timer(0.15).timeout
+		if not (await _wait_or_shutdown(0.15, quiz_token, -1)):
+			return
 		await _play_hungry_reaction()
 		_setup_ear_compare(choice_quality, _current_chord_quality)
 
@@ -22758,6 +23201,7 @@ func _refresh_home_ear_dashboard_card() -> void:
 	for chip in [
 		["Accuracy", "%d%%" % int(stats.get("accuracy", 0))],
 		["Sessions", str(int(stats.get("sessions", 0)))],
+		["Mastered", str(int(stats.get("mastered", 0)))],
 		["Questions", str(int(stats.get("asked", 0)))],
 	]:
 		var lbl := Label.new()
@@ -22793,6 +23237,7 @@ func _active_student_ear_dashboard_stats() -> Dictionary:
 	var categories: Array[String] = ["interval", "chord", "pitch_match", "progression", "scale_mode", "cadence"]
 	var asked_total: int = 0
 	var correct_total: int = 0
+	var mastered_total: int = 0
 	var weak_rows: Array[Dictionary] = []
 	for category in categories:
 		var bucket_any: Variant = stats_source.get(category, {})
@@ -22812,6 +23257,8 @@ func _active_student_ear_dashboard_stats() -> Dictionary:
 				var acc := float(correct) / float(maxi(1, asked))
 				if acc < 0.70:
 					weak_rows.append({"label": str(key), "acc": acc})
+				elif asked >= 5 and acc >= 0.85:
+					mastered_total += 1
 	if asked_total <= 0:
 		return {}
 	weak_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("acc", 1.0)) < float(b.get("acc", 1.0)))
@@ -22822,6 +23269,7 @@ func _active_student_ear_dashboard_stats() -> Dictionary:
 		"accuracy": int(round(float(correct_total) / float(maxi(1, asked_total)) * 100.0)),
 		"sessions": int(_lifetime_stats.get("sessions_interval", 0)) + int(_lifetime_stats.get("sessions_chord", 0)) + int(_lifetime_stats.get("sessions_pitch_match", 0)) + int(_lifetime_stats.get("sessions_progression", 0)) + int(_lifetime_stats.get("sessions_scale_mode", 0)) + int(_lifetime_stats.get("sessions_cadence", 0)),
 		"asked": asked_total,
+		"mastered": mastered_total,
 		"weak": weak_labels,
 	}
 
@@ -31581,7 +32029,8 @@ func _blink_answer_feedback(wrong_btn: Button, correct_btn: Button, times: int) 
 	# Mirrors the sight-reading feedback so ear training feels immediate too.
 	if wrong_btn == null and correct_btn != null:
 		correct_btn.modulate = green
-		await get_tree().create_timer(0.18).timeout
+		if not (await _wait_or_shutdown(0.18, _quiz_run_token, -1)):
+			return
 		correct_btn.modulate = correct_original
 		return
 
@@ -31590,19 +32039,22 @@ func _blink_answer_feedback(wrong_btn: Button, correct_btn: Button, times: int) 
 			wrong_btn.modulate = red
 		if correct_btn != null:
 			correct_btn.modulate = green
-		await get_tree().create_timer(0.11).timeout
+		if not (await _wait_or_shutdown(0.11, _quiz_run_token, -1)):
+			return
 		if wrong_btn != null:
 			wrong_btn.modulate = wrong_original
 		if correct_btn != null:
 			correct_btn.modulate = correct_original
-		await get_tree().create_timer(0.09).timeout
+		if not (await _wait_or_shutdown(0.09, _quiz_run_token, -1)):
+			return
 
 	# Hold final state for 0.5s so player can clearly read which was correct
 	if wrong_btn != null:
 		wrong_btn.modulate = red
 	if correct_btn != null:
 		correct_btn.modulate = green
-	await get_tree().create_timer(0.5).timeout
+	if not (await _wait_or_shutdown(0.5, _quiz_run_token, -1)):
+		return
 	if wrong_btn != null:
 		wrong_btn.modulate = wrong_original
 	if correct_btn != null:
@@ -32027,6 +32479,9 @@ func _feed_chicken_at_target(target_button: Control) -> void:
 		return
 	if _food_token == null:
 		return
+	if _qa_enabled:
+		_hide_food_token()
+		return
 	if _selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"):
 		return
 	# Place food at the button
@@ -32043,7 +32498,10 @@ func _feed_chicken_at_target(target_button: Control) -> void:
 	fly_tween.set_ease(Tween.EASE_IN)
 	fly_tween.tween_property(_food_token, "global_position", food_target, 0.4)
 	fly_tween.parallel().tween_property(_food_token, "scale", Vector2(0.5, 0.5), 0.4)
-	await fly_tween.finished
+	if not (await _wait_or_shutdown(0.44, _quiz_run_token, -1)):
+		if fly_tween != null and is_instance_valid(fly_tween):
+			fly_tween.kill()
+		return
 	if not is_instance_valid(self):
 		return
 	# Chicken eats
@@ -32052,7 +32510,10 @@ func _feed_chicken_at_target(target_button: Control) -> void:
 	var eat_tween := create_tween()
 	eat_tween.tween_property(_food_token, "scale", Vector2(0.1, 0.1), 0.12)
 	eat_tween.parallel().tween_property(_food_token, "modulate:a", 0.0, 0.12)
-	await eat_tween.finished
+	if not (await _wait_or_shutdown(0.16, _quiz_run_token, -1)):
+		if eat_tween != null and is_instance_valid(eat_tween):
+			eat_tween.kill()
+		return
 	if is_instance_valid(_food_token):
 		_food_token.modulate = Color(1, 1, 1, 1)
 	_hide_food_token()
@@ -32060,6 +32521,9 @@ func _feed_chicken_at_target(target_button: Control) -> void:
 
 func _play_hungry_reaction() -> void:
 	if _bird_sprite == null:
+		return
+	if _qa_enabled:
+		_hide_food_token()
 		return
 	_hide_food_token()
 	_stop_bird_idle_anim()
@@ -32072,7 +32536,10 @@ func _play_hungry_reaction() -> void:
 	tween.parallel().tween_property(_bird_sprite, "rotation_degrees", 10.0, 0.14)
 	tween.tween_property(_bird_sprite, "global_position:y", base_pos.y, 0.16)
 	tween.parallel().tween_property(_bird_sprite, "rotation_degrees", 0.0, 0.16)
-	await tween.finished
+	if not (await _wait_or_shutdown(0.34, _quiz_run_token, -1)):
+		if tween != null and is_instance_valid(tween):
+			tween.kill()
+		return
 	_start_bird_idle_anim()
 
 
@@ -32094,13 +32561,19 @@ func _fly_bird_to_nest(target_button: Control) -> void:
 func _fly_bird_to_start() -> void:
 	if _bird_sprite == null or not _bird_home_ready:
 		return
+	if _qa_enabled:
+		_bird_sprite.global_position = _bird_home_global_position
+		return
 	_stop_bird_idle_anim()
 	_start_bird_flap_anim()
 	var tween := create_tween()
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(_bird_sprite, "global_position", _bird_home_global_position, 0.55)
-	await tween.finished
+	if not (await _wait_or_shutdown(0.59, _quiz_run_token, -1)):
+		if tween != null and is_instance_valid(tween):
+			tween.kill()
+		return
 	# Hard snap to perch to prevent tiny drift after repeated flights.
 	_bird_sprite.global_position = _bird_home_global_position
 	_stop_bird_flap_anim()
@@ -32332,8 +32805,9 @@ func _play_note(midi_note: int, duration: float) -> void:
 	_piano_player.stop()
 	_piano_player.stream = stream
 	_piano_player.pitch_scale = pow(2.0, float(midi_note - nearest) / 12.0)
+	_piano_player.volume_db = float(_ear_prompt_volume_db)
 	_piano_player.play()
-	await get_tree().create_timer(duration).timeout
+	await _wait_or_shutdown(duration, -1, _audio_sequence_run_id)
 	_piano_player.stop()
 
 
@@ -32388,8 +32862,9 @@ func _play_success_sfx() -> void:
 	if _correct_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _correct_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
-		await get_tree().create_timer(0.33).timeout
+		await _wait_or_shutdown(0.33, -1, -1)
 		return
 	await _push_sine(1046.5, 0.08)
 	await _push_silence(0.03)
@@ -32397,11 +32872,14 @@ func _play_success_sfx() -> void:
 
 
 func _play_new_question_cue() -> void:
+	if _qa_enabled:
+		return
 	if _new_question_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _new_question_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
-		await get_tree().create_timer(0.28).timeout
+		await _wait_or_shutdown(0.28, -1, -1)
 		return
 	await _push_sine(880.0, 0.05)
 	await _push_silence(0.015)
@@ -32412,8 +32890,9 @@ func _play_fail_sfx() -> void:
 	if _wrong_choice_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _wrong_choice_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
-		await get_tree().create_timer(0.34).timeout
+		await _wait_or_shutdown(0.34, -1, -1)
 		return
 	await _push_sine(392.0, 0.09)
 	await _push_silence(0.03)
@@ -32424,8 +32903,9 @@ func _play_gameover_fail_sfx() -> void:
 	if _fail_gameover_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _fail_gameover_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
-		await get_tree().create_timer(0.46).timeout
+		await _wait_or_shutdown(0.46, -1, -1)
 		return
 	await _push_sine(220.0, 0.2)
 
@@ -32434,14 +32914,16 @@ func _play_win_fanfare_sfx() -> void:
 	if _win_fanfare_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _win_fanfare_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
-		await get_tree().create_timer(0.8).timeout
+		await _wait_or_shutdown(0.8, -1, -1)
 
 
 func _play_module_complete_sfx() -> void:
 	if _module_complete_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _module_complete_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
 
 
@@ -32449,6 +32931,7 @@ func _play_powerup_sfx() -> void:
 	if _powerup_sfx != null and _sfx_player != null:
 		_sfx_player.stop()
 		_sfx_player.stream = _powerup_sfx
+		_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_sfx_player.play()
 
 
@@ -32456,6 +32939,7 @@ func _play_shield_activate_sfx() -> void:
 	if _shield_activate_sfx != null and _shield_sfx_player != null:
 		_shield_sfx_player.stop()
 		_shield_sfx_player.stream = _shield_activate_sfx
+		_shield_sfx_player.volume_db = float(_ear_sfx_volume_db)
 		_shield_sfx_player.play()
 		return
 	_play_success_sfx()
@@ -32548,6 +33032,8 @@ func _stop_home_ambient() -> void:
 
 
 func _push_sine(freq: float, duration: float) -> void:
+	if _shutdown_requested or _audio_stream == null or _playback == null:
+		return
 	_ensure_generator_audio_running()
 	var sample_rate := _audio_stream.mix_rate
 	var total_frames := int(duration * sample_rate)
@@ -32556,6 +33042,8 @@ func _push_sine(freq: float, duration: float) -> void:
 	var remaining := total_frames
 
 	while remaining > 0:
+		if _shutdown_requested:
+			return
 		var available := _playback.get_frames_available()
 		if available <= 0:
 			await get_tree().process_frame
@@ -32570,12 +33058,16 @@ func _push_sine(freq: float, duration: float) -> void:
 
 
 func _push_silence(duration: float) -> void:
+	if _shutdown_requested or _audio_stream == null or _playback == null:
+		return
 	_ensure_generator_audio_running()
 	var sample_rate := _audio_stream.mix_rate
 	var total_frames := int(duration * sample_rate)
 	var remaining := total_frames
 
 	while remaining > 0:
+		if _shutdown_requested:
+			return
 		var available := _playback.get_frames_available()
 		if available <= 0:
 			await get_tree().process_frame

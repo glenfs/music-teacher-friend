@@ -20,6 +20,60 @@ const INTERVAL_DIFFICULTY_RANK := {
 const EASY_INTERVAL_ORDER := ["P8", "P5", "P4", "M3", "P1"]
 const EASY_CHORD_ORDER := ["Major", "Minor", "Dom7", "Maj7", "Min7", "Dim"]
 
+# Chord difficulty rank used by mid-session adaptive escalation. Lower = easier
+# to recognize by ear. Triads first, dominant/major7th next, extensions later.
+const CHORD_DIFFICULTY_RANK := {
+	"Major": 0, "Minor": 1, "Power": 2, "Sus2": 3, "Sus4": 3,
+	"Dom7": 4, "Maj7": 5, "Min7": 6, "Dim": 7, "Aug": 8,
+	"Half-dim": 9, "Dim7": 10, "mMaj7": 11, "Aug7": 12, "AugMaj7": 13,
+	"7sus4": 9, "Maj6": 6, "Min6": 7, "6-9": 12,
+	"Dom9": 10, "Maj9": 11, "Min9": 11, "Add9": 8,
+}
+
+
+# Returns the rolling accuracy of the last N results in [0.0, 1.0]. Empty
+# arrays return -1.0 (sentinel: "not enough data, don't adapt").
+static func rolling_accuracy(results: Array, min_samples: int = 4) -> float:
+	if results.size() < min_samples:
+		return -1.0
+	var hits := 0
+	for r in results:
+		if bool(r):
+			hits += 1
+	return float(hits) / float(results.size())
+
+
+# Picks the easiest item from full_pool that's NOT already in active.
+# Used when rolling accuracy is high and we want to introduce a harder
+# item to keep the round growing in difficulty. Returns "" if none.
+static func next_item_to_add(active: Array, full_pool: Array, rank_table: Dictionary) -> String:
+	var candidates: Array[String] = []
+	for item in full_pool:
+		var sid := str(item)
+		if not active.has(sid):
+			candidates.append(sid)
+	if candidates.is_empty():
+		return ""
+	candidates.sort_custom(func(a, b): return int(rank_table.get(a, 99)) < int(rank_table.get(b, 99)))
+	return candidates[0]
+
+
+# Picks the hardest item in active that's safe to drop (not in protected_set
+# and would leave >= min_remaining items). Used when rolling accuracy is low.
+# Returns "" when no item is safe to drop.
+static func hardest_item_to_drop(active: Array, rank_table: Dictionary, protected_set: Dictionary = {}, min_remaining: int = 2) -> String:
+	if active.size() <= min_remaining:
+		return ""
+	var droppable: Array[String] = []
+	for item in active:
+		var sid := str(item)
+		if not protected_set.has(sid):
+			droppable.append(sid)
+	if droppable.is_empty():
+		return ""
+	droppable.sort_custom(func(a, b): return int(rank_table.get(a, 99)) > int(rank_table.get(b, 99)))
+	return droppable[0]
+
 
 # Build the interval pool from the user's selected degrees + minor toggle.
 # Falls back to the unfiltered selection when minor-stripping leaves the

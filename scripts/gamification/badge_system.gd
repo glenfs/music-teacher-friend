@@ -61,8 +61,34 @@ static func check_earned(
 
 
 # Lookup a single badge def by id. Returns {} if not found.
+# For per-item mastery badges (id of the form "mastered_<category>_<item>"),
+# synthesizes a def on the fly so callers don't need to special-case them.
 static func find_def(badge_id: String) -> Dictionary:
 	for d in DEFS:
 		if str(d.get("id", "")) == badge_id:
 			return d
+	# Dynamic per-item mastery badge format: "mastered_<category>_<item_id>"
+	if badge_id.begins_with("mastered_"):
+		var rest := badge_id.substr("mastered_".length())
+		var sep := rest.find("_")
+		if sep > 0:
+			var category := rest.substr(0, sep)
+			var item := rest.substr(sep + 1)
+			return {
+				"id": badge_id,
+				"name": "Mastered %s" % item,
+				"desc": "%s correct in a row on %s (%s)" % [MASTERY_STREAK_THRESHOLD, item, category],
+				"icon": 0x1F947,  # gold medal
+			}
 	return {}
+
+
+# Per-item mastery: a student is "mastered" on an item after this many
+# correct answers in a row. Caller (interval_birds.gd) tracks the streak
+# per "category:id" key and grants the badge when the count crosses this.
+const MASTERY_STREAK_THRESHOLD := 8
+
+
+# Format a per-item mastery badge id for a given category + item id.
+static func mastery_badge_id(category: String, item_id: String) -> String:
+	return "mastered_%s_%s" % [category, item_id]

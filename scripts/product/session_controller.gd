@@ -76,6 +76,10 @@ func apply_standard_start_state(host, mode_sight: int, mode_note_chase: int) -> 
 	host._quiz_start_time = Time.get_ticks_msec() / 1000.0
 	host._quiz_active = true
 	host._accepting_answer = false
+	# Reset adaptive-difficulty rolling windows + pending note for a fresh session.
+	host._interval_recent_results.clear()
+	host._chord_recent_results.clear()
+	host._adaptive_difficulty_note = ""
 
 
 func apply_end_state(host) -> void:
@@ -86,6 +90,8 @@ func apply_end_state(host) -> void:
 	host._quiz_active = false
 	host._accepting_answer = false
 	host._awaiting_round_start = false
+	# A confusion drill is one-shot; reset so the next session uses the normal pool.
+	host._confusion_drill_active = false
 	if host._note_chase_runtime != null:
 		host._note_chase_runtime.running = false
 		host._note_chase_runtime.fever_active = false
@@ -292,7 +298,11 @@ func advance_after_answer(host, quiz_token: int, asked_count: int = -1) -> void:
 	var delay := current_post_answer_delay(host._qa_enabled, slow_enabled)
 	if not host._qa_enabled and host._compare_bar != null and host._compare_bar.visible:
 		delay = maxf(delay, 4.0)
-	await host.get_tree().create_timer(delay).timeout
+	if host._qa_enabled:
+		for _i in range(4):
+			await host.get_tree().process_frame
+	else:
+		await host.get_tree().create_timer(delay).timeout
 	if host._should_advance_after_delay(quiz_token):
 		await begin_next_question(host, quiz_token)
 
@@ -413,6 +423,11 @@ func finish_quiz(host, mode_sight: int) -> void:
 	host._merge_session_into_lifetime()
 	host._save_progress_data()
 	host._complete_active_ear_assignment_if_target_met(host._score, host._total_questions)
+	# If this was a confusion drill that ended >=80% accurate, clear the
+	# drilled pairs from the confusion log so the button stops surfacing them.
+	if host._confusion_drill_active and host.has_method("_clear_drilled_confusion_pairs_if_mastered"):
+		host._clear_drilled_confusion_pairs_if_mastered()
+	host._confusion_drill_active = false
 	host._result_box_show("Complete", result_text)
 	await host._play_win_fanfare_sfx()
 	var score_pct := (float(host._score) / float(maxi(1, host._total_questions))) * 100.0
@@ -546,8 +561,10 @@ func init_session_stats(
 ) -> void:
 	host._interval_stats_asked.clear()
 	host._interval_stats_correct.clear()
+	host._interval_stats_correct_unaided.clear()
 	host._chord_stats_asked.clear()
 	host._chord_stats_correct.clear()
+	host._chord_stats_correct_unaided.clear()
 	host._ear_confusion_stats.clear()
 	host._sight_stats_asked.clear()
 	host._sight_stats_correct.clear()
@@ -614,11 +631,20 @@ func record_question_correct(
 	mode_scale_mode: int,
 	mode_cadence: int
 ) -> void:
+	# Hint-aided answers count toward the visible total but ALSO populate a
+	# parallel `_unaided` dict only when the student answered cold. That lets
+	# the result screen + teacher dashboard distinguish real mastery from
+	# assisted answers without losing the cheerful "you got it right" feedback.
+	var hint_was_used: bool = bool(host._chicken_hint_used_this_turn)
 	if host._selected_mode == mode_interval:
 		host._interval_stats_correct[host._current_interval_id] = int(host._interval_stats_correct.get(host._current_interval_id, 0)) + 1
+		if not hint_was_used:
+			host._interval_stats_correct_unaided[host._current_interval_id] = int(host._interval_stats_correct_unaided.get(host._current_interval_id, 0)) + 1
 	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
 		var ear_key: String = host._current_chord_quality if host._selected_mode == mode_chord else host._current_ear_text_answer
 		host._chord_stats_correct[ear_key] = int(host._chord_stats_correct.get(ear_key, 0)) + 1
+		if not hint_was_used:
+			host._chord_stats_correct_unaided[ear_key] = int(host._chord_stats_correct_unaided.get(ear_key, 0)) + 1
 	else:
 		var sight_key: String = host._current_sight_chord_name if host._sight_mode == "Chords" else host._current_sight_note
 		host._sight_stats_correct[sight_key] = int(host._sight_stats_correct.get(sight_key, 0)) + 1
@@ -765,6 +791,33 @@ func accuracy_motivational_message(total_correct: int, total_questions: int) -> 
 	return "%s Keep practicing!" % char(0x1F3B5)
 
 
+# Sums the unaided-correct values for the active mode. Returns -1 when the
+# unaided dicts haven't been populated (legacy data path), so the caller can
+# skip the breakdown line gracefully.
+func _sum_unaided_correct(
+	host,
+	mode_interval: int,
+	mode_chord: int,
+	mode_pitch_match: int,
+	mode_progression: int,
+	mode_scale_mode: int,
+	mode_cadence: int
+) -> int:
+	var src: Dictionary
+	if host._selected_mode == mode_interval:
+		src = host._interval_stats_correct_unaided
+	elif host._selected_mode == mode_chord or host._selected_mode == mode_pitch_match or host._selected_mode == mode_progression or host._selected_mode == mode_scale_mode or host._selected_mode == mode_cadence:
+		src = host._chord_stats_correct_unaided
+	else:
+		return -1
+	if src.is_empty():
+		return -1
+	var total := 0
+	for k in src.keys():
+		total += int(src[k])
+	return total
+
+
 func final_quiz_result_text(
 	host,
 	total_correct: int,
@@ -784,6 +837,12 @@ func final_quiz_result_text(
 	var elapsed: String = session_elapsed_text(host._quiz_start_time)
 	var time_part: String = ("   %s" % elapsed) if not elapsed.is_empty() else ""
 	var result := "%d%%  Accuracy   (%d/%d correct)%s" % [pct, total_correct, total_questions, time_part]
+	# Hint-aided vs unaided split — surface ONLY when the student used hints
+	# at least once this session, so it doesn't add noise to clean runs.
+	var unaided_total: int = _sum_unaided_correct(host, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence)
+	if unaided_total < total_correct and unaided_total >= 0:
+		var aided: int = total_correct - unaided_total
+		result += "\n%d unaided · %d with hint" % [unaided_total, aided]
 	var weak_lines: String = result_weak_breakdown(host, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, interval_display_name)
 	if not weak_lines.is_empty():
 		result += "\n\n%s" % weak_lines
