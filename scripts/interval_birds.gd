@@ -24285,10 +24285,11 @@ func _build_sight_big_piano() -> void:
 		lbl.add_theme_font_size_override("font_size", 14)
 		if _ui_font != null:
 			lbl.add_theme_font_override("font", _ui_font)
-		# Dark navy blue ties into the app's navy palette (MENU_SETUP_TINT
-		# #0F2740) and gives strong contrast on the cream key color. Subtle
-		# white outline keeps it legible when the key is lit blue/red/green.
-		lbl.add_theme_color_override("font_color", Color(0.039, 0.184, 0.361, 1.0))  # #0A2F5C
+		# Brighter navy blue from the learning-card palette (#1F4E6B) — sits
+		# in the app's blue family but reads more clearly than the very dark
+		# setup-tint. White outline preserves legibility when keys go
+		# lit-blue / red / green during answer feedback.
+		lbl.add_theme_color_override("font_color", Color(0.1216, 0.3059, 0.4196, 1.0))  # #1F4E6B
 		lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.95))
 		lbl.add_theme_constant_override("outline_size", 3)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
