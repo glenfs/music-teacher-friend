@@ -24273,12 +24273,25 @@ func _build_sight_big_piano() -> void:
 					lbl.text = "C%d" % int(pitch / 12 - 1)
 				else:
 					lbl.text = letter
-				lbl.add_theme_font_size_override("font_size", 12)
+				lbl.add_theme_font_size_override("font_size", 16)
 				if _ui_font != null:
 					lbl.add_theme_font_override("font", _ui_font)
-				var label_color := Color(0.20, 0.32, 0.55, 0.95) if pc == 0 else Color(0.32, 0.34, 0.40, 0.85)
+				var label_color := Color(0.08, 0.20, 0.55, 1.0) if pc == 0 else Color(0.15, 0.18, 0.24, 1.0)
 				lbl.add_theme_color_override("font_color", label_color)
-				lbl.position = Vector2(3, SIGHT_BIG_PIANO_WHITE_H - 20)
+				lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.85))
+				lbl.add_theme_constant_override("outline_size", 2)
+				lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+				lbl.size_flags_horizontal = Control.SIZE_FILL
+				lbl.anchor_left = 0.0
+				lbl.anchor_right = 1.0
+				lbl.anchor_top = 1.0
+				lbl.anchor_bottom = 1.0
+				lbl.offset_left = 0.0
+				lbl.offset_right = 0.0
+				lbl.offset_top = -26.0
+				lbl.offset_bottom = -2.0
+				lbl.z_index = 5
 				lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				btn.add_child(lbl)
 

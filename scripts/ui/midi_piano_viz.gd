@@ -260,11 +260,17 @@ func _build_keyboard() -> void:
 		_keys[pitch] = w_key
 		white_positions[pitch] = white_x
 		var pc := ((pitch % 12) + 12) % 12
-		if pc == 0:
+		var letter_for_pc := {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
+		var letter: String = String(letter_for_pc.get(pc, ""))
+		if not letter.is_empty():
 			var lbl := Label.new()
-			lbl.text = "C%d" % int(pitch / 12 - 1)
+			if pc == 0:
+				lbl.text = "C%d" % int(pitch / 12 - 1)
+			else:
+				lbl.text = letter
 			lbl.add_theme_font_size_override("font_size", 11)
-			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.38, 0.92))
+			var label_color := Color(0.20, 0.32, 0.55, 0.95) if pc == 0 else Color(0.32, 0.34, 0.38, 0.85)
+			lbl.add_theme_color_override("font_color", label_color)
 			lbl.position = Vector2(3, WHITE_H - 18)
 			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			w_key.add_child(lbl)
