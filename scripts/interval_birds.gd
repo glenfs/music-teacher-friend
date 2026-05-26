@@ -1157,6 +1157,7 @@ var _sight_round_start_overlay_button: Button = null
 # Big interactive piano shown during Sight Reading rounds — click any key to answer.
 var _sight_big_piano: Control = null
 var _sight_big_piano_keys: Dictionary = {}  # pitch -> Button
+var _sight_big_piano_key_labels: Dictionary = {}  # pitch -> Label (white keys only)
 var _sight_big_piano_frame: Panel = null  # wood-grain outer frame (resized on layout)
 var _sight_big_piano_felt: Panel = null   # red felt strip (resized on layout)
 var _sight_big_piano_keys_root: Control = null  # container that holds key buttons
@@ -24261,39 +24262,38 @@ func _build_sight_big_piano() -> void:
 			_chord_explorer_apply_white_style(btn, Color.WHITE)
 		_sight_big_piano_keys_root.add_child(btn)
 		_sight_big_piano_keys[pitch] = btn
-		# Letter label on every white key (A-G). C keys also show octave (e.g. C4).
-		# Black keys stay unlabeled to keep them clean.
+
+	# Letter labels on every white key. Added as siblings of the button (above
+	# in keys_root z-order) so they can't be hidden by the button's styling or
+	# feedback color changes. C keys also show octave (C3/C4/C5). Black keys
+	# stay unlabeled.
+	var letter_for_pc := {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
+	for pitch in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
+		if _ce_pitch_is_black(pitch):
+			continue
 		var pc := ((pitch % 12) + 12) % 12
-		if not is_black:
-			var letter_for_pc := {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
-			var letter: String = String(letter_for_pc.get(pc, ""))
-			if not letter.is_empty():
-				var lbl := Label.new()
-				if pc == 0:
-					lbl.text = "C%d" % int(pitch / 12 - 1)
-				else:
-					lbl.text = letter
-				lbl.add_theme_font_size_override("font_size", 16)
-				if _ui_font != null:
-					lbl.add_theme_font_override("font", _ui_font)
-				var label_color := Color(0.08, 0.20, 0.55, 1.0) if pc == 0 else Color(0.15, 0.18, 0.24, 1.0)
-				lbl.add_theme_color_override("font_color", label_color)
-				lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.85))
-				lbl.add_theme_constant_override("outline_size", 2)
-				lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-				lbl.size_flags_horizontal = Control.SIZE_FILL
-				lbl.anchor_left = 0.0
-				lbl.anchor_right = 1.0
-				lbl.anchor_top = 1.0
-				lbl.anchor_bottom = 1.0
-				lbl.offset_left = 0.0
-				lbl.offset_right = 0.0
-				lbl.offset_top = -26.0
-				lbl.offset_bottom = -2.0
-				lbl.z_index = 5
-				lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				btn.add_child(lbl)
+		var letter: String = String(letter_for_pc.get(pc, ""))
+		if letter.is_empty():
+			continue
+		var lbl := Label.new()
+		if pc == 0:
+			lbl.text = "C%d" % int(pitch / 12 - 1)
+		else:
+			lbl.text = letter
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		lbl.add_theme_font_size_override("font_size", 14)
+		if _ui_font != null:
+			lbl.add_theme_font_override("font", _ui_font)
+		# Strong contrast on any background: dark text + bright outline.
+		# Works on default cream key, lit blue key, red wrong-key feedback, etc.
+		lbl.add_theme_color_override("font_color", Color(0.08, 0.10, 0.16, 1.0))
+		lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
+		lbl.add_theme_constant_override("outline_size", 4)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lbl.z_index = 50
+		_sight_big_piano_keys_root.add_child(lbl)
+		_sight_big_piano_key_labels[pitch] = lbl
 
 	_layout_sight_big_piano()
 
@@ -24369,6 +24369,20 @@ func _layout_sight_big_piano() -> void:
 			var bx: float = float(white_positions[prev_white]) + white_w - black_w * 0.5
 			btn.position = Vector2(bx, 0)
 			btn.size = Vector2(black_w, black_h)
+
+	# Position the always-visible letter labels at the bottom of each white key.
+	# Sibling-to-button placement so feedback color changes on the buttons don't
+	# affect label visibility. Font scales down on narrow keys so text fits.
+	var label_band_h: float = 22.0
+	var font_size: int = clampi(int(white_w * 0.42), 10, 16)
+	for pitch in _sight_big_piano_key_labels.keys():
+		var lbl: Label = _sight_big_piano_key_labels[pitch] as Label
+		if lbl == null:
+			continue
+		var lbl_x: float = float(white_positions.get(int(pitch), 0.0))
+		lbl.position = Vector2(lbl_x, white_h - label_band_h - 2.0)
+		lbl.size = Vector2(white_w, label_band_h)
+		lbl.add_theme_font_size_override("font_size", font_size)
 
 
 func _on_sight_big_piano_key_pressed(pitch: int) -> void:

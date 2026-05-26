@@ -263,17 +263,24 @@ func _build_keyboard() -> void:
 		var letter_for_pc := {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
 		var letter: String = String(letter_for_pc.get(pc, ""))
 		if not letter.is_empty():
+			# Add label as sibling of the key (above in keys_root z-order) so
+			# feedback-role color changes on the key don't hide it.
 			var lbl := Label.new()
 			if pc == 0:
 				lbl.text = "C%d" % int(pitch / 12 - 1)
 			else:
 				lbl.text = letter
 			lbl.add_theme_font_size_override("font_size", 11)
-			var label_color := Color(0.20, 0.32, 0.55, 0.95) if pc == 0 else Color(0.32, 0.34, 0.38, 0.85)
-			lbl.add_theme_color_override("font_color", label_color)
-			lbl.position = Vector2(3, WHITE_H - 18)
+			lbl.add_theme_color_override("font_color", Color(0.08, 0.10, 0.16, 1.0))
+			lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
+			lbl.add_theme_constant_override("outline_size", 3)
+			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+			lbl.position = Vector2(white_x, WHITE_H - 18.0)
+			lbl.size = Vector2(WHITE_W, 16.0)
 			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			w_key.add_child(lbl)
+			lbl.z_index = 5
+			keys_root.add_child(lbl)
 		white_x += WHITE_W
 
 	for pitch in range(LOW, HIGH + 1):
