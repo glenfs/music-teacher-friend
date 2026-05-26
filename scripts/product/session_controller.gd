@@ -146,7 +146,7 @@ func _host_init_session_stats(host) -> void:
 
 
 func _host_reuse_current_rhythm(host) -> bool:
-	return host._is_rhythm_flow_mode() and (not host._rhythm_flow_patterns.is_empty() or not host._rhythm_flow_generated_bars.is_empty())
+	return host._is_rhythm_flow_mode() and (not host._rhythm_flow_runtime.patterns.is_empty() or not host._rhythm_flow_runtime.generated_bars.is_empty())
 
 
 func _enter_pre_round_gate(host) -> bool:
@@ -460,12 +460,12 @@ func handle_game_over(
 
 
 func finish_continuous_sight_reading(host, result_title: String = "Complete") -> void:
-	var was_rhythm_demo: bool = host._is_rhythm_flow_mode() and host._rhythm_flow_session_mode == host.RHYTHM_FLOW_SESSION_DEMO
+	var was_rhythm_demo: bool = host._is_rhythm_flow_mode() and host._rhythm_flow_runtime.session_mode == host.RHYTHM_FLOW_SESSION_DEMO
 	host._continuous_sight_active = false
 	host._continuous_sight_waiting_start = false
 	host._quiz_active = false
 	host._accepting_answer = false
-	host._rhythm_flow_paused = false
+	host._rhythm_flow_runtime.paused = false
 	host._set_answer_buttons_enabled(false)
 	host._refresh_rhythm_flow_play_pause_button()
 	if host._continuous_sight_play_line != null:
@@ -481,10 +481,10 @@ func finish_continuous_sight_reading(host, result_title: String = "Complete") ->
 	var summary := ""
 	if host._is_rhythm_flow_mode():
 		if was_rhythm_demo:
-			summary = "Listening and learning run finished | BPM %d\nScoring was paused." % [host._rhythm_flow_bpm]
+			summary = "Listening and learning run finished | BPM %d\nScoring was paused." % [host._rhythm_flow_runtime.bpm]
 		else:
 			var perfect_pct := int(round((float(host._continuous_sight_perfect_hits) / float(maxi(1, host._continuous_sight_total_hits))) * 100.0))
-			summary = "Rhythm Flow | BPM %d | Score %d | Accuracy %d%% | Perfect %d%%\nPerfect %d  Good %d  OK %d  Miss %d | Longest Streak %d" % [host._rhythm_flow_bpm, host._score, acc, perfect_pct, host._continuous_sight_perfect_hits, host._continuous_sight_good_hits, host._rhythm_flow_ok_hits, host._continuous_sight_miss_hits, host._continuous_sight_best_combo]
+			summary = "Rhythm Flow | BPM %d | Score %d | Accuracy %d%% | Perfect %d%%\nPerfect %d  Good %d  OK %d  Miss %d | Longest Streak %d" % [host._rhythm_flow_runtime.bpm, host._score, acc, perfect_pct, host._continuous_sight_perfect_hits, host._continuous_sight_good_hits, host._rhythm_flow_runtime.ok_hits, host._continuous_sight_miss_hits, host._continuous_sight_best_combo]
 	else:
 		summary = "Level %d | Score %d | Accuracy %d%% | Avg RT %.0fms\nPerfect %d  Good %d  Miss %d | Best Combo %d" % [host._continuous_sight_level, host._score, acc, avg_rt_ms, host._continuous_sight_perfect_hits, host._continuous_sight_good_hits, host._continuous_sight_miss_hits, host._continuous_sight_best_combo]
 		var problem_summary: String = host._continuous_problem_area_summary()
@@ -515,14 +515,14 @@ func finish_continuous_sight_reading(host, result_title: String = "Complete") ->
 	host._clear_continuous_sight_notes()
 	host._hide_continuous_visual_aids()
 	host._set_continuous_rest_symbol_visible(false)
-	host._rhythm_flow_session_mode = host.RHYTHM_FLOW_SESSION_PLAYING
-	host._rhythm_flow_scoring_enabled = true
-	host._rhythm_flow_input_enabled = true
+	host._rhythm_flow_runtime.session_mode = host.RHYTHM_FLOW_SESSION_PLAYING
+	host._rhythm_flow_runtime.scoring_enabled = true
+	host._rhythm_flow_runtime.input_enabled = true
 	host._rhythm_is_practice = was_rhythm_demo
-	host._rhythm_flow_demo_next_event_idx = 0
+	host._rhythm_flow_runtime.demo_next_event_idx = 0
 	host._refresh_rhythm_flow_demo_buttons()
 	if was_rhythm_demo:
-		host._rhythm_flow_paused = true
+		host._rhythm_flow_runtime.paused = true
 		host._refresh_rhythm_flow_practice_scrub_overlay()
 
 

@@ -114,6 +114,7 @@ const SightSingingTheoryScript = preload("res://scripts/sight_singing/sight_sing
 const EarTrainingCoreScript = preload("res://scripts/exercises/ear_training_core.gd")
 const NoteChasePhysicsScript = preload("res://scripts/exercises/note_chase_physics.gd")
 const NoteChaseRuntimeScript = preload("res://scripts/exercises/note_chase_runtime.gd")
+const RhythmFlowRuntimeScript = preload("res://scripts/rhythm/rhythm_flow_runtime.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -932,38 +933,13 @@ var _continuous_miss_reason_counts := {"Too Early": 0, "Too Late": 0, "Wrong Pit
 var _continuous_miss_note_counts: Dictionary = {}
 var _continuous_miss_step_counts: Dictionary = {}
 var _continuous_miss_ledger_depth_counts: Dictionary = {}
-var _rhythm_flow_bpm := 44
-var _rhythm_flow_paused := false
-var _rhythm_flow_count_in_beats := 4
-var _rhythm_flow_count_in_seconds := 0.0
-var _rhythm_flow_patterns: Array[Array] = []
-var _rhythm_flow_events: Array[Dictionary] = []
-var _rhythm_flow_next_spawn_idx := 0
-var _rhythm_flow_ok_hits := 0
-var _rhythm_flow_wrong_taps := 0
-var _rhythm_flow_count_in_announced := -1
-var _rhythm_flow_last_click_beat_index := -1
-var _rhythm_flow_difficulty_level := 1
-var _rhythm_flow_seed_base := -1
-var _rhythm_flow_seed_offset := 0
-var _rhythm_flow_next_seed := -1
-var _rhythm_flow_generated_bars: Array[String] = []
-var _rhythm_flow_generator
+# Rhythm Flow runtime — owns the 28 runtime state vars (+ 4 typed Arrays
+# + 1 generator ref). Same RefCounted pattern as _note_chase_runtime.
+var _rhythm_flow_runtime: RefCounted = RhythmFlowRuntimeScript.new()
 var _rhythm_flow_exercise_select: OptionButton
 var _rhythm_flow_beat_labels: Array[Label] = []
 var _rhythm_flow_time_sig_labels: Array[Label] = []
 var _rhythm_flow_perc_clef_bars: Array[ColorRect] = []
-var _rhythm_flow_session_mode := 0
-var _rhythm_flow_scoring_enabled := true
-var _rhythm_flow_input_enabled := true
-var _rhythm_flow_demo_next_event_idx := 0
-var _rhythm_flow_metronome_enabled := true
-var _rhythm_flow_triplet_assist_enabled := true
-var _rhythm_flow_triplet_guides_enabled := true
-var _rhythm_flow_tap_latency_ms := 0
-var _rhythm_flow_syncing_ui_controls := false
-var _rhythm_flow_last_start_demo_mode := false
-var _rhythm_flow_saved_maps: Array[Dictionary] = []
 var _rhythm_is_practice := false
 var _rhythm_pause_scrub_panel: PanelContainer
 var _rhythm_pause_scrub_label: Label
@@ -2708,11 +2684,11 @@ func _handle_app_backgrounded() -> void:
 	_accepting_answer = false
 	_awaiting_round_start = false
 	_note_chase_runtime.running = false
-	_rhythm_flow_paused = false
+	_rhythm_flow_runtime.paused = false
 	_rhythm_is_practice = false
-	_rhythm_flow_session_mode = RHYTHM_FLOW_SESSION_PLAYING
-	_rhythm_flow_scoring_enabled = true
-	_rhythm_flow_input_enabled = true
+	_rhythm_flow_runtime.session_mode = RHYTHM_FLOW_SESSION_PLAYING
+	_rhythm_flow_runtime.scoring_enabled = true
+	_rhythm_flow_runtime.input_enabled = true
 	if _status_label != null:
 		_status_label.text = "Session paused in background. Restart to continue."
 	# Return to home UI to avoid stale gameplay visuals on resume.
@@ -6277,7 +6253,7 @@ func _build_ui_game_panel() -> void:
 	_rhythm_bpm_spin_ingame.min_value = 40
 	_rhythm_bpm_spin_ingame.max_value = 180
 	_rhythm_bpm_spin_ingame.step = 1
-	_rhythm_bpm_spin_ingame.value = _rhythm_flow_bpm
+	_rhythm_bpm_spin_ingame.value = _rhythm_flow_runtime.bpm
 	_rhythm_bpm_spin_ingame.custom_minimum_size = Vector2(92, 56)
 	_rhythm_bpm_spin_ingame.mouse_filter = Control.MOUSE_FILTER_STOP
 	_rhythm_bpm_spin_ingame.focus_mode = Control.FOCUS_ALL
@@ -6287,7 +6263,7 @@ func _build_ui_game_panel() -> void:
 
 	_rhythm_metronome_check_ingame = CheckBox.new()
 	_rhythm_metronome_check_ingame.text = "Metronome"
-	_rhythm_metronome_check_ingame.button_pressed = _rhythm_flow_metronome_enabled
+	_rhythm_metronome_check_ingame.button_pressed = _rhythm_flow_runtime.metronome_enabled
 	_rhythm_metronome_check_ingame.custom_minimum_size = Vector2(170, 56)
 	_rhythm_metronome_check_ingame.mouse_filter = Control.MOUSE_FILTER_STOP
 	_rhythm_metronome_check_ingame.focus_mode = Control.FOCUS_ALL
@@ -6305,7 +6281,7 @@ func _build_ui_game_panel() -> void:
 	_rhythm_tap_latency_spin_ingame.min_value = -80
 	_rhythm_tap_latency_spin_ingame.max_value = 80
 	_rhythm_tap_latency_spin_ingame.step = 1
-	_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_tap_latency_ms
+	_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_runtime.tap_latency_ms
 	_rhythm_tap_latency_spin_ingame.suffix = " ms"
 	_rhythm_tap_latency_spin_ingame.custom_minimum_size = Vector2(112, 56)
 	_rhythm_tap_latency_spin_ingame.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -6385,7 +6361,7 @@ func _build_ui_game_panel() -> void:
 	_rhythm_bpm_spin.min_value = 40
 	_rhythm_bpm_spin.max_value = 180
 	_rhythm_bpm_spin.step = 1
-	_rhythm_bpm_spin.value = _rhythm_flow_bpm
+	_rhythm_bpm_spin.value = _rhythm_flow_runtime.bpm
 	_rhythm_bpm_spin.custom_minimum_size = Vector2(92, 40)
 	_rhythm_bpm_spin.mouse_filter = Control.MOUSE_FILTER_STOP
 	_rhythm_bpm_spin.focus_mode = Control.FOCUS_ALL
@@ -6413,7 +6389,7 @@ func _build_ui_game_panel() -> void:
 		elif lvl >= 11:
 			label += " (t4 triplets)"
 		_rhythm_flow_exercise_select.add_item(label, lvl)
-	_rhythm_flow_exercise_select.selected = _rhythm_flow_difficulty_level - 1
+	_rhythm_flow_exercise_select.selected = _rhythm_flow_runtime.difficulty_level - 1
 	_rhythm_flow_exercise_select.item_selected.connect(_on_rhythm_flow_exercise_selected)
 	_rhythm_flow_settings_row.add_child(_rhythm_flow_exercise_select)
 	_rhythm_flow_settings_row_2 = HBoxContainer.new()
@@ -6430,7 +6406,7 @@ func _build_ui_game_panel() -> void:
 	rhythm_setup_group.add_child(_rhythm_flow_settings_row_3)
 	_rhythm_flow_metronome_check = CheckBox.new()
 	_rhythm_flow_metronome_check.text = "Metronome"
-	_rhythm_flow_metronome_check.button_pressed = _rhythm_flow_metronome_enabled
+	_rhythm_flow_metronome_check.button_pressed = _rhythm_flow_runtime.metronome_enabled
 	_rhythm_flow_metronome_check.custom_minimum_size = Vector2(150, 40)
 	_rhythm_flow_metronome_check.mouse_filter = Control.MOUSE_FILTER_STOP
 	_rhythm_flow_metronome_check.focus_mode = Control.FOCUS_ALL
@@ -6470,7 +6446,7 @@ func _build_ui_game_panel() -> void:
 	_rhythm_flow_seed_spin.min_value = -1
 	_rhythm_flow_seed_spin.max_value = 2147483647
 	_rhythm_flow_seed_spin.step = 1
-	_rhythm_flow_seed_spin.value = _rhythm_flow_seed_base
+	_rhythm_flow_seed_spin.value = _rhythm_flow_runtime.seed_base
 	_rhythm_flow_seed_spin.custom_minimum_size = Vector2(140, 40)
 	_rhythm_flow_seed_spin.mouse_filter = Control.MOUSE_FILTER_STOP
 	_rhythm_flow_seed_spin.focus_mode = Control.FOCUS_ALL
@@ -10175,7 +10151,7 @@ func _refresh_practice_setup_theme() -> void:
 	_style_practice_setup_toggle_button(_scale_asc_desc_toggle, _scale_asc_desc, false)
 	_style_practice_setup_toggle_button(_cadence_broken_toggle, _cadence_broken, false)
 	_style_practice_setup_toggle_button(_sight_accidentals_toggle, _sight_accidentals_toggle != null and _sight_accidentals_toggle.button_pressed, false)
-	_style_practice_setup_toggle_button(_rhythm_flow_metronome_check, _rhythm_flow_metronome_enabled, false)
+	_style_practice_setup_toggle_button(_rhythm_flow_metronome_check, _rhythm_flow_runtime.metronome_enabled, false)
 
 	_style_practice_setup_input_control(_pitch_match_key_option)
 	_style_practice_setup_input_control(_pitch_match_scale_option)
@@ -11098,7 +11074,7 @@ func _refresh_sight_streak_panel_ui() -> void:
 		if _sight_streak_title_label != null:
 			_sight_streak_title_label.text = "BPM"
 		if _sight_streak_value_label != null:
-			_sight_streak_value_label.text = str(_rhythm_flow_bpm)
+			_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm)
 		if _sight_streak_score_label != null:
 			var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
 			_sight_streak_score_label.text = "ACC %d%%" % acc
@@ -11499,7 +11475,7 @@ func _apply_continuous_sight_skin() -> void:
 		_sight_streak_title_label.text = "BPM" if is_rhythm else "STREAK"
 		_sight_streak_title_label.add_theme_color_override("font_color", Color(0.70, 0.80, 0.93, 0.94))
 	if _sight_streak_value_label != null:
-		_sight_streak_value_label.text = str(_rhythm_flow_bpm) if is_rhythm else ("%s %d" % [char(0x1F525), _continuous_sight_combo])
+		_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm) if is_rhythm else ("%s %d" % [char(0x1F525), _continuous_sight_combo])
 		_sight_streak_value_label.add_theme_color_override("font_color", Color(1.0, 0.76, 0.30, 0.99))
 		_sight_streak_value_label.add_theme_color_override("font_outline_color", Color(0.18, 0.10, 0.02, 0.80))
 		_sight_streak_value_label.add_theme_color_override("font_shadow_color", Color(1.0, 0.66, 0.20, icon_glow_alpha))
@@ -11941,7 +11917,7 @@ func _on_result_action_primary_pressed() -> void:
 	_play_ui_click_sfx()
 	_focus_missed_ids.clear()  # Normal restart: use full settings pool
 	if _is_rhythm_flow_mode():
-		_start_rhythm_flow_session_from_current_pattern(_rhythm_flow_last_start_demo_mode)
+		_start_rhythm_flow_session_from_current_pattern(_rhythm_flow_runtime.last_start_demo_mode)
 		return
 	_on_restart_quiz_pressed()
 
@@ -12694,8 +12670,8 @@ func _load_ear_settings() -> void:
 	_use_descending_intervals = false
 	_use_harmonic_intervals = false
 	_practice_mode_enabled = true
-	_rhythm_flow_saved_maps = []
-	_rhythm_flow_tap_latency_ms = 0
+	_rhythm_flow_runtime.clear_saved_maps()
+	_rhythm_flow_runtime.tap_latency_ms = 0
 	if not FileAccess.file_exists(EAR_SETTINGS_PATH):
 		_rhythm_flow_ensure_saved_maps_slots()
 		if _home_tokens != null:
@@ -12730,9 +12706,9 @@ func _load_ear_settings() -> void:
 	if d.has("rhythm_flow_saved_maps") and d["rhythm_flow_saved_maps"] is Array:
 		for item in (d["rhythm_flow_saved_maps"] as Array):
 			if typeof(item) == TYPE_DICTIONARY:
-				_rhythm_flow_saved_maps.append((item as Dictionary).duplicate(true))
+				_rhythm_flow_runtime.append_saved_map((item as Dictionary).duplicate(true))
 	if d.has("rhythm_flow_tap_latency_ms"):
-		_rhythm_flow_tap_latency_ms = clampi(int(d["rhythm_flow_tap_latency_ms"]), -80, 80)
+		_rhythm_flow_runtime.tap_latency_ms = clampi(int(d["rhythm_flow_tap_latency_ms"]), -80, 80)
 	if d.has("streak_count"):
 		_streak_count = maxi(0, int(d["streak_count"]))
 	if d.has("streak_last_date"):
@@ -12845,8 +12821,8 @@ func _save_ear_settings() -> void:
 		"theme_id": _ui_theme_id,
 		"use_descending_intervals": _use_descending_intervals,
 		"use_harmonic_intervals": _use_harmonic_intervals,
-		"rhythm_flow_saved_maps": _rhythm_flow_saved_maps,
-		"rhythm_flow_tap_latency_ms": _rhythm_flow_tap_latency_ms,
+		"rhythm_flow_saved_maps": _rhythm_flow_runtime.saved_maps,
+		"rhythm_flow_tap_latency_ms": _rhythm_flow_runtime.tap_latency_ms,
 		"streak_count": _streak_count,
 		"streak_last_date": _streak_last_date,
 		"ear_intro_seen": _ear_intro_seen,
@@ -13439,13 +13415,13 @@ func _rhythm_flow_empty_saved_map_slot() -> Dictionary:
 
 func _rhythm_flow_ensure_saved_maps_slots() -> void:
 	var typed: Array[Dictionary] = []
-	for item in RhythmFlowLibraryScript.ensure_saved_maps_slots(_rhythm_flow_saved_maps):
+	for item in RhythmFlowLibraryScript.ensure_saved_maps_slots(_rhythm_flow_runtime.saved_maps):
 		typed.append(item)
-	_rhythm_flow_saved_maps = typed
+	_rhythm_flow_runtime.set_saved_maps(typed)
 
 
 func _rhythm_flow_slot_is_filled(slot_idx: int) -> bool:
-	return RhythmFlowLibraryScript.slot_is_filled(_rhythm_flow_saved_maps, slot_idx)
+	return RhythmFlowLibraryScript.slot_is_filled(_rhythm_flow_runtime.saved_maps, slot_idx)
 
 
 func _rhythm_flow_now_stamp() -> String:
@@ -16178,22 +16154,22 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		_rhythm_flow_test_button.disabled = rhythm_flow_selected and _game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active
 	if _rhythm_flow_metronome_check != null:
 		_rhythm_flow_metronome_check.visible = rhythm_flow_selected and not in_rhythm_menu
-		_rhythm_flow_metronome_check.set_pressed_no_signal(_rhythm_flow_metronome_enabled)
+		_rhythm_flow_metronome_check.set_pressed_no_signal(_rhythm_flow_runtime.metronome_enabled)
 	if _rhythm_bpm_spin_ingame != null:
 		_rhythm_bpm_spin_ingame.visible = rhythm_flow_selected and _game_panel != null and _game_panel.visible
-		if int(round(_rhythm_bpm_spin_ingame.value)) != _rhythm_flow_bpm:
-			_rhythm_bpm_spin_ingame.value = _rhythm_flow_bpm
+		if int(round(_rhythm_bpm_spin_ingame.value)) != _rhythm_flow_runtime.bpm:
+			_rhythm_bpm_spin_ingame.value = _rhythm_flow_runtime.bpm
 	if _rhythm_bpm_label_ingame != null:
 		_rhythm_bpm_label_ingame.visible = rhythm_flow_selected and _game_panel != null and _game_panel.visible
 	if _rhythm_metronome_check_ingame != null:
 		_rhythm_metronome_check_ingame.visible = rhythm_flow_selected and _game_panel != null and _game_panel.visible
-		_rhythm_metronome_check_ingame.set_pressed_no_signal(_rhythm_flow_metronome_enabled)
+		_rhythm_metronome_check_ingame.set_pressed_no_signal(_rhythm_flow_runtime.metronome_enabled)
 	if _rhythm_tap_latency_label_ingame != null:
 		_rhythm_tap_latency_label_ingame.visible = rhythm_flow_selected and _game_panel != null and _game_panel.visible
 	if _rhythm_tap_latency_spin_ingame != null:
 		_rhythm_tap_latency_spin_ingame.visible = rhythm_flow_selected and _game_panel != null and _game_panel.visible
-		if int(round(_rhythm_tap_latency_spin_ingame.value)) != _rhythm_flow_tap_latency_ms:
-			_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_tap_latency_ms
+		if int(round(_rhythm_tap_latency_spin_ingame.value)) != _rhythm_flow_runtime.tap_latency_ms:
+			_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_runtime.tap_latency_ms
 	if _rhythm_flow_save_button_ingame != null:
 		_rhythm_flow_save_button_ingame.visible = rhythm_flow_selected and _game_panel != null and _game_panel.visible
 		_rhythm_flow_save_button_ingame.disabled = not _rhythm_flow_has_current_bars()
@@ -17217,23 +17193,23 @@ func _apply_answer_mode() -> void:
 	if _rhythm_tap_button != null:
 		var show_rhythm_tap := _selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow"
 		_rhythm_tap_button.visible = show_rhythm_tap
-		_rhythm_tap_button.disabled = not show_rhythm_tap or not _continuous_sight_active or _continuous_sight_waiting_start or _rhythm_flow_paused
+		_rhythm_tap_button.disabled = not show_rhythm_tap or not _continuous_sight_active or _continuous_sight_waiting_start or _rhythm_flow_runtime.paused
 	var show_rhythm_ingame_controls := _selected_mode == MODE_SIGHT and _sight_mode == "Rhythm Flow" and _game_panel != null and _game_panel.visible
 	if _rhythm_bpm_label_ingame != null:
 		_rhythm_bpm_label_ingame.visible = show_rhythm_ingame_controls
 	if _rhythm_bpm_spin_ingame != null:
 		_rhythm_bpm_spin_ingame.visible = show_rhythm_ingame_controls
-		if int(round(_rhythm_bpm_spin_ingame.value)) != _rhythm_flow_bpm:
-			_rhythm_bpm_spin_ingame.value = _rhythm_flow_bpm
+		if int(round(_rhythm_bpm_spin_ingame.value)) != _rhythm_flow_runtime.bpm:
+			_rhythm_bpm_spin_ingame.value = _rhythm_flow_runtime.bpm
 	if _rhythm_metronome_check_ingame != null:
 		_rhythm_metronome_check_ingame.visible = show_rhythm_ingame_controls
-		_rhythm_metronome_check_ingame.set_pressed_no_signal(_rhythm_flow_metronome_enabled)
+		_rhythm_metronome_check_ingame.set_pressed_no_signal(_rhythm_flow_runtime.metronome_enabled)
 	if _rhythm_tap_latency_label_ingame != null:
 		_rhythm_tap_latency_label_ingame.visible = show_rhythm_ingame_controls
 	if _rhythm_tap_latency_spin_ingame != null:
 		_rhythm_tap_latency_spin_ingame.visible = show_rhythm_ingame_controls
-		if int(round(_rhythm_tap_latency_spin_ingame.value)) != _rhythm_flow_tap_latency_ms:
-			_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_tap_latency_ms
+		if int(round(_rhythm_tap_latency_spin_ingame.value)) != _rhythm_flow_runtime.tap_latency_ms:
+			_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_runtime.tap_latency_ms
 	if _rhythm_flow_save_button_ingame != null:
 		_rhythm_flow_save_button_ingame.visible = show_rhythm_ingame_controls
 		_rhythm_flow_save_button_ingame.disabled = not _rhythm_flow_has_current_bars()
@@ -25263,7 +25239,7 @@ func _start_continuous_flow_after_waiting() -> void:
 	_continuous_sight_spawn_timer = 0.0
 	if _is_rhythm_flow_mode():
 		_status_label.text = "Count-in: 1"
-		_rhythm_flow_count_in_announced = 0
+		_rhythm_flow_runtime.count_in_announced = 0
 	else:
 		# Settle any responsive layout changes first so seeded Note Flow notes spawn at the final Y positions.
 		_apply_answer_mode()
@@ -26268,7 +26244,7 @@ func _continuous_can_spawn_note() -> bool:
 
 
 func _rhythm_flow_pattern_library() -> Array[Array]:
-	return RhythmFlowLibraryScript.pattern_library(_rhythm_flow_difficulty_level)
+	return RhythmFlowLibraryScript.pattern_library(_rhythm_flow_runtime.difficulty_level)
 
 
 func _rhythm_flow_timing_windows() -> Dictionary:
@@ -26276,11 +26252,11 @@ func _rhythm_flow_timing_windows() -> Dictionary:
 
 
 func _rhythm_flow_timing_windows_for_event(evt: Dictionary) -> Dictionary:
-	return RhythmFlowLibraryScript.timing_windows_for_event(evt, _rhythm_flow_triplet_assist_enabled)
+	return RhythmFlowLibraryScript.timing_windows_for_event(evt, _rhythm_flow_runtime.triplet_assist_enabled)
 
 
 func _rhythm_flow_tap_latency_sec() -> float:
-	return RhythmFlowLibraryScript.tap_latency_sec(_rhythm_flow_tap_latency_ms)
+	return RhythmFlowLibraryScript.tap_latency_sec(_rhythm_flow_runtime.tap_latency_ms)
 
 
 func _rhythm_flow_triplet_snap_window_sec(evt: Dictionary) -> float:
@@ -26289,19 +26265,19 @@ func _rhythm_flow_triplet_snap_window_sec(evt: Dictionary) -> float:
 
 func _rhythm_flow_triplet_snapped_tap_time(tap_t: float, evt: Dictionary) -> float:
 	return RhythmFlowLibraryScript.triplet_snapped_tap_time(
-		tap_t, evt, _rhythm_flow_count_in_seconds,
-		_rhythm_flow_seconds_per_beat(), _rhythm_flow_triplet_assist_enabled
+		tap_t, evt, _rhythm_flow_runtime.count_in_seconds,
+		_rhythm_flow_seconds_per_beat(), _rhythm_flow_runtime.triplet_assist_enabled
 	)
 
 
 func _rhythm_flow_triplet_guides_active_near_head() -> bool:
-	if not _rhythm_flow_triplet_guides_enabled:
+	if not _rhythm_flow_runtime.triplet_guides_enabled:
 		return false
 	if not _is_rhythm_flow_mode():
 		return false
 	if not (_game_panel != null and _game_panel.visible and _continuous_sight_active):
 		return false
-	for evt_v in _rhythm_flow_events:
+	for evt_v in _rhythm_flow_runtime.events:
 		var evt: Dictionary = evt_v
 		if not bool(evt.get("triplet", false)):
 			continue
@@ -26323,7 +26299,7 @@ func _set_rhythm_triplet_guides_visible(visible_state: bool) -> void:
 func _update_rhythm_triplet_guide_pulses(delta: float) -> void:
 	if _staff_area == null or _continuous_sight_play_line == null:
 		return
-	var show := _rhythm_flow_triplet_guides_active_near_head() and _continuous_sight_play_line.visible and not _continuous_sight_waiting_start and _continuous_sight_elapsed >= _rhythm_flow_count_in_seconds
+	var show: bool = _rhythm_flow_triplet_guides_active_near_head() and _continuous_sight_play_line.visible and not _continuous_sight_waiting_start and _continuous_sight_elapsed >= _rhythm_flow_runtime.count_in_seconds
 	if not show:
 		_set_rhythm_triplet_guides_visible(false)
 		_rhythm_triplet_guide_last_tick_idx = -1
@@ -26342,9 +26318,9 @@ func _update_rhythm_triplet_guide_pulses(delta: float) -> void:
 	if step_sec <= 0.0:
 		_set_rhythm_triplet_guides_visible(false)
 		return
-	var tick_idx := int(floor(((_continuous_sight_elapsed - _rhythm_flow_count_in_seconds) / step_sec) + 0.0001))
+	var tick_idx := int(floor(((_continuous_sight_elapsed - _rhythm_flow_runtime.count_in_seconds) / step_sec) + 0.0001))
 	var tick_mod := ((tick_idx % 3) + 3) % 3
-	if not _rhythm_flow_paused and tick_idx != _rhythm_triplet_guide_last_tick_idx:
+	if not _rhythm_flow_runtime.paused and tick_idx != _rhythm_triplet_guide_last_tick_idx:
 		if _rhythm_triplet_guide_last_tick_idx != -1:
 			_rhythm_triplet_guide_flash_dot = tick_mod
 			_rhythm_triplet_guide_flash_until_sec = _continuous_sight_elapsed + maxf(0.05, minf(0.12, step_sec * 0.75))
@@ -26374,34 +26350,34 @@ func _update_rhythm_triplet_guide_pulses(delta: float) -> void:
 
 
 func _rhythm_flow_generator_ensure() -> void:
-	if _rhythm_flow_generator != null:
+	if _rhythm_flow_runtime.generator != null:
 		return
 	if RhythmGeneratorScript == null:
 		return
-	_rhythm_flow_generator = RhythmGeneratorScript.new()
-	if _rhythm_flow_generator != null:
-		_rhythm_flow_generator.allow_rests = true
+	_rhythm_flow_runtime.generator = RhythmGeneratorScript.new()
+	if _rhythm_flow_runtime.generator != null:
+		_rhythm_flow_runtime.generator.allow_rests = true
 
 
 func _rhythm_flow_generate_16bar_patterns() -> Array[Array]:
 	_rhythm_flow_generator_ensure()
 	var out: Array[Array] = []
-	if _rhythm_flow_generator == null:
+	if _rhythm_flow_runtime.generator == null:
 		return out
 	var effective_seed := -1
-	if _rhythm_flow_seed_base >= 0:
-		effective_seed = _rhythm_flow_seed_base + _rhythm_flow_seed_offset
-	elif _rhythm_flow_next_seed >= 0:
-		effective_seed = _rhythm_flow_next_seed
-	var bars: Array[String] = _rhythm_flow_generator.generate_exercise(_rhythm_flow_difficulty_level, effective_seed)
-	_rhythm_flow_generated_bars = bars
+	if _rhythm_flow_runtime.seed_base >= 0:
+		effective_seed = _rhythm_flow_runtime.seed_base + _rhythm_flow_runtime.seed_offset
+	elif _rhythm_flow_runtime.next_seed >= 0:
+		effective_seed = _rhythm_flow_runtime.next_seed
+	var bars: Array[String] = _rhythm_flow_runtime.generator.generate_exercise(_rhythm_flow_runtime.difficulty_level, effective_seed)
+	_rhythm_flow_runtime.set_generated_bars(bars)
 	# After a seeded generation, future "next" calls become new random sets unless user sets seed again.
-	_rhythm_flow_next_seed = -1
+	_rhythm_flow_runtime.next_seed = -1
 	for bar_idx in range(bars.size()):
 		var bar_str := str(bars[bar_idx])
 		var toks := bar_str.split(" ", false)
 		var pattern: Array = []
-		var events: Array[Dictionary] = _rhythm_flow_generator.bar_to_events(toks)
+		var events: Array[Dictionary] = _rhythm_flow_runtime.generator.bar_to_events(toks)
 		for evt in events:
 			var is_rest := bool(evt.get("is_rest", false))
 			pattern.append({
@@ -26421,13 +26397,13 @@ func _rhythm_flow_generate_16bar_patterns() -> Array[Array]:
 func _rhythm_flow_patterns_from_generated_bars() -> Array[Array]:
 	_rhythm_flow_generator_ensure()
 	var out: Array[Array] = []
-	if _rhythm_flow_generator == null or _rhythm_flow_generated_bars.is_empty():
+	if _rhythm_flow_runtime.generator == null or _rhythm_flow_runtime.generated_bars.is_empty():
 		return out
-	for bar_str_v in _rhythm_flow_generated_bars:
+	for bar_str_v in _rhythm_flow_runtime.generated_bars:
 		var bar_str := str(bar_str_v)
 		var toks := bar_str.split(" ", false)
 		var pattern: Array = []
-		var events: Array[Dictionary] = _rhythm_flow_generator.bar_to_events(toks)
+		var events: Array[Dictionary] = _rhythm_flow_runtime.generator.bar_to_events(toks)
 		for evt in events:
 			var is_rest := bool(evt.get("is_rest", false))
 			pattern.append({
@@ -26444,38 +26420,38 @@ func _rhythm_flow_patterns_from_generated_bars() -> Array[Array]:
 
 
 func _rhythm_flow_log_generated_exercise() -> void:
-	if _rhythm_flow_generator == null:
+	if _rhythm_flow_runtime.generator == null:
 		return
-	var summary: Dictionary = _rhythm_flow_generator.summarize_exercise(_rhythm_flow_generated_bars)
+	var summary: Dictionary = _rhythm_flow_runtime.generator.summarize_exercise(_rhythm_flow_runtime.generated_bars)
 	var valid := bool(summary.get("valid", false))
 	var hits := int(summary.get("hit_count", 0))
 	var rests := int(summary.get("rest_count", 0))
 	if OS.is_debug_build():
 		print("[RhythmFlow Generator] level=%d bars=%d valid=%s hits=%d rests=%d" % [
-			_rhythm_flow_difficulty_level,
-			_rhythm_flow_generated_bars.size(),
+			_rhythm_flow_runtime.difficulty_level,
+			_rhythm_flow_runtime.generated_bars.size(),
 			"PASS" if valid else "FAIL",
 			hits,
 			rests
 		])
-		for i in range(_rhythm_flow_generated_bars.size()):
-			print("  bar %02d: %s" % [i + 1, _rhythm_flow_generated_bars[i]])
+		for i in range(_rhythm_flow_runtime.generated_bars.size()):
+			print("  bar %02d: %s" % [i + 1, _rhythm_flow_runtime.generated_bars[i]])
 
 
 func _rhythm_flow_has_token(token_text: String) -> bool:
-	return RhythmFlowLibraryScript.has_token(_rhythm_flow_generated_bars, token_text)
+	return RhythmFlowLibraryScript.has_token(_rhythm_flow_runtime.generated_bars, token_text)
 
 
 func _rhythm_flow_hint_suffix_for_current_bars() -> String:
-	return RhythmFlowLibraryScript.hint_suffix_for_bars(_rhythm_flow_generated_bars)
+	return RhythmFlowLibraryScript.hint_suffix_for_bars(_rhythm_flow_runtime.generated_bars)
 
 
 func _rhythm_flow_generator_self_test() -> bool:
 	_rhythm_flow_generator_ensure()
-	if _rhythm_flow_generator == null:
+	if _rhythm_flow_runtime.generator == null:
 		push_warning("RhythmFlow generator unavailable for self-test.")
 		return false
-	var ok := bool(_rhythm_flow_generator.self_test_generate_100())
+	var ok := bool(_rhythm_flow_runtime.generator.self_test_generate_100())
 	if OS.is_debug_build():
 		print("[RhythmFlow Generator Test] %s" % ["PASS" if ok else "FAIL"])
 	return ok
@@ -26484,39 +26460,39 @@ func _rhythm_flow_generator_self_test() -> bool:
 func _on_rhythm_flow_exercise_selected(idx: int) -> void:
 	if _rhythm_flow_exercise_select != null and idx >= 0 and idx < _rhythm_flow_exercise_select.item_count:
 		var meta_v: Variant = _rhythm_flow_exercise_select.get_item_id(idx)
-		_rhythm_flow_difficulty_level = clampi(int(meta_v), 1, 99)
+		_rhythm_flow_runtime.difficulty_level = clampi(int(meta_v), 1, 99)
 	else:
-		_rhythm_flow_difficulty_level = clampi(idx + 1, 1, 99)
-	_rhythm_flow_seed_offset = 0
+		_rhythm_flow_runtime.difficulty_level = clampi(idx + 1, 1, 99)
+	_rhythm_flow_runtime.seed_offset = 0
 	if not _is_rhythm_flow_mode():
 		return
 	# Rebuild immediately only when not actively running a quiz.
 	if _quiz_active:
 		return
 	_rhythm_flow_build_events()
-	_status_label.text = ("Rhythm Flow ready | Level %d" % [_rhythm_flow_difficulty_level]) + _rhythm_flow_hint_suffix_for_current_bars()
+	_status_label.text = ("Rhythm Flow ready | Level %d" % [_rhythm_flow_runtime.difficulty_level]) + _rhythm_flow_hint_suffix_for_current_bars()
 
 
 func _on_rhythm_flow_seed_changed(v: float) -> void:
-	_rhythm_flow_seed_base = int(round(v))
-	_rhythm_flow_seed_offset = 0
+	_rhythm_flow_runtime.seed_base = int(round(v))
+	_rhythm_flow_runtime.seed_offset = 0
 	if not _is_rhythm_flow_mode():
 		return
 	if _game_panel != null and _game_panel.visible and _quiz_active:
 		return
 	_rhythm_flow_build_events()
-	var seed_txt := "random" if _rhythm_flow_seed_base < 0 else str(_rhythm_flow_seed_base)
-	_status_label.text = ("Rhythm Flow ready | Level %d | Seed %s" % [_rhythm_flow_difficulty_level, seed_txt]) + _rhythm_flow_hint_suffix_for_current_bars()
+	var seed_txt := "random" if _rhythm_flow_runtime.seed_base < 0 else str(_rhythm_flow_runtime.seed_base)
+	_status_label.text = ("Rhythm Flow ready | Level %d | Seed %s" % [_rhythm_flow_runtime.difficulty_level, seed_txt]) + _rhythm_flow_hint_suffix_for_current_bars()
 
 
 func _on_rhythm_flow_next_exercise_pressed() -> void:
 	if _game_panel != null and _game_panel.visible and _quiz_active:
 		return
-	if _rhythm_flow_seed_base >= 0:
-		_rhythm_flow_seed_offset += 1
+	if _rhythm_flow_runtime.seed_base >= 0:
+		_rhythm_flow_runtime.seed_offset += 1
 	_rhythm_flow_build_events()
-	var eff_seed := "random" if _rhythm_flow_seed_base < 0 else str(_rhythm_flow_seed_base + _rhythm_flow_seed_offset)
-	_status_label.text = ("Rhythm Flow ready | Level %d | Next generated (%s)" % [_rhythm_flow_difficulty_level, eff_seed]) + _rhythm_flow_hint_suffix_for_current_bars()
+	var eff_seed := "random" if _rhythm_flow_runtime.seed_base < 0 else str(_rhythm_flow_runtime.seed_base + _rhythm_flow_runtime.seed_offset)
+	_status_label.text = ("Rhythm Flow ready | Level %d | Next generated (%s)" % [_rhythm_flow_runtime.difficulty_level, eff_seed]) + _rhythm_flow_hint_suffix_for_current_bars()
 
 
 func _on_rhythm_flow_run_generator_test_pressed() -> void:
@@ -26535,37 +26511,37 @@ func _restart_rhythm_flow_current_session_for_bpm_change() -> void:
 	_result_box_hide()
 	_start_continuous_sight_reading(was_demo, true)
 	_start_continuous_flow_after_waiting()
-	_status_label.text = ("Demo restarted at BPM %d" if was_demo else "Rhythm restarted at BPM %d") % [_rhythm_flow_bpm]
+	_status_label.text = ("Demo restarted at BPM %d" if was_demo else "Rhythm restarted at BPM %d") % [_rhythm_flow_runtime.bpm]
 
 
 func _on_rhythm_flow_bpm_changed(v: float) -> void:
 	var new_bpm := clampi(int(round(v)), 40, 180)
-	if _rhythm_flow_syncing_ui_controls:
-		_rhythm_flow_bpm = new_bpm
+	if _rhythm_flow_runtime.syncing_ui_controls:
+		_rhythm_flow_runtime.bpm = new_bpm
 		return
-	var changed := new_bpm != _rhythm_flow_bpm
-	_rhythm_flow_bpm = new_bpm
-	_rhythm_flow_syncing_ui_controls = true
-	if _rhythm_bpm_spin != null and int(round(_rhythm_bpm_spin.value)) != _rhythm_flow_bpm:
-		_rhythm_bpm_spin.value = _rhythm_flow_bpm
-	if _rhythm_bpm_spin_ingame != null and int(round(_rhythm_bpm_spin_ingame.value)) != _rhythm_flow_bpm:
-		_rhythm_bpm_spin_ingame.value = _rhythm_flow_bpm
-	_rhythm_flow_syncing_ui_controls = false
+	var changed: bool = new_bpm != _rhythm_flow_runtime.bpm
+	_rhythm_flow_runtime.bpm = new_bpm
+	_rhythm_flow_runtime.syncing_ui_controls = true
+	if _rhythm_bpm_spin != null and int(round(_rhythm_bpm_spin.value)) != _rhythm_flow_runtime.bpm:
+		_rhythm_bpm_spin.value = _rhythm_flow_runtime.bpm
+	if _rhythm_bpm_spin_ingame != null and int(round(_rhythm_bpm_spin_ingame.value)) != _rhythm_flow_runtime.bpm:
+		_rhythm_bpm_spin_ingame.value = _rhythm_flow_runtime.bpm
+	_rhythm_flow_runtime.syncing_ui_controls = false
 	if changed:
 		_restart_rhythm_flow_current_session_for_bpm_change()
 
 
 func _on_rhythm_flow_metronome_toggled(pressed: bool) -> void:
-	if _rhythm_flow_syncing_ui_controls:
-		_rhythm_flow_metronome_enabled = pressed
+	if _rhythm_flow_runtime.syncing_ui_controls:
+		_rhythm_flow_runtime.metronome_enabled = pressed
 		return
-	_rhythm_flow_metronome_enabled = pressed
-	_rhythm_flow_syncing_ui_controls = true
+	_rhythm_flow_runtime.metronome_enabled = pressed
+	_rhythm_flow_runtime.syncing_ui_controls = true
 	if _rhythm_flow_metronome_check != null:
 		_rhythm_flow_metronome_check.set_pressed_no_signal(pressed)
 	if _rhythm_metronome_check_ingame != null:
 		_rhythm_metronome_check_ingame.set_pressed_no_signal(pressed)
-	_rhythm_flow_syncing_ui_controls = false
+	_rhythm_flow_runtime.syncing_ui_controls = false
 	if not pressed and _rhythm_metronome_player != null and _rhythm_metronome_player.playing:
 		_rhythm_metronome_player.stop()
 	if _is_rhythm_flow_mode() and not (_game_panel != null and _game_panel.visible and _quiz_active):
@@ -26574,24 +26550,24 @@ func _on_rhythm_flow_metronome_toggled(pressed: bool) -> void:
 
 func _on_rhythm_flow_tap_latency_changed(v: float) -> void:
 	var new_ms := clampi(int(round(v)), -80, 80)
-	if _rhythm_flow_syncing_ui_controls:
-		_rhythm_flow_tap_latency_ms = new_ms
+	if _rhythm_flow_runtime.syncing_ui_controls:
+		_rhythm_flow_runtime.tap_latency_ms = new_ms
 		return
-	var changed := new_ms != _rhythm_flow_tap_latency_ms
-	_rhythm_flow_tap_latency_ms = new_ms
-	_rhythm_flow_syncing_ui_controls = true
-	if _rhythm_tap_latency_spin_ingame != null and int(round(_rhythm_tap_latency_spin_ingame.value)) != _rhythm_flow_tap_latency_ms:
-		_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_tap_latency_ms
-	_rhythm_flow_syncing_ui_controls = false
+	var changed: bool = new_ms != _rhythm_flow_runtime.tap_latency_ms
+	_rhythm_flow_runtime.tap_latency_ms = new_ms
+	_rhythm_flow_runtime.syncing_ui_controls = true
+	if _rhythm_tap_latency_spin_ingame != null and int(round(_rhythm_tap_latency_spin_ingame.value)) != _rhythm_flow_runtime.tap_latency_ms:
+		_rhythm_tap_latency_spin_ingame.value = _rhythm_flow_runtime.tap_latency_ms
+	_rhythm_flow_runtime.syncing_ui_controls = false
 	if changed:
 		_save_ear_settings()
-		if _is_rhythm_flow_mode() and _status_label != null and not (_game_panel != null and _game_panel.visible and _quiz_active and not _rhythm_flow_paused):
-			var sign_txt := "+" if _rhythm_flow_tap_latency_ms > 0 else ""
-			_status_label.text = "Tap offset set to %s%d ms" % [sign_txt, _rhythm_flow_tap_latency_ms]
+		if _is_rhythm_flow_mode() and _status_label != null and not (_game_panel != null and _game_panel.visible and _quiz_active and not _rhythm_flow_runtime.paused):
+			var sign_txt := "+" if _rhythm_flow_runtime.tap_latency_ms > 0 else ""
+			_status_label.text = "Tap offset set to %s%d ms" % [sign_txt, _rhythm_flow_runtime.tap_latency_ms]
 
 
 func _rhythm_flow_has_current_bars() -> bool:
-	return not _rhythm_flow_generated_bars.is_empty()
+	return not _rhythm_flow_runtime.generated_bars.is_empty()
 
 
 func _rhythm_flow_refresh_slot_dialog_ui() -> void:
@@ -26605,8 +26581,8 @@ func _rhythm_flow_refresh_slot_dialog_ui() -> void:
 		var btn := _rhythm_flow_slot_buttons[i]
 		if btn == null:
 			continue
-		var slot := _rhythm_flow_saved_maps[i] if i < _rhythm_flow_saved_maps.size() else _rhythm_flow_empty_saved_map_slot()
-		var filled := _rhythm_flow_slot_is_filled(i)
+		var slot: Dictionary = _rhythm_flow_runtime.saved_maps[i] if i < _rhythm_flow_runtime.saved_maps.size() else _rhythm_flow_empty_saved_map_slot()
+		var filled: bool = _rhythm_flow_slot_is_filled(i)
 		var slot_name := str(slot.get("name", "")).strip_edges()
 		if slot_name.is_empty():
 			slot_name = "Empty Slot" if not filled else "Unnamed Rhythm"
@@ -26631,7 +26607,7 @@ func _open_rhythm_flow_slot_dialog(mode_name: String) -> void:
 			_status_label.text = "No rhythm to save yet. Generate or load a rhythm first."
 			return
 		if _rhythm_flow_slot_name_edit != null:
-			_rhythm_flow_slot_name_edit.text = "Level %d Rhythm" % _rhythm_flow_difficulty_level
+			_rhythm_flow_slot_name_edit.text = "Level %d Rhythm" % _rhythm_flow_runtime.difficulty_level
 	_rhythm_flow_refresh_slot_dialog_ui()
 	if _rhythm_flow_slot_dialog != null:
 		_rhythm_flow_slot_dialog.title = "Save Rhythm" if mode_name == "save" else "Load Rhythm"
@@ -26651,7 +26627,7 @@ func _on_rhythm_flow_load_pressed() -> void:
 
 func _on_rhythm_flow_slot_button_pressed(slot_idx: int) -> void:
 	_rhythm_flow_ensure_saved_maps_slots()
-	if slot_idx < 0 or slot_idx >= _rhythm_flow_saved_maps.size():
+	if slot_idx < 0 or slot_idx >= _rhythm_flow_runtime.saved_maps.size():
 		return
 	if _rhythm_flow_slot_dialog_mode == "save":
 		var name_txt := ""
@@ -26660,15 +26636,15 @@ func _on_rhythm_flow_slot_button_pressed(slot_idx: int) -> void:
 		if name_txt.is_empty():
 			name_txt = "Rhythm Slot %d" % [slot_idx + 1]
 		var bars_copy: Array[String] = []
-		for b in _rhythm_flow_generated_bars:
+		for b in _rhythm_flow_runtime.generated_bars:
 			bars_copy.append(str(b))
-		_rhythm_flow_saved_maps[slot_idx] = {
+		_rhythm_flow_runtime.update_saved_map(slot_idx, {
 			"name": name_txt,
 			"bars": bars_copy,
-			"difficulty_level": _rhythm_flow_difficulty_level,
-			"bpm": _rhythm_flow_bpm,
-			"saved_at": _rhythm_flow_now_stamp()
-		}
+			"difficulty_level": _rhythm_flow_runtime.difficulty_level,
+			"bpm": _rhythm_flow_runtime.bpm,
+			"saved_at": _rhythm_flow_now_stamp(),
+		})
 		_save_ear_settings()
 		_rhythm_flow_refresh_slot_dialog_ui()
 		if _rhythm_flow_slot_dialog != null:
@@ -26679,20 +26655,20 @@ func _on_rhythm_flow_slot_button_pressed(slot_idx: int) -> void:
 	# load mode
 	if not _rhythm_flow_slot_is_filled(slot_idx):
 		return
-	var slot := _rhythm_flow_saved_maps[slot_idx]
+	var slot: Dictionary = _rhythm_flow_runtime.saved_maps[slot_idx]
 	var bars_v: Variant = slot.get("bars", [])
 	var bars_arr: Array = bars_v as Array
-	_rhythm_flow_generated_bars.clear()
+	_rhythm_flow_runtime.clear_generated_bars()
 	if bars_arr != null:
 		for b in bars_arr:
-			_rhythm_flow_generated_bars.append(str(b))
-	var saved_level := clampi(int(slot.get("difficulty_level", _rhythm_flow_difficulty_level)), 1, 99)
-	_rhythm_flow_difficulty_level = saved_level
+			_rhythm_flow_runtime.append_generated_bar(str(b))
+	var saved_level := clampi(int(slot.get("difficulty_level", _rhythm_flow_runtime.difficulty_level)), 1, 99)
+	_rhythm_flow_runtime.difficulty_level = saved_level
 	if _rhythm_flow_exercise_select != null and _rhythm_flow_exercise_select.item_count >= saved_level:
 		_rhythm_flow_exercise_select.select(saved_level - 1)
-	var saved_bpm := clampi(int(slot.get("bpm", _rhythm_flow_bpm)), 40, 180)
+	var saved_bpm := clampi(int(slot.get("bpm", _rhythm_flow_runtime.bpm)), 40, 180)
 	_on_rhythm_flow_bpm_changed(float(saved_bpm))
-	_rhythm_flow_patterns = _rhythm_flow_patterns_from_generated_bars()
+	_rhythm_flow_runtime.set_patterns(_rhythm_flow_patterns_from_generated_bars())
 	_rhythm_flow_rebuild_events_from_patterns()
 	if _rhythm_flow_slot_dialog != null:
 		_rhythm_flow_slot_dialog.hide()
@@ -26701,7 +26677,7 @@ func _on_rhythm_flow_slot_button_pressed(slot_idx: int) -> void:
 
 
 func _rhythm_flow_demo_running() -> bool:
-	return _is_rhythm_flow_mode() and _continuous_sight_active and _quiz_active and _rhythm_flow_session_mode == RHYTHM_FLOW_SESSION_DEMO
+	return _is_rhythm_flow_mode() and _continuous_sight_active and _quiz_active and _rhythm_flow_runtime.session_mode == RHYTHM_FLOW_SESSION_DEMO
 
 
 func _refresh_rhythm_flow_demo_buttons() -> void:
@@ -26742,18 +26718,18 @@ func _on_rhythm_flow_play_pause_pressed() -> void:
 		return
 	if not (_game_panel != null and _game_panel.visible and _continuous_sight_active and _quiz_active):
 		return
-	_rhythm_flow_paused = not _rhythm_flow_paused
-	if _rhythm_flow_paused and _rhythm_metronome_player != null and _rhythm_metronome_player.playing:
+	_rhythm_flow_runtime.paused = not _rhythm_flow_runtime.paused
+	if _rhythm_flow_runtime.paused and _rhythm_metronome_player != null and _rhythm_metronome_player.playing:
 		_rhythm_metronome_player.stop()
 	if _status_label != null:
-		_status_label.text = "Rhythm paused. Press Play to continue." if _rhythm_flow_paused else "Rhythm resumed."
+		_status_label.text = "Rhythm paused. Press Play to continue." if _rhythm_flow_runtime.paused else "Rhythm resumed."
 	_refresh_rhythm_flow_play_pause_button()
 	_refresh_rhythm_flow_practice_scrub_overlay()
 
 
 func _rhythm_total_duration_sec() -> float:
 	var total := 0.0
-	for evt in _rhythm_flow_events:
+	for evt in _rhythm_flow_runtime.events:
 		var t0 := float(evt.get("expected_time_sec", 0.0))
 		var dur := float(evt.get("duration_sec", 0.0))
 		total = maxf(total, t0 + dur)
@@ -26761,23 +26737,23 @@ func _rhythm_total_duration_sec() -> float:
 
 
 func _rhythm_first_unprocessed_event_idx_at_time(t: float) -> int:
-	for i in range(_rhythm_flow_events.size()):
-		var evt := _rhythm_flow_events[i]
+	for i in range(_rhythm_flow_runtime.events.size()):
+		var evt: Dictionary = _rhythm_flow_runtime.events[i]
 		var expected_t := float(evt.get("expected_time_sec", 0.0))
 		if expected_t >= (t - 0.005):
 			return i
-	return _rhythm_flow_events.size()
+	return _rhythm_flow_runtime.events.size()
 
 
 func _rhythm_first_unprocessed_hit_idx_at_time(t: float) -> int:
-	for i in range(_rhythm_flow_events.size()):
-		var evt := _rhythm_flow_events[i]
+	for i in range(_rhythm_flow_runtime.events.size()):
+		var evt: Dictionary = _rhythm_flow_runtime.events[i]
 		if str(evt.get("type", "")) != "hit":
 			continue
 		var expected_t := float(evt.get("expected_time_sec", 0.0))
 		if expected_t >= (t - 0.005):
 			return i
-	return _rhythm_flow_events.size()
+	return _rhythm_flow_runtime.events.size()
 
 
 func _rhythm_update_scrub_status_label() -> void:
@@ -26785,7 +26761,7 @@ func _rhythm_update_scrub_status_label() -> void:
 		return
 	var spb := _rhythm_flow_seconds_per_beat()
 	var beat_float := _continuous_sight_elapsed / maxf(0.001, spb)
-	var musical_beat_float := maxf(0.0, beat_float - float(_rhythm_flow_count_in_beats))
+	var musical_beat_float := maxf(0.0, beat_float - float(_rhythm_flow_runtime.count_in_beats))
 	var bar_idx := int(floor(musical_beat_float / 4.0)) + 1
 	var beat_in_bar := fmod(musical_beat_float, 4.0) + 1.0
 	var mode_text := "Practice paused" if _rhythm_is_practice else "Paused"
@@ -26796,15 +26772,15 @@ func _rhythm_seek_to_time(t: float) -> void:
 	var total := _rhythm_total_duration_sec()
 	_continuous_sight_elapsed = clampf(t, 0.0, maxf(0.0, total))
 	var spb := _rhythm_flow_seconds_per_beat()
-	_rhythm_flow_last_click_beat_index = int(floor(_continuous_sight_elapsed / maxf(0.001, spb))) - 1
-	_rhythm_flow_demo_next_event_idx = _rhythm_first_unprocessed_hit_idx_at_time(_continuous_sight_elapsed)
-	_rhythm_flow_next_spawn_idx = _rhythm_first_unprocessed_event_idx_at_time(_continuous_sight_elapsed)
+	_rhythm_flow_runtime.last_click_beat_index = int(floor(_continuous_sight_elapsed / maxf(0.001, spb))) - 1
+	_rhythm_flow_runtime.demo_next_event_idx = _rhythm_first_unprocessed_hit_idx_at_time(_continuous_sight_elapsed)
+	_rhythm_flow_runtime.next_spawn_idx = _rhythm_first_unprocessed_event_idx_at_time(_continuous_sight_elapsed)
 	_rhythm_triplet_guide_last_tick_idx = -1
 	_rhythm_triplet_guide_flash_dot = -1
 	_rhythm_triplet_guide_flash_until_sec = -1.0
 	_rhythm_update_scrub_status_label()
 	if OS.is_debug_build():
-		print("Rhythm scrub -> t=%.3f, next_hit=%d, next_spawn=%d" % [_continuous_sight_elapsed, _rhythm_flow_demo_next_event_idx, _rhythm_flow_next_spawn_idx])
+		print("Rhythm scrub -> t=%.3f, next_hit=%d, next_spawn=%d" % [_continuous_sight_elapsed, _rhythm_flow_runtime.demo_next_event_idx, _rhythm_flow_runtime.next_spawn_idx])
 
 
 func _rhythm_flow_spawn_visual_for_seek(event_idx: int) -> void:
@@ -26813,34 +26789,34 @@ func _rhythm_flow_spawn_visual_for_seek(event_idx: int) -> void:
 
 func _rhythm_rebuild_visible_notation() -> void:
 	_clear_continuous_sight_notes()
-	if _rhythm_flow_events.is_empty():
+	if _rhythm_flow_runtime.events.is_empty():
 		return
-	for evt_i in range(_rhythm_flow_events.size()):
-		_rhythm_flow_events[evt_i]["spawned"] = false
+	for evt_i in range(_rhythm_flow_runtime.events.size()):
+		_rhythm_flow_runtime.events[evt_i]["spawned"] = false
 	var past_window_sec := 2.0
 	var future_window_sec := maxf(6.0, _rhythm_flow_visible_lead_seconds())
-	for i in range(_rhythm_flow_events.size()):
-		var evt := _rhythm_flow_events[i]
+	for i in range(_rhythm_flow_runtime.events.size()):
+		var evt: Dictionary = _rhythm_flow_runtime.events[i]
 		var dt := float(evt.get("expected_time_sec", 0.0)) - _continuous_sight_elapsed
 		if dt < -past_window_sec:
 			continue
 		if dt > future_window_sec:
 			continue
 		_rhythm_flow_spawn_visual_for_seek(i)
-	for i2 in range(_rhythm_flow_events.size()):
-		if not bool(_rhythm_flow_events[i2].get("spawned", false)):
-			_rhythm_flow_next_spawn_idx = i2
+	for i2 in range(_rhythm_flow_runtime.events.size()):
+		if not bool(_rhythm_flow_runtime.events[i2].get("spawned", false)):
+			_rhythm_flow_runtime.next_spawn_idx = i2
 			return
-	_rhythm_flow_next_spawn_idx = _rhythm_flow_events.size()
+	_rhythm_flow_runtime.next_spawn_idx = _rhythm_flow_runtime.events.size()
 
 
 func _rhythm_reset_event_runtime_flags() -> void:
-	for i in range(_rhythm_flow_events.size()):
-		_rhythm_flow_events[i]["matched"] = false
-		_rhythm_flow_events[i]["missed"] = false
-		_rhythm_flow_events[i]["spawned"] = false
-		_rhythm_flow_events[i]["judgement"] = ""
-		_rhythm_flow_events[i]["tap_time_sec"] = -1.0
+	for i in range(_rhythm_flow_runtime.events.size()):
+		_rhythm_flow_runtime.events[i]["matched"] = false
+		_rhythm_flow_runtime.events[i]["missed"] = false
+		_rhythm_flow_runtime.events[i]["spawned"] = false
+		_rhythm_flow_runtime.events[i]["judgement"] = ""
+		_rhythm_flow_runtime.events[i]["tap_time_sec"] = -1.0
 
 
 func _rhythm_reset_attempt_stats() -> void:
@@ -26854,8 +26830,8 @@ func _rhythm_reset_attempt_stats() -> void:
 	_continuous_sight_perfect_hits = 0
 	_continuous_sight_good_hits = 0
 	_continuous_sight_miss_hits = 0
-	_rhythm_flow_ok_hits = 0
-	_rhythm_flow_wrong_taps = 0
+	_rhythm_flow_runtime.ok_hits = 0
+	_rhythm_flow_runtime.wrong_taps = 0
 	_refresh_meta_ui()
 
 
@@ -26865,15 +26841,15 @@ func _rhythm_practice_play_from_here() -> void:
 	var start_time := _continuous_sight_elapsed
 	_start_rhythm_flow_session_from_current_pattern(true)
 	_rhythm_is_practice = true
-	_rhythm_flow_scoring_enabled = false
-	_rhythm_flow_input_enabled = false
+	_rhythm_flow_runtime.scoring_enabled = false
+	_rhythm_flow_runtime.input_enabled = false
 	_rhythm_reset_attempt_stats()
 	_rhythm_reset_event_runtime_flags()
 	_quiz_active = true
 	_accepting_answer = true
 	_continuous_sight_waiting_start = false
 	_awaiting_round_start = false
-	_rhythm_flow_paused = false
+	_rhythm_flow_runtime.paused = false
 	_result_box_hide()
 	_rhythm_seek_to_time(start_time)
 	_rhythm_rebuild_visible_notation()
@@ -26887,7 +26863,7 @@ func _rhythm_practice_play_from_here() -> void:
 func _on_rhythm_flow_pause_scrub_slider_changed(value: float) -> void:
 	if _rhythm_pause_scrub_ui_syncing:
 		return
-	if not (_rhythm_is_practice and _rhythm_flow_paused):
+	if not (_rhythm_is_practice and _rhythm_flow_runtime.paused):
 		return
 	_rhythm_seek_to_time(value)
 	_rhythm_rebuild_visible_notation()
@@ -26907,7 +26883,7 @@ func _on_rhythm_flow_pause_scrub_restart_pressed() -> void:
 
 func _on_rhythm_flow_pause_scrub_close_pressed() -> void:
 	_play_ui_click_sfx()
-	_rhythm_flow_paused = false
+	_rhythm_flow_runtime.paused = false
 	_refresh_rhythm_flow_play_pause_button()
 	_refresh_rhythm_flow_practice_scrub_overlay()
 
@@ -26915,7 +26891,7 @@ func _on_rhythm_flow_pause_scrub_close_pressed() -> void:
 func _refresh_rhythm_flow_practice_scrub_overlay() -> void:
 	if _rhythm_pause_scrub_panel == null or _staff_area == null:
 		return
-	var show := _is_rhythm_flow_mode() and _rhythm_is_practice and _rhythm_flow_paused and _game_panel != null and _game_panel.visible and (_continuous_sight_active or (_result_overlay != null and _result_overlay.visible))
+	var show: bool = _is_rhythm_flow_mode() and _rhythm_is_practice and _rhythm_flow_runtime.paused and _game_panel != null and _game_panel.visible and (_continuous_sight_active or (_result_overlay != null and _result_overlay.visible))
 	_rhythm_pause_scrub_panel.visible = show
 	if not show:
 		return
@@ -26959,7 +26935,7 @@ func _refresh_rhythm_flow_play_pause_button() -> void:
 		_rhythm_center_action_row.visible = show
 	if not show:
 		return
-	_rhythm_play_pause_button.text = "Play" if _rhythm_flow_paused else "Pause"
+	_rhythm_play_pause_button.text = "Play" if _rhythm_flow_runtime.paused else "Pause"
 	_rhythm_play_pause_button.disabled = false
 	var y := 54.0
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
@@ -27070,19 +27046,19 @@ func _rhythm_flow_update_demo_scheduler() -> void:
 	if _continuous_sight_waiting_start:
 		return
 	var eps := 0.008
-	while _rhythm_flow_demo_next_event_idx < _rhythm_flow_events.size():
-		var evt := _rhythm_flow_events[_rhythm_flow_demo_next_event_idx]
+	while _rhythm_flow_runtime.demo_next_event_idx < _rhythm_flow_runtime.events.size():
+		var evt: Dictionary = _rhythm_flow_runtime.events[_rhythm_flow_runtime.demo_next_event_idx]
 		var expected_t := float(evt.get("expected_time_sec", 0.0))
 		if (_continuous_sight_elapsed + eps) < expected_t:
 			break
 		if str(evt.get("type", "")) == "hit" and not bool(evt.get("matched", false)) and not bool(evt.get("missed", false)):
-			_play_rhythm_flow_tap_sfx(_rhythm_flow_demo_next_event_idx)
-			_rhythm_flow_apply_judgement(_rhythm_flow_demo_next_event_idx, "Demo", expected_t)
-		_rhythm_flow_demo_next_event_idx += 1
+			_play_rhythm_flow_tap_sfx(_rhythm_flow_runtime.demo_next_event_idx)
+			_rhythm_flow_apply_judgement(_rhythm_flow_runtime.demo_next_event_idx, "Demo", expected_t)
+		_rhythm_flow_runtime.demo_next_event_idx += 1
 
 
 func _rhythm_flow_seconds_per_beat() -> float:
-	return RhythmFlowLibraryScript.seconds_per_beat(_rhythm_flow_bpm)
+	return RhythmFlowLibraryScript.seconds_per_beat(_rhythm_flow_runtime.bpm)
 
 
 func _ensure_rhythm_flow_beat_labels(min_count: int = 4) -> void:
@@ -27159,8 +27135,8 @@ func _update_rhythm_flow_beat_labels() -> void:
 		if not lbl.visible:
 			continue
 		var beat_idx := next_beat_idx + i
-		var measure_beat := ((beat_idx - _rhythm_flow_count_in_beats) % 4) + 1
-		if beat_idx < _rhythm_flow_count_in_beats:
+		var measure_beat: int = ((beat_idx - _rhythm_flow_runtime.count_in_beats) % 4) + 1
+		if beat_idx < _rhythm_flow_runtime.count_in_beats:
 			measure_beat = ((beat_idx % 4) + 4) % 4 + 1
 		lbl.text = str(measure_beat)
 		lbl.position = Vector2((x0 + (beat_w * float(i))) - 10.0, top_y - 8.0)
@@ -27204,13 +27180,13 @@ func _rhythm_flow_visible_lead_seconds() -> float:
 
 
 func _rhythm_flow_rebuild_events_from_patterns() -> void:
-	_rhythm_flow_events.clear()
+	_rhythm_flow_runtime.clear_events()
 	var spb := _rhythm_flow_seconds_per_beat()
-	_rhythm_flow_count_in_seconds = float(_rhythm_flow_count_in_beats) * spb
-	var beat_cursor := float(_rhythm_flow_count_in_beats)
+	_rhythm_flow_runtime.count_in_seconds = float(_rhythm_flow_runtime.count_in_beats) * spb
+	var beat_cursor := float(_rhythm_flow_runtime.count_in_beats)
 	var event_id := 0
-	for pattern_idx in range(_rhythm_flow_patterns.size()):
-		var pattern: Array = _rhythm_flow_patterns[pattern_idx]
+	for pattern_idx in range(_rhythm_flow_runtime.patterns.size()):
+		var pattern: Array = _rhythm_flow_runtime.patterns[pattern_idx]
 		for token_v in pattern:
 			var token: Dictionary = token_v
 			if token.is_empty():
@@ -27233,14 +27209,14 @@ func _rhythm_flow_rebuild_events_from_patterns() -> void:
 			}
 			evt["triplet"] = bool(token.get("triplet", false))
 			evt["triplet_token"] = str(token.get("triplet_token", ""))
-			_rhythm_flow_events.append(evt)
+			_rhythm_flow_runtime.add_event(evt)
 			beat_cursor += dur_beats
 			event_id += 1
 	# Add one trailing rest beat to let the last block fully cross before ending.
-	if _rhythm_flow_events.is_empty() or str(_rhythm_flow_events[_rhythm_flow_events.size() - 1].get("type", "")) != "rest":
+	if _rhythm_flow_runtime.events.is_empty() or str(_rhythm_flow_runtime.events[_rhythm_flow_runtime.events.size() - 1].get("type", "")) != "rest":
 		var end_evt := {
 			"id": event_id,
-			"pattern_index": _rhythm_flow_patterns.size(),
+			"pattern_index": _rhythm_flow_runtime.patterns.size(),
 			"type": "rest",
 			"duration_beats": 1.0,
 			"start_beat": beat_cursor,
@@ -27252,21 +27228,21 @@ func _rhythm_flow_rebuild_events_from_patterns() -> void:
 			"judgement": "",
 			"tap_time_sec": -1.0
 		}
-		_rhythm_flow_events.append(end_evt)
-	_rhythm_flow_next_spawn_idx = 0
+		_rhythm_flow_runtime.add_event(end_evt)
+	_rhythm_flow_runtime.next_spawn_idx = 0
 
 
 func _rhythm_flow_build_events() -> void:
-	_rhythm_flow_patterns = _rhythm_flow_generate_16bar_patterns()
+	_rhythm_flow_runtime.patterns = _rhythm_flow_generate_16bar_patterns()
 	_rhythm_flow_rebuild_events_from_patterns()
 
 
 func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 	if _staff_area == null:
 		return
-	if event_idx < 0 or event_idx >= _rhythm_flow_events.size():
+	if event_idx < 0 or event_idx >= _rhythm_flow_runtime.events.size():
 		return
-	var evt := _rhythm_flow_events[event_idx]
+	var evt: Dictionary = _rhythm_flow_runtime.events[event_idx]
 	var start_t := float(evt.get("expected_time_sec", 0.0))
 	var dur_sec := float(evt.get("duration_sec", _rhythm_flow_seconds_per_beat()))
 	var center_y := _staff_center_y_for_step(4)
@@ -27296,7 +27272,7 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 				var stem_local_x := 32.0 # note center x (24) + stem offset (8) in glyph local coords
 				var stem_world_x := center_x + (8.0 * glyph_scale)
 				if event_idx > 0:
-					var prev_evt := _rhythm_flow_events[event_idx - 1]
+					var prev_evt: Dictionary = _rhythm_flow_runtime.events[event_idx - 1]
 					if str(prev_evt.get("type", "")) == "hit" and is_equal_approx(float(prev_evt.get("duration_beats", 0.0)), step_beats) and bool(prev_evt.get("triplet", false)) == is_triplet:
 						var prev_start := float(prev_evt.get("start_beat", -999.0))
 						if is_equal_approx(prev_start + step_beats, start_beat):
@@ -27305,8 +27281,8 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 							var prev_center_x := _continuous_play_line_x() + (_continuous_sight_speed * (prev_t - _continuous_sight_elapsed))
 							var prev_stem_world_x := prev_center_x + (8.0 * glyph_scale)
 							beam_left_len = clampf((stem_world_x - prev_stem_world_x) / glyph_scale, 6.0, 40.0)
-				if event_idx + 1 < _rhythm_flow_events.size():
-					var next_evt := _rhythm_flow_events[event_idx + 1]
+				if event_idx + 1 < _rhythm_flow_runtime.events.size():
+					var next_evt: Dictionary = _rhythm_flow_runtime.events[event_idx + 1]
 					if str(next_evt.get("type", "")) == "hit" and is_equal_approx(float(next_evt.get("duration_beats", 0.0)), step_beats) and bool(next_evt.get("triplet", false)) == is_triplet:
 						var next_start := float(next_evt.get("start_beat", 999999.0))
 						if is_equal_approx(start_beat + step_beats, next_start):
@@ -27322,26 +27298,26 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 				if is_triplet:
 					var run_start := event_idx
 					while run_start > 0:
-						var prev_evt2 := _rhythm_flow_events[run_start - 1]
+						var prev_evt2: Dictionary = _rhythm_flow_runtime.events[run_start - 1]
 						if str(prev_evt2.get("type", "")) != "hit":
 							break
 						if not bool(prev_evt2.get("triplet", false)):
 							break
 						if str(prev_evt2.get("triplet_token", "")) != triplet_token:
 							break
-						if not is_equal_approx(float(prev_evt2.get("duration_beats", 0.0)) + float(prev_evt2.get("start_beat", 0.0)), float(_rhythm_flow_events[run_start].get("start_beat", 0.0))):
+						if not is_equal_approx(float(prev_evt2.get("duration_beats", 0.0)) + float(prev_evt2.get("start_beat", 0.0)), float(_rhythm_flow_runtime.events[run_start].get("start_beat", 0.0))):
 							break
 						run_start -= 1
 					var run_end := event_idx
-					while (run_end + 1) < _rhythm_flow_events.size():
-						var next_evt2 := _rhythm_flow_events[run_end + 1]
+					while (run_end + 1) < _rhythm_flow_runtime.events.size():
+						var next_evt2: Dictionary = _rhythm_flow_runtime.events[run_end + 1]
 						if str(next_evt2.get("type", "")) != "hit":
 							break
 						if not bool(next_evt2.get("triplet", false)):
 							break
 						if str(next_evt2.get("triplet_token", "")) != triplet_token:
 							break
-						if not is_equal_approx(float(_rhythm_flow_events[run_end].get("start_beat", 0.0)) + float(_rhythm_flow_events[run_end].get("duration_beats", 0.0)), float(next_evt2.get("start_beat", 0.0))):
+						if not is_equal_approx(float(_rhythm_flow_runtime.events[run_end].get("start_beat", 0.0)) + float(_rhythm_flow_runtime.events[run_end].get("duration_beats", 0.0)), float(next_evt2.get("start_beat", 0.0))):
 							break
 						run_end += 1
 					triplet_group_len = (run_end - run_start) + 1
@@ -27359,8 +27335,8 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 						evt_for_glyph["beam_left"] = false
 					if subgroup_pos == (subgroup_len - 1):
 						evt_for_glyph["beam_right"] = false
-					var first_evt := _rhythm_flow_events[subgroup_start_idx]
-					var last_evt := _rhythm_flow_events[subgroup_end_idx]
+					var first_evt: Dictionary = _rhythm_flow_runtime.events[subgroup_start_idx]
+					var last_evt: Dictionary = _rhythm_flow_runtime.events[subgroup_end_idx]
 					var first_t := float(first_evt.get("expected_time_sec", 0.0))
 					var last_t := float(last_evt.get("expected_time_sec", 0.0))
 					var first_center_x := _continuous_play_line_x() + (_continuous_sight_speed * (first_t - _continuous_sight_elapsed))
@@ -27422,38 +27398,38 @@ func _rhythm_flow_spawn_hit_visual(event_idx: int) -> void:
 		"rhythm_feedback_until": -1.0
 	})
 	_continuous_spawn_seq += 1
-	_rhythm_flow_events[event_idx]["spawned"] = true
+	_rhythm_flow_runtime.events[event_idx]["spawned"] = true
 
 
 func _rhythm_flow_try_spawn_events() -> void:
-	if _rhythm_flow_events.is_empty():
+	if _rhythm_flow_runtime.events.is_empty():
 		return
 	var lead_sec := _rhythm_flow_visible_lead_seconds()
-	while _rhythm_flow_next_spawn_idx < _rhythm_flow_events.size():
-		var evt := _rhythm_flow_events[_rhythm_flow_next_spawn_idx]
+	while _rhythm_flow_runtime.next_spawn_idx < _rhythm_flow_runtime.events.size():
+		var evt: Dictionary = _rhythm_flow_runtime.events[_rhythm_flow_runtime.next_spawn_idx]
 		if bool(evt.get("spawned", false)):
-			_rhythm_flow_next_spawn_idx += 1
+			_rhythm_flow_runtime.next_spawn_idx += 1
 			continue
 		var start_t := float(evt.get("expected_time_sec", 0.0))
 		if (start_t - _continuous_sight_elapsed) > lead_sec:
 			break
-		_rhythm_flow_spawn_hit_visual(_rhythm_flow_next_spawn_idx)
-		_rhythm_flow_next_spawn_idx += 1
+		_rhythm_flow_spawn_hit_visual(_rhythm_flow_runtime.next_spawn_idx)
+		_rhythm_flow_runtime.next_spawn_idx += 1
 
 
 func _rhythm_flow_status_count_in() -> void:
 	var spb := _rhythm_flow_seconds_per_beat()
-	var beats_remaining := int(ceil(maxf(0.0, _rhythm_flow_count_in_seconds - _continuous_sight_elapsed) / spb))
+	var beats_remaining := int(ceil(maxf(0.0, _rhythm_flow_runtime.count_in_seconds - _continuous_sight_elapsed) / spb))
 	if beats_remaining <= 0:
 		return
-	var beat_num := (_rhythm_flow_count_in_beats - beats_remaining) + 1
-	if beat_num != _rhythm_flow_count_in_announced:
-		_rhythm_flow_count_in_announced = beat_num
+	var beat_num: int = (_rhythm_flow_runtime.count_in_beats - beats_remaining) + 1
+	if beat_num != _rhythm_flow_runtime.count_in_announced:
+		_rhythm_flow_runtime.count_in_announced = beat_num
 		_status_label.text = "Count-in: %d" % beat_num
 
 
 func _rhythm_flow_play_metronome_clicks() -> void:
-	if not _rhythm_flow_metronome_enabled:
+	if not _rhythm_flow_runtime.metronome_enabled:
 		return
 	if _ui_click_sfx == null:
 		return
@@ -27461,9 +27437,9 @@ func _rhythm_flow_play_metronome_clicks() -> void:
 	if spb <= 0.0:
 		return
 	var beat_idx := int(floor(_continuous_sight_elapsed / spb))
-	if beat_idx <= _rhythm_flow_last_click_beat_index:
+	if beat_idx <= _rhythm_flow_runtime.last_click_beat_index:
 		return
-	for i in range(_rhythm_flow_last_click_beat_index + 1, beat_idx + 1):
+	for i in range(_rhythm_flow_runtime.last_click_beat_index + 1, beat_idx + 1):
 		if i < 0:
 			continue
 		if _rhythm_metronome_player != null:
@@ -27474,7 +27450,7 @@ func _rhythm_flow_play_metronome_clicks() -> void:
 			_ui_sfx_player.stop()
 			_ui_sfx_player.stream = _ui_click_sfx
 			_ui_sfx_player.play()
-	_rhythm_flow_last_click_beat_index = beat_idx
+	_rhythm_flow_runtime.last_click_beat_index = beat_idx
 
 
 func _rhythm_flow_find_live_note_for_event(event_idx: int) -> int:
@@ -27490,13 +27466,13 @@ func _rhythm_flow_feedback_color(judgement: String) -> Color:
 
 
 func _rhythm_flow_apply_judgement(event_idx: int, judgement: String, tap_time_sec: float) -> void:
-	if event_idx < 0 or event_idx >= _rhythm_flow_events.size():
+	if event_idx < 0 or event_idx >= _rhythm_flow_runtime.events.size():
 		return
-	var is_demo_hit := judgement == "Demo" or not _rhythm_flow_scoring_enabled
-	_rhythm_flow_events[event_idx]["matched"] = true
-	_rhythm_flow_events[event_idx]["judgement"] = judgement
-	_rhythm_flow_events[event_idx]["tap_time_sec"] = tap_time_sec
-	if _rhythm_flow_scoring_enabled:
+	var is_demo_hit: bool = judgement == "Demo" or not _rhythm_flow_runtime.scoring_enabled
+	_rhythm_flow_runtime.events[event_idx]["matched"] = true
+	_rhythm_flow_runtime.events[event_idx]["judgement"] = judgement
+	_rhythm_flow_runtime.events[event_idx]["tap_time_sec"] = tap_time_sec
+	if _rhythm_flow_runtime.scoring_enabled:
 		_continuous_sight_total_hits += 1
 		_continuous_sight_correct_hits += 1
 		_continuous_sight_combo += 1
@@ -27510,7 +27486,7 @@ func _rhythm_flow_apply_judgement(event_idx: int, judgement: String, tap_time_se
 				_continuous_sight_good_hits += 1
 				_score += 70
 			"OK":
-				_rhythm_flow_ok_hits += 1
+				_rhythm_flow_runtime.ok_hits += 1
 				_score += 35
 		var pts_awarded := 100 if judgement == "Perfect" else (70 if judgement == "Good" else 35)
 		_status_label.text = "%s! +%d  Combo x%d" % [judgement, pts_awarded, _continuous_sight_combo]
@@ -27531,19 +27507,19 @@ func _rhythm_flow_apply_judgement(event_idx: int, judgement: String, tap_time_se
 				var pop_color := _rhythm_flow_feedback_color("Demo" if is_demo_hit else judgement)
 				_note_chase_spawn_pop_effect(pop_center, pop_color)
 				_note_chase_spawn_note_name_text(pop_center, ("Demo" if is_demo_hit else judgement), pop_color)
-	if _rhythm_flow_scoring_enabled:
+	if _rhythm_flow_runtime.scoring_enabled:
 		_refresh_meta_ui()
 
 
 func _rhythm_flow_apply_miss(custom_status: String = "Miss", wrong_tap: bool = false) -> void:
-	if not _rhythm_flow_scoring_enabled:
+	if not _rhythm_flow_runtime.scoring_enabled:
 		return
 	_continuous_sight_total_hits += 1
 	_continuous_sight_miss_hits += 1
 	_continuous_sight_combo = 0
 	_streak = 0
 	if wrong_tap:
-		_rhythm_flow_wrong_taps += 1
+		_rhythm_flow_runtime.wrong_taps += 1
 	var penalty := -60 if wrong_tap else -40
 	_score += penalty
 	_status_label.text = "%s  %d" % [custom_status, penalty]
@@ -27551,11 +27527,11 @@ func _rhythm_flow_apply_miss(custom_status: String = "Miss", wrong_tap: bool = f
 
 
 func _rhythm_flow_mark_passed_misses() -> void:
-	if not _rhythm_flow_scoring_enabled:
+	if not _rhythm_flow_runtime.scoring_enabled:
 		return
 	var win_ok := float(_rhythm_flow_timing_windows().get("ok", 0.2))
-	for i in range(_rhythm_flow_events.size()):
-		var evt := _rhythm_flow_events[i]
+	for i in range(_rhythm_flow_runtime.events.size()):
+		var evt: Dictionary = _rhythm_flow_runtime.events[i]
 		if str(evt.get("type", "")) != "hit":
 			continue
 		if bool(evt.get("matched", false)) or bool(evt.get("missed", false)):
@@ -27564,7 +27540,7 @@ func _rhythm_flow_mark_passed_misses() -> void:
 		win_ok = float(_rhythm_flow_timing_windows_for_event(evt).get("ok", win_ok))
 		if _continuous_sight_elapsed <= (expected_t + win_ok):
 			continue
-		_rhythm_flow_events[i]["missed"] = true
+		_rhythm_flow_runtime.events[i]["missed"] = true
 		_rhythm_flow_apply_miss("Miss")
 		var li := _rhythm_flow_find_live_note_for_event(i)
 		if li >= 0 and li < _continuous_sight_notes.size():
@@ -27583,7 +27559,7 @@ func _rhythm_flow_mark_passed_misses() -> void:
 func _rhythm_flow_try_finish_if_complete() -> void:
 	if not _continuous_sight_active:
 		return
-	for evt in _rhythm_flow_events:
+	for evt in _rhythm_flow_runtime.events:
 		if str(evt.get("type", "")) != "hit":
 			continue
 		if not bool(evt.get("matched", false)) and not bool(evt.get("missed", false)):
@@ -27598,25 +27574,25 @@ func _on_rhythm_flow_tap() -> void:
 		return
 	if not _continuous_sight_active or not _quiz_active:
 		return
-	if _rhythm_flow_paused:
+	if _rhythm_flow_runtime.paused:
 		_status_label.text = "Paused. Press Play to continue."
 		return
-	if not _rhythm_flow_input_enabled:
+	if not _rhythm_flow_runtime.input_enabled:
 		_status_label.text = "Demo is playing. Scoring is paused."
 		return
 	if _continuous_sight_waiting_start:
 		_start_continuous_flow_after_waiting()
 		return
 	var tap_t_raw := _continuous_sight_elapsed - _rhythm_flow_tap_latency_sec()
-	if tap_t_raw < _rhythm_flow_count_in_seconds:
+	if tap_t_raw < _rhythm_flow_runtime.count_in_seconds:
 		_status_label.text = "Count-in..."
 		return
 	var best_idx := -1
 	var best_abs_dt := INF
 	var best_wins: Dictionary = _rhythm_flow_timing_windows()
 	var best_tap_t := tap_t_raw
-	for i in range(_rhythm_flow_events.size()):
-		var evt := _rhythm_flow_events[i]
+	for i in range(_rhythm_flow_runtime.events.size()):
+		var evt: Dictionary = _rhythm_flow_runtime.events[i]
 		if str(evt.get("type", "")) != "hit":
 			continue
 		if bool(evt.get("matched", false)) or bool(evt.get("missed", false)):
@@ -27651,7 +27627,7 @@ func _on_rhythm_flow_tap_pressed() -> void:
 func _rhythm_flow_update_count_in_and_spawns() -> void:
 	_rhythm_flow_play_metronome_clicks()
 	_rhythm_flow_try_spawn_events()
-	if _continuous_sight_elapsed < _rhythm_flow_count_in_seconds:
+	if _continuous_sight_elapsed < _rhythm_flow_runtime.count_in_seconds:
 		_rhythm_flow_status_count_in()
 	else:
 		if _status_label.text.begins_with("Count-in:"):
@@ -27692,12 +27668,12 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 	_continuous_sight_reaction_sum = 0.0
 	_continuous_sight_reaction_count = 0
 	_continuous_sight_level = 1
-	_rhythm_flow_ok_hits = 0
-	_rhythm_flow_wrong_taps = 0
-	_rhythm_flow_count_in_announced = -1
-	_rhythm_flow_last_click_beat_index = -1
-	_rhythm_flow_demo_next_event_idx = 0
-	_rhythm_flow_paused = false
+	_rhythm_flow_runtime.ok_hits = 0
+	_rhythm_flow_runtime.wrong_taps = 0
+	_rhythm_flow_runtime.count_in_announced = -1
+	_rhythm_flow_runtime.last_click_beat_index = -1
+	_rhythm_flow_runtime.demo_next_event_idx = 0
+	_rhythm_flow_runtime.paused = false
 	_continuous_rest_bar_active = false
 	_continuous_rest_bar_timer = 0.0
 	_continuous_notes_until_rest = 16
@@ -27711,38 +27687,38 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 	_lives = 5
 	_streak = 0
 	if _is_rhythm_flow_mode():
-		_rhythm_flow_session_mode = RHYTHM_FLOW_SESSION_DEMO if demo_mode else RHYTHM_FLOW_SESSION_PLAYING
+		_rhythm_flow_runtime.session_mode = RHYTHM_FLOW_SESSION_DEMO if demo_mode else RHYTHM_FLOW_SESSION_PLAYING
 		_rhythm_is_practice = demo_mode
-		_rhythm_flow_scoring_enabled = not demo_mode
-		_rhythm_flow_input_enabled = not demo_mode
-		_rhythm_flow_last_start_demo_mode = demo_mode
-		_continuous_sight_bpm = _rhythm_flow_bpm
+		_rhythm_flow_runtime.scoring_enabled = not demo_mode
+		_rhythm_flow_runtime.input_enabled = not demo_mode
+		_rhythm_flow_runtime.last_start_demo_mode = demo_mode
+		_continuous_sight_bpm = _rhythm_flow_runtime.bpm
 		# Increase pixels-per-beat for readability; keep timing tied to expected_time_sec.
 		var rhythm_speed_mult := 1.42 # quarter/half focused levels
-		if _rhythm_flow_difficulty_level >= 5:
+		if _rhythm_flow_runtime.difficulty_level >= 5:
 			rhythm_speed_mult = 1.62 # more gap for eighth-note levels
-		if _rhythm_flow_difficulty_level >= 9:
+		if _rhythm_flow_runtime.difficulty_level >= 9:
 			rhythm_speed_mult = 1.95 # even more gap for sixteenth-note levels
 		# Keep pixels-per-beat visually stable across BPM changes by scaling scroll speed with BPM.
 		# (Spacing ~= speed * seconds_per_beat, so speed must scale up when BPM increases.)
-		var rhythm_bpm_scale := float(maxi(1, _rhythm_flow_bpm)) / 44.0
+		var rhythm_bpm_scale := float(maxi(1, _rhythm_flow_runtime.bpm)) / 44.0
 		_continuous_sight_speed = _continuous_sight_base_speed * rhythm_speed_mult * rhythm_bpm_scale
 		_continuous_sight_zone_width = _continuous_sight_zone_width_base * 1.75
 		_continuous_sight_hit_window = _continuous_sight_hit_window_base
 		_continuous_sight_early_window_mult = _continuous_sight_early_window_mult_base
 		if demo_mode or reuse_current_rhythm_pattern:
-			if _rhythm_flow_patterns.is_empty() and not _rhythm_flow_generated_bars.is_empty():
-				_rhythm_flow_patterns = _rhythm_flow_patterns_from_generated_bars()
-			if not _rhythm_flow_patterns.is_empty():
+			if _rhythm_flow_runtime.patterns.is_empty() and not _rhythm_flow_runtime.generated_bars.is_empty():
+				_rhythm_flow_runtime.set_patterns(_rhythm_flow_patterns_from_generated_bars())
+			if not _rhythm_flow_runtime.patterns.is_empty():
 				_rhythm_flow_rebuild_events_from_patterns()
 			else:
 				_rhythm_flow_build_events()
 		else:
 			_rhythm_flow_build_events()
 	else:
-		_rhythm_flow_session_mode = RHYTHM_FLOW_SESSION_PLAYING
-		_rhythm_flow_scoring_enabled = true
-		_rhythm_flow_input_enabled = true
+		_rhythm_flow_runtime.session_mode = RHYTHM_FLOW_SESSION_PLAYING
+		_rhythm_flow_runtime.scoring_enabled = true
+		_rhythm_flow_runtime.input_enabled = true
 		_apply_continuous_level_profile()
 	_clear_continuous_sight_notes()
 	_hide_continuous_visual_aids()
@@ -27912,9 +27888,9 @@ func _update_rhythm_flow(delta: float) -> void:
 	_refresh_rhythm_flow_play_pause_button()
 	_refresh_rhythm_flow_practice_scrub_overlay()
 	_update_rhythm_triplet_guide_pulses(delta)
-	if _rhythm_flow_paused:
+	if _rhythm_flow_runtime.paused:
 		if _progress_label != null:
-			_progress_label.text = "RHYTHM PAUSED  BPM:%d" % [_rhythm_flow_bpm]
+			_progress_label.text = "RHYTHM PAUSED  BPM:%d" % [_rhythm_flow_runtime.bpm]
 		return
 	_rhythm_flow_update_count_in_and_spawns()
 	var remove_x := -40.0
@@ -27933,8 +27909,8 @@ func _update_rhythm_flow(delta: float) -> void:
 		p.position.x -= _continuous_sight_speed * delta
 		var center_x := p.position.x + (p.size.x * 0.5)
 		var evt_idx := int(n.get("rhythm_event_idx", -1))
-		if evt_idx >= 0 and evt_idx < _rhythm_flow_events.size():
-			var evt := _rhythm_flow_events[evt_idx]
+		if evt_idx >= 0 and evt_idx < _rhythm_flow_runtime.events.size():
+			var evt: Dictionary = _rhythm_flow_runtime.events[evt_idx]
 			if bool(evt.get("matched", false)):
 				p.self_modulate = Color(0.75, 1.0, 0.75, 1.0)
 			else:
@@ -27967,12 +27943,12 @@ func _update_rhythm_flow(delta: float) -> void:
 	if not _continuous_sight_active:
 		return
 	var acc := int(round((float(_continuous_sight_correct_hits) / float(maxi(1, _continuous_sight_total_hits))) * 100.0))
-	if _rhythm_flow_session_mode == RHYTHM_FLOW_SESSION_DEMO:
-		var demo_text := "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_bpm]
+	if _rhythm_flow_runtime.session_mode == RHYTHM_FLOW_SESSION_DEMO:
+		var demo_text := "RHYTHM DEMO  BPM:%d  (Scoring paused)" % [_rhythm_flow_runtime.bpm]
 		if _progress_label.text != demo_text:
 			_progress_label.text = demo_text
 	else:
-		var rhythm_text := "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
+		var rhythm_text := "RHYTHM  ACC:%d%%  P:%d G:%d O:%d M:%d  COMBO:%d" % [acc, _continuous_sight_perfect_hits, _continuous_sight_good_hits, _rhythm_flow_runtime.ok_hits, _continuous_sight_miss_hits, _continuous_sight_combo]
 		if _progress_label.text != rhythm_text:
 			_progress_label.text = rhythm_text
 	_score_label.text = "Score: %d" % _score
@@ -27980,9 +27956,9 @@ func _update_rhythm_flow(delta: float) -> void:
 		if _sight_lives_hearts_label != null and _hud_combo_displayed != _continuous_sight_combo:
 			_hud_combo_displayed = _continuous_sight_combo
 			_sight_lives_hearts_label.text = str(_continuous_sight_combo)
-		if _sight_streak_value_label != null and _hud_level_displayed != _rhythm_flow_bpm:
-			_hud_level_displayed = _rhythm_flow_bpm
-			_sight_streak_value_label.text = str(_rhythm_flow_bpm)
+		if _sight_streak_value_label != null and _hud_level_displayed != _rhythm_flow_runtime.bpm:
+			_hud_level_displayed = _rhythm_flow_runtime.bpm
+			_sight_streak_value_label.text = str(_rhythm_flow_runtime.bpm)
 		if _sight_streak_score_label != null and _hud_acc_displayed != acc:
 			_hud_acc_displayed = acc
 			_sight_streak_score_label.text = "ACC %d%%" % acc
@@ -27995,7 +27971,7 @@ func _update_continuous_sight(delta: float) -> void:
 		return
 	if _continuous_sight_waiting_start:
 		return
-	var rhythm_paused := _is_rhythm_flow_mode() and _rhythm_flow_paused
+	var rhythm_paused: bool = _is_rhythm_flow_mode() and _rhythm_flow_runtime.paused
 	if not rhythm_paused:
 		_continuous_sight_elapsed += delta
 	_setup_continuous_play_line()
@@ -28303,14 +28279,14 @@ func _on_staff_area_gui_input(event: InputEvent) -> void:
 		if event is InputEventScreenTouch:
 			var st_tap := event as InputEventScreenTouch
 			if st_tap.pressed:
-				if not _rhythm_flow_paused:
+				if not _rhythm_flow_runtime.paused:
 					_on_rhythm_flow_tap()
 				accept_event()
 				return
 		if event is InputEventMouseButton:
 			var mb_tap := event as InputEventMouseButton
 			if mb_tap.button_index == MOUSE_BUTTON_LEFT and mb_tap.pressed:
-				if not _rhythm_flow_paused:
+				if not _rhythm_flow_runtime.paused:
 					_on_rhythm_flow_tap()
 				accept_event()
 				return
@@ -30969,7 +30945,7 @@ func _play_sight_answer_click_sfx() -> void:
 
 
 func _rhythm_flow_is_downbeat_event(event_idx: int) -> bool:
-	return RhythmFlowLibraryScript.is_downbeat_event(event_idx, _rhythm_flow_events, _rhythm_flow_count_in_beats)
+	return RhythmFlowLibraryScript.is_downbeat_event(event_idx, _rhythm_flow_runtime.events, _rhythm_flow_runtime.count_in_beats)
 
 
 func _play_rhythm_flow_tap_sfx(event_idx: int = -1) -> void:
