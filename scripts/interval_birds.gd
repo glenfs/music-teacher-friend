@@ -1468,6 +1468,11 @@ var _active_ear_assignment_idx := -1
 var _active_ear_assignment_target := 0
 var _active_ear_assignment_title := ""
 var _ear_assignment_start_pending := false
+var _active_sight_assignment_student_id := ""
+var _active_sight_assignment_idx := -1
+var _active_sight_assignment_target := 0
+var _active_sight_assignment_title := ""
+var _sight_assignment_start_pending := false
 var _tutorial_module_recorded := false
 var _ear_choice_count := 6
 var _ear_question_count := 10
@@ -2596,7 +2601,7 @@ func _mvp_is_sight_mode_enabled(mode_name: String) -> bool:
 func _mvp_is_sight_key_signature_enabled(sig_name: String, mode_name: String = "") -> bool:
 	var normalized_mode := _normalize_sight_mode(mode_name if mode_name != "" else _sight_mode)
 	if normalized_mode == "Notes" or normalized_mode == "Chords":
-		return sig_name == "C"
+		return sig_name in ["C", "1#", "2#", "3#", "1b", "2b", "3b"]
 	return true
 
 
@@ -4063,10 +4068,10 @@ func _build_ui() -> void:
 	_hb_sb.corner_radius_top_right = 8
 	_hb_sb.corner_radius_bottom_left = 8
 	_hb_sb.corner_radius_bottom_right = 8
-	_hb_sb.content_margin_left = 14
-	_hb_sb.content_margin_right = 14
-	_hb_sb.content_margin_top = 10
-	_hb_sb.content_margin_bottom = 10
+	_hb_sb.content_margin_left = 10
+	_hb_sb.content_margin_right = 10
+	_hb_sb.content_margin_top = 6
+	_hb_sb.content_margin_bottom = 6
 	_home_badges_card.add_theme_stylebox_override("panel", _hb_sb)
 	_home_badges_vbox = VBoxContainer.new()
 	_home_badges_vbox.add_theme_constant_override("separation", 6)
@@ -4190,7 +4195,7 @@ func _build_ui() -> void:
 	_ear_mode_buttons[MODE_INTERVAL] = ear_interval_btn
 	_home_material_buttons.append(ear_interval_btn)
 
-	var ear_chord_btn := _build_ear_mode_card(_ear_mode_row, MODE_CHORD, "Chord", "Quality", ICON_PIANO_PATH, Color(0.9098, 0.6275, 0.1255, 1.0))
+	var ear_chord_btn := _build_ear_mode_card(_ear_mode_row, MODE_CHORD, "Chord", "Quality", ICON_PIANO_PATH, Color(0.3686, 0.8157, 0.8392, 1.0))
 	_ear_mode_buttons[MODE_CHORD] = ear_chord_btn
 	_home_material_buttons.append(ear_chord_btn)
 
@@ -4203,7 +4208,7 @@ func _build_ui() -> void:
 	_ear_mode_buttons[MODE_PROGRESSION] = ear_progression_btn
 	_home_material_buttons.append(ear_progression_btn)
 
-	var ear_scale_mode_btn := _build_ear_mode_card(_ear_mode_row, MODE_SCALE_MODE, "Scale/Mode", "Color", ICON_FLAME_PATH, Color(0.9686, 0.7608, 0.2745, 1.0))
+	var ear_scale_mode_btn := _build_ear_mode_card(_ear_mode_row, MODE_SCALE_MODE, "Scale/Mode", "Color", ICON_FLAME_PATH, Color(0.3686, 0.8157, 0.8392, 1.0))
 	_set_ear_mode_card_visibility(ear_scale_mode_btn, _mvp_is_ear_mode_enabled(MODE_SCALE_MODE))
 	_ear_mode_buttons[MODE_SCALE_MODE] = ear_scale_mode_btn
 	_home_material_buttons.append(ear_scale_mode_btn)
@@ -4430,9 +4435,9 @@ func _build_ui() -> void:
 	interval_main_group.add_child(interval_preset_row)
 	_interval_preset_btns.clear()
 	var _ipreset_defs := [
-		["beginner", "★ Beginner", "P4 · P5 · P8"],
-		["standard", "★★ Standard", "3rds + 6ths"],
-		["advanced", "★★★ Advanced", "All intervals"],
+		["beginner", "★ Beginner", "1-5 + 8"],
+		["standard", "★★ Standard", "1-8 major"],
+		["advanced", "★★★ Advanced", "Major + minor"],
 	]
 	for _ipreset in _ipreset_defs:
 		var _ipreset_id: String = _ipreset[0]
@@ -5157,7 +5162,7 @@ func _build_ui() -> void:
 	clef_row.add_child(_sight_round_length_row)
 
 	_sight_key_sig_row = HBoxContainer.new()
-	_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_sight_key_sig_row.add_theme_constant_override("separation", 8)
 	# Own row below the mode buttons inside the controls column. The mode row
 	# (Notes/Chords/Note Flow/Rhythm Flow/Sight Singing/Note Chase) + 7 key
@@ -5278,7 +5283,7 @@ func _build_ui() -> void:
 	midi_group.add_child(_sight_midi_collapsible_content)
 
 	var midi_toggle_row := HBoxContainer.new()
-	midi_toggle_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	midi_toggle_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	midi_toggle_row.add_theme_constant_override("separation", 12)
 	_sight_midi_collapsible_content.add_child(midi_toggle_row)
 
@@ -5329,7 +5334,7 @@ func _build_ui() -> void:
 	sight_chord_group.add_child(_grand_staff_label)
 
 	var sight_tier_row := HBoxContainer.new()
-	sight_tier_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	sight_tier_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	sight_tier_row.add_theme_constant_override("separation", 8)
 	sight_chord_group.add_child(sight_tier_row)
 	_sight_chord_tier_row = sight_tier_row
@@ -5349,7 +5354,7 @@ func _build_ui() -> void:
 		_home_material_buttons.append(tier_btn)
 
 	var sight_acc_row := HBoxContainer.new()
-	sight_acc_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	sight_acc_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	sight_acc_row.add_theme_constant_override("separation", 10)
 	sight_chord_group.add_child(sight_acc_row)
 	_sight_accidentals_row = sight_acc_row
@@ -7271,21 +7276,21 @@ func _build_ui_game_panel() -> void:
 	_result_overlay = ColorRect.new()
 	_result_overlay.set_anchors_preset(PRESET_FULL_RECT)
 	_result_overlay.color = Color(0.0, 0.0, 0.0, 0.42)
-	_result_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_result_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_result_overlay.z_as_relative = false
-	_result_overlay.z_index = 600
+	_result_overlay.z_index = 760
 	_result_overlay.visible = false
 	add_child(_result_overlay)
 
 	var result_center := CenterContainer.new()
 	result_center.set_anchors_preset(PRESET_FULL_RECT)
-	result_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_center.mouse_filter = Control.MOUSE_FILTER_PASS
 	_result_overlay.add_child(result_center)
 
 	_result_box_panel = PanelContainer.new()
-	_result_box_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_result_box_panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	_result_box_panel.z_as_relative = false
-	_result_box_panel.z_index = 601
+	_result_box_panel.z_index = 761
 	result_center.add_child(_result_box_panel)
 
 	var result_box := VBoxContainer.new()
@@ -7297,7 +7302,7 @@ func _build_ui_game_panel() -> void:
 	_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_title.add_theme_font_size_override("font_size", 64)
 	_result_title.z_as_relative = false
-	_result_title.z_index = 602
+	_result_title.z_index = 762
 	result_box.add_child(_result_title)
 
 	_result_subtitle = Label.new()
@@ -7305,7 +7310,7 @@ func _build_ui_game_panel() -> void:
 	_result_subtitle.add_theme_font_size_override("font_size", 20)
 	_result_subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_result_subtitle.z_as_relative = false
-	_result_subtitle.z_index = 602
+	_result_subtitle.z_index = 762
 	result_box.add_child(_result_subtitle)
 	# SR6 — celebration content (accuracy badge + focus chip). Filled by
 	# _build_result_celebration_content() each time the result box is shown.
@@ -7313,14 +7318,16 @@ func _build_ui_game_panel() -> void:
 	_result_celebration_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_result_celebration_container.add_theme_constant_override("separation", 12)
 	_result_celebration_container.z_as_relative = false
-	_result_celebration_container.z_index = 602
+	_result_celebration_container.z_index = 762
+	_result_celebration_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	result_box.add_child(_result_celebration_container)
 	_result_action_row = HBoxContainer.new()
 	_result_action_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_result_action_row.add_theme_constant_override("separation", 12)
 	_result_action_row.visible = false
 	_result_action_row.z_as_relative = false
-	_result_action_row.z_index = 602
+	_result_action_row.z_index = 762
+	_result_action_row.mouse_filter = Control.MOUSE_FILTER_PASS
 	result_box.add_child(_result_action_row)
 	_result_action_primary_button = Button.new()
 	_result_action_primary_button.text = "Restart"
@@ -9370,10 +9377,9 @@ func _ear_mode_card_stylebox(bg: Color, border: Color, selected: bool, disabled:
 func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> void:
 	if btn == null:
 		return
-	var accent_v: Variant = btn.get_meta("ear_mode_accent_color", MENU_CARD_LEARNING_ACCENT)
-	var accent: Color = accent_v if accent_v is Color else MENU_CARD_LEARNING_ACCENT
 	var gold := MENU_SETUP_HIGHLIGHT
 	var cyan := MENU_CARD_LEARNING_ACCENT
+	var accent: Color = cyan
 	var normal_bg := Color(0.0588, 0.1529, 0.2510, 0.78)
 	var selected_bg := Color(0.1020, 0.2471, 0.3569, 0.95)
 	var normal_border := Color(cyan.r, cyan.g, cyan.b, 0.24)
@@ -9998,7 +10004,7 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_clef_label.add_theme_constant_override("outline_size", 0)
 		_sight_clef_label.add_theme_font_size_override("font_size", 15 if active else 14)
 	if _sight_key_sig_row != null:
-		_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_BEGIN if active else BoxContainer.ALIGNMENT_CENTER
+		_sight_key_sig_row.alignment = BoxContainer.ALIGNMENT_CENTER
 		_sight_key_sig_row.add_theme_constant_override("separation", 6 if active else 12)
 	if _sight_chord_options_group != null:
 		_sight_chord_options_group.visible = sight_chords_mode
@@ -10006,7 +10012,7 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 	if _sight_chord_options_title_label != null:
 		_sight_chord_options_title_label.visible = false
 	if _sight_chord_tier_row != null:
-		_sight_chord_tier_row.alignment = BoxContainer.ALIGNMENT_CENTER if active else BoxContainer.ALIGNMENT_BEGIN
+		_sight_chord_tier_row.alignment = BoxContainer.ALIGNMENT_CENTER
 		_sight_chord_tier_row.add_theme_constant_override("separation", 8 if active else 8)
 	if _sight_notes_range_title_label != null:
 		_sight_notes_range_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if active else HORIZONTAL_ALIGNMENT_CENTER
@@ -10016,7 +10022,7 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_range_info_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_SECONDARY if active else Color(0.88, 0.86, 0.80, 0.88))
 		_sight_range_info_label.add_theme_font_size_override("font_size", 14 if active else 13)
 	if _sight_range_row != null:
-		_sight_range_row.alignment = BoxContainer.ALIGNMENT_BEGIN if active else BoxContainer.ALIGNMENT_CENTER
+		_sight_range_row.alignment = BoxContainer.ALIGNMENT_CENTER
 		_sight_range_row.add_theme_constant_override("separation", 10 if active else 8)
 	if _sight_range_to_label != null:
 		_sight_range_to_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_SECONDARY if active else Color(0.88, 0.86, 0.80, 0.88))
@@ -10161,30 +10167,34 @@ func _style_practice_setup_chip_button(btn: Button, selected: bool) -> void:
 	_home_button_clean_base_text(btn)
 	var pal := _theme_button_palette()
 	var contract := _menu_style_contract()
-	var selected_bg := Color(contract.get("btn_selected_bg", Color(0.9098, 0.6275, 0.1255, 0.26)))
-	var selected_hover := Color(contract.get("btn_selected_hover", Color(0.9098, 0.6275, 0.1255, 0.34)))
-	var selected_pressed := Color(contract.get("btn_selected_pressed", Color(0.9098, 0.6275, 0.1255, 0.22)))
+	# Selected state: same base bg as non-selected, with a bold golden border
+	# acting as the primary selected indicator. Previously used a 26%-alpha
+	# golden fill which reads as a stuck "yellow" button on first entry.
+	# Bumped border width 2 → 3 to compensate for the now-subtle fill.
 	var selected_border := Color(contract.get("btn_selected_border", MENU_SETUP_HIGHLIGHT))
 	var selected_text := Color(contract.get("btn_selected_text", SIGHT_NOTES_SETUP_TEXT_PRIMARY))
 	var normal := _setup_chip_stylebox(selected)
-	normal.bg_color = selected_bg if selected else Color(pal["base_bg"])
+	# Use the inactive bg for both states; the golden border carries the
+	# "this is selected" signal. Hover/pressed states still get the lighter
+	# golden tints so interaction still feels responsive.
+	normal.bg_color = Color(pal["base_bg"])
 	normal.corner_radius_top_left = 14
 	normal.corner_radius_top_right = 14
 	normal.corner_radius_bottom_left = 14
 	normal.corner_radius_bottom_right = 14
-	normal.border_width_left = 2 if selected else 1
-	normal.border_width_top = 2 if selected else 1
-	normal.border_width_right = 2 if selected else 1
-	normal.border_width_bottom = 2 if selected else 1
+	normal.border_width_left = 3 if selected else 1
+	normal.border_width_top = 3 if selected else 1
+	normal.border_width_right = 3 if selected else 1
+	normal.border_width_bottom = 3 if selected else 1
 	normal.border_color = selected_border if selected else Color(contract.get("btn_inactive_border", Color(MENU_SETUP_BORDER.r, MENU_SETUP_BORDER.g, MENU_SETUP_BORDER.b, 0.34)))
 	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_chip_alpha", 0.10)))
 	normal.shadow_size = int(contract.get("shadow_chip_size", 2))
 	btn.add_theme_stylebox_override("normal", normal)
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = selected_hover if selected else Color(pal["base_hover"])
+	hover.bg_color = Color(pal["base_hover"])
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = selected_pressed if selected else Color(pal["base_pressed"])
+	pressed.bg_color = Color(pal["base_pressed"])
 	btn.add_theme_stylebox_override("pressed", pressed)
 	var base_text := Color(contract.get("btn_inactive_text", SIGHT_NOTES_SETUP_TEXT_BODY))
 	btn.add_theme_color_override("font_color", selected_text if selected else base_text)
@@ -12038,6 +12048,8 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 	_result_subtitle.text = subtitle_text
 	if _result_action_row != null:
 		_result_action_row.visible = false
+	if _result_overlay != null:
+		_result_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	if _result_box_panel != null:
 		_result_box_panel.move_to_front()
 	if _result_title != null:
@@ -12060,7 +12072,8 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 				_result_action_home_button.disabled = false
 			if _result_action_focus_button != null:
 				var is_ear_mode := _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_CADENCE]
-				var has_misses := is_ear_mode and not _compute_missed_ids().is_empty()
+				var is_sight_review_mode := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+				var has_misses := (is_ear_mode or is_sight_review_mode) and not _compute_missed_ids().is_empty()
 				_result_action_focus_button.visible = has_misses
 				_result_action_focus_button.disabled = false
 			if _result_action_assignments_button != null:
@@ -12075,6 +12088,7 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 			if _result_action_assignments_button != null:
 				_result_action_assignments_button.visible = false
 	_result_overlay.visible = true
+	_result_overlay.move_to_front()
 	# Bounce-in animation for result box
 	if _result_box_panel != null:
 		_result_box_panel.scale = Vector2(0.72, 0.72)
@@ -12088,7 +12102,6 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 	_build_result_celebration_content(title_text)
 	# SR7 — If a daily challenge was active, record the score against today.
 	if title_text == "Complete":
-		_record_daily_challenge_score_if_active()
 		# SS5 — Mastery badges check after a successful session completion.
 		_check_and_award_badges(_question_index, _score)
 	# Result overlay just became visible — re-evaluate the lesson-session
@@ -12099,6 +12112,7 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 func _result_box_hide() -> void:
 	if _result_overlay != null:
 		_result_overlay.visible = false
+		_result_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _result_action_row != null:
 		_result_action_row.visible = false
 	_refresh_lesson_session_button()
@@ -12313,6 +12327,11 @@ func _on_result_action_focus_pressed() -> void:
 		_suppress_round_count_save = true
 		_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
 		_suppress_round_count_save = false
+	elif _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords") and _sight_question_spin != null:
+		_suppress_round_count_save = true
+		_sight_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
+		_sight_question_count = FOCUS_MISSES_QUESTION_COUNT
+		_suppress_round_count_save = false
 	_on_restart_quiz_pressed()
 
 
@@ -12463,9 +12482,66 @@ func _compute_missed_ids() -> Array[String]:
 	elif _selected_mode == MODE_CHORD or _selected_mode == MODE_PITCH_MATCH or _selected_mode == MODE_CADENCE:
 		stats_asked = _chord_stats_asked
 		stats_correct = _chord_stats_correct
+	elif _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords"):
+		stats_asked = _sight_stats_asked
+		stats_correct = _sight_stats_correct
 	else:
 		return []
 	return _ensure_progress_store().compute_missed_ids(stats_asked, stats_correct)
+
+
+func _sight_adaptive_result_text() -> String:
+	if _selected_mode != MODE_SIGHT or not (_sight_mode == "Notes" or _sight_mode == "Chords"):
+		return ""
+	var asked_total := 0
+	var correct_total := 0
+	var weakest := ""
+	var weakest_acc := 101
+	for key in _sight_stats_asked.keys():
+		var asked := int(_sight_stats_asked.get(key, 0))
+		if asked <= 0:
+			continue
+		var correct := int(_sight_stats_correct.get(key, 0))
+		asked_total += asked
+		correct_total += correct
+		var acc := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+		if asked >= 2 and acc < weakest_acc:
+			weakest_acc = acc
+			weakest = str(key)
+	if asked_total <= 0:
+		return ""
+	var total_acc := int(round(float(correct_total) / float(maxi(1, asked_total)) * 100.0))
+	var parts: Array[String] = []
+	if not weakest.is_empty() and weakest_acc < 80:
+		parts.append("Adaptive path: review %s first, then restart the same clef/key." % weakest)
+	elif total_acc >= 85 and asked_total >= 8:
+		if _sight_mode == "Notes":
+			parts.append("Adaptive path: increase range or add the next key signature.")
+		else:
+			parts.append("Adaptive path: keep Grand Staff and add the next chord group.")
+	else:
+		parts.append("Adaptive path: repeat this setup once more for fluency.")
+	var key_hint := _weakest_sight_key_text()
+	if not key_hint.is_empty():
+		parts.append(key_hint)
+	return "\n".join(parts)
+
+
+func _weakest_sight_key_text() -> String:
+	var weak_key := ""
+	var weak_acc := 101
+	for key in _sight_per_key_asked.keys():
+		var asked := int(_sight_per_key_asked.get(key, 0))
+		if asked < 3:
+			continue
+		var correct := int(_sight_per_key_correct.get(key, 0))
+		var acc := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+		if acc < weak_acc:
+			weak_acc = acc
+			weak_key = str(key)
+	if weak_key.is_empty() or weak_acc >= 75:
+		return ""
+	return "Key focus: %s is currently %d%%; keep it before adding harder keys." % [weak_key, weak_acc]
 
 
 func _on_result_action_secondary_pressed() -> void:
@@ -14036,7 +14112,7 @@ func _apply_interval_preset(preset: String) -> void:
 			for _d in range(1, 9):
 				var _dbtn: Button = _degree_toggles.get(_d, null)
 				if _dbtn != null:
-					_dbtn.set_pressed_no_signal([1, 4, 5, 8].has(_d))
+					_dbtn.set_pressed_no_signal([1, 2, 3, 4, 5, 8].has(_d))
 			_include_minor_intervals = false
 			if _include_minor_toggle != null:
 				_include_minor_toggle.set_pressed_no_signal(false)
@@ -14051,7 +14127,7 @@ func _apply_interval_preset(preset: String) -> void:
 			for _d in range(1, 9):
 				var _dbtn: Button = _degree_toggles.get(_d, null)
 				if _dbtn != null:
-					_dbtn.set_pressed_no_signal([2, 3, 4, 5].has(_d))
+					_dbtn.set_pressed_no_signal([1, 2, 3, 4, 5, 6, 7, 8].has(_d))
 			_include_minor_intervals = false
 			if _include_minor_toggle != null:
 				_include_minor_toggle.set_pressed_no_signal(false)
@@ -14436,6 +14512,8 @@ func _on_mode_selected() -> void:
 		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_SIGHT, MODE_NOTE_CHASE, MODE_CADENCE]
 		_how_to_play_button.visible = has_intro
 	_refresh_confusion_drill_button_visibility()
+	# Badge card is home-only — re-evaluate every time menu visibility shifts.
+	_refresh_home_badges_card()
 	if _mic_toggle_button != null:
 		_mic_toggle_button.visible = show_detail and _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
 	if _home_footer_bar != null:
@@ -16758,6 +16836,8 @@ func _teacher_record_session_metrics(mode: int, correct_count: int, asked_count:
 		store.record_item_stats(sid, _sight_chord_quality_asked, _sight_chord_quality_correct, "sight_chord")
 		_sight_chord_quality_asked.clear()
 		_sight_chord_quality_correct.clear()
+	elif sid != "" and mode == MODE_SIGHT and _sight_mode == "Notes" and not _sight_stats_asked.is_empty():
+		store.record_item_stats(sid, _sight_stats_asked, _sight_stats_correct, "sight_note")
 	# SR8/SS3 — per-key accuracy persists to "sight_key" category so the
 	# dashboard radar can render per-student. Recorded for any sight mode.
 	if sid != "" and mode == MODE_SIGHT and not _sight_per_key_asked.is_empty():
@@ -17702,6 +17782,8 @@ func _on_start_quiz_pressed() -> void:
 		return
 	if not _ear_assignment_start_pending:
 		_clear_active_ear_assignment()
+	if not _sight_assignment_start_pending:
+		_clear_active_sight_assignment()
 	# Teacher Edition gate: require an active student before any session begins.
 	# Student Edition skips this check (single-user product).
 	if not _ensure_active_student_for_practice():
@@ -17719,6 +17801,7 @@ func _on_start_quiz_pressed() -> void:
 	if _selected_mode == MODE_PITCH_MATCH:
 		_start_pitch_match_drone()
 	_ear_assignment_start_pending = false
+	_sight_assignment_start_pending = false
 
 
 func _on_end_quiz_pressed() -> void:
@@ -20496,6 +20579,9 @@ func _set_note_chase_staff_scrolling(enabled: bool) -> void:
 	var line_x := _active_staff_left_x()
 	var available := _staff_area.size.x - line_x - 18.0
 	var segment := clampf(available, 280.0, STAFF_LINE_WIDTH)
+	if _selected_mode == MODE_NOTE_CHASE:
+		var spawn_extent := (_note_chase_spawn_x() - line_x) + 28.0
+		segment = clampf(maxf(segment, spawn_extent), 280.0, maxf(280.0, available))
 	if _selected_mode == MODE_SIGHT:
 		var g := _sight_visual_staff_geometry()
 		line_x = float(g.get("left", line_x))
@@ -21171,8 +21257,8 @@ func _play_ear_count_in_and_context() -> void:
 			await _play_note(_ear_key_root_midi(_scale_root, 60), 0.22)
 			await _push_silence(0.08)
 		elif _selected_mode == MODE_CADENCE:
-			await _play_chord_block(_diatonic_triad_notes(1, _cadence_play_root), 0.30)
-			await _push_silence(0.08)
+			await _play_chord_block(_diatonic_triad_notes(1, _cadence_play_root), 0.44)
+			await _push_silence(0.32)
 	if _ear_melodic_context_enabled:
 		var root := _current_root_midi
 		if _selected_mode == MODE_PROGRESSION:
@@ -21482,7 +21568,9 @@ func _play_chord_sequence(chords: Array, tempo_bpm: int, play_style: String) -> 
 		block = true
 	var chord_duration := _chord_seconds_from_tempo(tempo_bpm) * 2.0
 	# Progression/cadence "slow" settings felt a little rushed on device; add a small cushion.
-	if _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_CADENCE:
+	if _selected_mode == MODE_CADENCE:
+		chord_duration *= 1.28 if tempo_bpm <= 90 else 1.16
+	elif _selected_mode == MODE_PROGRESSION:
 		chord_duration *= 1.12 if tempo_bpm <= 90 else 1.05
 	_invalidate_audio_sequence_schedule()
 	var run_id := _audio_sequence_run_id
@@ -22497,23 +22585,21 @@ func _build_active_student_chip() -> void:
 	if not IS_TEACHER_EDITION:
 		return  # Student Edition has no concept of active student
 	_active_student_chip = PanelContainer.new()
-	_active_student_chip.anchor_left = 1.0
-	_active_student_chip.anchor_right = 1.0
-	_active_student_chip.anchor_top = 0.0
-	_active_student_chip.anchor_bottom = 0.0
-	_active_student_chip.offset_left = -240
-	_active_student_chip.offset_right = -16
-	# Sit BELOW the 96-px header card so we don't collide with the right-side nav
-	# cluster (back/home/gear). Top-right of the game area is empty space across
-	# every in-game mode, so the chip lives there cleanly without overlap.
-	_active_student_chip.offset_top = 104
-	_active_student_chip.offset_bottom = 144
-	_active_student_chip.z_as_relative = false
-	_active_student_chip.z_index = 350  # above most UI, below modal picker (z=600)
+	# Live INSIDE the header nav slot, immediately left of the gear button —
+	# moved here (from a free-floating top-right overlay) so it reads as
+	# part of the navigation cluster.
+	_active_student_chip.custom_minimum_size = Vector2(220, 38)
 	_active_student_chip.mouse_filter = Control.MOUSE_FILTER_STOP
 	_active_student_chip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_active_student_chip.visible = false
-	add_child(_active_student_chip)
+	if _header_back_slot != null:
+		_header_back_slot.add_child(_active_student_chip)
+		# Reorder: place chip immediately before the settings (gear) button so
+		# the layout reads back → home → student → gear.
+		if _sight_settings_button != null and _sight_settings_button.get_parent() == _header_back_slot:
+			_header_back_slot.move_child(_active_student_chip, _sight_settings_button.get_index())
+	else:
+		add_child(_active_student_chip)
 
 	# Click overlay covering the whole chip
 	var click_btn := Button.new()
@@ -22673,8 +22759,6 @@ func _refresh_active_student_chip() -> void:
 	_refresh_home_recommended_card()
 	_refresh_home_ear_dashboard_card()
 	_refresh_home_sync_status_label()
-	_refresh_home_daily_challenge_card()
-	_refresh_home_key_radar_card()
 	_refresh_home_badges_card()
 
 
@@ -22755,13 +22839,18 @@ func _refresh_home_assignments_card() -> void:
 		row_box.add_child(done_btn)
 
 		var assignment_for_start: Dictionary = row.get("assignment", {})
-		if str(assignment_for_start.get("type", "")) == "ear_training":
+		var assignment_type := str(assignment_for_start.get("type", ""))
+		if assignment_type == "ear_training" or assignment_type == "sight_reading":
 			var start_btn := Button.new()
 			start_btn.text = "Start"
 			start_btn.custom_minimum_size = Vector2(82, 32)
 			var assignment_capture: Dictionary = assignment_for_start.duplicate(true)
+			var assignment_type_capture: String = assignment_type
 			start_btn.pressed.connect(func():
-				_on_home_ear_assignment_start_pressed(sid_capture, idx_capture, assignment_capture)
+				if assignment_type_capture == "sight_reading":
+					_on_home_sight_assignment_start_pressed(sid_capture, idx_capture, assignment_capture)
+				else:
+					_on_home_ear_assignment_start_pressed(sid_capture, idx_capture, assignment_capture)
 			)
 			row_box.add_child(start_btn)
 
@@ -22810,6 +22899,24 @@ func _on_home_ear_assignment_start_pressed(student_id: String, assignment_idx: i
 	_active_ear_assignment_title = str(assignment.get("task", "Ear Training"))
 	_ear_assignment_start_pending = true
 	_on_ear_mode_button_pressed(mode)
+	_on_start_quiz_pressed()
+
+
+func _on_home_sight_assignment_start_pressed(student_id: String, assignment_idx: int, assignment: Dictionary) -> void:
+	if student_id == "" or assignment_idx < 0:
+		return
+	var sight_mode_name := str(assignment.get("mode", "Notes"))
+	if sight_mode_name != "Notes" and sight_mode_name != "Chords":
+		if _home_info_label != null:
+			_home_info_label.text = "This assigned Sight Reading mode is not available in this build."
+		return
+	_on_sight_mode_button_pressed(sight_mode_name)
+	_apply_sight_assignment_settings(assignment)
+	_active_sight_assignment_student_id = student_id
+	_active_sight_assignment_idx = assignment_idx
+	_active_sight_assignment_target = clampi(int(assignment.get("target_score", 0)), 0, 100)
+	_active_sight_assignment_title = str(assignment.get("task", "Sight Reading"))
+	_sight_assignment_start_pending = true
 	_on_start_quiz_pressed()
 
 
@@ -22876,6 +22983,87 @@ func _apply_ear_assignment_settings(assignment: Dictionary, mode: int) -> void:
 	_save_ear_settings()
 
 
+func _apply_sight_assignment_settings(assignment: Dictionary) -> void:
+	var mode_name := str(assignment.get("mode", "Notes"))
+	_sight_mode = "Chords" if mode_name == "Chords" else "Notes"
+	_selected_mode = MODE_SIGHT
+	var clef_name := str(assignment.get("clef", "Grand Staff" if _sight_mode == "Chords" else "Treble"))
+	if _sight_mode == "Chords":
+		_selected_clef = "Grand Staff"
+	else:
+		if clef_name == "Bass":
+			_selected_clef = "Bass"
+		else:
+			_selected_clef = "Treble"
+	var key_name := str(assignment.get("key_signature", "C"))
+	if _mvp_is_sight_key_signature_enabled(key_name, _sight_mode):
+		_sight_key_signature = key_name
+	else:
+		_sight_key_signature = "C"
+	var q_count := clampi(int(assignment.get("question_count", _sight_question_count)), 1, 100)
+	_sight_question_count = q_count
+	if _sight_question_spin != null:
+		_sight_question_spin.value = q_count
+	_total_questions = q_count
+	if _sight_mode == "Chords":
+		_sight_selected_chord_tier = 1
+	else:
+		_apply_sight_assignment_range(str(assignment.get("range_preset", "Adaptive")))
+	_focus_missed_ids.clear()
+	var focus_any: Variant = assignment.get("focus_items", [])
+	if typeof(focus_any) == TYPE_ARRAY:
+		for item_any in focus_any:
+			if typeof(item_any) != TYPE_DICTIONARY:
+				continue
+			var item: Dictionary = item_any
+			var category := str(item.get("category", ""))
+			if _sight_assignment_category_matches_mode(category, _sight_mode):
+				if category == "sight_key":
+					var weak_key := str(item.get("item", ""))
+					if _mvp_is_sight_key_signature_enabled(weak_key, _sight_mode):
+						_sight_key_signature = weak_key
+				else:
+					_focus_missed_ids.append(str(item.get("item", "")))
+	_sync_home_state_from_runtime()
+	_refresh_sight_key_sig_buttons()
+	_refresh_clef_buttons()
+	_refresh_sight_chord_tier_buttons()
+	_refresh_sight_note_key_buttons()
+	_update_sight_range_ui()
+	_save_ear_settings()
+
+
+func _apply_sight_assignment_range(range_preset: String) -> void:
+	var preset := range_preset.strip_edges()
+	if preset == "Current range":
+		return
+	if preset == "Middle C-G":
+		var c4_step := _sight_step_for_label_in_clef("C4", _selected_clef)
+		var g4_step := _sight_step_for_label_in_clef("G4", _selected_clef)
+		if c4_step != 999 and g4_step != 999:
+			_sight_range_min_step = mini(c4_step, g4_step)
+			_sight_range_max_step = maxi(c4_step, g4_step)
+			_sight_selected_notes_by_clef[_selected_clef] = _sanitize_sight_note_set_for_clef(_selected_clef, PackedStringArray(["C4", "D4", "E4", "F4", "G4"]))
+			return
+	if preset == "Treble staff":
+		_selected_clef = "Treble"
+		_sight_selected_notes_by_clef["Treble"] = _sanitize_sight_note_set_for_clef("Treble", PackedStringArray(["E4", "F4", "G4", "A4", "B4", "C5", "D5", "E5", "F5"]))
+		_set_default_sight_range_for_clef("Treble")
+		return
+	if preset == "Bass staff":
+		_selected_clef = "Bass"
+		_sight_selected_notes_by_clef["Bass"] = _sanitize_sight_note_set_for_clef("Bass", PackedStringArray(["G2", "A2", "B2", "C3", "D3", "E3", "F3", "G3", "A3"]))
+		_set_default_sight_range_for_clef("Bass")
+		return
+	_set_default_sight_range_for_clef(_selected_clef)
+
+
+func _sight_assignment_category_matches_mode(category: String, mode_name: String) -> bool:
+	if mode_name == "Chords":
+		return category == "sight_chord"
+	return category == "sight_note" or category == "sight_key"
+
+
 func _ear_assignment_category_matches_mode(category: String, mode: int) -> bool:
 	match mode:
 		MODE_INTERVAL:
@@ -22899,6 +23087,14 @@ func _clear_active_ear_assignment() -> void:
 	_active_ear_assignment_target = 0
 	_active_ear_assignment_title = ""
 	_ear_assignment_start_pending = false
+
+
+func _clear_active_sight_assignment() -> void:
+	_active_sight_assignment_student_id = ""
+	_active_sight_assignment_idx = -1
+	_active_sight_assignment_target = 0
+	_active_sight_assignment_title = ""
+	_sight_assignment_start_pending = false
 
 
 # Returns the count of OPEN assignments for the currently active real student.
@@ -23020,25 +23216,43 @@ func _mark_selected_assignments_done(student_id: String, indices: Array, checkbo
 
 
 func _complete_active_ear_assignment_if_target_met(correct_count: int, asked_count: int) -> void:
-	if _active_ear_assignment_student_id == "" or _active_ear_assignment_idx < 0:
-		return
 	var pct := int(round((float(correct_count) / float(maxi(1, asked_count))) * 100.0))
-	if _active_ear_assignment_target > 0 and pct < _active_ear_assignment_target:
-		if _home_info_label != null:
-			_home_info_label.text = "Assignment target: %d%%. This round: %d%%." % [_active_ear_assignment_target, pct]
-		return
-	if _teacher_store == null:
+	if _active_ear_assignment_student_id != "" and _active_ear_assignment_idx >= 0:
+		if _active_ear_assignment_target > 0 and pct < _active_ear_assignment_target:
+			if _home_info_label != null:
+				_home_info_label.text = "Assignment target: %d%%. This round: %d%%." % [_active_ear_assignment_target, pct]
+			return
+		if _teacher_store == null:
+			_clear_active_ear_assignment()
+			return
+		var result: Dictionary = _teacher_store.mark_assignment_done(_active_ear_assignment_student_id, _active_ear_assignment_idx, _today_str())
+		if bool(result.get("updated", false)):
+			_save_teacher_data()
+			_refresh_home_assignments_card()
+			if _home_info_label != null:
+				_home_info_label.text = "Assignment complete: %s" % _active_ear_assignment_title
+			if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
+				_teacher_dashboard.refresh(_teacher_store.get_data(), _build_module_progress_snapshot_for_teacher())
 		_clear_active_ear_assignment()
 		return
-	var result: Dictionary = _teacher_store.mark_assignment_done(_active_ear_assignment_student_id, _active_ear_assignment_idx, _today_str())
-	if bool(result.get("updated", false)):
+	if _active_sight_assignment_student_id == "" or _active_sight_assignment_idx < 0:
+		return
+	if _active_sight_assignment_target > 0 and pct < _active_sight_assignment_target:
+		if _home_info_label != null:
+			_home_info_label.text = "Sight assignment target: %d%%. This round: %d%%." % [_active_sight_assignment_target, pct]
+		return
+	if _teacher_store == null:
+		_clear_active_sight_assignment()
+		return
+	var sight_result: Dictionary = _teacher_store.mark_assignment_done(_active_sight_assignment_student_id, _active_sight_assignment_idx, _today_str())
+	if bool(sight_result.get("updated", false)):
 		_save_teacher_data()
 		_refresh_home_assignments_card()
 		if _home_info_label != null:
-			_home_info_label.text = "Assignment complete: %s" % _active_ear_assignment_title
+			_home_info_label.text = "Assignment complete: %s" % _active_sight_assignment_title
 		if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
 			_teacher_dashboard.refresh(_teacher_store.get_data(), _build_module_progress_snapshot_for_teacher())
-	_clear_active_ear_assignment()
+	_clear_active_sight_assignment()
 
 
 # Returns IDs of items with at least 3 attempts and <70% accuracy in the given
@@ -23370,6 +23584,8 @@ func _compute_daily_challenge_config() -> Dictionary:
 func _refresh_home_daily_challenge_card() -> void:
 	if _home_daily_challenge_card == null or _home_daily_challenge_vbox == null:
 		return
+	_home_daily_challenge_card.visible = false
+	return
 	# Hide during teacher dashboard / first-run states.
 	if _first_run_assessment_pending or (_teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible):
 		_home_daily_challenge_card.visible = false
@@ -23512,53 +23728,66 @@ func _refresh_home_badges_card() -> void:
 	if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
 		_home_badges_card.visible = false
 		return
+	# Badges card is part of the home overview only — hide it once the user
+	# enters any mode-detail setup, settings screen, or active gameplay.
+	var on_home_overview: bool = (
+		_is_home_ui_active()
+		and not _home_mode_detail_active
+		and not _ear_settings_screen_active
+		and not _sight_settings_screen_active
+		and (_game_panel == null or not _game_panel.visible)
+	)
+	if not on_home_overview:
+		_home_badges_card.visible = false
+		return
 	if _earned_badges.is_empty():
 		_home_badges_card.visible = false
 		return
 	_home_badges_card.visible = true
 	for child in _home_badges_vbox.get_children():
 		child.queue_free()
-	var header := Label.new()
-	header.text = "%s  Badges (%d/%d)" % [char(0x1F396), _earned_badges.size(), BadgeSystemScript.DEFS.size()]
-	header.add_theme_font_size_override("font_size", 15)
-	header.add_theme_color_override("font_color", Color(0.96, 0.86, 0.42, 1.0))
-	_home_badges_vbox.add_child(header)
-	var grid := HFlowContainer.new()
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 6)
-	_home_badges_vbox.add_child(grid)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 6)
+	_home_badges_vbox.add_child(row)
+	var summary := Label.new()
+	summary.text = "%s %d/%d" % [char(0x1F396), _earned_badges.size(), BadgeSystemScript.DEFS.size()]
+	summary.add_theme_font_size_override("font_size", 13)
+	summary.add_theme_color_override("font_color", Color(0.96, 0.86, 0.42, 0.95))
+	row.add_child(summary)
 	for def in BadgeSystemScript.DEFS:
 		var bid: String = str(def.get("id", ""))
 		var earned: bool = _earned_badges.has(bid)
-		var chip := PanelContainer.new()
+		var chip := Button.new()
+		chip.text = char(int(def.get("icon", 0x2B50)))
+		chip.tooltip_text = "%s\n%s" % [str(def.get("name", bid)), str(def.get("desc", ""))]
+		chip.custom_minimum_size = Vector2(34, 34)
+		chip.focus_mode = Control.FOCUS_NONE
+		chip.mouse_default_cursor_shape = Control.CURSOR_HELP
+		chip.add_theme_font_size_override("font_size", 18)
 		var chip_sb := StyleBoxFlat.new()
 		if earned:
 			chip_sb.bg_color = Color(0.95, 0.78, 0.32, 0.20)
 			chip_sb.border_color = Color(0.95, 0.78, 0.32, 0.85)
+			chip.add_theme_color_override("font_color", Color(1.0, 0.92, 0.58, 1.0))
 		else:
 			chip_sb.bg_color = Color(0.20, 0.22, 0.26, 0.55)
 			chip_sb.border_color = Color(0.40, 0.42, 0.48, 0.55)
+			chip.add_theme_color_override("font_color", Color(0.55, 0.58, 0.64, 0.55))
 		chip_sb.border_width_left = 1
 		chip_sb.border_width_top = 1
 		chip_sb.border_width_right = 1
 		chip_sb.border_width_bottom = 1
-		chip_sb.corner_radius_top_left = 6
-		chip_sb.corner_radius_top_right = 6
-		chip_sb.corner_radius_bottom_left = 6
-		chip_sb.corner_radius_bottom_right = 6
-		chip_sb.content_margin_left = 8
-		chip_sb.content_margin_right = 8
-		chip_sb.content_margin_top = 4
-		chip_sb.content_margin_bottom = 4
-		chip.add_theme_stylebox_override("panel", chip_sb)
-		var chip_lbl := Label.new()
-		var icon_codepoint: int = int(def.get("icon", 0x2B50))
-		chip_lbl.text = "%s  %s" % [char(icon_codepoint), str(def.get("name", bid))]
-		chip_lbl.add_theme_font_size_override("font_size", 12)
-		chip_lbl.add_theme_color_override("font_color", Color(0.96, 0.92, 0.78, 1.0) if earned else Color(0.65, 0.68, 0.72, 0.70))
-		chip_lbl.tooltip_text = str(def.get("desc", ""))
-		chip.add_child(chip_lbl)
-		grid.add_child(chip)
+		chip_sb.corner_radius_top_left = 10
+		chip_sb.corner_radius_top_right = 10
+		chip_sb.corner_radius_bottom_left = 10
+		chip_sb.corner_radius_bottom_right = 10
+		chip.add_theme_stylebox_override("normal", chip_sb)
+		var hover := chip_sb.duplicate()
+		(hover as StyleBoxFlat).bg_color = chip_sb.bg_color.lightened(0.08)
+		chip.add_theme_stylebox_override("hover", hover)
+		chip.add_theme_stylebox_override("pressed", chip_sb)
+		row.add_child(chip)
 
 
 # SR8 — Per-key accuracy radar (bar chart). Shows a row per key signature
@@ -23567,6 +23796,8 @@ func _refresh_home_badges_card() -> void:
 func _refresh_home_key_radar_card() -> void:
 	if _home_key_radar_card == null or _home_key_radar_vbox == null:
 		return
+	_home_key_radar_card.visible = false
+	return
 	# Hide during teacher dashboard.
 	if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
 		_home_key_radar_card.visible = false
@@ -24738,12 +24969,12 @@ func _build_sight_big_piano() -> void:
 		# Deep saturated blue (#0A2C6B) — punchier contrast on cream keys
 		# than the muted #1F4E6B. White outline keeps it legible when the
 		# key flips to feedback colors (lit blue / red wrong / green correct).
-		var label_color := Color(0.0392, 0.1725, 0.4196, 1.0)  # #0A2C6B deep blue
+		var label_color := Color(0.015, 0.045, 0.11, 1.0)
 		btn.add_theme_color_override("font_color", label_color)
 		btn.add_theme_color_override("font_hover_color", label_color)
 		btn.add_theme_color_override("font_pressed_color", label_color)
 		btn.add_theme_color_override("font_focus_color", label_color)
-		btn.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
+		btn.add_theme_color_override("font_outline_color", Color(1.0, 0.96, 0.78, 1.0))
 		btn.add_theme_constant_override("outline_size", 4)
 		# Push text down to the bottom of the key (like real piano labels):
 		# clone the StyleBox and bias content_margin_top so the rendered
@@ -25070,12 +25301,12 @@ func _sight_big_piano_apply_feedback_style(pitch: int) -> void:
 func _reapply_sight_key_label_style(btn: Button) -> void:
 	if btn == null or btn.text.is_empty():
 		return
-	var label_color := Color(0.0392, 0.1725, 0.4196, 1.0)  # #0A2C6B
+	var label_color := Color(0.015, 0.045, 0.11, 1.0)
 	btn.add_theme_color_override("font_color", label_color)
 	btn.add_theme_color_override("font_hover_color", label_color)
 	btn.add_theme_color_override("font_pressed_color", label_color)
 	btn.add_theme_color_override("font_focus_color", label_color)
-	btn.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.add_theme_color_override("font_outline_color", Color(1.0, 0.96, 0.78, 1.0))
 	btn.add_theme_constant_override("outline_size", 4)
 	_bias_button_text_to_bottom(btn)
 
@@ -27003,6 +27234,16 @@ func _hide_sight_note_name_label() -> void:
 		_sight_note_name_label.visible = false
 
 
+func _sight_note_staff_location_text() -> String:
+	var lane := "line" if posmod(_current_sight_display_step, 2) == 0 else "space"
+	var ledger := ""
+	if _current_sight_display_step < 0:
+		ledger = " above the staff"
+	elif _current_sight_display_step > 8:
+		ledger = " below the staff"
+	return "%s %s%s in %s clef, key %s" % [_current_sight_note, lane, ledger, _selected_clef, _sight_key_signature_display_text()]
+
+
 func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null) -> void:
 	if _selected_mode != MODE_SIGHT:
 		return
@@ -27109,6 +27350,7 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 		# Only on wrong/almost-right; correct answers skip to save flow time.
 		var note_teach_lines: Array[String] = []
 		note_teach_lines.append("%s  Correct: %s   ·   You picked: %s" % [char(0x2717), _current_sight_note, note_name])
+		note_teach_lines.append("Read: %s" % _sight_note_staff_location_text())
 		note_teach_lines.append("Why: %s" % _sight_note_reason_text(_current_sight_note, _selected_clef))
 		var note_topic := "sight_note:%s:%s:subtle" % [_current_sight_note, _selected_clef]
 		var note_hint_line := _pick_topic_hint_line(note_topic, _sight_note_hint_lines(_current_sight_note, _selected_clef, false))
@@ -30161,6 +30403,7 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 		# shows (root position vs inversion vs bass note) to the answer.
 		var sc_teach_lines: Array[String] = []
 		sc_teach_lines.append("%s  Correct: %s   ·   You picked: %s" % [char(0x2717), _current_sight_chord_name, chosen_name])
+		sc_teach_lines.append("Read: root %s, quality %s, key %s" % [str(_current_sight_chord_def.get("root_letter", "C")), str(_current_sight_chord_def.get("quality", _current_sight_chord_name)), _sight_key_signature_display_text()])
 		sc_teach_lines.append("Why: %s" % _sight_chord_reason_text(_current_sight_chord_name))
 		var voicing_line2: String = _describe_sight_chord_voicing()
 		if not voicing_line2.is_empty():
@@ -31217,6 +31460,13 @@ func _generate_sight_chord_round() -> void:
 	var chosen_inversion := 0
 	var include_accidental_variants := _sight_include_accidental_variants()
 	var candidates := _sight_chord_candidates(include_accidental_variants)
+	if not _focus_missed_ids.is_empty():
+		var focused_candidates: Array[Dictionary] = []
+		for candidate in candidates:
+			if _focus_missed_ids.has(str(candidate.get("name", ""))):
+				focused_candidates.append(candidate)
+		if not focused_candidates.is_empty():
+			candidates = focused_candidates
 	if _sight_selected_chord_tier == 1 and include_accidental_variants:
 		var accidental_pool: Array[Dictionary] = []
 		var normal_pool: Array[Dictionary] = []
@@ -31694,6 +31944,15 @@ func _pick_sight_note_slot() -> Dictionary:
 				var s := _sight_step_for_label_in_clef(str(note_name), _selected_clef)
 				if s != 999:
 					allowed_steps.append(s)
+			if not _focus_missed_ids.is_empty() and not allowed_steps.is_empty():
+				var focus_steps: Array[int] = []
+				for s in allowed_steps:
+					var focus_base := _staff_step_name_for_clef(s, _selected_clef)
+					var focus_display := _sight_note_name_with_key_signature(focus_base, false)
+					if _focus_missed_ids.has(focus_base) or _focus_missed_ids.has(focus_display):
+						focus_steps.append(s)
+				if not focus_steps.is_empty():
+					allowed_steps = focus_steps
 			if not allowed_steps.is_empty():
 				var idx := _rng.randi_range(0, allowed_steps.size() - 1)
 				step = allowed_steps[idx]

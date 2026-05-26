@@ -858,6 +858,10 @@ func final_quiz_result_text(
 		var bpm_summary: String = host._max_bpm_summary_text()
 		if not bpm_summary.is_empty():
 			result += "\n\n%s" % bpm_summary
+	if host.has_method("_sight_adaptive_result_text"):
+		var sight_path: String = host._sight_adaptive_result_text()
+		if not sight_path.is_empty():
+			result += "\n\n%s" % sight_path
 	return result
 
 
