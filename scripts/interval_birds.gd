@@ -112,6 +112,7 @@ const NoteChaseDifficultyScript = preload("res://scripts/exercises/note_chase_di
 const NoteChaseEffectsScript = preload("res://scripts/exercises/note_chase_effects.gd")
 const SightSingingTheoryScript = preload("res://scripts/sight_singing/sight_singing_theory.gd")
 const EarTrainingCoreScript = preload("res://scripts/exercises/ear_training_core.gd")
+const NoteChasePhysicsScript = preload("res://scripts/exercises/note_chase_physics.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -19034,126 +19035,34 @@ func _note_chase_relabel_active_notes_for_clef() -> void:
 
 
 func _note_chase_visible_target_count() -> int:
-	var count := 0
-	for item in _note_chase_active_notes:
-		var n: Dictionary = item
-		if bool(n.get("hit", false)):
-			continue
-		if str(n.get("kind", "note")) != "note":
-			continue
-		if not bool(n.get("target", false)):
-			continue
-		var node_obj = n.get("node", null)
-		if node_obj == null or not is_instance_valid(node_obj):
-			continue
-		var panel := node_obj as Panel
-		if panel == null:
-			continue
-		if panel.position.x + panel.size.x < STAFF_LEFT_X:
-			continue
-		if panel.position.x > _note_chase_spawn_x() + 8.0:
-			continue
-		count += 1
-	return count
+	return NoteChasePhysicsScript.visible_target_count(_note_chase_active_notes, STAFF_LEFT_X, _note_chase_spawn_x())
 
 
 func _note_chase_has_active_special(kind: String) -> bool:
-	for item in _note_chase_active_notes:
-		var n: Dictionary = item
-		if bool(n.get("hit", false)):
-			continue
-		var note_kind := str(n.get("kind", ""))
-		if kind == "rainbow":
-			if note_kind != "note" or not bool(n.get("rainbow", false)):
-				continue
-		elif note_kind != kind:
-			continue
-		var node_obj = n.get("node", null)
-		if node_obj != null and is_instance_valid(node_obj):
-			return true
-	return false
+	return NoteChasePhysicsScript.has_active_special(_note_chase_active_notes, kind)
 
 
 func _note_chase_next_spawn_x_with_spacing(base_x: float, min_gap: float = 58.0) -> float:
-	var x := base_x
-	for _i in range(16):
-		var overlap := false
-		for item in _note_chase_active_notes:
-			var n: Dictionary = item
-			if bool(n.get("hit", false)):
-				continue
-			if str(n.get("kind", "note")) == "clef":
-				continue
-			var node_obj = n.get("node", null)
-			if node_obj == null or not is_instance_valid(node_obj):
-				continue
-			var panel := node_obj as Panel
-			if panel == null:
-				continue
-			if absf(panel.position.x - x) < min_gap:
-				x = panel.position.x + min_gap
-				overlap = true
-				break
-		if not overlap:
-			break
-	return x
+	return NoteChasePhysicsScript.next_spawn_x_with_spacing(_note_chase_active_notes, base_x, min_gap)
 
 
 func _note_chase_item_speed_multiplier(n: Dictionary) -> float:
-	var kind := str(n.get("kind", "note"))
-	if kind == "clef":
-		return 1.65
-	if kind == "shield":
-		return 1.55
-	if kind == "freeze":
-		return 0.88
-	if kind == "note" and bool(n.get("rainbow", false)):
-		return 1.22
-	return 1.0
+	return NoteChasePhysicsScript.item_speed_multiplier(n)
 
 
 func _note_chase_has_untriggered_clef_token() -> bool:
-	for item in _note_chase_active_notes:
-		var n: Dictionary = item
-		if bool(n.get("hit", false)):
-			continue
-		if str(n.get("kind", "")) != "clef":
-			continue
-		if bool(n.get("triggered", false)):
-			continue
-		var node_obj = n.get("node", null)
-		if node_obj != null and is_instance_valid(node_obj):
-			return true
-	return false
+	return NoteChasePhysicsScript.has_untriggered_clef_token(_note_chase_active_notes)
 
 
 func _note_chase_clear_recent_notes_after_clef_switch(_trigger_x: float, recent_seconds: float = 2.0) -> int:
-	var kept: Array[Dictionary] = []
-	var removed_notes := 0
-	var spawn_cutoff_x := _note_chase_spawn_x() - 24.0
-	for item in _note_chase_active_notes:
-		var n: Dictionary = item
-		var node_obj = n.get("node", null)
-		if node_obj == null or not is_instance_valid(node_obj):
-			continue
-		var panel := node_obj as Panel
-		if panel == null:
-			continue
-		var kind := str(n.get("kind", "note"))
-		if kind == "clef":
-			kept.append(n)
-			continue
-		var spawn_t := float(n.get("spawn_t", -9999.0))
-		var age := _note_chase_elapsed - spawn_t
-		var near_spawn_zone := panel.position.x >= spawn_cutoff_x
-		if age <= recent_seconds or near_spawn_zone:
-			if kind == "note":
-				removed_notes += 1
-			panel.queue_free()
-			continue
-		kept.append(n)
-	_note_chase_active_notes = kept
-	return removed_notes
+	var result := NoteChasePhysicsScript.clear_recent_notes_after_clef_switch(
+		_note_chase_active_notes, _note_chase_elapsed, _note_chase_spawn_x(), recent_seconds
+	)
+	var typed: Array[Dictionary] = []
+	for item in result["active_notes"]:
+		typed.append(item)
+	_note_chase_active_notes = typed
+	return int(result["removed_notes"])
 
 
 func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
