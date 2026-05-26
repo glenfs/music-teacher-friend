@@ -1803,7 +1803,8 @@ func _assert_continuous_notes_cleared() -> void:
 
 
 func _assert_note_chase_cleared(context: String) -> void:
-	var items_v: Variant = _member("_note_chase_active_notes")
+	var runtime_v: Variant = _member("_note_chase_runtime")
+	var items_v: Variant = runtime_v.get("active_notes") if runtime_v != null else null
 	if items_v is Array and (items_v as Array).size() > 0:
 		fail("%s: note chase active notes not cleared" % context)
 		_record_issue("Note Chase stale notes after reset/exit", "High", "Note Chase", [
@@ -2311,7 +2312,8 @@ func _wait_for_note_chase_running(max_frames: int) -> bool:
 	var timeout_seconds := maxf(3.2, float(max_frames) / 60.0)
 	var deadline := Time.get_ticks_msec() + int(round(timeout_seconds * 1000.0))
 	while Time.get_ticks_msec() <= deadline:
-		if bool(_app.get("_note_chase_running")):
+		var runtime = _app.get("_note_chase_runtime")
+		if runtime != null and bool(runtime.get("running")):
 			return true
 		await get_tree().process_frame
 	return false
@@ -2321,7 +2323,11 @@ func _wait_for_note_chase_note(max_frames: int) -> bool:
 	var timeout_seconds := maxf(2.8, float(max_frames) / 60.0)
 	var deadline := Time.get_ticks_msec() + int(round(timeout_seconds * 1000.0))
 	while Time.get_ticks_msec() <= deadline:
-		var items: Array = _app.get("_note_chase_active_notes")
+		var runtime = _app.get("_note_chase_runtime")
+		if runtime == null:
+			await get_tree().process_frame
+			continue
+		var items: Array = runtime.get("active_notes")
 		for item_any in items:
 			var item: Dictionary = item_any
 			if str(item.get("kind", "")) != "note":
@@ -2462,7 +2468,10 @@ func _answer_sight_chord(prefer_wrong: bool = false) -> bool:
 
 
 func _click_first_note_chase_note() -> bool:
-	var items: Array = _app.get("_note_chase_active_notes")
+	var runtime = _app.get("_note_chase_runtime")
+	if runtime == null:
+		return false
+	var items: Array = runtime.get("active_notes")
 	for item_any in items:
 		var item: Dictionary = item_any
 		if str(item.get("kind", "")) != "note":

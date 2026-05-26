@@ -113,6 +113,7 @@ const NoteChaseEffectsScript = preload("res://scripts/exercises/note_chase_effec
 const SightSingingTheoryScript = preload("res://scripts/sight_singing/sight_singing_theory.gd")
 const EarTrainingCoreScript = preload("res://scripts/exercises/ear_training_core.gd")
 const NoteChasePhysicsScript = preload("res://scripts/exercises/note_chase_physics.gd")
+const NoteChaseRuntimeScript = preload("res://scripts/exercises/note_chase_runtime.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -1376,32 +1377,12 @@ var _is_prompt_playing := false
 var _quiz_run_token := 0
 var _accepting_answer := false
 var _awaiting_round_start := false
-var _note_chase_running := false
-var _note_chase_staff_scroll_x := 0.0
-var _note_chase_spawn_timer := 0.0
-var _note_chase_spawn_interval := 1.2
-var _note_chase_scroll_speed := 95.0
-var _note_chase_base_spawn_interval := 1.2
-var _note_chase_base_scroll_speed := 95.0
-var _note_chase_speed_stage := 0
-var _note_chase_correct_streak := 0
-var _note_chase_wrongs := 0
-var _note_chase_correct_clicks := 0
-var _note_chase_spawned := 0
-var _note_chase_elapsed := 0.0
-var _note_chase_active_notes: Array[Dictionary] = []
-var _note_chase_target_spawn_streak := 0
-var _note_chase_fever_active := false
-var _note_chase_fever_timer := 0.0
-var _note_chase_boss_active := false
-var _note_chase_boss_timer := 0.0
-var _note_chase_boss_last_stage := -1
-var _note_chase_last_theme_stage := -1
-var _note_chase_clef_switch_cd := 0.0
-var _note_chase_freeze_timer := 0.0
-var _note_chase_shield_timer := 0.0
-var _note_chase_combo_mult := 1
-var _note_chase_last_spawn_note := ""
+# Note Chase runtime — owns the 26 runtime state vars + active_notes array.
+# Strict-typed RefCounted ref (NOT Node-based) so Godot 4.6's typed property
+# dispatch works correctly across scripts. Eager-initialized so early access
+# from teardown helpers (e.g. session_controller.apply_end_state) is safe
+# before _build_ui_game_panel runs.
+var _note_chase_runtime: RefCounted = NoteChaseRuntimeScript.new()  # actually NoteChaseRuntime — declared as RefCounted to avoid class_name cycle
 var _bird_home_global_position := Vector2.ZERO
 var _bird_home_ready := false
 var _chicken_hint_busy := false
@@ -2620,7 +2601,7 @@ func _clear_gameplay_transient_visuals() -> void:
 	_pitch_match_clear_keyboard_feedback()
 	if _pitch_match_keyboard_scroll != null:
 		_pitch_match_keyboard_scroll.visible = false
-	if not _quiz_active and not _continuous_sight_active and not _note_chase_running:
+	if not _quiz_active and not _continuous_sight_active and not _note_chase_runtime.running:
 		return
 	_continuous_touch_suppress_note = ""
 	_continuous_touch_suppress_until_sec = 0.0
@@ -2716,7 +2697,7 @@ func _handle_app_backgrounded() -> void:
 	# Stop active gameplay and clear visuals so no Note Flow/Rhythm Flow runs behind menus.
 	if _game_panel == null or not _game_panel.visible:
 		return
-	if not (_quiz_active or _continuous_sight_active or _note_chase_running):
+	if not (_quiz_active or _continuous_sight_active or _note_chase_runtime.running):
 		return
 	_bump_quiz_run_token()
 	_invalidate_audio_sequence_schedule()
@@ -2726,7 +2707,7 @@ func _handle_app_backgrounded() -> void:
 	_quiz_active = false
 	_accepting_answer = false
 	_awaiting_round_start = false
-	_note_chase_running = false
+	_note_chase_runtime.running = false
 	_rhythm_flow_paused = false
 	_rhythm_is_practice = false
 	_rhythm_flow_session_mode = RHYTHM_FLOW_SESSION_PLAYING
@@ -16445,8 +16426,8 @@ func _refresh_meta_ui() -> void:
 			_score_label.visible = true
 		var target_text := "Targets: %s" % ", ".join(_note_chase_selected_notes)
 		var speed_text := "Speed: %.1fx" % _note_chase_speed_multiplier()
-		var combo_text := "Combo: x%d" % maxi(1, _note_chase_combo_mult)
-		var shield_text := ("%.1fs" % _note_chase_shield_timer) if _note_chase_shield_timer > 0.0 else "0s"
+		var combo_text := "Combo: x%d" % maxi(1, _note_chase_runtime.combo_mult)
+		var shield_text := ("%.1fs" % _note_chase_runtime.shield_timer) if _note_chase_runtime.shield_timer > 0.0 else "0s"
 		if _note_chase_target_label != null:
 			_note_chase_target_label.text = target_text
 		if _note_chase_speed_label != null:
@@ -16465,10 +16446,10 @@ func _refresh_meta_ui() -> void:
 			_note_chase_side_shield_label.text = shield_text
 		_set_note_chase_bottom_metric(_note_chase_bottom_target_label, "♪", ", ".join(_note_chase_selected_notes))
 		_set_note_chase_bottom_metric(_note_chase_bottom_speed_label, "⚡", "%.1fx" % _note_chase_speed_multiplier())
-		_set_note_chase_bottom_metric(_note_chase_bottom_combo_label, "xP", "x%d" % maxi(1, _note_chase_combo_mult))
+		_set_note_chase_bottom_metric(_note_chase_bottom_combo_label, "xP", "x%d" % maxi(1, _note_chase_runtime.combo_mult))
 		_set_note_chase_bottom_metric(_note_chase_bottom_shield_label, "🛡", shield_text)
 		if _note_chase_level_label != null:
-			_note_chase_level_label.text = "Level %d" % (_note_chase_speed_stage + 1)
+			_note_chase_level_label.text = "Level %d" % (_note_chase_runtime.speed_stage + 1)
 			_note_chase_level_label.visible = true
 		if _streak_label != null:
 			_streak_label.visible = false
@@ -16490,7 +16471,7 @@ func _refresh_meta_ui() -> void:
 			_note_chase_bottom_spacer.visible = true
 			_note_chase_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 			_note_chase_bottom_spacer.custom_minimum_size = Vector2(0, 8)
-		_set_note_chase_metric_highlight(_note_chase_bottom_shield_box, _note_chase_shield_timer > 0.0)
+		_set_note_chase_metric_highlight(_note_chase_bottom_shield_box, _note_chase_runtime.shield_timer > 0.0)
 		_refresh_sight_question_progress_ui(false)
 		return
 	_set_note_chase_top_text_only(false)
@@ -16779,7 +16760,7 @@ func _on_game_home_pressed() -> void:
 	_sync_home_state_from_runtime()
 	# Home from gameplay must fully end any active run (especially Note Flow/Rhythm Flow),
 	# otherwise continuous sessions can keep updating behind menus on some devices.
-	if (_game_panel != null and _game_panel.visible) or _quiz_active or _continuous_sight_active or _note_chase_running:
+	if (_game_panel != null and _game_panel.visible) or _quiz_active or _continuous_sight_active or _note_chase_runtime.running:
 		_on_end_quiz_pressed()
 		return
 	_show_home()
@@ -17537,7 +17518,7 @@ func _show_home() -> void:
 	if _continuous_sight_play_line != null:
 		_continuous_sight_play_line.visible = false
 	_in_tutorial = false
-	_note_chase_running = false
+	_note_chase_runtime.running = false
 	_stop_note_chase_music()
 	_set_note_chase_overlay("", false)
 	_clear_note_chase_visual_notes()
@@ -18558,35 +18539,35 @@ func _play_tutorial_hmm(run_id: int = -1) -> void:
 
 
 func _start_note_chase_round() -> void:
-	_note_chase_running = false
+	_note_chase_runtime.running = false
 	if _note_chase_clef_mode == "Treble" or _note_chase_clef_mode == "Bass":
 		_selected_clef = _note_chase_clef_mode
 	else:
 		_selected_clef = "Treble"
 	_refresh_note_chase_clef_buttons()
 	_refresh_clef_buttons()
-	_note_chase_staff_scroll_x = 0.0
+	_note_chase_runtime.staff_scroll_x = 0.0
 	_set_note_chase_staff_scrolling(true)
-	_note_chase_spawn_timer = 0.0
-	_note_chase_correct_clicks = 0
-	_note_chase_correct_streak = 0
-	_note_chase_wrongs = 0
-	_note_chase_speed_stage = 0
-	_note_chase_fever_active = false
-	_note_chase_fever_timer = 0.0
-	_note_chase_boss_active = false
-	_note_chase_boss_timer = 0.0
-	_note_chase_boss_last_stage = -1
-	_note_chase_last_theme_stage = -1
-	_note_chase_clef_switch_cd = 0.0
-	_note_chase_freeze_timer = 0.0
-	_note_chase_shield_timer = 0.0
-	_note_chase_combo_mult = 1
-	_note_chase_last_spawn_note = ""
-	_note_chase_target_spawn_streak = 0
-	_note_chase_spawned = 0
-	_note_chase_elapsed = 0.0
-	_note_chase_active_notes.clear()
+	_note_chase_runtime.spawn_timer = 0.0
+	_note_chase_runtime.correct_clicks = 0
+	_note_chase_runtime.correct_streak = 0
+	_note_chase_runtime.wrongs = 0
+	_note_chase_runtime.speed_stage = 0
+	_note_chase_runtime.fever_active = false
+	_note_chase_runtime.fever_timer = 0.0
+	_note_chase_runtime.boss_active = false
+	_note_chase_runtime.boss_timer = 0.0
+	_note_chase_runtime.boss_last_stage = -1
+	_note_chase_runtime.last_theme_stage = -1
+	_note_chase_runtime.clef_switch_cd = 0.0
+	_note_chase_runtime.freeze_timer = 0.0
+	_note_chase_runtime.shield_timer = 0.0
+	_note_chase_runtime.combo_mult = 1
+	_note_chase_runtime.last_spawn_note = ""
+	_note_chase_runtime.target_spawn_streak = 0
+	_note_chase_runtime.spawned = 0
+	_note_chase_runtime.elapsed = 0.0
+	_note_chase_runtime.active_notes.clear()
 	_clear_note_chase_visual_notes()
 	_apply_note_chase_speed_from_option()
 	_set_answer_buttons_enabled(false)
@@ -18610,42 +18591,42 @@ func _start_note_chase_round() -> void:
 	_status_label.text = "Go!"
 	await _play_new_question_cue()
 	_start_note_chase_music()
-	_note_chase_running = true
+	_note_chase_runtime.running = true
 	_accepting_answer = true
 
 
 func _apply_note_chase_speed_from_option() -> void:
 	# Speed selector removed from menu; keep default "Normal" profile.
-	_note_chase_base_scroll_speed = 82.0
-	_note_chase_base_spawn_interval = 1.38
+	_note_chase_runtime.base_scroll_speed = 82.0
+	_note_chase_runtime.base_spawn_interval = 1.38
 	_note_chase_apply_speed_stage()
 
 
 func _note_chase_apply_speed_stage() -> void:
 	var multiplier := _note_chase_speed_multiplier()
-	_note_chase_scroll_speed = _note_chase_base_scroll_speed * multiplier
+	_note_chase_runtime.scroll_speed = _note_chase_runtime.base_scroll_speed * multiplier
 	# Softer acceleration curve so difficulty ramps up less aggressively.
 	var spawn_mult := 1.0 + ((multiplier - 1.0) * 0.28)
-	if _note_chase_speed_stage >= 7:
+	if _note_chase_runtime.speed_stage >= 7:
 		# After level 7, increase spawn frequency each level.
-		spawn_mult += 0.08 * float(_note_chase_speed_stage - 6)
-	_note_chase_spawn_interval = maxf(0.52, _note_chase_base_spawn_interval / maxf(1.0, spawn_mult))
+		spawn_mult += 0.08 * float(_note_chase_runtime.speed_stage - 6)
+	_note_chase_runtime.spawn_interval = maxf(0.52, _note_chase_runtime.base_spawn_interval / maxf(1.0, spawn_mult))
 	_apply_note_chase_staff_colors()
 	_note_chase_apply_theme()
 	_note_chase_refresh_progress_text()
-	if _note_chase_speed_stage > 0 and _note_chase_speed_stage % 3 == 0 and _note_chase_boss_last_stage != _note_chase_speed_stage:
+	if _note_chase_runtime.speed_stage > 0 and _note_chase_runtime.speed_stage % 3 == 0 and _note_chase_runtime.boss_last_stage != _note_chase_runtime.speed_stage:
 		_note_chase_start_boss_round()
-	if _note_chase_last_theme_stage != _note_chase_speed_stage:
-		_note_chase_last_theme_stage = _note_chase_speed_stage
-		_play_note_chase_stage_motif(_note_chase_speed_stage)
+	if _note_chase_runtime.last_theme_stage != _note_chase_runtime.speed_stage:
+		_note_chase_runtime.last_theme_stage = _note_chase_runtime.speed_stage
+		_play_note_chase_stage_motif(_note_chase_runtime.speed_stage)
 
 
 func _note_chase_speed_multiplier() -> float:
-	return NoteChaseDifficultyScript.speed_multiplier(_note_chase_speed_stage)
+	return NoteChaseDifficultyScript.speed_multiplier(_note_chase_runtime.speed_stage)
 
 
 func _note_chase_points_per_note() -> int:
-	return NoteChaseDifficultyScript.points_per_note(_note_chase_speed_stage)
+	return NoteChaseDifficultyScript.points_per_note(_note_chase_runtime.speed_stage)
 
 
 func _set_note_chase_overlay(text: String, visible: bool) -> void:
@@ -18656,48 +18637,48 @@ func _set_note_chase_overlay(text: String, visible: bool) -> void:
 
 
 func _note_chase_stage_note_color() -> Color:
-	return NoteChaseDifficultyScript.stage_note_color(_note_chase_speed_stage)
+	return NoteChaseDifficultyScript.stage_note_color(_note_chase_runtime.speed_stage)
 
 
 func _note_chase_target_bias() -> float:
-	return NoteChaseDifficultyScript.target_bias(_note_chase_selected_notes.size(), _note_chase_boss_active)
+	return NoteChaseDifficultyScript.target_bias(_note_chase_selected_notes.size(), _note_chase_runtime.boss_active)
 
 
 func _note_chase_decoy_chance() -> float:
-	return NoteChaseDifficultyScript.decoy_chance(_note_chase_speed_stage, _note_chase_boss_active)
+	return NoteChaseDifficultyScript.decoy_chance(_note_chase_runtime.speed_stage, _note_chase_runtime.boss_active)
 
 
 func _note_chase_rainbow_chance() -> float:
-	return NoteChaseDifficultyScript.rainbow_chance(_note_chase_speed_stage)
+	return NoteChaseDifficultyScript.rainbow_chance(_note_chase_runtime.speed_stage)
 
 
 func _note_chase_score_multiplier() -> float:
-	return NoteChaseDifficultyScript.score_multiplier(_note_chase_fever_active, _note_chase_boss_active, _note_chase_combo_mult)
+	return NoteChaseDifficultyScript.score_multiplier(_note_chase_runtime.fever_active, _note_chase_runtime.boss_active, _note_chase_runtime.combo_mult)
 
 
 func _note_chase_refresh_progress_text() -> void:
 	var parts: Array[String] = []
-	if _note_chase_freeze_timer > 0.0:
-		parts.append("Freeze %.1fs" % _note_chase_freeze_timer)
-	if _note_chase_fever_active:
-		parts.append("Fever %.1fs" % _note_chase_fever_timer)
-	if _note_chase_boss_active:
-		parts.append("Boss %.1fs" % _note_chase_boss_timer)
+	if _note_chase_runtime.freeze_timer > 0.0:
+		parts.append("Freeze %.1fs" % _note_chase_runtime.freeze_timer)
+	if _note_chase_runtime.fever_active:
+		parts.append("Fever %.1fs" % _note_chase_runtime.fever_timer)
+	if _note_chase_runtime.boss_active:
+		parts.append("Boss %.1fs" % _note_chase_runtime.boss_timer)
 	_progress_label.text = " | ".join(parts) if not parts.is_empty() else ""
 	_refresh_meta_ui()
 
 
 func _note_chase_start_fever() -> void:
-	_note_chase_fever_active = true
-	_note_chase_fever_timer = 5.0
+	_note_chase_runtime.fever_active = true
+	_note_chase_runtime.fever_timer = 5.0
 	_status_label.text = "Fever! 2x points"
 	_note_chase_refresh_progress_text()
 
 
 func _note_chase_start_boss_round() -> void:
-	_note_chase_boss_active = true
-	_note_chase_boss_timer = 20.0
-	_note_chase_boss_last_stage = _note_chase_speed_stage
+	_note_chase_runtime.boss_active = true
+	_note_chase_runtime.boss_timer = 20.0
+	_note_chase_runtime.boss_last_stage = _note_chase_runtime.speed_stage
 	_status_label.text = "Boss Round! Dense targets + bonus points"
 	_play_powerup_sfx()
 	_note_chase_refresh_progress_text()
@@ -18754,13 +18735,13 @@ func _note_chase_spawn_note_name_text(center: Vector2, text: String, color: Colo
 
 
 func _note_chase_apply_level_reward() -> void:
-	_note_chase_combo_mult += 2
+	_note_chase_runtime.combo_mult += 2
 	if _lives < 5:
 		_lives += 1
-		_status_label.text = "Level up! +1 Life | Combo x%d" % _note_chase_combo_mult
+		_status_label.text = "Level up! +1 Life | Combo x%d" % _note_chase_runtime.combo_mult
 	else:
 		_score += 25
-		_status_label.text = "Level up! +25 Bonus | Combo x%d" % _note_chase_combo_mult
+		_status_label.text = "Level up! +25 Bonus | Combo x%d" % _note_chase_runtime.combo_mult
 	_score_label.text = "Score: %d" % _score
 	_refresh_meta_ui()
 	_note_chase_refresh_progress_text()
@@ -18806,11 +18787,11 @@ func _spawn_note_chase_special(kind: String) -> void:
 	p.gui_input.connect(_on_note_chase_note_gui_input.bind(p))
 	_staff_area.add_child(p)
 	_note_chase_play_spawn_bubble_anim(p)
-	_note_chase_active_notes.append({
+	_note_chase_runtime.add_active_note({
 		"node": p,
 		"kind": kind,
 		"note": "Shield" if kind == "shield" else "Time",
-		"spawn_t": _note_chase_elapsed,
+		"spawn_t": _note_chase_runtime.elapsed,
 		"target": false,
 		"hit": false
 	})
@@ -18844,21 +18825,21 @@ func _spawn_note_chase_clef_switch() -> void:
 	if _staff_clef_label != null:
 		_staff_clef_label.visible = false
 	_note_chase_play_spawn_bubble_anim(p)
-	_note_chase_active_notes.append({
+	_note_chase_runtime.add_active_note({
 		"node": p,
 		"kind": "clef",
 		"next_clef": next_clef,
-		"spawn_t": _note_chase_elapsed,
+		"spawn_t": _note_chase_runtime.elapsed,
 		"triggered": false,
 		"hit": false
 	})
-	_note_chase_clef_switch_cd = 9.0 + _rng.randf() * 4.0
+	_note_chase_runtime.clef_switch_cd = 9.0 + _rng.randf() * 4.0
 
 
 func _note_chase_capture_targets_with_rainbow(skip_node: Panel) -> int:
 	var captured := 0
-	for i in range(_note_chase_active_notes.size()):
-		var n: Dictionary = _note_chase_active_notes[i]
+	for i in range(_note_chase_runtime.active_notes.size()):
+		var n: Dictionary = _note_chase_runtime.active_notes[i]
 		if bool(n.get("hit", false)):
 			continue
 		var node_obj = n.get("node", null)
@@ -18876,7 +18857,7 @@ func _note_chase_capture_targets_with_rainbow(skip_node: Panel) -> int:
 			continue
 		_note_chase_spawn_pop_effect(p.position + (p.size * 0.5), Color(1.0, 0.92, 0.45, 1.0))
 		n["hit"] = true
-		_note_chase_active_notes[i] = n
+		_note_chase_runtime.update_active_note(i, n)
 		_note_chase_fade_out_control(p, 0.16)
 		captured += 1
 	return captured
@@ -18944,7 +18925,7 @@ func _apply_note_chase_staff_colors() -> void:
 		var line := _staff_lines[i]
 		if line != null:
 			if colorize and not NoteChaseDifficultyScript.STAFF_COLORS.is_empty():
-				var c: Color = NoteChaseDifficultyScript.STAFF_COLORS[(i + _note_chase_speed_stage) % NoteChaseDifficultyScript.STAFF_COLORS.size()]
+				var c: Color = NoteChaseDifficultyScript.STAFF_COLORS[(i + _note_chase_runtime.speed_stage) % NoteChaseDifficultyScript.STAFF_COLORS.size()]
 				line.color = c
 			else:
 				line.color = Color(1.0, 1.0, 1.0, 0.95)
@@ -18952,7 +18933,7 @@ func _apply_note_chase_staff_colors() -> void:
 			var clone := _note_chase_staff_clone_lines[i]
 			if clone != null:
 				if colorize and not NoteChaseDifficultyScript.STAFF_COLORS.is_empty():
-					var cc: Color = NoteChaseDifficultyScript.STAFF_COLORS[(i + _note_chase_speed_stage) % NoteChaseDifficultyScript.STAFF_COLORS.size()]
+					var cc: Color = NoteChaseDifficultyScript.STAFF_COLORS[(i + _note_chase_runtime.speed_stage) % NoteChaseDifficultyScript.STAFF_COLORS.size()]
 					clone.color = cc
 				else:
 					clone.color = Color(1.0, 1.0, 1.0, 0.95)
@@ -18968,7 +18949,7 @@ func _note_chase_step_for_letter(letter: String) -> int:
 func _note_chase_step_pool() -> Array[int]:
 	return NoteChaseDifficultyScript.step_pool(
 		_selected_clef,
-		_note_chase_speed_stage,
+		_note_chase_runtime.speed_stage,
 		_note_chase_safe_y_top(),
 		_note_chase_safe_y_bottom(),
 		Callable(self, "_staff_center_y_for_step")
@@ -19010,8 +18991,8 @@ func _note_chase_play_spawn_bubble_anim(panel: Control) -> void:
 
 
 func _note_chase_relabel_active_notes_for_clef() -> void:
-	for i in range(_note_chase_active_notes.size()):
-		var n: Dictionary = _note_chase_active_notes[i]
+	for i in range(_note_chase_runtime.active_notes.size()):
+		var n: Dictionary = _note_chase_runtime.active_notes[i]
 		if str(n.get("kind", "note")) != "note":
 			continue
 		if bool(n.get("hit", false)):
@@ -19031,19 +19012,19 @@ func _note_chase_relabel_active_notes_for_clef() -> void:
 			var panel := node_obj as Panel
 			if panel != null:
 				_note_chase_apply_note_style(panel, is_target, bool(n.get("decoy", false)), bool(n.get("rainbow", false)))
-		_note_chase_active_notes[i] = n
+		_note_chase_runtime.update_active_note(i, n)
 
 
 func _note_chase_visible_target_count() -> int:
-	return NoteChasePhysicsScript.visible_target_count(_note_chase_active_notes, STAFF_LEFT_X, _note_chase_spawn_x())
+	return NoteChasePhysicsScript.visible_target_count(_note_chase_runtime.active_notes, STAFF_LEFT_X, _note_chase_spawn_x())
 
 
 func _note_chase_has_active_special(kind: String) -> bool:
-	return NoteChasePhysicsScript.has_active_special(_note_chase_active_notes, kind)
+	return NoteChasePhysicsScript.has_active_special(_note_chase_runtime.active_notes, kind)
 
 
 func _note_chase_next_spawn_x_with_spacing(base_x: float, min_gap: float = 58.0) -> float:
-	return NoteChasePhysicsScript.next_spawn_x_with_spacing(_note_chase_active_notes, base_x, min_gap)
+	return NoteChasePhysicsScript.next_spawn_x_with_spacing(_note_chase_runtime.active_notes, base_x, min_gap)
 
 
 func _note_chase_item_speed_multiplier(n: Dictionary) -> float:
@@ -19051,17 +19032,17 @@ func _note_chase_item_speed_multiplier(n: Dictionary) -> float:
 
 
 func _note_chase_has_untriggered_clef_token() -> bool:
-	return NoteChasePhysicsScript.has_untriggered_clef_token(_note_chase_active_notes)
+	return NoteChasePhysicsScript.has_untriggered_clef_token(_note_chase_runtime.active_notes)
 
 
 func _note_chase_clear_recent_notes_after_clef_switch(_trigger_x: float, recent_seconds: float = 2.0) -> int:
 	var result := NoteChasePhysicsScript.clear_recent_notes_after_clef_switch(
-		_note_chase_active_notes, _note_chase_elapsed, _note_chase_spawn_x(), recent_seconds
+		_note_chase_runtime.active_notes, _note_chase_runtime.elapsed, _note_chase_spawn_x(), recent_seconds
 	)
 	var typed: Array[Dictionary] = []
 	for item in result["active_notes"]:
 		typed.append(item)
-	_note_chase_active_notes = typed
+	_note_chase_runtime.set_active_notes(typed)
 	return int(result["removed_notes"])
 
 
@@ -19069,13 +19050,13 @@ func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
 	if _staff_area == null:
 		return
 	var visible_targets := _note_chase_visible_target_count()
-	if _note_chase_speed_stage >= 1 and _rng.randf() < 0.035:
+	if _note_chase_runtime.speed_stage >= 1 and _rng.randf() < 0.035:
 		_spawn_note_chase_special("shield")
 		return
-	if _note_chase_speed_stage >= 3 and visible_targets > 1 and _note_chase_freeze_timer <= 0.0 and not _note_chase_has_active_special("freeze") and _rng.randf() < 0.009:
+	if _note_chase_runtime.speed_stage >= 3 and visible_targets > 1 and _note_chase_runtime.freeze_timer <= 0.0 and not _note_chase_has_active_special("freeze") and _rng.randf() < 0.009:
 		_spawn_note_chase_special("freeze")
 		return
-	if _note_chase_clef_mode == "Both" and _note_chase_speed_stage >= 3 and _note_chase_clef_switch_cd <= 0.0 and _rng.randf() < 0.02:
+	if _note_chase_clef_mode == "Both" and _note_chase_runtime.speed_stage >= 3 and _note_chase_runtime.clef_switch_cd <= 0.0 and _rng.randf() < 0.02:
 		_spawn_note_chase_clef_switch()
 		return
 	var steps := _note_chase_step_pool()
@@ -19088,7 +19069,7 @@ func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
 		else:
 			non_target_steps.append(s)
 	var prefer_target := _rng.randf() < _note_chase_target_bias()
-	if not target_steps.is_empty() and not non_target_steps.is_empty() and _note_chase_target_spawn_streak >= 3:
+	if not target_steps.is_empty() and not non_target_steps.is_empty() and _note_chase_runtime.target_spawn_streak >= 3:
 		prefer_target = false
 	var step := steps[_rng.randi_range(0, steps.size() - 1)]
 	if prefer_target and not target_steps.is_empty():
@@ -19096,9 +19077,9 @@ func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
 	elif not non_target_steps.is_empty():
 		step = non_target_steps[_rng.randi_range(0, non_target_steps.size() - 1)]
 	var note_name := _staff_step_name_for_clef(step, _selected_clef)
-	if _note_chase_last_spawn_note != "":
+	if _note_chase_runtime.last_spawn_note != "":
 		for _k in range(12):
-			if note_name != _note_chase_last_spawn_note:
+			if note_name != _note_chase_runtime.last_spawn_note:
 				break
 			if prefer_target and not target_steps.is_empty():
 				step = target_steps[_rng.randi_range(0, target_steps.size() - 1)]
@@ -19109,17 +19090,17 @@ func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
 			note_name = _staff_step_name_for_clef(step, _selected_clef)
 	var is_target := _note_chase_selected_notes.has(note_name)
 	if is_target:
-		_note_chase_target_spawn_streak += 1
+		_note_chase_runtime.target_spawn_streak += 1
 	else:
-		_note_chase_target_spawn_streak = 0
+		_note_chase_runtime.target_spawn_streak = 0
 	var y := _staff_center_y_for_step(step)
 	var decoy_chance := _note_chase_decoy_chance()
 	var is_decoy := (not is_target) and (_rng.randf() < decoy_chance)
 	var is_rainbow := false
 	var rainbow_spawn_mul := 0.16
-	if _note_chase_speed_stage >= 9:
+	if _note_chase_runtime.speed_stage >= 9:
 		rainbow_spawn_mul = 0.24
-	if _note_chase_speed_stage >= 11:
+	if _note_chase_runtime.speed_stage >= 11:
 		rainbow_spawn_mul = 0.28
 	if is_target and not _note_chase_has_active_special("rainbow") and _rng.randf() < (_note_chase_rainbow_chance() * rainbow_spawn_mul):
 		is_rainbow = true
@@ -19138,11 +19119,11 @@ func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
 	p.gui_input.connect(_on_note_chase_note_gui_input.bind(p))
 	_staff_area.add_child(p)
 	_note_chase_play_spawn_bubble_anim(p)
-	_note_chase_active_notes.append({
+	_note_chase_runtime.add_active_note({
 		"node": p,
 		"note": note_name,
 		"step": step,
-		"spawn_t": _note_chase_elapsed,
+		"spawn_t": _note_chase_runtime.elapsed,
 		"target": is_target,
 		"kind": "note",
 		"decoy": is_decoy,
@@ -19151,20 +19132,20 @@ func _spawn_note_chase_note(spawn_x_offset: float = 0.0) -> void:
 		"hit": false
 	})
 	_question_index += 1
-	_note_chase_last_spawn_note = note_name
+	_note_chase_runtime.last_spawn_note = note_name
 	_note_chase_refresh_progress_text()
 
 
 func _on_note_chase_note_gui_input(event: InputEvent, note_panel: Panel) -> void:
-	if not _note_chase_running or not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+	if not _note_chase_runtime.running or not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
 		return
 	if not (event is InputEventMouseButton):
 		return
 	var mb := event as InputEventMouseButton
 	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
-	for i in range(_note_chase_active_notes.size()):
-		var n: Dictionary = _note_chase_active_notes[i]
+	for i in range(_note_chase_runtime.active_notes.size()):
+		var n: Dictionary = _note_chase_runtime.active_notes[i]
 		if n.get("node", null) != note_panel:
 			continue
 		if bool(n.get("hit", false)):
@@ -19178,24 +19159,24 @@ func _on_note_chase_note_gui_input(event: InputEvent, note_panel: Panel) -> void
 		_note_chase_spawn_note_name_text(pop_center, note_text, Color(1.0, 0.96, 0.88, 1.0))
 		if kind == "shield":
 			n["hit"] = true
-			_note_chase_shield_timer += 10.0
-			_status_label.text = "Shield active: %.1fs" % _note_chase_shield_timer
+			_note_chase_runtime.shield_timer += 10.0
+			_status_label.text = "Shield active: %.1fs" % _note_chase_runtime.shield_timer
 			_play_shield_activate_sfx()
 			_note_chase_spawn_pop_effect(pop_center, Color(0.42, 0.86, 1.0, 1.0))
 			if note_panel != null:
 				note_panel.queue_free()
-			_note_chase_active_notes[i] = n
+			_note_chase_runtime.update_active_note(i, n)
 			_note_chase_refresh_progress_text()
 			return
 		if kind == "freeze":
 			n["hit"] = true
-			_note_chase_freeze_timer = maxf(_note_chase_freeze_timer, 2.0)
+			_note_chase_runtime.freeze_timer = maxf(_note_chase_runtime.freeze_timer, 2.0)
 			_status_label.text = "Time Freeze!"
 			_play_powerup_sfx()
 			_note_chase_spawn_pop_effect(pop_center, Color(1.0, 0.86, 0.36, 1.0))
 			if note_panel != null:
 				note_panel.queue_free()
-			_note_chase_active_notes[i] = n
+			_note_chase_runtime.update_active_note(i, n)
 			_note_chase_refresh_progress_text()
 			return
 		if kind != "note":
@@ -19212,27 +19193,27 @@ func _on_note_chase_note_gui_input(event: InputEvent, note_panel: Panel) -> void
 			_note_chase_spawn_pop_effect(pop_center, pop_color)
 			var gained := int(round(float(_note_chase_points_per_note()) * _note_chase_score_multiplier()))
 			var captured_extra := 0
-			if is_rainbow and _note_chase_speed_stage >= 3:
+			if is_rainbow and _note_chase_runtime.speed_stage >= 3:
 				captured_extra = _note_chase_capture_targets_with_rainbow(note_panel)
 				gained += 5
 				gained += int(round(float(captured_extra * _note_chase_points_per_note()) * _note_chase_score_multiplier()))
 			_score += gained
-			_note_chase_correct_clicks += 1
-			_note_chase_correct_streak += 1
+			_note_chase_runtime.correct_clicks += 1
+			_note_chase_runtime.correct_streak += 1
 			if is_rainbow:
 				_status_label.text = "Rainbow! +%d (captured %d)" % [gained, captured_extra]
 			else:
 				_status_label.text = "Nice! %s +%d" % [str(n.get("note", "")), gained]
 			_play_success_sfx()
-			if _note_chase_correct_streak == 8 or _note_chase_correct_streak == 16 or _note_chase_correct_streak == 24:
+			if _note_chase_runtime.correct_streak == 8 or _note_chase_runtime.correct_streak == 16 or _note_chase_runtime.correct_streak == 24:
 				_note_chase_start_fever()
-			if _note_chase_correct_streak > 0 and _note_chase_correct_streak % 8 == 0:
+			if _note_chase_runtime.correct_streak > 0 and _note_chase_runtime.correct_streak % 8 == 0:
 				var prev_mult := _note_chase_speed_multiplier()
-				_note_chase_speed_stage = mini(12, _note_chase_speed_stage + 1)
+				_note_chase_runtime.speed_stage = mini(12, _note_chase_runtime.speed_stage + 1)
 				_note_chase_apply_speed_stage()
 				_note_chase_apply_level_reward()
 				var new_mult := _note_chase_speed_multiplier()
-				if _note_chase_speed_stage == 2:
+				if _note_chase_runtime.speed_stage == 2:
 					_status_label.text = "Decoys unlocked!"
 				elif new_mult > prev_mult:
 					_status_label.text = "Speed up!"
@@ -19241,63 +19222,63 @@ func _on_note_chase_note_gui_input(event: InputEvent, note_panel: Panel) -> void
 				_play_powerup_sfx()
 		else:
 			# Wrong click: keep note moving, but reduce focus life unless shield is active.
-			if _note_chase_shield_timer > 0.0:
+			if _note_chase_runtime.shield_timer > 0.0:
 				_status_label.text = "Shield blocked wrong"
 			else:
 				_score -= 6
 				if not _practice_mode_enabled:
 					_lives = maxi(0, _lives - 1)
-				_note_chase_wrongs += 1
-				_note_chase_combo_mult = maxi(1, _note_chase_combo_mult - 1)
+				_note_chase_runtime.wrongs += 1
+				_note_chase_runtime.combo_mult = maxi(1, _note_chase_runtime.combo_mult - 1)
 				_status_label.text = "Wrong note."
 				_play_fail_sfx()
 				_refresh_meta_ui()
 			n["click_cd"] = 0.28
-			_note_chase_active_notes[i] = n
+			_note_chase_runtime.update_active_note(i, n)
 			_score_label.text = "Score: %d" % _score
 			_note_chase_refresh_progress_text()
 			return
 		if note_panel != null and bool(n.get("hit", false)):
 			note_panel.queue_free()
-		_note_chase_active_notes[i] = n
+		_note_chase_runtime.update_active_note(i, n)
 		_score_label.text = "Score: %d" % _score
 		_note_chase_refresh_progress_text()
 		return
 
 
 func _update_note_chase(delta: float) -> void:
-	if not _note_chase_running or not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
+	if not _note_chase_runtime.running or not _quiz_active or _selected_mode != MODE_NOTE_CHASE:
 		return
-	_note_chase_elapsed += delta
+	_note_chase_runtime.elapsed += delta
 	var pending_clef_switch := false
 	var pending_switch_to := ""
 	var pending_trigger_x := 0.0
 	_update_note_chase_staff_scroll(delta)
-	_note_chase_clef_switch_cd = maxf(0.0, _note_chase_clef_switch_cd - delta)
-	_note_chase_freeze_timer = maxf(0.0, _note_chase_freeze_timer - delta)
-	_note_chase_shield_timer = maxf(0.0, _note_chase_shield_timer - delta)
-	if _note_chase_fever_active:
-		_note_chase_fever_timer = maxf(0.0, _note_chase_fever_timer - delta)
-		if _note_chase_fever_timer <= 0.0:
-			_note_chase_fever_active = false
-	if _note_chase_boss_active:
-		_note_chase_boss_timer = maxf(0.0, _note_chase_boss_timer - delta)
-		if _note_chase_boss_timer <= 0.0:
-			_note_chase_boss_active = false
+	_note_chase_runtime.clef_switch_cd = maxf(0.0, _note_chase_runtime.clef_switch_cd - delta)
+	_note_chase_runtime.freeze_timer = maxf(0.0, _note_chase_runtime.freeze_timer - delta)
+	_note_chase_runtime.shield_timer = maxf(0.0, _note_chase_runtime.shield_timer - delta)
+	if _note_chase_runtime.fever_active:
+		_note_chase_runtime.fever_timer = maxf(0.0, _note_chase_runtime.fever_timer - delta)
+		if _note_chase_runtime.fever_timer <= 0.0:
+			_note_chase_runtime.fever_active = false
+	if _note_chase_runtime.boss_active:
+		_note_chase_runtime.boss_timer = maxf(0.0, _note_chase_runtime.boss_timer - delta)
+		if _note_chase_runtime.boss_timer <= 0.0:
+			_note_chase_runtime.boss_active = false
 			_status_label.text = "Boss clear!"
 	_note_chase_refresh_progress_text()
-	if _note_chase_freeze_timer <= 0.0:
-		_note_chase_spawn_timer -= delta
-	var effective_spawn_interval := _note_chase_spawn_interval
-	if _note_chase_boss_active:
+	if _note_chase_runtime.freeze_timer <= 0.0:
+		_note_chase_runtime.spawn_timer -= delta
+	var effective_spawn_interval: float = _note_chase_runtime.spawn_interval
+	if _note_chase_runtime.boss_active:
 		effective_spawn_interval *= 0.62
-	if _note_chase_spawn_timer <= 0.0 and not _note_chase_has_untriggered_clef_token():
+	if _note_chase_runtime.spawn_timer <= 0.0 and not _note_chase_has_untriggered_clef_token():
 		_spawn_note_chase_note()
-		_note_chase_spawned += 1
-		_note_chase_spawn_timer = effective_spawn_interval
+		_note_chase_runtime.spawned += 1
+		_note_chase_runtime.spawn_timer = effective_spawn_interval
 
 	var still_active: Array[Dictionary] = []
-	for item in _note_chase_active_notes:
+	for item in _note_chase_runtime.active_notes:
 		var n: Dictionary = item
 		var node_obj = n.get("node", null)
 		if node_obj == null or not is_instance_valid(node_obj):
@@ -19315,9 +19296,9 @@ func _update_note_chase(delta: float) -> void:
 				var trigger_x := _note_chase_end_x()
 				var already_triggered := bool(n.get("triggered", false))
 				if not already_triggered:
-					if _note_chase_freeze_timer <= 0.0:
-						panel.position.x -= (_note_chase_scroll_speed * _note_chase_item_speed_multiplier(n)) * delta
-					var blink := 0.45 + (absf(sin(_note_chase_elapsed * 13.0)) * 0.55)
+					if _note_chase_runtime.freeze_timer <= 0.0:
+						panel.position.x -= (_note_chase_runtime.scroll_speed * _note_chase_item_speed_multiplier(n)) * delta
+					var blink := 0.45 + (absf(sin(_note_chase_runtime.elapsed * 13.0)) * 0.55)
 					panel.modulate = Color(1.0, 1.0, 1.0, blink)
 					if panel.position.x <= trigger_x:
 						n["triggered"] = true
@@ -19341,8 +19322,8 @@ func _update_note_chase(delta: float) -> void:
 				if panel.position.x <= reveal_x:
 					n["decoy"] = false
 					_note_chase_apply_note_style(panel, bool(n.get("target", false)), false, bool(n.get("rainbow", false)))
-			if _note_chase_freeze_timer <= 0.0:
-				panel.position.x -= (_note_chase_scroll_speed * _note_chase_item_speed_multiplier(n)) * delta
+			if _note_chase_runtime.freeze_timer <= 0.0:
+				panel.position.x -= (_note_chase_runtime.scroll_speed * _note_chase_item_speed_multiplier(n)) * delta
 			var miss_x := STAFF_LEFT_X + 8.0
 			if _note_chase_fail_line != null and _note_chase_fail_line.visible:
 				miss_x = _note_chase_fail_line.position.x
@@ -19350,17 +19331,17 @@ func _update_note_chase(delta: float) -> void:
 				if not bool(n.get("missed", false)):
 					n["missed"] = true
 					if bool(n.get("target", false)):
-						if _note_chase_shield_timer > 0.0:
+						if _note_chase_runtime.shield_timer > 0.0:
 							_status_label.text = "Shield blocked miss"
 						else:
 							_score -= 3
 							if not _practice_mode_enabled:
 								_lives = maxi(0, _lives - 1)
-							_note_chase_correct_streak = 0
-							_note_chase_fever_active = false
-							_note_chase_fever_timer = 0.0
-							_note_chase_wrongs += 1
-							_note_chase_combo_mult = maxi(1, _note_chase_combo_mult - 1)
+							_note_chase_runtime.correct_streak = 0
+							_note_chase_runtime.fever_active = false
+							_note_chase_runtime.fever_timer = 0.0
+							_note_chase_runtime.wrongs += 1
+							_note_chase_runtime.combo_mult = maxi(1, _note_chase_runtime.combo_mult - 1)
 							_status_label.text = "Missed target note."
 							_play_fail_sfx()
 							_score_label.text = "Score: %d" % _score
@@ -19374,7 +19355,7 @@ func _update_note_chase(delta: float) -> void:
 			still_active.append(n)
 		else:
 			panel.queue_free()
-	_note_chase_active_notes = still_active
+	_note_chase_runtime.set_active_notes(still_active)
 	if pending_clef_switch:
 		_selected_clef = pending_switch_to
 		_refresh_clef_buttons()
@@ -19387,19 +19368,19 @@ func _update_note_chase(delta: float) -> void:
 		_question_index = maxi(0, _question_index - removed_count)
 		for _j in range(removed_count):
 			_spawn_note_chase_note(float(_j) * 72.0)
-		_note_chase_spawn_timer = maxf(_note_chase_spawn_timer, _note_chase_spawn_interval * 0.65)
+		_note_chase_runtime.spawn_timer = maxf(_note_chase_runtime.spawn_timer, _note_chase_runtime.spawn_interval * 0.65)
 		_status_label.text = "Clef switched to %s" % pending_switch_to
 		_play_transition_whoosh_sfx()
 
 	if _lives <= 0:
-		_note_chase_running = false
+		_note_chase_runtime.running = false
 		_quiz_active = false
 		_accepting_answer = false
 		_set_answer_buttons_enabled(false)
 		_replay_button.disabled = true
 		_restart_button.disabled = false
 		_status_label.text = ""
-		var fail_perf := "Score: %d | Focus Hearts: 0/5 | Misses: %d" % [_score, _note_chase_wrongs]
+		var fail_perf := "Score: %d | Focus Hearts: 0/5 | Misses: %d" % [_score, _note_chase_runtime.wrongs]
 		_progress_label.text = fail_perf
 		_home_info_label.text = ""
 		await _play_gameover_fail_sfx()
@@ -19408,8 +19389,8 @@ func _update_note_chase(delta: float) -> void:
 		_set_note_chase_staff_scrolling(false)
 		return
 
-	if _note_chase_speed_stage >= 12 and not _note_chase_boss_active:
-		_note_chase_running = false
+	if _note_chase_runtime.speed_stage >= 12 and not _note_chase_runtime.boss_active:
+		_note_chase_runtime.running = false
 		_quiz_active = false
 		_accepting_answer = false
 		_set_answer_buttons_enabled(false)
@@ -19426,7 +19407,7 @@ func _update_note_chase(delta: float) -> void:
 
 
 func _clear_note_chase_visual_notes() -> void:
-	for item in _note_chase_active_notes:
+	for item in _note_chase_runtime.active_notes:
 		var n: Dictionary = item
 		var node_obj = n.get("node", null)
 		if node_obj == null or not is_instance_valid(node_obj):
@@ -19434,7 +19415,7 @@ func _clear_note_chase_visual_notes() -> void:
 		var panel := node_obj as Panel
 		if panel != null:
 			panel.queue_free()
-	_note_chase_active_notes.clear()
+	_note_chase_runtime.active_notes.clear()
 
 
 func _set_note_chase_staff_scrolling(enabled: bool) -> void:
@@ -19802,8 +19783,8 @@ func _update_note_chase_staff_scroll(delta: float) -> void:
 			if _selected_mode == MODE_NOTE_CHASE:
 				_staff_clef_label.position.x = _note_chase_end_x() + 10.0
 				_staff_clef_label.modulate = Color(1, 1, 1, 1)
-			elif _note_chase_freeze_timer <= 0.0:
-				_staff_clef_label.position.x -= _note_chase_scroll_speed * 0.55 * delta
+			elif _note_chase_runtime.freeze_timer <= 0.0:
+				_staff_clef_label.position.x -= _note_chase_runtime.scroll_speed * 0.55 * delta
 				if _staff_clef_label.position.x + 42.0 < STAFF_LEFT_X:
 					_note_chase_fade_out_control(_staff_clef_label, 0.28)
 				if _staff_clef_label.has_meta("nc_fading") and bool(_staff_clef_label.get_meta("nc_fading")) and _staff_clef_label.modulate.a <= 0.02:
@@ -24895,8 +24876,8 @@ func _handle_midi_note_on_for_note_chase(pitch: int) -> void:
 	# Find the best matching in-flight note: prefer current target, then any note matching the letter.
 	var matched_idx := -1
 	var matched_target := false
-	for i in range(_note_chase_active_notes.size()):
-		var n: Dictionary = _note_chase_active_notes[i]
+	for i in range(_note_chase_runtime.active_notes.size()):
+		var n: Dictionary = _note_chase_runtime.active_notes[i]
 		if str(n.get("kind", "note")) != "note":
 			continue
 		if bool(n.get("hit", false)):
@@ -24913,7 +24894,7 @@ func _handle_midi_note_on_for_note_chase(pitch: int) -> void:
 			matched_idx = i
 	if matched_idx < 0:
 		return
-	var matched_node: Panel = _note_chase_active_notes[matched_idx].get("node", null) as Panel
+	var matched_node: Panel = _note_chase_runtime.active_notes[matched_idx].get("node", null) as Panel
 	if matched_node == null:
 		return
 	var fake := InputEventMouseButton.new()

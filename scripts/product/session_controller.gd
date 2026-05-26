@@ -86,18 +86,20 @@ func apply_end_state(host) -> void:
 	host._quiz_active = false
 	host._accepting_answer = false
 	host._awaiting_round_start = false
-	host._note_chase_running = false
-	host._note_chase_fever_active = false
-	host._note_chase_boss_active = false
+	if host._note_chase_runtime != null:
+		host._note_chase_runtime.running = false
+		host._note_chase_runtime.fever_active = false
+		host._note_chase_runtime.boss_active = false
 
 
 func apply_restart_state(host, mode_note_chase: int) -> void:
 	host._quiz_active = false
 	host._accepting_answer = false
 	host._awaiting_round_start = false
-	host._note_chase_running = false
-	host._note_chase_fever_active = false
-	host._note_chase_boss_active = false
+	if host._note_chase_runtime != null:
+		host._note_chase_runtime.running = false
+		host._note_chase_runtime.fever_active = false
+		host._note_chase_runtime.boss_active = false
 	host._score = 0
 	host._question_index = 0
 	host._lives = 5 if (host._selected_mode == mode_note_chase or host._is_continuous_flow_sight_mode()) else 3
