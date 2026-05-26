@@ -155,3 +155,104 @@ static func uses_varied_rhythm(durations: Array, rhythm_level: int) -> bool:
 # don't drag out for too long during melody playback.
 static func note_seconds(duration_beats: float) -> float:
 	return clampf(maxf(0.5, duration_beats) * REFERENCE_SECONDS_PER_BEAT, 0.22, 1.85)
+
+
+# Upper bound on phrase recording time: enough beats at the per-note limit,
+# plus a 1.5s safety margin, with a 4-second floor for very short melodies.
+static func max_phrase_seconds(durations: Array, melody: Array) -> float:
+	return maxf(4.0, total_beats(durations, melody) * SECONDS_PER_NOTE_LIMIT + 1.5)
+
+
+# Build a StaffRenderer score dict from the given melody + per-note durations
+# in the given key. Caller passes the ScoreModel script so this module stays
+# free of the score-engine preload chain.
+static func build_score_dict(melody: Array, durations: Array, sight_key_signature: String, score_model_script) -> Dictionary:
+	var notes: Array = []
+	var beat := 0.0
+	for i in range(melody.size()):
+		var dur := duration_at(durations, i)
+		notes.append({
+			"midi": int(melody[i]),
+			"duration_beats": dur,
+			"beat_offset": beat,
+		})
+		beat += dur
+	return score_model_script.from_flat_notes(
+		notes, "treble", 4, 4, fifths(sight_key_signature), false, 100, ""
+	)
+
+
+# Decide whether the mic listener has captured enough valid pitch candidates
+# to commit a take. Pure analysis over the captured candidate stream — UI
+# layer just feeds in candidates + phrase duration and gets a bool back.
+#
+# When the melody uses straight quarters (rhythm_level 1), a simple span +
+# count check is enough. For varied rhythms, the analysis windows each note
+# slot in the captured time range and verifies enough candidates land in the
+# expected window for each note.
+static func live_candidates_enough(
+	candidates: Array,
+	phrase_duration: float,
+	durations: Array,
+	melody: Array,
+	rhythm_level: int
+) -> bool:
+	var expected_count := maxi(1, melody.size())
+	var valid_candidates: Array = []
+	var first_t := INF
+	var last_t := -INF
+	for candidate_any in candidates:
+		var candidate: Dictionary = candidate_any
+		if int(candidate.get("midi", -1)) < 0:
+			continue
+		if float(candidate.get("confidence", 0.0)) < 0.30:
+			continue
+		var t := float(candidate.get("time", -1.0))
+		if t < 0.0:
+			continue
+		valid_candidates.append(candidate)
+		first_t = minf(first_t, t)
+		last_t = maxf(last_t, t)
+	if valid_candidates.size() < expected_count * 3:
+		return false
+	if first_t == INF or last_t <= first_t:
+		return false
+	var min_span := maxf(0.35, float(maxi(1, expected_count - 1)) * 0.10)
+	if (last_t - first_t) < min_span:
+		return false
+	if not uses_varied_rhythm(durations, rhythm_level):
+		return true
+	var span := maxf(last_t - first_t, 0.001)
+	var note_gap := span / float(maxi(1, expected_count - 1))
+	var edge_pad := clampf(note_gap * 0.35, 0.06, 0.22)
+	var vocal_start := maxf(0.0, first_t - edge_pad)
+	var vocal_end := minf(maxf(phrase_duration, last_t), last_t + edge_pad)
+	if vocal_end <= vocal_start:
+		return false
+	var vocal_duration := maxf(vocal_end - vocal_start, 0.001)
+	var beats := total_beats(durations, melody)
+	for i in range(expected_count):
+		var duration_beats := duration_at(durations, i)
+		var start_t := vocal_start + duration_prefix(durations, melody, i) / beats * vocal_duration
+		var end_t := vocal_start + duration_prefix(durations, melody, i + 1) / beats * vocal_duration
+		var window := maxf(end_t - start_t, 0.001)
+		var short_window := duration_beats <= 0.5 or window <= 0.32
+		var required_total := 5 if short_window else 3
+		var required_core := 2 if short_window else 1
+		var core_margin := minf(window * (0.18 if short_window else 0.10), window * 0.42)
+		var core_start := start_t + core_margin
+		var core_end := end_t - core_margin
+		var pad := maxf(window * (0.18 if short_window else 0.30), 0.025 if short_window else 0.05)
+		var total_count := 0
+		var core_count := 0
+		for candidate_any in valid_candidates:
+			var candidate: Dictionary = candidate_any
+			var t := float(candidate.get("time", -1.0))
+			if t < start_t - pad or t > end_t + pad:
+				continue
+			total_count += 1
+			if t >= core_start and t <= core_end:
+				core_count += 1
+		if total_count < required_total or core_count < required_core:
+			return false
+	return true

@@ -24150,19 +24150,7 @@ func _sight_singing_note_seconds(duration_beats: float) -> float:
 # Builds a StaffRenderer score dict from the current sight-singing melody.
 # Treble clef, 4/4, no tempo metronome (free-pace), title blank.
 func _sight_singing_build_score_dict() -> Dictionary:
-	var notes: Array = []
-	var beat := 0.0
-	for i in range(_sight_singing_melody.size()):
-		var dur := _sight_singing_duration_at(i)
-		notes.append({
-			"midi": int(_sight_singing_melody[i]),
-			"duration_beats": dur,
-			"beat_offset": beat,
-		})
-		beat += dur
-	return ScoreModelScript.from_flat_notes(
-		notes, "treble", 4, 4, _sight_singing_fifths(), false, 100, ""
-	)
+	return SightSingingTheoryScript.build_score_dict(_sight_singing_melody, _sight_singing_durations, _sight_key_signature, ScoreModelScript)
 
 
 func _layout_sight_singing_overlay() -> void:
@@ -24339,7 +24327,7 @@ func _sight_singing_arm_phrase_recording() -> void:
 
 
 func _sight_singing_max_phrase_seconds() -> float:
-	return maxf(4.0, _sight_singing_total_beats() * SIGHT_SINGING_SECONDS_PER_NOTE_LIMIT + 1.5)
+	return SightSingingTheoryScript.max_phrase_seconds(_sight_singing_durations, _sight_singing_melody)
 
 
 func _sight_singing_capture_pitch_candidates(result: Dictionary) -> void:
@@ -24501,65 +24489,10 @@ func _sight_singing_finalize_phrase(force: bool = false) -> void:
 
 
 func _sight_singing_live_candidates_enough(candidates: Array, phrase_duration: float) -> bool:
-	var expected_count := maxi(1, _sight_singing_melody.size())
-	var valid_candidates: Array = []
-	var first_t := INF
-	var last_t := -INF
-	for candidate_any in candidates:
-		var candidate: Dictionary = candidate_any
-		if int(candidate.get("midi", -1)) < 0:
-			continue
-		if float(candidate.get("confidence", 0.0)) < 0.30:
-			continue
-		var t := float(candidate.get("time", -1.0))
-		if t < 0.0:
-			continue
-		valid_candidates.append(candidate)
-		first_t = minf(first_t, t)
-		last_t = maxf(last_t, t)
-	if valid_candidates.size() < expected_count * 3:
-		return false
-	if first_t == INF or last_t <= first_t:
-		return false
-	var min_span := maxf(0.35, float(maxi(1, expected_count - 1)) * 0.10)
-	if (last_t - first_t) < min_span:
-		return false
-	if not _sight_singing_uses_varied_rhythm():
-		return true
-	var span := maxf(last_t - first_t, 0.001)
-	var note_gap := span / float(maxi(1, expected_count - 1))
-	var edge_pad := clampf(note_gap * 0.35, 0.06, 0.22)
-	var vocal_start := maxf(0.0, first_t - edge_pad)
-	var vocal_end := minf(maxf(phrase_duration, last_t), last_t + edge_pad)
-	if vocal_end <= vocal_start:
-		return false
-	var vocal_duration := maxf(vocal_end - vocal_start, 0.001)
-	var total_beats := _sight_singing_total_beats()
-	for i in range(expected_count):
-		var duration_beats := _sight_singing_duration_at(i)
-		var start_t := vocal_start + _sight_singing_duration_prefix(i) / total_beats * vocal_duration
-		var end_t := vocal_start + _sight_singing_duration_prefix(i + 1) / total_beats * vocal_duration
-		var window := maxf(end_t - start_t, 0.001)
-		var short_window := duration_beats <= 0.5 or window <= 0.32
-		var required_total := 5 if short_window else 3
-		var required_core := 2 if short_window else 1
-		var core_margin := minf(window * (0.18 if short_window else 0.10), window * 0.42)
-		var core_start := start_t + core_margin
-		var core_end := end_t - core_margin
-		var pad := maxf(window * (0.18 if short_window else 0.30), 0.025 if short_window else 0.05)
-		var total_count := 0
-		var core_count := 0
-		for candidate_any in valid_candidates:
-			var candidate: Dictionary = candidate_any
-			var t := float(candidate.get("time", -1.0))
-			if t < start_t - pad or t > end_t + pad:
-				continue
-			total_count += 1
-			if t >= core_start and t <= core_end:
-				core_count += 1
-		if total_count < required_total or core_count < required_core:
-			return false
-	return true
+	return SightSingingTheoryScript.live_candidates_enough(
+		candidates, phrase_duration,
+		_sight_singing_durations, _sight_singing_melody, _sight_singing_rhythm_level
+	)
 
 
 func _sight_singing_phrase_earned_point(result: Dictionary) -> bool:
