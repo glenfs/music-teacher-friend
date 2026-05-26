@@ -289,7 +289,10 @@ func advance_after_answer(host, quiz_token: int, asked_count: int = -1) -> void:
 		await handle_game_over(host, final_asked_count, host.MODE_SIGHT)
 		return
 	var slow_enabled: bool = host._slow_toggle != null and host._slow_toggle.button_pressed
-	await host.get_tree().create_timer(current_post_answer_delay(host._qa_enabled, slow_enabled)).timeout
+	var delay := current_post_answer_delay(host._qa_enabled, slow_enabled)
+	if not host._qa_enabled and host._compare_bar != null and host._compare_bar.visible:
+		delay = maxf(delay, 4.0)
+	await host.get_tree().create_timer(delay).timeout
 	if host._should_advance_after_delay(quiz_token):
 		await begin_next_question(host, quiz_token)
 
@@ -409,6 +412,7 @@ func finish_quiz(host, mode_sight: int) -> void:
 	host._update_daily_streak(true)
 	host._merge_session_into_lifetime()
 	host._save_progress_data()
+	host._complete_active_ear_assignment_if_target_met(host._score, host._total_questions)
 	host._result_box_show("Complete", result_text)
 	await host._play_win_fanfare_sfx()
 	var score_pct := (float(host._score) / float(maxi(1, host._total_questions))) * 100.0
@@ -456,6 +460,7 @@ func handle_game_over(
 		host._set_sight_result_background_hidden(true)
 	host._merge_session_into_lifetime()
 	host._save_progress_data()
+	host._complete_active_ear_assignment_if_target_met(host._score, asked_count)
 	host._result_box_show(result_title, result_message)
 
 
@@ -543,6 +548,7 @@ func init_session_stats(
 	host._interval_stats_correct.clear()
 	host._chord_stats_asked.clear()
 	host._chord_stats_correct.clear()
+	host._ear_confusion_stats.clear()
 	host._sight_stats_asked.clear()
 	host._sight_stats_correct.clear()
 	if host._selected_mode == mode_interval:
@@ -784,6 +790,15 @@ func final_quiz_result_text(
 	var insight: String = session_insight_text(host, mode_interval, mode_chord, mode_pitch_match, mode_progression, mode_scale_mode, mode_cadence, mode_sight, mode_note_chase, interval_display_name)
 	if not insight.is_empty():
 		result += "\n\n%s" % insight
+	# Tempo training: best-ever-BPM record + next-BPM ramp suggestion.
+	if host.has_method("_tempo_ramp_suggestion_text"):
+		var ramp: String = host._tempo_ramp_suggestion_text()
+		if not ramp.is_empty():
+			result += "\n\n%s" % ramp
+	if host.has_method("_max_bpm_summary_text"):
+		var bpm_summary: String = host._max_bpm_summary_text()
+		if not bpm_summary.is_empty():
+			result += "\n\n%s" % bpm_summary
 	return result
 
 

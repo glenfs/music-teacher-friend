@@ -118,6 +118,7 @@ const NoteChaseRuntimeScript = preload("res://scripts/exercises/note_chase_runti
 const RhythmFlowRuntimeScript = preload("res://scripts/rhythm/rhythm_flow_runtime.gd")
 const SightSingingRuntimeScript = preload("res://scripts/sight_singing/sight_singing_runtime.gd")
 const ContinuousSightRuntimeScript = preload("res://scripts/exercises/continuous_sight_runtime.gd")
+const PhraseGeneratorScript = preload("res://scripts/exercises/phrase_generator.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -578,6 +579,8 @@ var _home_assignments_vbox: VBoxContainer = null
 # active student's weakest intervals/chords. Hidden when no weak data exists.
 var _home_recommended_card: PanelContainer = null
 var _home_recommended_vbox: VBoxContainer = null
+var _home_ear_dashboard_card: PanelContainer = null
+var _home_ear_dashboard_vbox: VBoxContainer = null
 # SR7 — Daily Challenge card. Deterministic from today's date; fixed mode +
 # key sig + question count. Best-score persisted per-date in ear_settings.
 var _home_daily_challenge_card: PanelContainer = null
@@ -591,6 +594,11 @@ var _earned_badges: Array[String] = []
 var _badge_lifetime_correct_sight: int = 0
 var _badge_lifetime_correct_chord: int = 0
 var _badge_daily_completed_dates: Array[String] = []  # for daily_3
+# Per-student badge state. Keyed by student_id → Dict of badge fields. The
+# in-memory `_earned_badges` (and lifetime counters) reflects the active
+# student. On student switch we snapshot-and-restore these vars from this map.
+# An empty key "" represents the device-fallback (legacy / no active student).
+var _per_student_badge_state: Dictionary = {}
 # Home overview badges card.
 var _home_badges_card: PanelContainer = null
 var _home_badges_vbox: VBoxContainer = null
@@ -602,6 +610,25 @@ var _sight_per_key_correct: Dictionary = {}
 # Home-overview radar card.
 var _home_key_radar_card: PanelContainer = null
 var _home_key_radar_vbox: VBoxContainer = null
+# Tempo training mode (Sight Notes). When enabled, a metronome ticks every
+# beat and each question gets a fixed beat budget. Out-of-time answers count
+# as miss. Tracks max sustained BPM per session for progress measurement.
+var _sight_tempo_mode_enabled: bool = false
+var _sight_tempo_bpm: int = 60
+const SIGHT_TEMPO_BEATS_PER_QUESTION: float = 2.0
+const SIGHT_TEMPO_MIN_BPM: int = 40
+const SIGHT_TEMPO_MAX_BPM: int = 160
+var _sight_tempo_row: HBoxContainer = null
+var _sight_tempo_toggle: CheckButton = null
+var _sight_tempo_bpm_spin: SpinBox = null
+var _sight_tempo_session_active: bool = false
+var _sight_tempo_question_start_sec: float = 0.0
+var _sight_tempo_question_deadline_sec: float = 0.0
+var _sight_tempo_next_click_sec: float = 0.0
+var _sight_tempo_click_count: int = 0
+var _sight_tempo_session_correct: int = 0
+var _sight_tempo_session_total: int = 0
+var _sight_tempo_best_bpm_lifetime: int = 60
 # Cloud-sync status pill on the home menu. Mirrors the dashboard's Cloud Sync
 # button so multi-device teachers can see freshness without opening the dashboard.
 var _home_sync_status_label: Label = null
@@ -706,6 +733,14 @@ var _midi_chord_buffer: Array[int] = []
 var _midi_chord_window_start: float = -1.0
 const MIDI_CHORD_WINDOW_SEC := 0.18  # collect notes within ~180ms of first press
 const MIDI_NOTE_LETTER_ORDER := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+# Ear-training Interval MIDI: collect 2 notes within window for melodic intervals
+var _midi_ear_interval_buffer: Array[int] = []
+var _midi_ear_interval_window_start: float = -1.0
+const MIDI_EAR_INTERVAL_WINDOW_SEC := 1.6
+# Ear-training sequence buffer (Progression/Cadence/Scale-Mode): buffer up to N notes
+var _midi_ear_seq_buffer: Array[int] = []
+var _midi_ear_seq_window_start: float = -1.0
+const MIDI_EAR_SEQ_WINDOW_SEC := 3.5
 var _sight_settings_button: Button
 var _sight_settings_more_panel: VBoxContainer
 var _sight_settings_back_button: Button
@@ -768,6 +803,7 @@ var _chord_tier_toggles: Dictionary = {}  # chord_name -> Button
 var _chord_tier_headers: Dictionary = {}  # tier_name -> Button (collapsible)
 var _chord_tier_containers: Dictionary = {}  # tier_name -> HBoxContainer
 var _selected_chord_types: Array[String] = []
+var _chord_preset_btns: Array[Button] = []
 var _degree_toggles: Dictionary = {}
 var _include_minor_toggle: Button
 var _descending_intervals_toggle: Button
@@ -785,6 +821,12 @@ var _pitch_match_cadence_check: CheckButton = null
 var _pitch_match_drone_check: CheckButton = null
 # In-game "Play Tonic" button shown alongside Replay during a Pitch Match round.
 var _pitch_match_play_tonic_button: Button = null
+var _progression_key_option: OptionButton = null
+var _progression_tempo_spin: SpinBox = null
+var _scale_root_option: OptionButton = null
+var _scale_tempo_spin: SpinBox = null
+var _cadence_key_option: OptionButton = null
+var _cadence_tempo_spin: SpinBox = null
 var _progression_broken_toggle: CheckButton
 var _scale_asc_desc_toggle: CheckButton
 var _cadence_broken_toggle: CheckButton
@@ -881,6 +923,13 @@ var _rhythm_flow_slot_dialog_title_label: Label
 var _rhythm_flow_slot_name_edit: LineEdit
 var _rhythm_flow_slot_buttons: Array[Button] = []
 var _continuous_sight_min_gap := 72.0
+# Phrase-coherent mode: when on, Note Flow draws bars from a 4-bar PhraseGenerator
+# template (antecedent/consequent shapes) instead of independent random motifs.
+# Default ON at level >=2 — at level 1 we keep the simpler random motifs for ease.
+var _phrase_mode_enabled := true
+var _current_phrase: Dictionary = {}
+var _current_phrase_bar_idx := 0
+var _current_phrase_root_step := 0
 var _continuous_rest_bar_active := false
 var _continuous_rest_bar_timer := 0.0
 var _continuous_rest_symbol: ColorRect
@@ -1134,6 +1183,10 @@ var _compare_your_btn: Button = null
 var _compare_correct_play_btn: Button = null
 var _compare_chosen_root: int = 0
 var _compare_chosen_second: int = 0
+var _compare_chosen_mode: int = -1
+var _compare_chosen_answer := ""
+var _compare_chosen_notes: Array[int] = []
+var _compare_chosen_chords: Array[Array] = []
 var _cadence_roman_label: Label = null
 var _chord_recent_results: Array[bool] = []
 var _interval_choices_top_spacer: Control
@@ -1238,6 +1291,31 @@ var _progression_key := "C"
 var _progression_selected: Array[String] = ["IVviIV", "iiVI"]
 var _progression_broken := false
 var _progression_tempo := 90
+var _ear_tempo := 90
+var _ear_context_tonic_enabled := true
+var _ear_melodic_context_enabled := false
+var _ear_count_in_enabled := false
+# Audible 4-beat metronome before each ear prompt (drives tempo training).
+# Distinct from `_ear_count_in_enabled` (which is the legacy 2-beat high-pitch beep).
+var _ear_metronome_enabled := false
+# Tempo training: best-ever BPM at >=85% accuracy. Keyed "mode_id" for ear modes,
+# and "sight:<key_sig>" for sight reading. Persisted in ear_settings.json.
+var _max_bpm_records: Dictionary = {}
+# Last N session accuracy results per mode for tempo-ramp suggestion ("if last
+# 3 ear sessions were all >=85%, suggest +5 BPM"). Keyed mode_id → Array[float].
+var _recent_accuracy_window: Dictionary = {}
+var _ear_replay_limit_enabled := false
+var _ear_replay_limit := 3
+var _ear_replays_used := 0
+var _ear_free_replay_for_wrong := true
+var _ear_register_variation_enabled := true
+var _ear_tempo_spin: SpinBox = null
+var _ear_count_in_toggle: CheckButton = null
+var _ear_metronome_toggle: CheckButton = null
+var _ear_context_tonic_toggle: CheckButton = null
+var _ear_melodic_context_toggle: CheckButton = null
+var _ear_replay_limit_toggle: CheckButton = null
+var _ear_replay_limit_spin: SpinBox = null
 var _scale_root := "C"
 var _scale_selected_modes: Array[String] = ["Major", "Natural Minor", "Dorian", "Mixolydian"]
 var _scale_asc_desc := false
@@ -1277,6 +1355,8 @@ var _sight_singing_runtime: RefCounted = SightSingingRuntimeScript.new()
 var _sight_singing_rng: RandomNumberGenerator = null
 # Compact "running progress" status row drawn under the staff (e.g. "Note 3/5  ✓ ✓ ✗").
 var _sight_singing_progress_label: Label = null
+var _sight_singing_pitch_bar: ColorRect = null
+var _sight_singing_pitch_label: Label = null
 var _sight_singing_controls_row: HBoxContainer = null
 var _sight_singing_finish_take_button: Button = null
 var _sight_singing_replay_take_button: Button = null
@@ -1342,6 +1422,7 @@ var _interval_stats_asked: Dictionary = {}
 var _interval_stats_correct: Dictionary = {}
 var _chord_stats_asked: Dictionary = {}
 var _chord_stats_correct: Dictionary = {}
+var _ear_confusion_stats: Dictionary = {}
 var _sight_stats_asked: Dictionary = {}
 var _sight_stats_correct: Dictionary = {}
 # Per-chord-quality stats for SIGHT chord mode (separate from EAR chord stats).
@@ -1360,6 +1441,11 @@ var _lesson_session_elapsed_label: Label = null
 var _lesson_session_elapsed_timer: Timer = null
 var _teacher_selected_student_id := ""
 var _teacher_list_student_ids: Array[String] = []
+var _active_ear_assignment_student_id := ""
+var _active_ear_assignment_idx := -1
+var _active_ear_assignment_target := 0
+var _active_ear_assignment_title := ""
+var _ear_assignment_start_pending := false
 var _tutorial_module_recorded := false
 var _ear_choice_count := 6
 var _ear_question_count := 10
@@ -1431,6 +1517,7 @@ var _profile_prompt_overlay: ColorRect = null
 var _quick_practice_button: Button = null
 # Difficulty presets
 var _interval_difficulty_preset: String = "beginner"
+var _chord_difficulty_preset: String = "beginner"
 var _cadence_difficulty_preset: String = "beginner"
 var _interval_preset_btns: Array[Button] = []
 var _cadence_preset_btns: Array[Button] = []
@@ -3807,6 +3894,30 @@ func _build_ui() -> void:
 
 	# SR7 — Daily Challenge card. Gold-accented; date-deterministic challenge
 	# that resets daily, with persisted best-score-for-today.
+	_home_ear_dashboard_card = PanelContainer.new()
+	_home_ear_dashboard_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_home_ear_dashboard_card.visible = false
+	var _hed_sb := StyleBoxFlat.new()
+	_hed_sb.bg_color = Color(0.09, 0.14, 0.20, 0.92)
+	_hed_sb.border_color = Color(0.62, 0.86, 0.96, 1.0)
+	_hed_sb.border_width_left = 4
+	_hed_sb.border_width_top = 1
+	_hed_sb.border_width_right = 1
+	_hed_sb.border_width_bottom = 1
+	_hed_sb.corner_radius_top_left = 8
+	_hed_sb.corner_radius_top_right = 8
+	_hed_sb.corner_radius_bottom_left = 8
+	_hed_sb.corner_radius_bottom_right = 8
+	_hed_sb.content_margin_left = 14
+	_hed_sb.content_margin_right = 14
+	_hed_sb.content_margin_top = 10
+	_hed_sb.content_margin_bottom = 10
+	_home_ear_dashboard_card.add_theme_stylebox_override("panel", _hed_sb)
+	_home_ear_dashboard_vbox = VBoxContainer.new()
+	_home_ear_dashboard_vbox.add_theme_constant_override("separation", 6)
+	_home_ear_dashboard_card.add_child(_home_ear_dashboard_vbox)
+	home_overview_stack.add_child(_home_ear_dashboard_card)
+
 	_home_daily_challenge_card = PanelContainer.new()
 	_home_daily_challenge_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_home_daily_challenge_card.visible = false
@@ -4104,6 +4215,68 @@ func _build_ui() -> void:
 	_ear_choice_count_select.item_selected.connect(_on_ear_choice_count_selected)
 	ear_choice_row.add_child(_ear_choice_count_select)
 
+	var ear_audio_row := HBoxContainer.new()
+	ear_audio_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	ear_audio_row.add_theme_constant_override("separation", 10)
+	_ear_settings_more_panel.add_child(ear_audio_row)
+
+	var ear_tempo_label := Label.new()
+	ear_tempo_label.text = "Tempo"
+	ear_tempo_label.set_meta("settings_small_label", true)
+	ear_audio_row.add_child(ear_tempo_label)
+	_ear_tempo_spin = SpinBox.new()
+	_ear_tempo_spin.min_value = 50
+	_ear_tempo_spin.max_value = 160
+	_ear_tempo_spin.step = 5
+	_ear_tempo_spin.value = _ear_tempo
+	_ear_tempo_spin.custom_minimum_size = Vector2(86, 36)
+	_ear_tempo_spin.value_changed.connect(_on_ear_tempo_changed)
+	_style_practice_setup_input_control(_ear_tempo_spin)
+	ear_audio_row.add_child(_ear_tempo_spin)
+
+	_ear_context_tonic_toggle = CheckButton.new()
+	_ear_context_tonic_toggle.text = "Tonic"
+	_ear_context_tonic_toggle.button_pressed = _ear_context_tonic_enabled
+	_ear_context_tonic_toggle.toggled.connect(_on_ear_context_tonic_toggled)
+	ear_audio_row.add_child(_ear_context_tonic_toggle)
+
+	_ear_count_in_toggle = CheckButton.new()
+	_ear_count_in_toggle.text = "Count-in"
+	_ear_count_in_toggle.button_pressed = _ear_count_in_enabled
+	_ear_count_in_toggle.toggled.connect(_on_ear_count_in_toggled)
+	ear_audio_row.add_child(_ear_count_in_toggle)
+
+	_ear_metronome_toggle = CheckButton.new()
+	_ear_metronome_toggle.text = "Metronome"
+	_ear_metronome_toggle.button_pressed = _ear_metronome_enabled
+	_ear_metronome_toggle.toggled.connect(_on_ear_metronome_toggled)
+	ear_audio_row.add_child(_ear_metronome_toggle)
+
+	_ear_melodic_context_toggle = CheckButton.new()
+	_ear_melodic_context_toggle.text = "Example"
+	_ear_melodic_context_toggle.button_pressed = _ear_melodic_context_enabled
+	_ear_melodic_context_toggle.toggled.connect(_on_ear_melodic_context_toggled)
+	ear_audio_row.add_child(_ear_melodic_context_toggle)
+
+	var replay_row := HBoxContainer.new()
+	replay_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	replay_row.add_theme_constant_override("separation", 10)
+	_ear_settings_more_panel.add_child(replay_row)
+	_ear_replay_limit_toggle = CheckButton.new()
+	_ear_replay_limit_toggle.text = "Replay limit"
+	_ear_replay_limit_toggle.button_pressed = _ear_replay_limit_enabled
+	_ear_replay_limit_toggle.toggled.connect(_on_ear_replay_limit_toggled)
+	replay_row.add_child(_ear_replay_limit_toggle)
+	_ear_replay_limit_spin = SpinBox.new()
+	_ear_replay_limit_spin.min_value = 1
+	_ear_replay_limit_spin.max_value = 10
+	_ear_replay_limit_spin.step = 1
+	_ear_replay_limit_spin.value = _ear_replay_limit
+	_ear_replay_limit_spin.custom_minimum_size = Vector2(72, 36)
+	_ear_replay_limit_spin.value_changed.connect(_on_ear_replay_limit_changed)
+	_style_practice_setup_input_control(_ear_replay_limit_spin)
+	replay_row.add_child(_ear_replay_limit_spin)
+
 	# Practice mode toggle lives on the home page footer button
 
 	# Diagnostics section — Codex P2 review item: Settings needs to be useful
@@ -4220,6 +4393,28 @@ func _build_ui() -> void:
 	chord_options_title.text = "Chord Options"
 	chord_options_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_chord_options_box.add_child(chord_options_title)
+
+	var chord_preset_group := _create_home_option_group(_chord_options_box)
+	var chord_preset_row := HBoxContainer.new()
+	chord_preset_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	chord_preset_row.add_theme_constant_override("separation", 8)
+	chord_preset_group.add_child(chord_preset_row)
+	_chord_preset_btns.clear()
+	var chord_preset_defs := [
+		["beginner", "Chords I", "Major, Minor"],
+		["standard", "Triads", "Major/Minor + color"],
+		["advanced", "Advanced", "7ths + extensions"],
+	]
+	for chord_preset in chord_preset_defs:
+		var chord_preset_id: String = chord_preset[0]
+		var chord_preset_btn := Button.new()
+		chord_preset_btn.text = "%s\n%s" % [chord_preset[1], chord_preset[2]]
+		chord_preset_btn.custom_minimum_size = Vector2(142, 46)
+		chord_preset_btn.set_meta("compact_btn", true)
+		chord_preset_btn.pressed.connect(_apply_chord_preset.bind(chord_preset_id))
+		chord_preset_row.add_child(chord_preset_btn)
+		_chord_preset_btns.append(chord_preset_btn)
+		_home_material_buttons.append(chord_preset_btn)
 
 	# Inversion toggle row
 	var inversion_group := _create_home_option_group(_chord_options_box, true)
@@ -4444,6 +4639,34 @@ func _build_ui() -> void:
 	_progression_broken_toggle.toggled.connect(_on_progression_broken_toggled)
 	progression_toggle_group.add_child(_progression_broken_toggle)
 
+	var progression_context_row := HBoxContainer.new()
+	progression_context_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	progression_context_row.add_theme_constant_override("separation", 10)
+	progression_toggle_group.add_child(progression_context_row)
+	var progression_key_label := Label.new()
+	progression_key_label.text = "Key"
+	progression_context_row.add_child(progression_key_label)
+	_progression_key_option = OptionButton.new()
+	_progression_key_option.custom_minimum_size = Vector2(112, 36)
+	for opt in PRACTICE_KEY_OPTIONS:
+		var pkey_name := str(opt[0])
+		_progression_key_option.add_item(pkey_name)
+		_progression_key_option.set_item_metadata(_progression_key_option.item_count - 1, pkey_name)
+	_progression_key_option.item_selected.connect(_on_progression_key_selected)
+	progression_context_row.add_child(_progression_key_option)
+	var progression_tempo_label := Label.new()
+	progression_tempo_label.text = "Tempo"
+	progression_context_row.add_child(progression_tempo_label)
+	_progression_tempo_spin = SpinBox.new()
+	_progression_tempo_spin.min_value = 40
+	_progression_tempo_spin.max_value = 180
+	_progression_tempo_spin.step = 5
+	_progression_tempo_spin.value = _progression_tempo
+	_progression_tempo_spin.custom_minimum_size = Vector2(86, 36)
+	_progression_tempo_spin.value_changed.connect(_on_progression_tempo_changed)
+	_style_practice_setup_input_control(_progression_tempo_spin)
+	progression_context_row.add_child(_progression_tempo_spin)
+
 	_scale_mode_options_box = VBoxContainer.new()
 	_scale_mode_options_box.add_theme_constant_override("separation", 16)
 	_home_panel.add_child(_scale_mode_options_box)
@@ -4479,6 +4702,34 @@ func _build_ui() -> void:
 	_scale_asc_desc_toggle.set_meta("compact_btn", true)
 	_scale_asc_desc_toggle.toggled.connect(_on_scale_asc_desc_toggled)
 	scale_toggle_group.add_child(_scale_asc_desc_toggle)
+
+	var scale_context_row := HBoxContainer.new()
+	scale_context_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	scale_context_row.add_theme_constant_override("separation", 10)
+	scale_toggle_group.add_child(scale_context_row)
+	var scale_root_label := Label.new()
+	scale_root_label.text = "Root"
+	scale_context_row.add_child(scale_root_label)
+	_scale_root_option = OptionButton.new()
+	_scale_root_option.custom_minimum_size = Vector2(112, 36)
+	for opt in PRACTICE_KEY_OPTIONS:
+		var scale_key_name := str(opt[0])
+		_scale_root_option.add_item(scale_key_name)
+		_scale_root_option.set_item_metadata(_scale_root_option.item_count - 1, scale_key_name)
+	_scale_root_option.item_selected.connect(_on_scale_root_selected)
+	scale_context_row.add_child(_scale_root_option)
+	var scale_tempo_label := Label.new()
+	scale_tempo_label.text = "Tempo"
+	scale_context_row.add_child(scale_tempo_label)
+	_scale_tempo_spin = SpinBox.new()
+	_scale_tempo_spin.min_value = 40
+	_scale_tempo_spin.max_value = 180
+	_scale_tempo_spin.step = 5
+	_scale_tempo_spin.value = _scale_tempo
+	_scale_tempo_spin.custom_minimum_size = Vector2(86, 36)
+	_scale_tempo_spin.value_changed.connect(_on_scale_tempo_changed)
+	_style_practice_setup_input_control(_scale_tempo_spin)
+	scale_context_row.add_child(_scale_tempo_spin)
 
 	_cadence_options_box = VBoxContainer.new()
 	_cadence_options_box.add_theme_constant_override("separation", 16)
@@ -4534,6 +4785,40 @@ func _build_ui() -> void:
 	_cadence_broken_toggle.custom_minimum_size = Vector2(180, 40)
 	_cadence_broken_toggle.toggled.connect(_on_cadence_broken_toggled)
 	cadence_toggle_group.add_child(_cadence_broken_toggle)
+
+	var cadence_context_row := HBoxContainer.new()
+	cadence_context_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	cadence_context_row.add_theme_constant_override("separation", 10)
+	cadence_toggle_group.add_child(cadence_context_row)
+	var cadence_key_label := Label.new()
+	cadence_key_label.text = "Key"
+	cadence_context_row.add_child(cadence_key_label)
+	_cadence_key_option = OptionButton.new()
+	_cadence_key_option.custom_minimum_size = Vector2(124, 36)
+	_cadence_key_option.add_item("Rotate")
+	_cadence_key_option.set_item_metadata(_cadence_key_option.item_count - 1, "Rotate")
+	for opt in PRACTICE_KEY_OPTIONS:
+		var cadence_key_name := str(opt[0])
+		_cadence_key_option.add_item(cadence_key_name)
+		_cadence_key_option.set_item_metadata(_cadence_key_option.item_count - 1, cadence_key_name)
+	_cadence_key_option.item_selected.connect(_on_cadence_key_selected)
+	cadence_context_row.add_child(_cadence_key_option)
+	var cadence_tempo_label := Label.new()
+	cadence_tempo_label.text = "Tempo"
+	cadence_context_row.add_child(cadence_tempo_label)
+	_cadence_tempo_spin = SpinBox.new()
+	_cadence_tempo_spin.min_value = 40
+	_cadence_tempo_spin.max_value = 180
+	_cadence_tempo_spin.step = 5
+	_cadence_tempo_spin.value = _cadence_tempo
+	_cadence_tempo_spin.custom_minimum_size = Vector2(86, 36)
+	_cadence_tempo_spin.value_changed.connect(_on_cadence_tempo_changed)
+	_style_practice_setup_input_control(_cadence_tempo_spin)
+	cadence_context_row.add_child(_cadence_tempo_spin)
+	_refresh_progression_setup_controls()
+	_refresh_scale_mode_setup_controls()
+	_refresh_cadence_setup_controls()
+	_refresh_chord_preset_buttons()
 
 	_sight_options_box = VBoxContainer.new()
 	_sight_options_box.add_theme_constant_override("separation", 18)
@@ -5833,6 +6118,29 @@ func _build_ui_game_panel() -> void:
 	_sight_singing_progress_label.z_as_relative = false
 	_sight_singing_progress_label.z_index = 80
 	_staff_area.add_child(_sight_singing_progress_label)
+
+	# Live pitch indicator — shown during recording. Two pieces:
+	#  - _sight_singing_pitch_bar: thin horizontal bar that fills/colors by cents-off
+	#  - _sight_singing_pitch_label: small text "Sung: G4 (target A4, -200 cents)"
+	_sight_singing_pitch_bar = ColorRect.new()
+	_sight_singing_pitch_bar.visible = false
+	_sight_singing_pitch_bar.position = Vector2(0, 270)
+	_sight_singing_pitch_bar.size = Vector2(760, 6)
+	_sight_singing_pitch_bar.color = Color(0.55, 0.85, 0.55, 0.92)
+	_sight_singing_pitch_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sight_singing_pitch_bar.z_as_relative = false
+	_sight_singing_pitch_bar.z_index = 80
+	_staff_area.add_child(_sight_singing_pitch_bar)
+	_sight_singing_pitch_label = Label.new()
+	_sight_singing_pitch_label.visible = false
+	_sight_singing_pitch_label.position = Vector2(0, 248)
+	_sight_singing_pitch_label.size = Vector2(760, 20)
+	_sight_singing_pitch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sight_singing_pitch_label.add_theme_font_size_override("font_size", 14)
+	_sight_singing_pitch_label.add_theme_color_override("font_color", Color(0.92, 0.96, 1.0, 0.92))
+	_sight_singing_pitch_label.z_as_relative = false
+	_sight_singing_pitch_label.z_index = 80
+	_staff_area.add_child(_sight_singing_pitch_label)
 
 	_sight_singing_controls_row = HBoxContainer.new()
 	_sight_singing_controls_row.visible = false
@@ -10059,6 +10367,7 @@ func _refresh_practice_setup_theme() -> void:
 		if cad_btn != null:
 			_style_practice_setup_chip_button(cad_btn, cad_btn.button_pressed)
 	_refresh_interval_preset_buttons()
+	_refresh_chord_preset_buttons()
 	_refresh_cadence_preset_buttons()
 	for note_key in _note_chase_note_toggles.keys():
 		var note_btn := _note_chase_note_toggles[note_key] as Button
@@ -12620,6 +12929,13 @@ func _load_ear_settings() -> void:
 	_ui_theme_id = FIXED_MENU_THEME_ID
 	_use_descending_intervals = false
 	_use_harmonic_intervals = false
+	_ear_tempo = 90
+	_ear_context_tonic_enabled = true
+	_ear_melodic_context_enabled = false
+	_ear_count_in_enabled = false
+	_ear_metronome_enabled = false
+	_ear_replay_limit_enabled = false
+	_ear_replay_limit = 3
 	_practice_mode_enabled = true
 	_rhythm_flow_runtime.clear_saved_maps()
 	_rhythm_flow_runtime.tap_latency_ms = 0
@@ -12654,6 +12970,24 @@ func _load_ear_settings() -> void:
 		_use_descending_intervals = bool(d["use_descending_intervals"])
 	if d.has("use_harmonic_intervals"):
 		_use_harmonic_intervals = bool(d["use_harmonic_intervals"])
+	if d.has("ear_tempo"):
+		_ear_tempo = clampi(int(d["ear_tempo"]), 50, 160)
+	if d.has("ear_context_tonic_enabled"):
+		_ear_context_tonic_enabled = bool(d["ear_context_tonic_enabled"])
+	if d.has("ear_melodic_context_enabled"):
+		_ear_melodic_context_enabled = bool(d["ear_melodic_context_enabled"])
+	if d.has("ear_count_in_enabled"):
+		_ear_count_in_enabled = bool(d["ear_count_in_enabled"])
+	if d.has("ear_metronome_enabled"):
+		_ear_metronome_enabled = bool(d["ear_metronome_enabled"])
+	if d.has("max_bpm_records") and typeof(d["max_bpm_records"]) == TYPE_DICTIONARY:
+		_max_bpm_records = (d["max_bpm_records"] as Dictionary).duplicate(true)
+	if d.has("recent_accuracy_window") and typeof(d["recent_accuracy_window"]) == TYPE_DICTIONARY:
+		_recent_accuracy_window = (d["recent_accuracy_window"] as Dictionary).duplicate(true)
+	if d.has("ear_replay_limit_enabled"):
+		_ear_replay_limit_enabled = bool(d["ear_replay_limit_enabled"])
+	if d.has("ear_replay_limit"):
+		_ear_replay_limit = clampi(int(d["ear_replay_limit"]), 1, 10)
 	if d.has("rhythm_flow_saved_maps") and d["rhythm_flow_saved_maps"] is Array:
 		for item in (d["rhythm_flow_saved_maps"] as Array):
 			if typeof(item) == TYPE_DICTIONARY:
@@ -12698,6 +13032,8 @@ func _load_ear_settings() -> void:
 		_earned_badges.clear()
 		for b in (d["earned_badges"] as Array):
 			_earned_badges.append(str(b))
+	if d.has("per_student_badge_state") and typeof(d["per_student_badge_state"]) == TYPE_DICTIONARY:
+		_per_student_badge_state = (d["per_student_badge_state"] as Dictionary).duplicate(true)
 	if d.has("badge_lifetime_correct_sight"):
 		_badge_lifetime_correct_sight = int(d["badge_lifetime_correct_sight"])
 	if d.has("badge_lifetime_correct_chord"):
@@ -12708,8 +13044,46 @@ func _load_ear_settings() -> void:
 			_badge_daily_completed_dates.append(str(ds))
 	if d.has("interval_preset"):
 		_interval_difficulty_preset = str(d["interval_preset"])
+	if d.has("chord_preset"):
+		_chord_difficulty_preset = str(d["chord_preset"])
 	if d.has("cadence_preset"):
 		_cadence_difficulty_preset = str(d["cadence_preset"])
+	if d.has("progression_key"):
+		_progression_key = str(d["progression_key"])
+	if d.has("progression_selected") and d["progression_selected"] is Array:
+		_progression_selected.clear()
+		for item in (d["progression_selected"] as Array):
+			var pid := str(item)
+			if PROGRESSION_DEFS.has(pid) and not _progression_selected.has(pid):
+				_progression_selected.append(pid)
+		if _progression_selected.is_empty():
+			_progression_selected = ["IVviIV", "iiVI"]
+	if d.has("progression_tempo"):
+		_progression_tempo = clampi(int(d["progression_tempo"]), 40, 180)
+	if d.has("scale_root"):
+		_scale_root = str(d["scale_root"])
+	if d.has("scale_selected_modes") and d["scale_selected_modes"] is Array:
+		_scale_selected_modes.clear()
+		for item2 in (d["scale_selected_modes"] as Array):
+			var smid := str(item2)
+			if SCALE_MODE_DEFS.has(smid) and not _scale_selected_modes.has(smid):
+				_scale_selected_modes.append(smid)
+		if _scale_selected_modes.is_empty():
+			_scale_selected_modes = ["Major", "Natural Minor"]
+	if d.has("scale_tempo"):
+		_scale_tempo = clampi(int(d["scale_tempo"]), 40, 180)
+	if d.has("cadence_key"):
+		_cadence_key = str(d["cadence_key"])
+	if d.has("cadence_selected") and d["cadence_selected"] is Array:
+		_cadence_selected.clear()
+		for item3 in (d["cadence_selected"] as Array):
+			var cid := str(item3)
+			if CADENCE_DEFS.has(cid) and not _cadence_selected.has(cid):
+				_cadence_selected.append(cid)
+		if _cadence_selected.is_empty():
+			_cadence_selected = ["Perfect", "Plagal"]
+	if d.has("cadence_tempo"):
+		_cadence_tempo = clampi(int(d["cadence_tempo"]), 40, 180)
 	if d.has("pitch_match_key"):
 		_pitch_match_key = str(d["pitch_match_key"])
 	if d.has("pitch_match_scale"):
@@ -12772,6 +13146,15 @@ func _save_ear_settings() -> void:
 		"theme_id": _ui_theme_id,
 		"use_descending_intervals": _use_descending_intervals,
 		"use_harmonic_intervals": _use_harmonic_intervals,
+		"ear_tempo": _ear_tempo,
+		"ear_context_tonic_enabled": _ear_context_tonic_enabled,
+		"ear_melodic_context_enabled": _ear_melodic_context_enabled,
+		"ear_count_in_enabled": _ear_count_in_enabled,
+		"ear_metronome_enabled": _ear_metronome_enabled,
+		"max_bpm_records": _max_bpm_records,
+		"recent_accuracy_window": _recent_accuracy_window,
+		"ear_replay_limit_enabled": _ear_replay_limit_enabled,
+		"ear_replay_limit": _ear_replay_limit,
 		"rhythm_flow_saved_maps": _rhythm_flow_runtime.saved_maps,
 		"rhythm_flow_tap_latency_ms": _rhythm_flow_runtime.tap_latency_ms,
 		"streak_count": _streak_count,
@@ -12794,8 +13177,19 @@ func _save_ear_settings() -> void:
 		"badge_lifetime_correct_sight": _badge_lifetime_correct_sight,
 		"badge_lifetime_correct_chord": _badge_lifetime_correct_chord,
 		"badge_daily_completed_dates": _badge_daily_completed_dates,
+		"per_student_badge_state": _per_student_badge_state_for_save(),
 		"interval_preset": _interval_difficulty_preset,
+		"chord_preset": _chord_difficulty_preset,
 		"cadence_preset": _cadence_difficulty_preset,
+		"progression_key": _progression_key,
+		"progression_selected": _progression_selected,
+		"progression_tempo": _progression_tempo,
+		"scale_root": _scale_root,
+		"scale_selected_modes": _scale_selected_modes,
+		"scale_tempo": _scale_tempo,
+		"cadence_key": _cadence_key,
+		"cadence_selected": _cadence_selected,
+		"cadence_tempo": _cadence_tempo,
 		"pitch_match_key": _pitch_match_key,
 		"pitch_match_scale": _pitch_match_scale,
 		"pitch_match_level": _pitch_match_level,
@@ -13171,6 +13565,60 @@ func _ensure_reserved_student_records() -> void:
 		_teacher_data = store.get_data()
 
 
+func _per_student_badge_state_for_save() -> Dictionary:
+	# Snapshot live badge state into the map before serializing so the active
+	# student's latest progress is preserved alongside other students' slots.
+	_capture_active_student_badges_to_map()
+	return _per_student_badge_state.duplicate(true)
+
+
+func _active_badge_slot_key() -> String:
+	# Empty string is the legacy / device-fallback slot (used when there's no
+	# active student or in Student Edition).
+	if _active_student == null:
+		return ""
+	if not _active_student.has_active_student():
+		return ""
+	return str(_active_student.get_active_id())
+
+
+func _capture_active_student_badges_to_map() -> void:
+	# Snapshot the in-memory badge vars into the per-student map under the
+	# currently active student's slot.
+	_per_student_badge_state[_active_badge_slot_key()] = {
+		"earned_badges": _earned_badges.duplicate(),
+		"lifetime_correct_sight": _badge_lifetime_correct_sight,
+		"lifetime_correct_chord": _badge_lifetime_correct_chord,
+		"daily_completed_dates": _badge_daily_completed_dates.duplicate(),
+	}
+
+
+func _restore_active_student_badges_from_map() -> void:
+	# Reverse of capture — pull the incoming student's badge state into the
+	# in-memory vars. Falls back to the device slot if the student has no entry.
+	var slot: String = _active_badge_slot_key()
+	var snapshot_v: Variant = _per_student_badge_state.get(slot, null)
+	if snapshot_v == null and slot != "":
+		# First time this student is selected — seed from legacy device-wide state
+		# so they start from where the previous device-only badge tracking left off.
+		snapshot_v = _per_student_badge_state.get("", null)
+	if typeof(snapshot_v) != TYPE_DICTIONARY:
+		_earned_badges = []
+		_badge_lifetime_correct_sight = 0
+		_badge_lifetime_correct_chord = 0
+		_badge_daily_completed_dates = []
+		return
+	var snapshot: Dictionary = snapshot_v
+	_earned_badges.clear()
+	for b in (snapshot.get("earned_badges", []) as Array):
+		_earned_badges.append(str(b))
+	_badge_lifetime_correct_sight = int(snapshot.get("lifetime_correct_sight", 0))
+	_badge_lifetime_correct_chord = int(snapshot.get("lifetime_correct_chord", 0))
+	_badge_daily_completed_dates.clear()
+	for d in (snapshot.get("daily_completed_dates", []) as Array):
+		_badge_daily_completed_dates.append(str(d))
+
+
 func _merge_session_into_lifetime() -> void:
 	_ensure_progress_store().set_stats(_lifetime_stats)
 	_lifetime_stats = _progress_store.merge_session(
@@ -13178,12 +13626,110 @@ func _merge_session_into_lifetime() -> void:
 		MODE_INTERVAL,
 		MODE_CHORD,
 		MODE_PITCH_MATCH,
+		MODE_PROGRESSION,
+		MODE_SCALE_MODE,
 		MODE_CADENCE,
 		_interval_stats_asked,
 		_interval_stats_correct,
 		_chord_stats_asked,
 		_chord_stats_correct
 	)
+	# Per-key/mode BPM record (tempo training).
+	# Only records when there were enough questions AND accuracy >= 85%.
+	_record_bpm_session_if_qualifying()
+
+
+func _bpm_record_key_for_mode() -> String:
+	# Stable string key for the per-key BPM dictionary.
+	match _selected_mode:
+		MODE_INTERVAL:
+			return "interval"
+		MODE_CHORD:
+			return "chord"
+		MODE_PROGRESSION:
+			return "progression:%s" % _progression_key
+		MODE_SCALE_MODE:
+			return "scale_mode:%s" % _scale_root
+		MODE_CADENCE:
+			return "cadence"
+		MODE_SIGHT:
+			return "sight:%s" % _sight_key_signature
+		_:
+			return ""
+
+
+func _current_session_bpm() -> int:
+	# Ear modes report their tempo as their "BPM" (60-160). Sight modes don't
+	# have a true BPM — fall back to ear tempo so the record still has meaning
+	# when the user changes the spin between sessions.
+	return clampi(_ear_tempo, 50, 160)
+
+
+func _record_bpm_session_if_qualifying() -> void:
+	if _total_questions < 4:
+		return
+	var accuracy: float = float(_score) / float(maxi(1, _total_questions))
+	var key: String = _bpm_record_key_for_mode()
+	if key.is_empty():
+		return
+	# Maintain recent accuracy window (max 5 entries per key)
+	var arr: Array = (_recent_accuracy_window.get(key, []) as Array).duplicate()
+	arr.append(accuracy)
+	while arr.size() > 5:
+		arr.pop_front()
+	_recent_accuracy_window[key] = arr
+	if accuracy < 0.85:
+		return
+	var bpm: int = _current_session_bpm()
+	var prev_max: int = int(_max_bpm_records.get(key, 0))
+	if bpm > prev_max:
+		_max_bpm_records[key] = bpm
+
+
+func _bpm_record_label_for_key(key: String) -> String:
+	if key == "interval":
+		return "Interval"
+	if key == "chord":
+		return "Chord"
+	if key == "cadence":
+		return "Cadence"
+	if key.begins_with("progression:"):
+		return "Progression (%s)" % key.substr("progression:".length())
+	if key.begins_with("scale_mode:"):
+		return "Scale (%s)" % key.substr("scale_mode:".length())
+	if key.begins_with("sight:"):
+		return "Sight (key %s)" % key.substr("sight:".length())
+	return key
+
+
+func _max_bpm_summary_text() -> String:
+	if _max_bpm_records.is_empty():
+		return ""
+	var lines: Array[String] = []
+	var sorted_keys := _max_bpm_records.keys()
+	sorted_keys.sort()
+	for k in sorted_keys:
+		var label: String = _bpm_record_label_for_key(String(k))
+		var bpm: int = int(_max_bpm_records[k])
+		lines.append("  %s — %d BPM" % [label, bpm])
+	return "Max steady-tempo records:\n%s" % "\n".join(lines)
+
+
+func _tempo_ramp_suggestion_text() -> String:
+	var key: String = _bpm_record_key_for_mode()
+	if key.is_empty():
+		return ""
+	var arr: Array = _recent_accuracy_window.get(key, [])
+	if arr.size() < 3:
+		return ""
+	var last3: Array = arr.slice(maxi(0, arr.size() - 3))
+	for v in last3:
+		if float(v) < 0.85:
+			return ""
+	var next_bpm: int = clampi(_current_session_bpm() + 5, 50, 160)
+	if next_bpm == _current_session_bpm():
+		return ""
+	return "Tempo ramp: 3 sessions ≥85% — try %d BPM next." % next_bpm
 
 
 func _progress_home_line(mode: int) -> String:
@@ -13198,7 +13744,7 @@ func _apply_interval_preset(preset: String) -> void:
 			for _d in range(1, 9):
 				var _dbtn: Button = _degree_toggles.get(_d, null)
 				if _dbtn != null:
-					_dbtn.set_pressed_no_signal([1, 2, 3, 4, 5, 8].has(_d))
+					_dbtn.set_pressed_no_signal([1, 4, 5, 8].has(_d))
 			_include_minor_intervals = false
 			if _include_minor_toggle != null:
 				_include_minor_toggle.set_pressed_no_signal(false)
@@ -13213,7 +13759,7 @@ func _apply_interval_preset(preset: String) -> void:
 			for _d in range(1, 9):
 				var _dbtn: Button = _degree_toggles.get(_d, null)
 				if _dbtn != null:
-					_dbtn.set_pressed_no_signal(true)
+					_dbtn.set_pressed_no_signal([2, 3, 4, 5].has(_d))
 			_include_minor_intervals = false
 			if _include_minor_toggle != null:
 				_include_minor_toggle.set_pressed_no_signal(false)
@@ -13240,6 +13786,29 @@ func _apply_interval_preset(preset: String) -> void:
 	_style_harmonic_intervals_toggle(_use_harmonic_intervals)
 	_save_ear_settings()
 	_refresh_interval_preset_buttons()
+
+
+func _apply_chord_preset(preset: String) -> void:
+	_chord_difficulty_preset = preset
+	match preset:
+		"beginner":
+			_selected_chord_types = ["Major", "Minor"]
+		"standard":
+			_selected_chord_types = CHORD_TIER_TRIADS.duplicate()
+		"advanced":
+			_selected_chord_types = []
+			for tier_name in CHORD_TIER_ORDER:
+				for chord_name in CHORD_TIERS[tier_name]:
+					_selected_chord_types.append(str(chord_name))
+	for chord_name in _chord_tier_toggles.keys():
+		var btn: Button = _chord_tier_toggles[chord_name]
+		if btn != null:
+			btn.set_pressed_no_signal(_selected_chord_types.has(str(chord_name)))
+	_current_available_chord_types.clear()
+	_refresh_chord_group_buttons()
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
+	_refresh_chord_preset_buttons()
 
 
 func _apply_cadence_preset(preset: String) -> void:
@@ -13296,6 +13865,16 @@ func _refresh_interval_preset_buttons() -> void:
 			_pbtn.modulate = Color.WHITE
 
 
+func _refresh_chord_preset_buttons() -> void:
+	var preset_names := ["beginner", "standard", "advanced"]
+	for i in range(_chord_preset_btns.size()):
+		var btn := _chord_preset_btns[i]
+		if btn == null:
+			continue
+		var pname: String = preset_names[i] if i < preset_names.size() else ""
+		_style_practice_setup_chip_button(btn, _chord_difficulty_preset == pname)
+
+
 func _refresh_cadence_preset_buttons() -> void:
 	var _preset_names := ["beginner", "standard", "advanced"]
 	for _i in range(_cadence_preset_btns.size()):
@@ -13344,7 +13923,25 @@ func _refresh_ear_settings_ui() -> void:
 			if v == _ear_choice_count:
 				_ear_choice_count_select.select(i)
 				break
+	if _ear_tempo_spin != null:
+		_ear_tempo_spin.value = _ear_tempo
+	if _ear_context_tonic_toggle != null:
+		_ear_context_tonic_toggle.set_pressed_no_signal(_ear_context_tonic_enabled)
+	if _ear_melodic_context_toggle != null:
+		_ear_melodic_context_toggle.set_pressed_no_signal(_ear_melodic_context_enabled)
+	if _ear_count_in_toggle != null:
+		_ear_count_in_toggle.set_pressed_no_signal(_ear_count_in_enabled)
+	if _ear_metronome_toggle != null:
+		_ear_metronome_toggle.set_pressed_no_signal(_ear_metronome_enabled)
+	if _ear_replay_limit_toggle != null:
+		_ear_replay_limit_toggle.set_pressed_no_signal(_ear_replay_limit_enabled)
+	if _ear_replay_limit_spin != null:
+		_ear_replay_limit_spin.value = _ear_replay_limit
+		_ear_replay_limit_spin.editable = _ear_replay_limit_enabled
 	_refresh_pitch_match_setup_controls()
+	_refresh_progression_setup_controls()
+	_refresh_scale_mode_setup_controls()
+	_refresh_cadence_setup_controls()
 
 
 func _refresh_pitch_match_setup_controls() -> void:
@@ -13358,6 +13955,36 @@ func _refresh_pitch_match_setup_controls() -> void:
 			if str(_pitch_match_scale_option.get_item_metadata(i)) == _pitch_match_scale:
 				_pitch_match_scale_option.select(i)
 				break
+
+
+func _refresh_progression_setup_controls() -> void:
+	if _progression_key_option != null:
+		for i in range(_progression_key_option.item_count):
+			if str(_progression_key_option.get_item_metadata(i)) == _progression_key:
+				_progression_key_option.select(i)
+				break
+	if _progression_tempo_spin != null:
+		_progression_tempo_spin.value = _progression_tempo
+
+
+func _refresh_scale_mode_setup_controls() -> void:
+	if _scale_root_option != null:
+		for i in range(_scale_root_option.item_count):
+			if str(_scale_root_option.get_item_metadata(i)) == _scale_root:
+				_scale_root_option.select(i)
+				break
+	if _scale_tempo_spin != null:
+		_scale_tempo_spin.value = _scale_tempo
+
+
+func _refresh_cadence_setup_controls() -> void:
+	if _cadence_key_option != null:
+		for i in range(_cadence_key_option.item_count):
+			if str(_cadence_key_option.get_item_metadata(i)) == _cadence_key:
+				_cadence_key_option.select(i)
+				break
+	if _cadence_tempo_spin != null:
+		_cadence_tempo_spin.value = _cadence_tempo
 
 
 func _rhythm_flow_empty_saved_map_slot() -> Dictionary:
@@ -13859,6 +14486,7 @@ func _show_teacher_dashboard() -> void:
 	_teacher_dashboard.piece_removed.connect(_on_teacher_piece_removed)
 	_teacher_dashboard.lesson_added.connect(_on_teacher_lesson_added)
 	_teacher_dashboard.assignment_added.connect(_on_teacher_assignment_added)
+	_teacher_dashboard.assignment_added_structured.connect(_on_teacher_assignment_added_structured)
 	_teacher_dashboard.assignment_toggled.connect(_on_teacher_assignment_toggled)
 	_teacher_dashboard.assignment_removed.connect(_on_teacher_assignment_removed)
 	_teacher_dashboard.tech_added.connect(_on_teacher_tech_added)
@@ -14097,6 +14725,15 @@ func _on_teacher_assignment_added(student_id: String, task: String, due: String)
 	_refresh_home_assignments_card()
 
 
+func _on_teacher_assignment_added_structured(student_id: String, assignment: Dictionary) -> void:
+	if _teacher_store == null:
+		return
+	_teacher_store.add_assignment_entry(student_id, assignment, _today_str())
+	_save_teacher_data()
+	_refresh_teacher_dashboard()
+	_refresh_home_assignments_card()
+
+
 func _on_teacher_assignment_toggled(student_id: String, idx: int) -> void:
 	if _teacher_store == null:
 		return
@@ -14273,12 +14910,28 @@ func _on_progression_toggle(enabled: bool, progression_id: String) -> void:
 					btn.button_pressed = true
 	_refresh_progression_pattern_buttons()
 	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_progression_broken_toggled(enabled: bool) -> void:
 	_progression_broken = enabled
 	_sync_home_state_from_runtime()
+	_save_ear_settings()
 	_refresh_practice_setup_theme()
+
+
+func _on_progression_key_selected(index: int) -> void:
+	if _progression_key_option == null:
+		return
+	_progression_key = str(_progression_key_option.get_item_metadata(index))
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
+
+
+func _on_progression_tempo_changed(value: float) -> void:
+	_progression_tempo = clampi(int(round(value)), 40, 180)
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_scale_mode_toggle(enabled: bool, mode_name: String) -> void:
@@ -14295,12 +14948,28 @@ func _on_scale_mode_toggle(enabled: bool, mode_name: String) -> void:
 					btn.button_pressed = true
 	_refresh_scale_mode_buttons()
 	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_scale_asc_desc_toggled(enabled: bool) -> void:
 	_scale_asc_desc = enabled
 	_sync_home_state_from_runtime()
+	_save_ear_settings()
 	_refresh_practice_setup_theme()
+
+
+func _on_scale_root_selected(index: int) -> void:
+	if _scale_root_option == null:
+		return
+	_scale_root = str(_scale_root_option.get_item_metadata(index))
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
+
+
+func _on_scale_tempo_changed(value: float) -> void:
+	_scale_tempo = clampi(int(round(value)), 40, 180)
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_cadence_toggle(enabled: bool, cadence_name: String) -> void:
@@ -14319,12 +14988,28 @@ func _on_cadence_toggle(enabled: bool, cadence_name: String) -> void:
 	_refresh_cadence_buttons()
 	_refresh_cadence_preset_buttons()
 	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_cadence_broken_toggled(enabled: bool) -> void:
 	_cadence_broken = enabled
 	_sync_home_state_from_runtime()
+	_save_ear_settings()
 	_refresh_practice_setup_theme()
+
+
+func _on_cadence_key_selected(index: int) -> void:
+	if _cadence_key_option == null:
+		return
+	_cadence_key = str(_cadence_key_option.get_item_metadata(index))
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
+
+
+func _on_cadence_tempo_changed(value: float) -> void:
+	_cadence_tempo = clampi(int(round(value)), 40, 180)
+	_sync_home_state_from_runtime()
+	_save_ear_settings()
 
 
 func _on_session_broken_toggled(enabled: bool) -> void:
@@ -14655,8 +15340,11 @@ func _on_chord_tier_toggle(enabled: bool, chord_name: String) -> void:
 			var _tb: Button = _chord_tier_toggles.get(_cn, null)
 			if _tb != null:
 				_tb.set_pressed_no_signal(true)
+	_chord_difficulty_preset = "custom"
 	_current_available_chord_types = []
 	_refresh_chord_tier_ui()
+	_refresh_chord_preset_buttons()
+	_sync_home_state_from_runtime()
 	_save_ear_settings()
 
 
@@ -14910,6 +15598,43 @@ func _on_ear_question_count_changed(value: float) -> void:
 	_save_ear_settings()
 	if _home_info_label != null and _selected_mode != MODE_SIGHT:
 		_home_info_label.text = "Round length: %d questions." % _ear_question_count
+
+
+func _on_ear_tempo_changed(value: float) -> void:
+	_ear_tempo = clampi(int(round(value)), 50, 160)
+	_save_ear_settings()
+
+
+func _on_ear_context_tonic_toggled(enabled: bool) -> void:
+	_ear_context_tonic_enabled = enabled
+	_save_ear_settings()
+
+
+func _on_ear_melodic_context_toggled(enabled: bool) -> void:
+	_ear_melodic_context_enabled = enabled
+	_save_ear_settings()
+
+
+func _on_ear_count_in_toggled(enabled: bool) -> void:
+	_ear_count_in_enabled = enabled
+	_save_ear_settings()
+
+
+func _on_ear_metronome_toggled(enabled: bool) -> void:
+	_ear_metronome_enabled = enabled
+	_save_ear_settings()
+
+
+func _on_ear_replay_limit_toggled(enabled: bool) -> void:
+	_ear_replay_limit_enabled = enabled
+	if _ear_replay_limit_spin != null:
+		_ear_replay_limit_spin.editable = enabled
+	_save_ear_settings()
+
+
+func _on_ear_replay_limit_changed(value: float) -> void:
+	_ear_replay_limit = clampi(int(round(value)), 1, 10)
+	_save_ear_settings()
 
 
 func _on_sight_question_count_changed(value: float) -> void:
@@ -15216,6 +15941,12 @@ func _teacher_mode_label(mode: int) -> String:
 			return "Ear - Chords"
 		MODE_PITCH_MATCH:
 			return "Ear - Pitch Match"
+		MODE_PROGRESSION:
+			return "Ear - Progression"
+		MODE_SCALE_MODE:
+			return "Ear - Scale/Mode"
+		MODE_CADENCE:
+			return "Ear - Cadence"
 		MODE_SIGHT:
 			return "Sight Reading"
 		MODE_READ:
@@ -15693,7 +16424,10 @@ func _teacher_record_session_metrics(mode: int, correct_count: int, asked_count:
 		Time.get_datetime_string_from_system(),
 		_teacher_now_string(),
 		Callable(self, "_teacher_mode_label"),
-		_session_best_streak
+		_session_best_streak,
+		MODE_PROGRESSION,
+		MODE_SCALE_MODE,
+		MODE_CADENCE
 	)
 	# Record per-item stats for weak area analysis
 	var sid := store.get_active_student_id(_teacher_selected_student_id)
@@ -15703,6 +16437,12 @@ func _teacher_record_session_metrics(mode: int, correct_count: int, asked_count:
 		store.record_item_stats(sid, _chord_stats_asked, _chord_stats_correct, "chord")
 	elif sid != "" and mode == MODE_PITCH_MATCH:
 		store.record_item_stats(sid, _chord_stats_asked, _chord_stats_correct, "pitch_match")
+	elif sid != "" and mode == MODE_PROGRESSION:
+		store.record_item_stats(sid, _chord_stats_asked, _chord_stats_correct, "progression")
+	elif sid != "" and mode == MODE_SCALE_MODE:
+		store.record_item_stats(sid, _chord_stats_asked, _chord_stats_correct, "scale_mode")
+	elif sid != "" and mode == MODE_CADENCE:
+		store.record_item_stats(sid, _chord_stats_asked, _chord_stats_correct, "cadence")
 	elif sid != "" and mode == MODE_SIGHT and _sight_mode == "Chords" and not _sight_chord_quality_asked.is_empty():
 		# SR4 — sight chord per-quality stats persist to a distinct category so
 		# the dashboard can surface them separately from ear-chord weak items.
@@ -15713,6 +16453,8 @@ func _teacher_record_session_metrics(mode: int, correct_count: int, asked_count:
 	# dashboard radar can render per-student. Recorded for any sight mode.
 	if sid != "" and mode == MODE_SIGHT and not _sight_per_key_asked.is_empty():
 		store.record_item_stats(sid, _sight_per_key_asked, _sight_per_key_correct, "sight_key")
+	if sid != "" and _is_ear_training_mode(mode) and not _ear_confusion_stats.is_empty():
+		store.record_confusion_stats(sid, _ear_confusion_stats)
 	_teacher_data = store.get_data()
 	if not bool(result.get("updated", false)):
 		return
@@ -16323,13 +17065,15 @@ func _get_selected_degrees() -> Array[int]:
 func _current_note_duration() -> float:
 	if _qa_enabled:
 		return 0.02
-	return NOTE_DURATION * (1.6 if _slow_toggle != null and _slow_toggle.button_pressed else 1.0)
+	var tempo_scale := 90.0 / float(clampi(_ear_tempo, 50, 160))
+	return NOTE_DURATION * tempo_scale * (1.6 if _slow_toggle != null and _slow_toggle.button_pressed else 1.0)
 
 
 func _current_gap_duration() -> float:
 	if _qa_enabled:
 		return 0.01
-	return GAP_DURATION * (1.7 if _slow_toggle != null and _slow_toggle.button_pressed else 1.0)
+	var tempo_scale := 90.0 / float(clampi(_ear_tempo, 50, 160))
+	return GAP_DURATION * tempo_scale * (1.7 if _slow_toggle != null and _slow_toggle.button_pressed else 1.0)
 
 
 func _current_post_answer_delay() -> float:
@@ -16516,6 +17260,19 @@ func _record_question_correct() -> void:
 	)
 
 
+func _record_ear_confusion(category: String, correct_answer: String, chosen_answer: String) -> void:
+	var cat := category.strip_edges()
+	var correct := correct_answer.strip_edges()
+	var chosen := chosen_answer.strip_edges()
+	if cat.is_empty() or correct.is_empty() or chosen.is_empty() or correct == chosen:
+		return
+	var cat_map: Dictionary = _ear_confusion_stats.get(cat, {})
+	var correct_map: Dictionary = cat_map.get(correct, {})
+	correct_map[chosen] = int(correct_map.get(chosen, 0)) + 1
+	cat_map[correct] = correct_map
+	_ear_confusion_stats[cat] = cat_map
+
+
 func _progress_dots_text(current: int, total: int) -> String:
 	return _ensure_session_controller().progress_dots_text(current, total)
 
@@ -16634,12 +17391,15 @@ func _begin_first_run_sight_assessment() -> void:
 func _on_start_quiz_pressed() -> void:
 	if _startup_boot_blocking_input():
 		return
+	if not _ear_assignment_start_pending:
+		_clear_active_ear_assignment()
 	# Teacher Edition gate: require an active student before any session begins.
 	# Student Edition skips this check (single-user product).
 	if not _ensure_active_student_for_practice():
 		return
 	if _first_run_assessment_pending:
 		_begin_first_run_sight_assessment()
+	_ear_replays_used = 0
 	_lesson_session_record_activity_start()
 	await _ensure_session_controller().start_quiz_from_home(self)
 	if _mic_mode_enabled and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
@@ -16649,6 +17409,7 @@ func _on_start_quiz_pressed() -> void:
 	# Drone tonic begins with the session (gated by setting; no-op otherwise).
 	if _selected_mode == MODE_PITCH_MATCH:
 		_start_pitch_match_drone()
+	_ear_assignment_start_pending = false
 
 
 func _on_end_quiz_pressed() -> void:
@@ -16749,20 +17510,38 @@ func _selected_ear_mode_choices() -> Array[String]:
 	return []
 
 
+func _practice_key_pc(key_name: String) -> int:
+	for opt in PRACTICE_KEY_OPTIONS:
+		if str(opt[0]) == key_name:
+			return int(opt[1])
+	return 0
+
+
+func _ear_key_root_midi(key_name: String, base_c_midi: int) -> int:
+	return base_c_midi + _practice_key_pc(key_name)
+
+
 func _build_theory_question_payload() -> Dictionary:
 	if _selected_mode == MODE_PROGRESSION:
 		return TheoryQuestionGeneratorScript.build_progression_payload(
 			_progression_selected, PROGRESSION_DEFS, CHORD_INTERVALS,
-			_review_queue_for_mode(MODE_PROGRESSION), _rng
+			_review_queue_for_mode(MODE_PROGRESSION), _rng,
+			_ear_key_root_midi(_progression_key, 48)
 		)
 	if _selected_mode == MODE_SCALE_MODE:
 		return TheoryQuestionGeneratorScript.build_scale_mode_payload(
 			_scale_selected_modes, SCALE_MODE_DEFS,
-			_review_queue_for_mode(MODE_SCALE_MODE), _rng
+			_review_queue_for_mode(MODE_SCALE_MODE), _rng,
+			_ear_key_root_midi(_scale_root, 60)
 		)
 	if _selected_mode == MODE_CADENCE:
+		var cadence_roots: Array[int] = []
+		if _cadence_key == "Rotate":
+			cadence_roots = CADENCE_KEY_ROOTS.duplicate()
+		else:
+			cadence_roots = [_ear_key_root_midi(_cadence_key, 48)]
 		var payload := TheoryQuestionGeneratorScript.build_cadence_payload(
-			_cadence_selected, CADENCE_DEFS, CHORD_INTERVALS, CADENCE_KEY_ROOTS,
+			_cadence_selected, CADENCE_DEFS, CHORD_INTERVALS, cadence_roots,
 			_focus_missed_ids, _review_queue_for_mode(MODE_CADENCE), _rng
 		)
 		# Cadence generator returns the picked key root in `play_root` so callers
@@ -19919,6 +20698,8 @@ func _play_current_prompt() -> void:
 	if _qa_enabled and _selected_mode != MODE_NOTE_CHASE:
 		await get_tree().create_timer(0.02).timeout
 		return
+	if _is_ear_training_mode():
+		await _play_ear_count_in_and_context()
 	if _selected_mode == MODE_CHORD:
 		await _play_chord(_current_chord_notes, _current_note_duration())
 		await _push_silence(0.05)
@@ -19995,6 +20776,50 @@ func _play_current_prompt() -> void:
 	await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
 
 
+func _play_ear_count_in_and_context() -> void:
+	if _qa_enabled:
+		return
+	# Audible 4-beat metronome at the current ear tempo. Drives the student's
+	# internal pulse before the prompt; also the foundation of tempo training.
+	if _ear_metronome_enabled:
+		var beat_sec := 60.0 / float(clampi(_ear_tempo, 50, 160))
+		# Click sound: short high-pitch note. Accent the downbeat with a slightly
+		# louder pitch so the student feels the "1" of the bar.
+		for i in range(4):
+			var click_pitch := 88 if i == 0 else 84
+			await _play_note(click_pitch, 0.035)
+			await _push_silence(maxf(0.02, beat_sec - 0.035))
+	if _ear_count_in_enabled:
+		for i in range(2):
+			await _play_note(84, 0.045)
+			await _push_silence(0.12)
+	if _ear_context_tonic_enabled:
+		if _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD:
+			await _play_note(_current_root_midi, 0.22)
+			await _push_silence(0.08)
+		elif _selected_mode == MODE_PROGRESSION:
+			await _play_chord_block(_diatonic_triad_notes(1, _ear_key_root_midi(_progression_key, 48)), 0.30)
+			await _push_silence(0.08)
+		elif _selected_mode == MODE_SCALE_MODE:
+			await _play_note(_ear_key_root_midi(_scale_root, 60), 0.22)
+			await _push_silence(0.08)
+		elif _selected_mode == MODE_CADENCE:
+			await _play_chord_block(_diatonic_triad_notes(1, _cadence_play_root), 0.30)
+			await _push_silence(0.08)
+	if _ear_melodic_context_enabled:
+		var root := _current_root_midi
+		if _selected_mode == MODE_PROGRESSION:
+			root = _ear_key_root_midi(_progression_key, 60)
+		elif _selected_mode == MODE_SCALE_MODE:
+			root = _ear_key_root_midi(_scale_root, 60)
+		elif _selected_mode == MODE_CADENCE:
+			root = _cadence_play_root + 12
+		for step in [0, 2, 4]:
+			await _play_note(root + int(step), 0.11)
+			await _push_silence(0.025)
+		await _push_silence(0.08)
+
+
 func _play_interval_prompt_async(root_midi: int, other_midi: int) -> void:
 	if _use_harmonic_intervals:
 		await _play_harmonic_interval_async(root_midi, other_midi)
@@ -20024,12 +20849,18 @@ func _play_harmonic_interval_async(midi_a: int, midi_b: int) -> void:
 func _on_replay_pressed() -> void:
 	if not _quiz_active or _is_prompt_playing:
 		return
+	if _is_ear_training_mode() and _ear_replay_limit_enabled and _ear_replays_used >= _ear_replay_limit:
+		if _status_label != null:
+			_status_label.text = "Replay limit reached for this round."
+		return
 	var replay_question_index := _question_index
 	var keep_answers_live := (_selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_INTERVAL or _selected_mode == MODE_PITCH_MATCH) and _accepting_answer
 	if not keep_answers_live:
 		_set_answer_buttons_enabled(false)
 	_replay_button.disabled = true
 	_status_label.text = "Replaying..."
+	if _is_ear_training_mode():
+		_ear_replays_used += 1
 	_is_prompt_playing = true
 	await _play_current_prompt()
 	_is_prompt_playing = false
@@ -20321,6 +21152,84 @@ func _play_broken_chord(notes: Array[int], duration: float) -> void:
 		await _push_silence(0.03)
 
 
+func _progression_id_from_label(label: String) -> String:
+	for key in PROGRESSION_DEFS.keys():
+		var def: Dictionary = PROGRESSION_DEFS[key]
+		if str(def.get("label", key)) == label or str(key) == label:
+			return str(key)
+	return ""
+
+
+func _cadence_id_from_label(label: String) -> String:
+	for key in CADENCE_DEFS.keys():
+		var def: Dictionary = CADENCE_DEFS[key]
+		if str(def.get("label", key)) == label or str(key) == label:
+			return str(key)
+	return ""
+
+
+func _progression_chords_for_id(progression_id: String) -> Array[Array]:
+	var out: Array[Array] = []
+	var def: Dictionary = PROGRESSION_DEFS.get(progression_id, {})
+	var steps: Array = def.get("steps", [])
+	var root_midi := _ear_key_root_midi(_progression_key, 48)
+	for step in steps:
+		out.append(_diatonic_triad_notes(int(step), root_midi))
+	return out
+
+
+func _cadence_chords_for_id(cadence_id: String) -> Array[Array]:
+	var out: Array[Array] = []
+	var def: Dictionary = CADENCE_DEFS.get(cadence_id, {})
+	var steps: Array = def.get("steps", [])
+	for step in steps:
+		out.append(_diatonic_triad_notes(int(step), _cadence_play_root))
+	return out
+
+
+func _scale_notes_for_mode(mode_name: String) -> Array[int]:
+	var out: Array[int] = []
+	var steps: Array = SCALE_MODE_DEFS.get(mode_name, [])
+	var root_midi := _ear_key_root_midi(_scale_root, 60)
+	for step in steps:
+		out.append(root_midi + int(step))
+	return out
+
+
+func _setup_ear_compare(chosen_answer: String, correct_answer: String) -> void:
+	if _qa_enabled or _compare_bar == null:
+		return
+	_compare_chosen_mode = _selected_mode
+	_compare_chosen_answer = chosen_answer
+	_compare_chosen_notes.clear()
+	_compare_chosen_chords.clear()
+	var chosen_label := chosen_answer
+	var correct_label := correct_answer
+	if _selected_mode == MODE_INTERVAL:
+		chosen_label = _interval_display_name(chosen_answer)
+		correct_label = _interval_display_name(correct_answer)
+		var chosen_semitones: int = int(INTERVAL_DATA.get(chosen_answer, {"semitones": [0]})["semitones"][0])
+		_compare_chosen_root = _current_root_midi
+		_compare_chosen_second = _current_root_midi + chosen_semitones
+	elif _selected_mode == MODE_CHORD:
+		_compare_chosen_notes = _build_chord_notes(_current_root_midi, chosen_answer, _current_chord_inversion)
+	elif _selected_mode == MODE_PROGRESSION:
+		var progression_id := _progression_id_from_label(chosen_answer)
+		_compare_chosen_chords = _progression_chords_for_id(progression_id)
+	elif _selected_mode == MODE_SCALE_MODE:
+		_compare_chosen_notes = _scale_notes_for_mode(chosen_answer)
+	elif _selected_mode == MODE_CADENCE:
+		var cadence_id := _cadence_id_from_label(chosen_answer)
+		_compare_chosen_chords = _cadence_chords_for_id(cadence_id)
+	else:
+		return
+	if _compare_your_btn != null:
+		_compare_your_btn.text = "Play yours: %s" % chosen_label
+	if _compare_correct_play_btn != null:
+		_compare_correct_play_btn.text = "Play correct: %s" % correct_label
+	_compare_bar.visible = true
+
+
 func _on_interval_choice_index(choice_idx: int) -> void:
 	var uses_interval_choice_row := _selected_mode == MODE_INTERVAL or _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_SCALE_MODE or _selected_mode == MODE_CADENCE
 	if not uses_interval_choice_row:
@@ -20376,6 +21285,14 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 		await _blink_answer_feedback(null, correct_btn, 3)
 		await _play_success_sfx()
 	else:
+		var confusion_category := "interval"
+		if _selected_mode == MODE_PROGRESSION:
+			confusion_category = "progression"
+		elif _selected_mode == MODE_SCALE_MODE:
+			confusion_category = "scale_mode"
+		elif _selected_mode == MODE_CADENCE:
+			confusion_category = "cadence"
+		_record_ear_confusion(confusion_category, expected_choice, choice_id)
 		var shielded := _consume_chicken_shield_on_wrong()
 		if not shielded:
 			_streak = 0
@@ -20474,6 +21391,7 @@ func _on_interval_choice_index(choice_idx: int) -> void:
 				_compare_correct_play_btn.text = "%s  Correct: %s" % [char(0x2713), _interval_display_name(expected_choice)]
 			if _compare_bar != null:
 				_compare_bar.visible = true
+		_setup_ear_compare(choice_id, expected_choice)
 
 	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
@@ -20526,6 +21444,7 @@ func _on_pitch_match_key_pressed(pitch: int) -> void:
 		await _blink_answer_feedback(null, correct_btn, 2)
 		await _play_success_sfx()
 	else:
+		_record_ear_confusion("pitch_match", _current_ear_text_answer, _pitch_match_note_label(chosen_pitch))
 		var shielded := _consume_chicken_shield_on_wrong()
 		var pm_display_wrong: String = _pitch_match_display_label_for_midi(_current_pitch_match_midi)
 		if not shielded:
@@ -20559,15 +21478,35 @@ func _on_pitch_match_key_pressed(pitch: int) -> void:
 
 
 func _on_compare_your_pressed() -> void:
-	var d := _current_note_duration()
-	var g := _current_gap_duration()
-	await _play_note(_compare_chosen_root, d)
-	await _push_silence(g)
-	await _play_note(_compare_chosen_second, d)
+	if _is_prompt_playing:
+		return
+	_is_prompt_playing = true
+	if _compare_chosen_mode == MODE_INTERVAL:
+		var d := _current_note_duration()
+		var g := _current_gap_duration()
+		await _play_note(_compare_chosen_root, d)
+		await _push_silence(g)
+		await _play_note(_compare_chosen_second, d)
+	elif _compare_chosen_mode == MODE_CHORD:
+		await _play_chord(_compare_chosen_notes, _current_note_duration())
+	elif _compare_chosen_mode == MODE_PROGRESSION:
+		await _play_chord_sequence(_compare_chosen_chords, _progression_tempo, "broken" if _progression_broken else "block")
+	elif _compare_chosen_mode == MODE_SCALE_MODE:
+		await _play_scale(_compare_chosen_notes, _scale_tempo)
+	elif _compare_chosen_mode == MODE_CADENCE:
+		await _play_chord_sequence(_compare_chosen_chords, _cadence_tempo, "broken" if _cadence_broken else "block")
+	_is_prompt_playing = false
 
 
 func _on_compare_correct_pressed() -> void:
-	await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
+	if _is_prompt_playing:
+		return
+	_is_prompt_playing = true
+	if _compare_chosen_mode == MODE_INTERVAL:
+		await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
+	else:
+		await _play_current_prompt()
+	_is_prompt_playing = false
 
 
 func _on_chord_chosen(choice_quality: String) -> void:
@@ -20612,6 +21551,7 @@ func _on_chord_chosen(choice_quality: String) -> void:
 		await _blink_answer_feedback(null, correct_btn, 3)
 		await _play_success_sfx()
 	else:
+		_record_ear_confusion("chord", _current_chord_quality, choice_quality)
 		var shielded := _consume_chicken_shield_on_wrong()
 		if not shielded:
 			_streak = 0
@@ -20653,6 +21593,7 @@ func _on_chord_chosen(choice_quality: String) -> void:
 		await _play_current_prompt()
 		await get_tree().create_timer(0.15).timeout
 		await _play_hungry_reaction()
+		_setup_ear_compare(choice_quality, _current_chord_quality)
 
 	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
 
@@ -20843,6 +21784,11 @@ func _midi_supported_for_mode() -> bool:
 		return _sight_mode == "Notes" or _sight_mode == "Chords"
 	if _selected_mode == MODE_NOTE_CHASE:
 		return true
+	# Ear training: teacher plays the prompt back on MIDI for validation
+	if _selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD:
+		return true
+	if _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_CADENCE or _selected_mode == MODE_SCALE_MODE:
+		return true
 	return false
 
 
@@ -20872,6 +21818,10 @@ func _stop_midi_listening() -> void:
 	_close_midi_inputs()
 	_midi_chord_buffer.clear()
 	_midi_chord_window_start = -1.0
+	_midi_ear_interval_buffer.clear()
+	_midi_ear_interval_window_start = -1.0
+	_midi_ear_seq_buffer.clear()
+	_midi_ear_seq_window_start = -1.0
 	if _midi_piano_viz != null:
 		_midi_piano_viz.visible = false
 		_midi_piano_viz_clear_all()
@@ -21076,10 +22026,13 @@ func _on_student_picker_select(student_id: String) -> void:
 	# Persist progress for the OUTGOING student before switching.
 	if _active_student.has_active_student():
 		_save_progress_data()
+	# Snapshot outgoing student's badge state into the per-student map.
+	_capture_active_student_badges_to_map()
 	_active_student.set_active_id(student_id)
-	# Reload progress for the INCOMING student so the dashboard/practice screens
-	# reflect their data.
+	# Reload progress + badges for the INCOMING student so the dashboard/practice
+	# screens reflect their data.
 	_load_progress_data()
+	_restore_active_student_badges_from_map()
 	_route_learning_progress_to_active_student()  # Phase 2b
 	_refresh_active_student_chip()
 	_hide_student_picker()
@@ -21274,6 +22227,7 @@ func _refresh_active_student_chip() -> void:
 	_refresh_lesson_session_button()
 	_refresh_home_assignments_card()
 	_refresh_home_recommended_card()
+	_refresh_home_ear_dashboard_card()
 	_refresh_home_sync_status_label()
 	_refresh_home_daily_challenge_card()
 	_refresh_home_key_radar_card()
@@ -21318,7 +22272,7 @@ func _refresh_home_assignments_card() -> void:
 		var a: Dictionary = a_any
 		if bool(a.get("done", false)):
 			continue
-		open_rows.append({"idx": i, "task": str(a.get("task", "")), "due": str(a.get("due", ""))})
+		open_rows.append({"idx": i, "task": str(a.get("task", "")), "due": str(a.get("due", "")), "assignment": a.duplicate(true)})
 	if open_rows.is_empty():
 		_home_assignments_card.visible = false
 		return
@@ -21356,6 +22310,17 @@ func _refresh_home_assignments_card() -> void:
 		)
 		row_box.add_child(done_btn)
 
+		var assignment_for_start: Dictionary = row.get("assignment", {})
+		if str(assignment_for_start.get("type", "")) == "ear_training":
+			var start_btn := Button.new()
+			start_btn.text = "Start"
+			start_btn.custom_minimum_size = Vector2(82, 32)
+			var assignment_capture: Dictionary = assignment_for_start.duplicate(true)
+			start_btn.pressed.connect(func():
+				_on_home_ear_assignment_start_pressed(sid_capture, idx_capture, assignment_capture)
+			)
+			row_box.add_child(start_btn)
+
 		var task_lbl := Label.new()
 		task_lbl.text = str(row.get("task", ""))
 		task_lbl.add_theme_font_size_override("font_size", 14)
@@ -21384,6 +22349,112 @@ func _on_home_assignment_done_pressed(student_id: String, assignment_idx: int) -
 	# in too so the dashboard's open/completed counts stay in sync.
 	if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
 		_teacher_dashboard.refresh(_teacher_store.get_data(), _build_module_progress_snapshot_for_teacher())
+
+
+func _on_home_ear_assignment_start_pressed(student_id: String, assignment_idx: int, assignment: Dictionary) -> void:
+	if student_id == "" or assignment_idx < 0:
+		return
+	var mode := _ear_assignment_mode_to_id(str(assignment.get("mode", "")))
+	if mode < 0 or not _mvp_is_ear_mode_enabled(mode):
+		if _home_info_label != null:
+			_home_info_label.text = "This assigned Ear mode is not available in this build."
+		return
+	_apply_ear_assignment_settings(assignment, mode)
+	_active_ear_assignment_student_id = student_id
+	_active_ear_assignment_idx = assignment_idx
+	_active_ear_assignment_target = clampi(int(assignment.get("target_score", 0)), 0, 100)
+	_active_ear_assignment_title = str(assignment.get("task", "Ear Training"))
+	_ear_assignment_start_pending = true
+	_on_ear_mode_button_pressed(mode)
+	_on_start_quiz_pressed()
+
+
+func _ear_assignment_mode_to_id(mode_name: String) -> int:
+	var m := mode_name.strip_edges().to_lower()
+	if m == "intervals" or m == "interval" or m == "weak areas":
+		return MODE_INTERVAL
+	if m == "chords" or m == "chord":
+		return MODE_CHORD
+	if m == "pitch match":
+		return MODE_PITCH_MATCH
+	if m == "cadence" or m == "cadences":
+		return MODE_CADENCE
+	if m == "progression" or m == "progressions":
+		return MODE_PROGRESSION
+	if m == "scale/mode" or m == "scale mode":
+		return MODE_SCALE_MODE
+	return -1
+
+
+func _apply_ear_assignment_settings(assignment: Dictionary, mode: int) -> void:
+	var q_count := clampi(int(assignment.get("question_count", _ear_question_count)), 1, 100)
+	_ear_question_count = q_count
+	if _question_spin != null:
+		_question_spin.value = q_count
+	_total_questions = q_count
+	var preset := str(assignment.get("preset", ""))
+	if mode == MODE_INTERVAL:
+		if preset.begins_with("Beginner"):
+			_apply_interval_preset("beginner")
+		elif preset.begins_with("Early Piano"):
+			_apply_interval_preset("standard")
+	elif mode == MODE_CHORD:
+		if preset.begins_with("Chords I"):
+			_apply_chord_preset("beginner")
+		elif preset == "Triads":
+			_apply_chord_preset("standard")
+		elif preset.begins_with("Advanced"):
+			_apply_chord_preset("advanced")
+	elif mode == MODE_CADENCE:
+		if preset.begins_with("Cadences I"):
+			_apply_cadence_preset("beginner")
+		elif preset == "Common cadences":
+			_apply_cadence_preset("standard")
+		elif preset.begins_with("Advanced"):
+			_apply_cadence_preset("advanced")
+	elif mode == MODE_PITCH_MATCH:
+		if preset == "Triad tones":
+			_pitch_match_level = 2
+		elif preset == "Chromatic challenge":
+			_pitch_match_level = 6
+		else:
+			_pitch_match_level = 4
+	_focus_missed_ids.clear()
+	var focus_any: Variant = assignment.get("focus_items", [])
+	if typeof(focus_any) == TYPE_ARRAY:
+		for item_any in focus_any:
+			if typeof(item_any) != TYPE_DICTIONARY:
+				continue
+			var item: Dictionary = item_any
+			var category := str(item.get("category", ""))
+			if _ear_assignment_category_matches_mode(category, mode):
+				_focus_missed_ids.append(str(item.get("item", "")))
+	_save_ear_settings()
+
+
+func _ear_assignment_category_matches_mode(category: String, mode: int) -> bool:
+	match mode:
+		MODE_INTERVAL:
+			return category == "interval"
+		MODE_CHORD:
+			return category == "chord"
+		MODE_PITCH_MATCH:
+			return category == "pitch_match"
+		MODE_PROGRESSION:
+			return category == "progression"
+		MODE_SCALE_MODE:
+			return category == "scale_mode"
+		MODE_CADENCE:
+			return category == "cadence"
+	return false
+
+
+func _clear_active_ear_assignment() -> void:
+	_active_ear_assignment_student_id = ""
+	_active_ear_assignment_idx = -1
+	_active_ear_assignment_target = 0
+	_active_ear_assignment_title = ""
+	_ear_assignment_start_pending = false
 
 
 # Returns the count of OPEN assignments for the currently active real student.
@@ -21421,7 +22492,8 @@ func _list_active_student_open_assignments() -> Array:
 			continue
 		if bool((a_any as Dictionary).get("done", false)):
 			continue
-		out.append({"idx": i, "task": str((a_any as Dictionary).get("task", "")), "due": str((a_any as Dictionary).get("due", ""))})
+		var a: Dictionary = a_any as Dictionary
+		out.append({"idx": i, "task": str(a.get("task", "")), "due": str(a.get("due", "")), "assignment": a.duplicate(true)})
 	return out
 
 
@@ -21501,6 +22573,28 @@ func _mark_selected_assignments_done(student_id: String, indices: Array, checkbo
 				_result_action_assignments_button.text = "✓ Mark Assignment Done (%d open)" % rem
 			else:
 				_result_action_assignments_button.visible = false
+
+
+func _complete_active_ear_assignment_if_target_met(correct_count: int, asked_count: int) -> void:
+	if _active_ear_assignment_student_id == "" or _active_ear_assignment_idx < 0:
+		return
+	var pct := int(round((float(correct_count) / float(maxi(1, asked_count))) * 100.0))
+	if _active_ear_assignment_target > 0 and pct < _active_ear_assignment_target:
+		if _home_info_label != null:
+			_home_info_label.text = "Assignment target: %d%%. This round: %d%%." % [_active_ear_assignment_target, pct]
+		return
+	if _teacher_store == null:
+		_clear_active_ear_assignment()
+		return
+	var result: Dictionary = _teacher_store.mark_assignment_done(_active_ear_assignment_student_id, _active_ear_assignment_idx, _today_str())
+	if bool(result.get("updated", false)):
+		_save_teacher_data()
+		_refresh_home_assignments_card()
+		if _home_info_label != null:
+			_home_info_label.text = "Assignment complete: %s" % _active_ear_assignment_title
+		if _teacher_dashboard != null and is_instance_valid(_teacher_dashboard) and _teacher_dashboard.visible:
+			_teacher_dashboard.refresh(_teacher_store.get_data(), _build_module_progress_snapshot_for_teacher())
+	_clear_active_ear_assignment()
 
 
 # Returns IDs of items with at least 3 attempts and <70% accuracy in the given
@@ -21640,6 +22734,95 @@ func _collect_weak_ids_from_device_bucket(bucket_any: Variant) -> Array[String]:
 	for w in weak:
 		out.append(str(w.id))
 	return out
+
+
+func _refresh_home_ear_dashboard_card() -> void:
+	if _home_ear_dashboard_card == null or _home_ear_dashboard_vbox == null:
+		return
+	var stats := _active_student_ear_dashboard_stats()
+	if stats.is_empty():
+		_home_ear_dashboard_card.visible = false
+		return
+	_home_ear_dashboard_card.visible = true
+	for child in _home_ear_dashboard_vbox.get_children():
+		child.queue_free()
+	var header := Label.new()
+	header.text = "%s  Ear Training Dashboard" % char(0x1F4CA)
+	header.add_theme_font_size_override("font_size", 17)
+	header.add_theme_color_override("font_color", Color(0.72, 0.90, 1.0, 1.0))
+	_home_ear_dashboard_vbox.add_child(header)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_home_ear_dashboard_vbox.add_child(row)
+	for chip in [
+		["Accuracy", "%d%%" % int(stats.get("accuracy", 0))],
+		["Sessions", str(int(stats.get("sessions", 0)))],
+		["Questions", str(int(stats.get("asked", 0)))],
+	]:
+		var lbl := Label.new()
+		lbl.text = "%s: %s" % [str(chip[0]), str(chip[1])]
+		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.add_theme_color_override("font_color", Color(0.86, 0.92, 0.96, 0.92))
+		row.add_child(lbl)
+	var weak: Array = stats.get("weak", [])
+	if not weak.is_empty():
+		var weak_lbl := Label.new()
+		var labels: Array[String] = []
+		for item in weak:
+			labels.append(str(item))
+		weak_lbl.text = "Needs review: %s" % ", ".join(labels)
+		weak_lbl.add_theme_font_size_override("font_size", 13)
+		weak_lbl.add_theme_color_override("font_color", Color(0.96, 0.78, 0.42, 0.95))
+		weak_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_home_ear_dashboard_vbox.add_child(weak_lbl)
+
+
+func _active_student_ear_dashboard_stats() -> Dictionary:
+	var stats_source: Dictionary = {}
+	if _teacher_store != null and _active_student != null and _active_student.has_active_student():
+		var sid: String = _active_student.get_active_id()
+		var idx: int = _teacher_store.find_index_by_id(sid)
+		if idx >= 0:
+			var students: Array = _teacher_store.students_array()
+			if idx < students.size() and typeof(students[idx]) == TYPE_DICTIONARY:
+				var student: Dictionary = students[idx]
+				stats_source = student.get("item_stats", {}) if typeof(student.get("item_stats", {})) == TYPE_DICTIONARY else {}
+	if stats_source.is_empty():
+		stats_source = _lifetime_stats
+	var categories: Array[String] = ["interval", "chord", "pitch_match", "progression", "scale_mode", "cadence"]
+	var asked_total: int = 0
+	var correct_total: int = 0
+	var weak_rows: Array[Dictionary] = []
+	for category in categories:
+		var bucket_any: Variant = stats_source.get(category, {})
+		if typeof(bucket_any) != TYPE_DICTIONARY:
+			continue
+		var bucket: Dictionary = bucket_any
+		for key in bucket:
+			var entry_any: Variant = bucket.get(key, {})
+			if typeof(entry_any) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = entry_any
+			var asked := int(entry.get("asked", 0))
+			var correct := int(entry.get("correct", 0))
+			asked_total += asked
+			correct_total += correct
+			if asked >= 3:
+				var acc := float(correct) / float(maxi(1, asked))
+				if acc < 0.70:
+					weak_rows.append({"label": str(key), "acc": acc})
+	if asked_total <= 0:
+		return {}
+	weak_rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("acc", 1.0)) < float(b.get("acc", 1.0)))
+	var weak_labels: Array[String] = []
+	for i in range(mini(3, weak_rows.size())):
+		weak_labels.append(str(weak_rows[i].get("label", "")))
+	return {
+		"accuracy": int(round(float(correct_total) / float(maxi(1, asked_total)) * 100.0)),
+		"sessions": int(_lifetime_stats.get("sessions_interval", 0)) + int(_lifetime_stats.get("sessions_chord", 0)) + int(_lifetime_stats.get("sessions_pitch_match", 0)) + int(_lifetime_stats.get("sessions_progression", 0)) + int(_lifetime_stats.get("sessions_scale_mode", 0)) + int(_lifetime_stats.get("sessions_cadence", 0)),
+		"asked": asked_total,
+		"weak": weak_labels,
+	}
 
 
 func _refresh_home_recommended_card() -> void:
@@ -23078,18 +24261,26 @@ func _build_sight_big_piano() -> void:
 			_chord_explorer_apply_white_style(btn, Color.WHITE)
 		_sight_big_piano_keys_root.add_child(btn)
 		_sight_big_piano_keys[pitch] = btn
-		# C-octave label — positioned later, but added now as a child of the white-C buttons.
+		# Letter label on every white key (A-G). C keys also show octave (e.g. C4).
+		# Black keys stay unlabeled to keep them clean.
 		var pc := ((pitch % 12) + 12) % 12
-		if pc == 0 and not is_black:
-			var lbl := Label.new()
-			lbl.text = "C%d" % int(pitch / 12 - 1)
-			lbl.add_theme_font_size_override("font_size", 12)
-			if _ui_font != null:
-				lbl.add_theme_font_override("font", _ui_font)
-			lbl.add_theme_color_override("font_color", Color(0.32, 0.34, 0.40, 0.92))
-			lbl.position = Vector2(3, SIGHT_BIG_PIANO_WHITE_H - 20)
-			lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			btn.add_child(lbl)
+		if not is_black:
+			var letter_for_pc := {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
+			var letter: String = String(letter_for_pc.get(pc, ""))
+			if not letter.is_empty():
+				var lbl := Label.new()
+				if pc == 0:
+					lbl.text = "C%d" % int(pitch / 12 - 1)
+				else:
+					lbl.text = letter
+				lbl.add_theme_font_size_override("font_size", 12)
+				if _ui_font != null:
+					lbl.add_theme_font_override("font", _ui_font)
+				var label_color := Color(0.20, 0.32, 0.55, 0.95) if pc == 0 else Color(0.32, 0.34, 0.40, 0.85)
+				lbl.add_theme_color_override("font_color", label_color)
+				lbl.position = Vector2(3, SIGHT_BIG_PIANO_WHITE_H - 20)
+				lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				btn.add_child(lbl)
 
 	_layout_sight_big_piano()
 
@@ -23904,6 +25095,12 @@ func _layout_sight_singing_overlay() -> void:
 	if _sight_singing_progress_label != null:
 		_sight_singing_progress_label.position = Vector2(score_x, score_y + score_h + 6.0)
 		_sight_singing_progress_label.size = Vector2(score_w, 28.0)
+	if _sight_singing_pitch_label != null:
+		_sight_singing_pitch_label.position = Vector2(score_x, score_y + score_h - 26.0)
+		_sight_singing_pitch_label.size = Vector2(score_w, 20.0)
+	if _sight_singing_pitch_bar != null:
+		_sight_singing_pitch_bar.position = Vector2(score_x + 20.0, score_y + score_h - 8.0)
+		_sight_singing_pitch_bar.size = Vector2(score_w - 40.0, 6.0)
 	if _sight_singing_controls_row != null:
 		_sight_singing_controls_row.position = Vector2(score_x, score_y + score_h + 34.0)
 		_sight_singing_controls_row.size = Vector2(score_w, 40.0)
@@ -24115,17 +25312,73 @@ func _sight_singing_phrase_feed_detection(result: Dictionary) -> void:
 			_sight_singing_progress_label.text = "Recording phrase..."
 	_sight_singing_runtime.last_voice_msec = now_msec
 	var t := float(now_msec - _sight_singing_runtime.phrase_start_msec) / 1000.0
+	var cents_off := float(result.get("cents_off", 0.0))
 	_sight_singing_runtime.phrase_detections.append({
 		"time": t,
 		"midi": detected_midi,
-		"cents_off": float(result.get("cents_off", 0.0)),
+		"cents_off": cents_off,
 		"freq": float(result.get("frequency", 0.0)),
 		"rms": float(result.get("rms", 0.0)),
 	})
 	if _sight_singing_progress_label != null:
 		_sight_singing_progress_label.text = "Recording phrase... %.1fs" % t
+	_sight_singing_update_live_pitch_feedback(detected_midi, cents_off, t)
 	if t >= _sight_singing_max_phrase_seconds():
 		_sight_singing_finalize_phrase(true)
+
+
+func _sight_singing_update_live_pitch_feedback(detected_midi: int, cents_off: float, t_seconds: float) -> void:
+	# Resolves which note in the melody the singer should be hitting RIGHT NOW
+	# based on cumulative durations, then colors the pitch bar by closeness and
+	# updates the label with octave warnings.
+	if _sight_singing_pitch_bar == null or _sight_singing_pitch_label == null:
+		return
+	if _sight_singing_runtime.melody.is_empty():
+		return
+	# Walk durations to find the expected note index at time t_seconds.
+	var note_idx := 0
+	var cumulative := 0.0
+	for i in range(_sight_singing_runtime.melody.size()):
+		var dur := float(SightSingingTheoryScript.duration_at(_sight_singing_runtime.durations, i))
+		# Each duration unit is one quarter note at ~80 BPM → 0.75s/beat-ish.
+		# Pitch detector logs candidates in seconds; close enough for visual feedback.
+		cumulative += dur * 0.75
+		if t_seconds <= cumulative:
+			note_idx = i
+			break
+		note_idx = i
+	var target_midi: int = int(_sight_singing_runtime.melody[note_idx])
+	var semis_off: int = detected_midi - target_midi
+	# Octave-fold semitone error: if ≥12 semis off, report octave mismatch.
+	var octave_warning := ""
+	if absi(semis_off) >= 11:
+		var oct_dir: String = "low" if semis_off < 0 else "high"
+		octave_warning = "  (an octave %s)" % oct_dir
+	# Pitch-bar color: green = within 25 cents AND same pitch class, yellow ≤50, red otherwise.
+	var same_pc: bool = ((detected_midi % 12) == (target_midi % 12))
+	var bar_color: Color
+	if same_pc and absf(cents_off) <= 25.0:
+		bar_color = Color(0.40, 0.92, 0.45, 0.92)  # green
+	elif same_pc and absf(cents_off) <= 50.0:
+		bar_color = Color(0.95, 0.85, 0.35, 0.92)  # yellow
+	else:
+		bar_color = Color(0.95, 0.45, 0.40, 0.92)  # red
+	_sight_singing_pitch_bar.color = bar_color
+	_sight_singing_pitch_bar.visible = true
+	_sight_singing_pitch_label.visible = true
+	_sight_singing_pitch_label.text = "Sung %s · target %s%s · %+d cents" % [
+		PitchDetectorScript.midi_to_full_name(detected_midi),
+		PitchDetectorScript.midi_to_full_name(target_midi),
+		octave_warning,
+		int(round(cents_off)),
+	]
+
+
+func _sight_singing_hide_live_pitch_feedback() -> void:
+	if _sight_singing_pitch_bar != null:
+		_sight_singing_pitch_bar.visible = false
+	if _sight_singing_pitch_label != null:
+		_sight_singing_pitch_label.visible = false
 
 
 func _sight_singing_phrase_tick_no_detection(_result: Dictionary) -> void:
@@ -24258,6 +25511,9 @@ func _sight_singing_run_soft_analysis_pass(analysis_hop: int = 1024) -> Array:
 
 
 func _sight_singing_apply_phrase_feedback(result: Dictionary) -> void:
+	# Hide the live pitch indicator once recording ends — the bands+curve on the
+	# staff carry the post-take feedback from here on.
+	_sight_singing_hide_live_pitch_feedback()
 	if _sight_singing_staff == null:
 		return
 	var bands: Dictionary = {}
@@ -24605,6 +25861,7 @@ func _stop_sight_singing() -> void:
 	if _sight_singing_runtime.started:
 		_sight_singing_runtime.started = false
 	_sight_singing_runtime.phrase_recording = false
+	_sight_singing_hide_live_pitch_feedback()
 	if _pitch_detector != null and _pitch_detector.has_method("stop_take_recording"):
 		_pitch_detector.call("stop_take_recording")
 	if _sight_singing_take_audio_player != null:
@@ -24760,6 +26017,12 @@ func _handle_midi_note_on(pitch: int) -> void:
 		_handle_midi_note_on_for_sight_chords(pitch)
 	elif _selected_mode == MODE_NOTE_CHASE:
 		_handle_midi_note_on_for_note_chase(pitch)
+	elif _selected_mode == MODE_INTERVAL:
+		_handle_midi_note_on_for_ear_interval(pitch)
+	elif _selected_mode == MODE_CHORD:
+		_handle_midi_note_on_for_ear_chord(pitch)
+	elif _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_CADENCE or _selected_mode == MODE_SCALE_MODE:
+		_handle_midi_note_on_for_ear_sequence(pitch)
 
 
 func _handle_midi_note_on_for_sight_notes(pitch: int) -> void:
@@ -24827,9 +26090,19 @@ func _handle_midi_note_on_for_sight_chords(pitch: int) -> void:
 
 
 func _midi_chord_buffer_tick() -> void:
+	# Tick handles three buffers: chord window (sight chord + ear chord),
+	# interval window (ear interval), and sequence window (progression/cadence/scale-mode).
+	_midi_chord_buffer_tick_for_chord()
+	_midi_ear_interval_buffer_tick()
+	_midi_ear_seq_buffer_tick()
+
+
+func _midi_chord_buffer_tick_for_chord() -> void:
 	if _midi_chord_window_start < 0.0:
 		return
-	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
+	var is_sight_chords := _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
+	var is_ear_chord := _selected_mode == MODE_CHORD
+	if not (is_sight_chords or is_ear_chord):
 		_midi_chord_buffer.clear()
 		_midi_chord_window_start = -1.0
 		return
@@ -24843,7 +26116,47 @@ func _midi_chord_buffer_tick() -> void:
 	var played: Array[int] = _midi_chord_buffer.duplicate()
 	_midi_chord_buffer.clear()
 	_midi_chord_window_start = -1.0
-	_midi_evaluate_played_chord(played)
+	if is_sight_chords:
+		_midi_evaluate_played_chord(played)
+	else:
+		_midi_evaluate_played_ear_chord(played)
+
+
+func _midi_ear_interval_buffer_tick() -> void:
+	if _midi_ear_interval_window_start < 0.0:
+		return
+	if _selected_mode != MODE_INTERVAL or not _quiz_active or not _accepting_answer:
+		_midi_ear_interval_buffer.clear()
+		_midi_ear_interval_window_start = -1.0
+		return
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if now - _midi_ear_interval_window_start < MIDI_EAR_INTERVAL_WINDOW_SEC:
+		return
+	# Window expired without enough notes — reset and prompt user
+	var played: Array[int] = _midi_ear_interval_buffer.duplicate()
+	_midi_ear_interval_buffer.clear()
+	_midi_ear_interval_window_start = -1.0
+	if played.size() >= 2:
+		_midi_evaluate_played_ear_interval(played)
+	elif _midi_status_label != null and _midi_status_label.is_inside_tree():
+		_midi_status_label.text = "MIDI: play 2 notes within 1.5s to answer."
+
+
+func _midi_ear_seq_buffer_tick() -> void:
+	if _midi_ear_seq_window_start < 0.0:
+		return
+	var seq_ok := _selected_mode == MODE_PROGRESSION or _selected_mode == MODE_CADENCE or _selected_mode == MODE_SCALE_MODE
+	if not seq_ok or not _quiz_active or not _accepting_answer:
+		_midi_ear_seq_buffer.clear()
+		_midi_ear_seq_window_start = -1.0
+		return
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if now - _midi_ear_seq_window_start < MIDI_EAR_SEQ_WINDOW_SEC:
+		return
+	var played: Array[int] = _midi_ear_seq_buffer.duplicate()
+	_midi_ear_seq_buffer.clear()
+	_midi_ear_seq_window_start = -1.0
+	_midi_evaluate_played_ear_sequence(played)
 
 
 func _midi_evaluate_played_chord(played_pitches: Array[int]) -> void:
@@ -24868,6 +26181,156 @@ func _midi_evaluate_played_chord(played_pitches: Array[int]) -> void:
 	# Recognizer returned a chord type that's not in the current choices, OR a cluster.
 	var fallback_idx := (correct_idx + 1) % _current_sight_chord_choices.size()
 	_on_sight_chord_choice_index(fallback_idx)
+
+
+# --- Ear training MIDI handlers (Interval / Chord / Sequence) ---
+
+func _handle_midi_note_on_for_ear_interval(pitch: int) -> void:
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if _midi_ear_interval_window_start < 0.0 or _midi_ear_interval_buffer.size() >= 2:
+		_midi_ear_interval_buffer.clear()
+		_midi_ear_interval_window_start = now
+	_midi_ear_interval_buffer.append(pitch)
+	if _midi_status_label != null and _midi_status_label.is_inside_tree():
+		if _midi_ear_interval_buffer.size() == 1:
+			_midi_status_label.text = "MIDI: 1 note received — play the second."
+		else:
+			_midi_status_label.text = "MIDI: evaluating..."
+	# If we collected 2 notes, evaluate immediately
+	if _midi_ear_interval_buffer.size() >= 2:
+		var played: Array[int] = _midi_ear_interval_buffer.duplicate()
+		_midi_ear_interval_buffer.clear()
+		_midi_ear_interval_window_start = -1.0
+		_midi_evaluate_played_ear_interval(played)
+
+
+func _midi_evaluate_played_ear_interval(played: Array[int]) -> void:
+	if played.size() < 2 or not _quiz_active or not _accepting_answer:
+		return
+	if _current_interval_choices.is_empty():
+		return
+	var played_semis: int = absi(int(played[1]) - int(played[0]))
+	# Clamp to 0..24 — anything wider is treated as compound, fall through to nearest interval
+	played_semis = clampi(played_semis, 0, 24)
+	var matched_id: String = MusicHelpersScript.interval_id_for_semitones(played_semis)
+	# If exact match isn't in choices, try the closest choice
+	var picked: String = ""
+	for choice_id in _current_interval_choices:
+		if choice_id == matched_id:
+			picked = choice_id
+			break
+	if picked.is_empty():
+		# Pick the choice with the smallest absolute semitone distance
+		var best_dist := 1000
+		for choice_id in _current_interval_choices:
+			var semis_arr: Array = INTERVAL_DATA.get(choice_id, {"semitones": [0]})["semitones"]
+			for s_v in semis_arr:
+				var dist := absi(int(s_v) - played_semis)
+				if dist < best_dist:
+					best_dist = dist
+					picked = String(choice_id)
+	if picked.is_empty():
+		picked = String(_current_interval_choices[0])
+	var btn: Button = _get_button_for_interval(picked)
+	if btn != null:
+		_pop_sight_button(btn)
+	var idx := _current_interval_choices.find(picked)
+	if idx < 0:
+		idx = 0
+	_on_interval_choice_index(idx)
+
+
+func _handle_midi_note_on_for_ear_chord(pitch: int) -> void:
+	# Reuse the chord-window buffer; the tick will route to _midi_evaluate_played_ear_chord
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if _midi_chord_window_start < 0.0:
+		_midi_chord_buffer.clear()
+		_midi_chord_window_start = now
+	if not _midi_chord_buffer.has(pitch):
+		_midi_chord_buffer.append(pitch)
+
+
+func _midi_evaluate_played_ear_chord(played: Array[int]) -> void:
+	if played.is_empty() or not _quiz_active or not _accepting_answer:
+		return
+	if _current_chord_choices.is_empty():
+		return
+	# Single-note input → treat as wrong (need at least 2 pitches for any chord)
+	if played.size() < 2:
+		if _midi_status_label != null and _midi_status_label.is_inside_tree():
+			_midi_status_label.text = "MIDI: play 3+ notes together for a chord."
+		return
+	var recognized: Dictionary = ChordRecognizerScript.recognize(played)
+	var played_quality := str(recognized.get("quality", ""))
+	var played_choice_name: String = RECOGNIZER_QUALITY_TO_CHOICE.get(played_quality, "")
+	var picked: String = ""
+	if not played_choice_name.is_empty() and _current_chord_choices.has(played_choice_name):
+		picked = played_choice_name
+	else:
+		# Fallback: pick the first non-correct choice (registers as wrong answer)
+		for c_name in _current_chord_choices:
+			if String(c_name) != _current_chord_quality:
+				picked = String(c_name)
+				break
+		if picked.is_empty():
+			picked = String(_current_chord_choices[0])
+	var btn: Button = _chord_buttons.get(picked, null) as Button
+	if btn != null:
+		_pop_sight_button(btn)
+	_on_chord_chosen(picked)
+
+
+func _handle_midi_note_on_for_ear_sequence(pitch: int) -> void:
+	# Collects a sequence of notes (up to MIDI_EAR_SEQ_WINDOW_SEC).
+	# For Progression/Cadence/Scale-Mode, evaluator picks the choice whose first
+	# 1-3 notes match the played root note(s).
+	var now := float(Time.get_ticks_msec()) / 1000.0
+	if _midi_ear_seq_window_start < 0.0:
+		_midi_ear_seq_buffer.clear()
+		_midi_ear_seq_window_start = now
+	if not _midi_ear_seq_buffer.has(pitch):
+		_midi_ear_seq_buffer.append(pitch)
+	if _midi_status_label != null and _midi_status_label.is_inside_tree():
+		_midi_status_label.text = "MIDI: %d note(s) received..." % _midi_ear_seq_buffer.size()
+
+
+func _midi_evaluate_played_ear_sequence(played: Array[int]) -> void:
+	if played.is_empty() or not _quiz_active or not _accepting_answer:
+		return
+	if _current_ear_text_choices.is_empty():
+		return
+	# Heuristic: count root-pitch-classes played, then map to choice whose label
+	# best matches the played pattern by length or starting pitch class.
+	# This is intentionally lenient — the prompt is the audio; MIDI just commits
+	# the chosen answer button. The student plays *something* on the keyboard
+	# to indicate "I'm answering now"; for finer matching they use the buttons.
+	var pc_set: Dictionary = {}
+	for p in played:
+		pc_set[((int(p) % 12) + 12) % 12] = true
+	# Heuristic match: pick the correct answer iff the student played
+	# >= 3 unique pitch classes AND root_midi pc is in the played set.
+	var correct_id := _current_ear_text_answer
+	var root_pc := ((_current_root_midi % 12) + 12) % 12
+	var picked: String = ""
+	if pc_set.size() >= 3 and pc_set.has(root_pc):
+		picked = correct_id
+	else:
+		# Otherwise pick the first non-correct choice (wrong answer)
+		for c in _current_ear_text_choices:
+			if String(c) != correct_id:
+				picked = String(c)
+				break
+		if picked.is_empty():
+			picked = String(_current_ear_text_choices[0])
+	# Find the button index and route through the standard answer path
+	var idx := _current_ear_text_choices.find(picked)
+	if idx < 0:
+		idx = 0
+	if idx < _interval_choice_buttons.size():
+		var btn: Button = _interval_choice_buttons[idx]
+		if btn != null:
+			_pop_sight_button(btn)
+	_on_interval_choice_index(idx)
 
 
 func _handle_midi_note_off(pitch: int) -> void:
@@ -25345,6 +26808,19 @@ func _continuous_choose_accidental_for_letter(letter: String) -> String:
 
 
 func _continuous_build_pattern_steps(bounds: Vector2i) -> Array[int]:
+	# Phrase-coherent path: at level >=2 with phrase mode on, draw 4 bars from a
+	# single phrase template so consecutive bars form an arc instead of being
+	# independent random motifs.
+	if _phrase_mode_enabled and _continuous_sight_runtime.level >= 2:
+		if _current_phrase.is_empty() or _current_phrase_bar_idx >= PhraseGeneratorScript.phrase_bar_count(_current_phrase):
+			_current_phrase = PhraseGeneratorScript.pick_phrase(_rng)
+			_current_phrase_bar_idx = 0
+			# Anchor the phrase on a stable root within bounds — middle of staff.
+			_current_phrase_root_step = clampi(int((bounds.x + bounds.y) / 2), bounds.x, bounds.y - 7)
+		var phrase_steps: Array[int] = PhraseGeneratorScript.bar_steps(_current_phrase, _current_phrase_bar_idx, _current_phrase_root_step, bounds)
+		_current_phrase_bar_idx += 1
+		if not phrase_steps.is_empty():
+			return phrase_steps
 	var motifs: Array[Array] = [
 		[0, 2, 4, 7],    # triad up to octave
 		[0, 4, 2, 7],    # broken triad variation
@@ -25415,14 +26891,32 @@ func _continuous_build_next_bar_queue(bounds: Vector2i) -> void:
 					explicit_symbol = char(0x266F) if chosen == "#" else char(0x266D)
 					_continuous_bar_accidentals[letter] = chosen
 		var bar_line_here := _continuous_bar_note_index == 0 and _continuous_total_spawned_notes > 0
-		_continuous_spawn_queue.append({
-			"step": step,
-			"letter": letter,
-			"name": letter + effective_acc,
-			"display_name": letter + explicit_symbol,
-			"acc_symbol": explicit_symbol,
-			"bar_line": bar_line_here
-		})
+		# Note Flow rests: at level >=2, ~15% chance to emit a rest at bar position 3
+		# (the "and" beat) — gives a musical break without overwhelming the stream.
+		# Rhythm Flow has its own rest rendering and skips this branch.
+		var emit_rest := false
+		if not _is_rhythm_flow_mode() and _continuous_sight_runtime.level >= 2 \
+				and _continuous_bar_note_index == 2 and _rng.randf() < 0.15:
+			emit_rest = true
+		if emit_rest:
+			_continuous_spawn_queue.append({
+				"rest": true,
+				"step": 4,  # middle of staff for visual placement
+				"letter": "",
+				"name": "_rest_",
+				"display_name": "rest",
+				"acc_symbol": "",
+				"bar_line": bar_line_here,
+			})
+		else:
+			_continuous_spawn_queue.append({
+				"step": step,
+				"letter": letter,
+				"name": letter + effective_acc,
+				"display_name": letter + explicit_symbol,
+				"acc_symbol": explicit_symbol,
+				"bar_line": bar_line_here
+			})
 		_continuous_bar_note_index += 1
 		_continuous_total_spawned_notes += 1
 		_continuous_last_spawn_step = step
@@ -25909,13 +27403,40 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 	var display_name := str(note_spec.get("display_name", note_name))
 	var accidental_symbol := str(note_spec.get("acc_symbol", ""))
 	var has_bar_line := bool(note_spec.get("bar_line", false))
+	var is_rest := bool(note_spec.get("rest", false))
 	var center_y := _continuous_note_center_y_for_step(step)
 	var p := Panel.new()
-	p.custom_minimum_size = Vector2(36, 26)
+	if is_rest:
+		# Quarter-rest visual: tall narrow dark bar with "𝄽" glyph if the font has it,
+		# otherwise a stylized stack of small rects. Sized similar to a notehead so
+		# the rhythm spacing reads naturally.
+		p.custom_minimum_size = Vector2(16, 36)
+	else:
+		p.custom_minimum_size = Vector2(36, 26)
 	p.size = p.custom_minimum_size
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.z_index = 246
-	_apply_notehead_material(p, Color(0.95, 0.55, 0.24, 0.96), Color(0.10, 0.08, 0.05, 0.85))
+	if is_rest:
+		# Style: transparent panel with a child Label showing a rest glyph.
+		var rest_sb := StyleBoxFlat.new()
+		rest_sb.bg_color = Color(0, 0, 0, 0)
+		p.add_theme_stylebox_override("panel", rest_sb)
+		var rest_lbl := Label.new()
+		rest_lbl.text = "%s" % char(0x1D13D)  # 𝄽 quarter rest
+		rest_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rest_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		rest_lbl.add_theme_font_size_override("font_size", 32)
+		if _ui_font != null:
+			rest_lbl.add_theme_font_override("font", _ui_font)
+		rest_lbl.add_theme_color_override("font_color", Color(0.95, 0.92, 0.78, 0.96))
+		rest_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.04, 0.85))
+		rest_lbl.add_theme_constant_override("outline_size", 2)
+		rest_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rest_lbl.anchor_right = 1.0
+		rest_lbl.anchor_bottom = 1.0
+		p.add_child(rest_lbl)
+	else:
+		_apply_notehead_material(p, Color(0.95, 0.55, 0.24, 0.96), Color(0.10, 0.08, 0.05, 0.85))
 	var center_x := _continuous_spawn_x() + x_offset
 	if not is_nan(center_x_override):
 		center_x = center_x_override
@@ -25964,11 +27485,14 @@ func _spawn_continuous_sight_note(x_offset: float = 0.0, center_x_override: floa
 		"acc_symbol": accidental_symbol,
 		"step": step,
 		"seq": _continuous_spawn_seq,
-		"answered": false,
+		# Rests pre-mark answered so the player isn't expected to interact and the
+		# scroll-update doesn't tag them as missed.
+		"answered": is_rest,
 		"zone_enter_time": -1.0,
 		"bar_line": bar_line,
 		"acc_label": acc_label,
 		"ledgers": ledgers,
+		"rest": is_rest,
 	})
 	_continuous_spawn_seq += 1
 
@@ -27622,6 +29146,9 @@ func _start_continuous_sight_reading(demo_mode: bool = false, reuse_current_rhyt
 	_continuous_last_spawn_step = 9999
 	_continuous_spawn_seq = 0
 	_continuous_last_spawn_elapsed = 0.0
+	# Reset phrase generator state so each session starts a fresh phrase.
+	_current_phrase = {}
+	_current_phrase_bar_idx = 0
 	_lives = 5
 	_streak = 0
 	if _is_rhythm_flow_mode():
