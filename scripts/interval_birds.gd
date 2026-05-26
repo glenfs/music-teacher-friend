@@ -111,6 +111,7 @@ const MusicHelpersScript = preload("res://scripts/music_theory/music_helpers.gd"
 const NoteChaseDifficultyScript = preload("res://scripts/exercises/note_chase_difficulty.gd")
 const NoteChaseEffectsScript = preload("res://scripts/exercises/note_chase_effects.gd")
 const SightSingingTheoryScript = preload("res://scripts/sight_singing/sight_singing_theory.gd")
+const EarTrainingCoreScript = preload("res://scripts/exercises/ear_training_core.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -313,11 +314,7 @@ const CADENCE_DEFS := {
 # C3, D3, F3, G3 — comfortable key rotation for cadence training
 const CADENCE_KEY_ROOTS := [48, 50, 53, 55]
 # Difficulty ranking for interval distractors and session ramping (0=easiest)
-const INTERVAL_DIFFICULTY_RANK := {
-	"P1": 0, "P8": 1, "P5": 2, "P4": 3,
-	"M3": 4, "m3": 5, "M6": 6, "m6": 7,
-	"M2": 8, "M7": 9, "m2": 10, "m7": 11, "TT": 12
-}
+const INTERVAL_DIFFICULTY_RANK := EarTrainingCoreScript.INTERVAL_DIFFICULTY_RANK
 const SIGHT_TRIADS := [
 	{"root": "C", "quality": "Major", "name": "C Major"},
 	{"root": "D", "quality": "Minor", "name": "D Minor"},
@@ -16583,14 +16580,7 @@ func _init_session_stats() -> void:
 
 
 func _get_available_chord_types() -> Array[String]:
-	var out: Array[String] = []
-	for chord_name in _selected_chord_types:
-		if CHORD_INTERVALS.has(chord_name) and not out.has(chord_name):
-			out.append(chord_name)
-	if out.is_empty():
-		for chord_name in CHORD_DEFAULT_SELECTED:
-			out.append(chord_name)
-	return out
+	return EarTrainingCoreScript.available_chord_types(_selected_chord_types, CHORD_INTERVALS, CHORD_DEFAULT_SELECTED)
 
 
 func _record_question_asked() -> void:
@@ -16801,24 +16791,7 @@ func _on_restart_quiz_pressed() -> void:
 
 
 func _build_interval_pool_for_settings() -> Array[String]:
-	var selected_degrees := _get_selected_degrees()
-	var pool: Array[String] = []
-	for d in selected_degrees:
-		var options: Array = DEGREE_INTERVALS.get(d, [])
-		for id in options:
-			var iid := str(id)
-			if iid.begins_with("m") and not _include_minor_intervals:
-				continue
-			if not pool.has(iid):
-				pool.append(iid)
-	if pool.is_empty():
-		for d in selected_degrees:
-			var fallback_options: Array = DEGREE_INTERVALS.get(d, [])
-			for id in fallback_options:
-				var fallback_id := str(id)
-				if not pool.has(fallback_id):
-					pool.append(fallback_id)
-	return pool
+	return EarTrainingCoreScript.build_interval_pool(_get_selected_degrees(), _include_minor_intervals, DEGREE_INTERVALS)
 
 
 func _build_interval_choices(correct_id: String, pool: Array[String]) -> Array[String]:
@@ -19949,108 +19922,76 @@ func _generate_round() -> void:
 	if _selected_mode == MODE_INTERVAL:
 		if _active_intervals.is_empty():
 			_active_intervals = _build_interval_pool_for_settings()
-		# When focus-missed mode is active, restrict question pool to missed intervals
 		var _ask_pool: Array[String] = _focus_missed_ids if not _focus_missed_ids.is_empty() else _active_intervals
 		# First question: pick the most recognizable interval for an immediate win
 		# (only in normal mode — in focus mode, every interval needs practice)
 		if _question_index == 1 and _focus_missed_ids.is_empty():
-			var easy_order := ["P8", "P5", "P4", "M3", "P1"]
-			for easy in easy_order:
-				if easy in _active_intervals:
-					_current_interval_id = easy
-					var semitone_options: Array = INTERVAL_DATA[_current_interval_id]["semitones"]
-					var semitones: int = int(semitone_options[0])
-					_current_root_midi = 60  # Middle C — a familiar reference
-					_current_second_midi = _current_root_midi + semitones
-					_last_interval_signature = "%s:%d:%d" % [_current_interval_id, _current_root_midi, _current_second_midi]
-					_current_interval_choices = _build_interval_choices(_current_interval_id, _active_intervals)
-					_current_ear_text_answer = _current_interval_id
-					_apply_interval_choice_texts(_current_interval_choices, true)
-					return
-		# Difficulty ramp: early questions favour easier intervals
+			var easy := EarTrainingCoreScript.easy_interval_first_pick(_active_intervals)
+			if easy != "":
+				_current_interval_id = easy
+				var semitone_options: Array = INTERVAL_DATA[_current_interval_id]["semitones"]
+				_current_root_midi = 60  # Middle C — a familiar reference
+				_current_second_midi = _current_root_midi + int(semitone_options[0])
+				_last_interval_signature = "%s:%d:%d" % [_current_interval_id, _current_root_midi, _current_second_midi]
+				_current_interval_choices = _build_interval_choices(_current_interval_id, _active_intervals)
+				_current_ear_text_answer = _current_interval_id
+				_apply_interval_choice_texts(_current_interval_choices, true)
+				return
 		var q_ratio := float(_question_index) / float(maxi(1, _total_questions))
-		if _focus_missed_ids.is_empty() and _ask_pool.size() > 2:
-			var max_rank := 3 if q_ratio < 0.25 else (7 if q_ratio < 0.55 else 99)
-			var ramped: Array[String] = []
-			for rid in _ask_pool:
-				if INTERVAL_DIFFICULTY_RANK.get(rid, 99) <= max_rank:
-					ramped.append(rid)
-			if not ramped.is_empty():
-				_ask_pool = ramped
-		# Spaced repetition: weight towards previously missed intervals
+		if _focus_missed_ids.is_empty():
+			_ask_pool = EarTrainingCoreScript.ramp_interval_pool(_ask_pool, q_ratio)
 		var rq_int = _review_queue_for_mode(MODE_INTERVAL)
 		var weighted_pick: String = ""
 		if rq_int != null and not _ask_pool.is_empty():
 			weighted_pick = str(rq_int.pick_next(_ask_pool))
-		# Dynamic root range: narrow early (comfortable), wide late (challenging)
-		var root_min := 58 if q_ratio < 0.30 else (53 if q_ratio < 0.65 else 48)
-		var root_max := 62 if q_ratio < 0.30 else (67 if q_ratio < 0.65 else 72)
-		var interval_sig := ""
-		for attempt in range(16):
-			if weighted_pick != "" and attempt == 0:
-				_current_interval_id = weighted_pick
-			else:
-				_current_interval_id = _ask_pool[_rng.randi_range(0, _ask_pool.size() - 1)]
-			var semitone_options: Array = INTERVAL_DATA[_current_interval_id]["semitones"]
-			var semitones: int = int(semitone_options[_rng.randi_range(0, semitone_options.size() - 1)])
-			_current_root_midi = _rng.randi_range(root_min, root_max)
-			_current_second_midi = _current_root_midi + semitones
-			_current_interval_id = _interval_id_for_semitones(_current_second_midi - _current_root_midi)
-			interval_sig = "%s:%d:%d" % [_current_interval_id, _current_root_midi, _current_second_midi]
-			if interval_sig != _last_interval_signature or attempt == 15:
-				break
-		_last_interval_signature = interval_sig
+		var picked := EarTrainingCoreScript.pick_interval_question(
+			_ask_pool, weighted_pick, _last_interval_signature, q_ratio,
+			INTERVAL_DATA, Callable(self, "_interval_id_for_semitones"), _rng
+		)
+		_current_interval_id = str(picked["interval_id"])
+		_current_root_midi = int(picked["root_midi"])
+		_current_second_midi = int(picked["second_midi"])
+		_last_interval_signature = str(picked["signature"])
 		_current_interval_choices = _build_interval_choices(_current_interval_id, _active_intervals)
 		_current_ear_text_answer = _current_interval_id
 		_apply_interval_choice_texts(_current_interval_choices, true)
 	elif _selected_mode == MODE_CHORD:
 		if _current_available_chord_types.is_empty():
 			_current_available_chord_types = _get_available_chord_types()
-		# When focus-missed mode is active, restrict chord pool to missed chord types
 		var _chord_ask_pool: Array[String] = _focus_missed_ids if not _focus_missed_ids.is_empty() else _current_available_chord_types
 		if _chord_ask_pool.is_empty():
 			_chord_ask_pool = _current_available_chord_types
 		# First question: start with the most recognisable chord for an easy opening win
 		if _question_index == 1 and _focus_missed_ids.is_empty():
-			var easy_chord_order := ["Major", "Minor", "Dom7", "Maj7", "Min7", "Dim"]
-			for easy_chord in easy_chord_order:
-				if easy_chord in _chord_ask_pool:
-					_current_chord_quality = easy_chord
-					_current_root_midi = 60  # Middle C — a familiar reference
-					_current_chord_inversion = 0
-					_current_chord_notes = _build_chord_notes(_current_root_midi, _current_chord_quality, 0)
-					_last_chord_signature = "%s:%d:%d" % [_current_chord_quality, _current_root_midi, _current_chord_inversion]
-					_current_chord_choices = _build_chord_choices(_current_chord_quality, _current_available_chord_types)
-					return
-		# Spaced repetition: weight towards previously missed chord qualities
+			var easy_chord := EarTrainingCoreScript.easy_chord_first_pick(_chord_ask_pool)
+			if easy_chord != "":
+				_current_chord_quality = easy_chord
+				_current_root_midi = 60  # Middle C — a familiar reference
+				_current_chord_inversion = 0
+				_current_chord_notes = _build_chord_notes(_current_root_midi, _current_chord_quality, 0)
+				_last_chord_signature = "%s:%d:%d" % [_current_chord_quality, _current_root_midi, _current_chord_inversion]
+				_current_chord_choices = _build_chord_choices(_current_chord_quality, _current_available_chord_types)
+				return
 		var rq_chord = _review_queue_for_mode(MODE_CHORD)
 		var chord_weighted_pick := ""
 		if rq_chord != null and not _chord_ask_pool.is_empty():
 			chord_weighted_pick = str(rq_chord.pick_next(_chord_ask_pool))
-		var chord_sig := ""
-		for attempt in range(16):
-			if attempt == 0 and not chord_weighted_pick.is_empty():
-				_current_chord_quality = chord_weighted_pick
-			else:
-				_current_chord_quality = _chord_ask_pool[_rng.randi_range(0, _chord_ask_pool.size() - 1)]
-			_current_root_midi = _rng.randi_range(50, 60)
-			_current_chord_inversion = 0
-			# Only allow inversions when user has chords beyond basic Foundations tier.
-			var _has_non_foundation := false
-			for _scn in _selected_chord_types:
-				if not CHORD_TIER_TRIADS.has(_scn):
-					_has_non_foundation = true
-					break
-			var allow_inversions := _has_non_foundation
-			if allow_inversions and _inversion_toggle != null and _inversion_toggle.button_pressed:
-				var max_inversion := mini(2, CHORD_INTERVALS[_current_chord_quality].size() - 1)
-				if max_inversion > 0:
-					_current_chord_inversion = _rng.randi_range(0, max_inversion)
-			_current_chord_notes = _build_chord_notes(_current_root_midi, _current_chord_quality, _current_chord_inversion)
-			chord_sig = "%s:%d:%d" % [_current_chord_quality, _current_root_midi, _current_chord_inversion]
-			if chord_sig != _last_chord_signature or attempt == 15:
+		# Only allow inversions when user has chords beyond basic Foundations tier.
+		var allow_inversions := false
+		for _scn in _selected_chord_types:
+			if not CHORD_TIER_TRIADS.has(_scn):
+				allow_inversions = true
 				break
-		_last_chord_signature = chord_sig
+		var inversion_on := _inversion_toggle != null and _inversion_toggle.button_pressed
+		var picked_chord := EarTrainingCoreScript.pick_chord_question(
+			_chord_ask_pool, chord_weighted_pick, _last_chord_signature,
+			allow_inversions, inversion_on, CHORD_INTERVALS, _rng
+		)
+		_current_chord_quality = str(picked_chord["quality"])
+		_current_root_midi = int(picked_chord["root_midi"])
+		_current_chord_inversion = int(picked_chord["inversion"])
+		_current_chord_notes = picked_chord["notes"]
+		_last_chord_signature = str(picked_chord["signature"])
 		_current_chord_choices = _build_chord_choices(_current_chord_quality, _current_available_chord_types)
 	elif _selected_mode == MODE_PITCH_MATCH:
 		var tonic := _pitch_match_tonic_midi()
@@ -20355,18 +20296,7 @@ func _consume_chicken_shield_on_wrong() -> bool:
 
 
 func _build_chord_notes(root_midi: int, chord_quality: String, inversion: int) -> Array[int]:
-	var raw_intervals: Array = CHORD_INTERVALS[chord_quality]
-	var intervals: Array[int] = []
-	for v in raw_intervals:
-		intervals.append(int(v))
-	var inv_count := mini(inversion, intervals.size() - 1)
-	for i in inv_count:
-		var moved: int = int(intervals.pop_front()) + 12
-		intervals.append(moved)
-	var notes: Array[int] = []
-	for iv in intervals:
-		notes.append(root_midi + iv)
-	return notes
+	return EarTrainingCoreScript.chord_notes(root_midi, chord_quality, inversion, CHORD_INTERVALS)
 
 
 func _play_chord(notes: Array[int], duration: float) -> void:
