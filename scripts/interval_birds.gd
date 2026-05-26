@@ -24263,10 +24263,11 @@ func _build_sight_big_piano() -> void:
 		_sight_big_piano_keys_root.add_child(btn)
 		_sight_big_piano_keys[pitch] = btn
 
-	# Letter labels on every white key. Added as siblings of the button (above
-	# in keys_root z-order) so they can't be hidden by the button's styling or
-	# feedback color changes. C keys also show octave (C3/C4/C5). Black keys
-	# stay unlabeled.
+	# Letter labels on every white key. Set the Button's text directly + apply
+	# a navy theme color override so the letter renders via the button's own
+	# text painter (most reliable across Godot 4.x — child-Label approaches
+	# can be hidden by the button's styling). C keys also show octave (C3/C4/C5).
+	# Black keys stay unlabeled.
 	var letter_for_pc := {0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B"}
 	for pitch in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
 		if _ce_pitch_is_black(pitch):
@@ -24275,27 +24276,25 @@ func _build_sight_big_piano() -> void:
 		var letter: String = String(letter_for_pc.get(pc, ""))
 		if letter.is_empty():
 			continue
-		var lbl := Label.new()
+		var btn = _sight_big_piano_keys.get(pitch) as Button
+		if btn == null:
+			continue
 		if pc == 0:
-			lbl.text = "C%d" % int(pitch / 12 - 1)
+			btn.text = "C%d" % int(pitch / 12 - 1)
 		else:
-			lbl.text = letter
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-		lbl.add_theme_font_size_override("font_size", 14)
+			btn.text = letter
+		btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		btn.add_theme_font_size_override("font_size", 14)
 		if _ui_font != null:
-			lbl.add_theme_font_override("font", _ui_font)
-		# Brighter navy blue from the learning-card palette (#1F4E6B) — sits
-		# in the app's blue family but reads more clearly than the very dark
-		# setup-tint. White outline preserves legibility when keys go
-		# lit-blue / red / green during answer feedback.
-		lbl.add_theme_color_override("font_color", Color(0.1216, 0.3059, 0.4196, 1.0))  # #1F4E6B
-		lbl.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.95))
-		lbl.add_theme_constant_override("outline_size", 3)
-		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		lbl.z_index = 50
-		_sight_big_piano_keys_root.add_child(lbl)
-		_sight_big_piano_key_labels[pitch] = lbl
+			btn.add_theme_font_override("font", _ui_font)
+		# Brighter navy blue from the learning-card palette (#1F4E6B). White
+		# outline keeps the letter legible when the key flips to feedback
+		# colors (lit blue / red wrong / green correct).
+		btn.add_theme_color_override("font_color", Color(0.1216, 0.3059, 0.4196, 1.0))  # #1F4E6B
+		btn.add_theme_color_override("font_hover_color", Color(0.1216, 0.3059, 0.4196, 1.0))
+		btn.add_theme_color_override("font_pressed_color", Color(0.1216, 0.3059, 0.4196, 1.0))
+		btn.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.95))
+		btn.add_theme_constant_override("outline_size", 3)
 
 	_layout_sight_big_piano()
 
@@ -24372,19 +24371,16 @@ func _layout_sight_big_piano() -> void:
 			btn.position = Vector2(bx, 0)
 			btn.size = Vector2(black_w, black_h)
 
-	# Position the always-visible letter labels at the bottom of each white key.
-	# Sibling-to-button placement so feedback color changes on the buttons don't
-	# affect label visibility. Font scales down on narrow keys so text fits.
-	var label_band_h: float = 22.0
+	# Scale the white-key letter font down on narrow keys so text fits
+	# (clamped 10-16pt). Buttons render their own text via the Godot theme.
 	var font_size: int = clampi(int(white_w * 0.42), 10, 16)
-	for pitch in _sight_big_piano_key_labels.keys():
-		var lbl: Label = _sight_big_piano_key_labels[pitch] as Label
-		if lbl == null:
+	for pitch in _sight_big_piano_keys.keys():
+		if _ce_pitch_is_black(int(pitch)):
 			continue
-		var lbl_x: float = float(white_positions.get(int(pitch), 0.0))
-		lbl.position = Vector2(lbl_x, white_h - label_band_h - 2.0)
-		lbl.size = Vector2(white_w, label_band_h)
-		lbl.add_theme_font_size_override("font_size", font_size)
+		var btn = _sight_big_piano_keys.get(pitch) as Button
+		if btn == null or btn.text.is_empty():
+			continue
+		btn.add_theme_font_size_override("font_size", font_size)
 
 
 func _on_sight_big_piano_key_pressed(pitch: int) -> void:
