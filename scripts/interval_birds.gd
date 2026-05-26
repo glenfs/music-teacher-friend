@@ -24287,14 +24287,20 @@ func _build_sight_big_piano() -> void:
 		btn.add_theme_font_size_override("font_size", 14)
 		if _ui_font != null:
 			btn.add_theme_font_override("font", _ui_font)
-		# Brighter navy blue from the learning-card palette (#1F4E6B). White
-		# outline keeps the letter legible when the key flips to feedback
-		# colors (lit blue / red wrong / green correct).
-		btn.add_theme_color_override("font_color", Color(0.1216, 0.3059, 0.4196, 1.0))  # #1F4E6B
-		btn.add_theme_color_override("font_hover_color", Color(0.1216, 0.3059, 0.4196, 1.0))
-		btn.add_theme_color_override("font_pressed_color", Color(0.1216, 0.3059, 0.4196, 1.0))
-		btn.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 0.95))
-		btn.add_theme_constant_override("outline_size", 3)
+		# Deep saturated blue (#0A2C6B) — punchier contrast on cream keys
+		# than the muted #1F4E6B. White outline keeps it legible when the
+		# key flips to feedback colors (lit blue / red wrong / green correct).
+		var label_color := Color(0.0392, 0.1725, 0.4196, 1.0)  # #0A2C6B deep blue
+		btn.add_theme_color_override("font_color", label_color)
+		btn.add_theme_color_override("font_hover_color", label_color)
+		btn.add_theme_color_override("font_pressed_color", label_color)
+		btn.add_theme_color_override("font_focus_color", label_color)
+		btn.add_theme_color_override("font_outline_color", Color(1.0, 1.0, 1.0, 1.0))
+		btn.add_theme_constant_override("outline_size", 4)
+		# Push text down to the bottom of the key (like real piano labels):
+		# clone the StyleBox and bias content_margin_top so the rendered
+		# text sits low on the key surface.
+		_bias_button_text_to_bottom(btn)
 
 	_layout_sight_big_piano()
 
@@ -24381,6 +24387,24 @@ func _layout_sight_big_piano() -> void:
 		if btn == null or btn.text.is_empty():
 			continue
 		btn.add_theme_font_size_override("font_size", font_size)
+
+
+func _bias_button_text_to_bottom(btn: Button) -> void:
+	# Godot Buttons center their text vertically. To push the letter to the
+	# bottom of the key (like real piano key labels), clone every StyleBoxFlat
+	# state override on the button and bias content_margin_top so the button
+	# treats its top as much taller than reality — text drops to the bottom.
+	var keys: Array[String] = ["normal", "hover", "pressed", "focus", "disabled"]
+	for state_key in keys:
+		var sb_v: Variant = btn.get_theme_stylebox(state_key)
+		if not (sb_v is StyleBoxFlat):
+			continue
+		var sb := (sb_v as StyleBoxFlat).duplicate() as StyleBoxFlat
+		# Aggressive top margin: pushes text content way down. The numbers
+		# here are pixels in button-local space (button is ~138px tall).
+		sb.content_margin_top = 90.0
+		sb.content_margin_bottom = 4.0
+		btn.add_theme_stylebox_override(state_key, sb)
 
 
 func _on_sight_big_piano_key_pressed(pitch: int) -> void:
