@@ -115,6 +115,7 @@ const EarTrainingCoreScript = preload("res://scripts/exercises/ear_training_core
 const NoteChasePhysicsScript = preload("res://scripts/exercises/note_chase_physics.gd")
 const NoteChaseRuntimeScript = preload("res://scripts/exercises/note_chase_runtime.gd")
 const RhythmFlowRuntimeScript = preload("res://scripts/rhythm/rhythm_flow_runtime.gd")
+const SightSingingRuntimeScript = preload("res://scripts/sight_singing/sight_singing_runtime.gd")
 const TechnicalExerciseGeneratorScript = preload("res://scripts/exercises/technical_exercise_generator.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
 const CurriculumScript = preload("res://scripts/exercises/curriculum.gd")
@@ -1292,9 +1293,9 @@ var _sight_singing_session: RefCounted = null   # SightSingingSession
 # notation looks identical (SMuFL clef + noteheads, proper accidentals,
 # key-signature spelling). Lives inside _staff_area as an overlay child.
 var _sight_singing_staff: Control = null         # StaffRendererScript instance
-var _sight_singing_melody: Array[int] = []
-var _sight_singing_durations: Array[float] = []
-var _sight_singing_started: bool = false  # true between round start and result
+# Sight Singing runtime — owns the melody/durations/started + phrase-detection
+# state machine. Same RefCounted pattern as the other Runtime modules.
+var _sight_singing_runtime: RefCounted = SightSingingRuntimeScript.new()
 var _sight_singing_rng: RandomNumberGenerator = null
 # Compact "running progress" status row drawn under the staff (e.g. "Note 3/5  ✓ ✓ ✗").
 var _sight_singing_progress_label: Label = null
@@ -1304,37 +1305,17 @@ var _sight_singing_replay_take_button: Button = null
 var _sight_singing_compare_button: Button = null
 var _sight_singing_next_button: Button = null
 var _sight_singing_octave_strict_toggle: CheckButton = null
-var _sight_singing_octave_strict: bool = false
 var _sight_singing_play_melody_first_toggle: CheckButton = null
-# Default ON: play the whole melody before the singer attempts it. Disable for
-# advanced students who want to read-only-then-sing.
-var _sight_singing_play_melody_first: bool = true
-var _sight_singing_rhythm_level: int = 1
 var _sight_singing_rhythm_setup_row: HBoxContainer = null
 var _sight_singing_rhythm_setup_option: OptionButton = null
 var _sight_singing_rhythm_level_option: OptionButton = null
-# Per-round phrase count. Applied at Start; saved in ear_settings.json.
-var _sight_singing_questions_per_round: int = 5
 var _sight_singing_questions_stepper: SpinBox = null
 var _sight_singing_take_audio_player: AudioStreamPlayer = null
-var _sight_singing_phrase_detections: Array = []
-var _sight_singing_phrase_started: bool = false
-var _sight_singing_phrase_recording: bool = false
-var _sight_singing_phrase_start_msec: int = 0
-var _sight_singing_last_voice_msec: int = 0
-var _sight_singing_phrase_result: Dictionary = {}
-var _sight_singing_take_segments: Array = []
-var _sight_singing_take_curve: Array = []
-var _sight_singing_pitch_candidates: Array = []
 const SIGHT_SINGING_END_SILENCE_SEC := SightSingingTheoryScript.END_SILENCE_SEC
 const SIGHT_SINGING_MIN_PHRASE_SEC := SightSingingTheoryScript.MIN_PHRASE_SEC
 const SIGHT_SINGING_SECONDS_PER_NOTE_LIMIT := SightSingingTheoryScript.SECONDS_PER_NOTE_LIMIT
 const SIGHT_SINGING_REFERENCE_SECONDS_PER_BEAT := SightSingingTheoryScript.REFERENCE_SECONDS_PER_BEAT
-# Tracks whether the bird/chicken sprites were visible before the sight-singing
-# round so we can restore them when the round ends. Sight Singing targets a
-# more adult user — the kid-friendly mascot decorations are out of place there.
-var _sight_singing_prev_bird_visible: bool = false
-var _sight_singing_prev_tutorial_chicken_visible: bool = false
+# prev_bird_visible / prev_tutorial_chicken_visible moved into runtime.
 var _cadence_key := "C"
 var _cadence_selected: Array[String] = ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]
 var _cadence_broken := false
@@ -4716,7 +4697,7 @@ func _build_ui() -> void:
 
 	# The standalone "Questions:" stepper is now superseded by the shared
 	# `_sight_question_spin` in the clef row (which retargets to
-	# `_sight_singing_questions_per_round` when Sight Singing is the active
+	# `_sight_singing_runtime.questions_per_round` when Sight Singing is the active
 	# sub-mode). Kept built-but-hidden so save/load code paths still resolve.
 	var sight_singing_questions_label := Label.new()
 	sight_singing_questions_label.text = "Questions:"
@@ -4728,7 +4709,7 @@ func _build_ui() -> void:
 	_sight_singing_questions_stepper.min_value = 1
 	_sight_singing_questions_stepper.max_value = 15
 	_sight_singing_questions_stepper.step = 1
-	_sight_singing_questions_stepper.value = _sight_singing_questions_per_round
+	_sight_singing_questions_stepper.value = _sight_singing_runtime.questions_per_round
 	_sight_singing_questions_stepper.custom_minimum_size = Vector2(76, 34)
 	_sight_singing_questions_stepper.value_changed.connect(_on_sight_singing_questions_changed)
 	_sight_singing_questions_stepper.visible = false
@@ -5921,7 +5902,7 @@ func _build_ui_game_panel() -> void:
 	# notation cold (advanced sight singing).
 	_sight_singing_play_melody_first_toggle = CheckButton.new()
 	_sight_singing_play_melody_first_toggle.text = "Play melody first"
-	_sight_singing_play_melody_first_toggle.button_pressed = _sight_singing_play_melody_first
+	_sight_singing_play_melody_first_toggle.button_pressed = _sight_singing_runtime.play_melody_first
 	_sight_singing_play_melody_first_toggle.toggled.connect(_on_sight_singing_play_melody_first_toggled)
 	_sight_singing_controls_row.add_child(_sight_singing_play_melody_first_toggle)
 
@@ -5937,7 +5918,7 @@ func _build_ui_game_panel() -> void:
 	# singers whose comfortable range doesn't include the written octave).
 	_sight_singing_octave_strict_toggle = CheckButton.new()
 	_sight_singing_octave_strict_toggle.text = "Octave-strict"
-	_sight_singing_octave_strict_toggle.button_pressed = _sight_singing_octave_strict
+	_sight_singing_octave_strict_toggle.button_pressed = _sight_singing_runtime.octave_strict
 	_sight_singing_octave_strict_toggle.toggled.connect(_on_sight_singing_octave_strict_toggled)
 	_sight_singing_controls_row.add_child(_sight_singing_octave_strict_toggle)
 
@@ -9676,7 +9657,7 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_style_home_footer_buttons()
 	# Same trailing override as in _apply_answer_mode: Sight Singing must own
 	# the staff visually, so hide the legacy decorations after this refresh
-	# would otherwise toggle them back on. Drop the _sight_singing_started
+	# would otherwise toggle them back on. Drop the _sight_singing_runtime.started
 	# check so the hide also covers the setup screen (no round in progress).
 	if _selected_mode == MODE_SIGHT and _sight_mode == "Sight Singing":
 		_hide_legacy_sight_staff_decor()
@@ -12792,13 +12773,13 @@ func _load_ear_settings() -> void:
 	if d.has("player_profile_seen"):
 		_player_profile_seen = bool(d["player_profile_seen"])
 	if d.has("sight_singing_questions_per_round"):
-		_sight_singing_questions_per_round = clampi(int(d["sight_singing_questions_per_round"]), 1, 15)
+		_sight_singing_runtime.questions_per_round = clampi(int(d["sight_singing_questions_per_round"]), 1, 15)
 	if d.has("sight_singing_play_melody_first"):
-		_sight_singing_play_melody_first = bool(d["sight_singing_play_melody_first"])
+		_sight_singing_runtime.play_melody_first = bool(d["sight_singing_play_melody_first"])
 	if d.has("sight_singing_octave_strict"):
-		_sight_singing_octave_strict = bool(d["sight_singing_octave_strict"])
+		_sight_singing_runtime.octave_strict = bool(d["sight_singing_octave_strict"])
 	if d.has("sight_singing_rhythm_level"):
-		_sight_singing_rhythm_level = clampi(int(d["sight_singing_rhythm_level"]), 1, 3)
+		_sight_singing_runtime.rhythm_level = clampi(int(d["sight_singing_rhythm_level"]), 1, 3)
 	if _selected_chord_types.is_empty():
 		_selected_chord_types = _default_selected_chord_types()
 	_update_daily_streak(false)
@@ -12857,10 +12838,10 @@ func _save_ear_settings() -> void:
 		"player_name": _player_name,
 		"player_level": _player_level,
 		"player_profile_seen": _player_profile_seen,
-		"sight_singing_questions_per_round": _sight_singing_questions_per_round,
-		"sight_singing_play_melody_first": _sight_singing_play_melody_first,
-		"sight_singing_octave_strict": _sight_singing_octave_strict,
-		"sight_singing_rhythm_level": _sight_singing_rhythm_level,
+		"sight_singing_questions_per_round": _sight_singing_runtime.questions_per_round,
+		"sight_singing_play_melody_first": _sight_singing_runtime.play_melody_first,
+		"sight_singing_octave_strict": _sight_singing_runtime.octave_strict,
+		"sight_singing_rhythm_level": _sight_singing_runtime.rhythm_level,
 	}
 	var txt := JSON.stringify(data, "\t")
 	var f := FileAccess.open(EAR_SETTINGS_PATH, FileAccess.WRITE)
@@ -14967,10 +14948,10 @@ func _on_sight_question_count_changed(value: float) -> void:
 	# Shared stepper routes to the mode-specific backing var so Sight Singing
 	# and Notes/Chords each keep their own preferred round length.
 	if _selected_mode == MODE_SIGHT and _sight_mode == "Sight Singing":
-		_sight_singing_questions_per_round = clampi(int(round(value)), 1, 15)
+		_sight_singing_runtime.questions_per_round = clampi(int(round(value)), 1, 15)
 		if _sight_singing_questions_stepper != null:
 			_suppress_round_count_save = true
-			_sight_singing_questions_stepper.value = _sight_singing_questions_per_round
+			_sight_singing_questions_stepper.value = _sight_singing_runtime.questions_per_round
 			_suppress_round_count_save = false
 	else:
 		_sight_question_count = clampi(int(round(value)), 1, 100)
@@ -16067,7 +16048,7 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 			_suppress_round_count_save = true
 			if sight_singing_mode:
 				_sight_question_spin.max_value = 15
-				_sight_question_spin.value = _sight_singing_questions_per_round
+				_sight_question_spin.value = _sight_singing_runtime.questions_per_round
 			else:
 				_sight_question_spin.max_value = 100
 				_sight_question_spin.value = _sight_question_count
@@ -23881,7 +23862,7 @@ func _sight_singing_populate_rhythm_option(opt: OptionButton) -> void:
 	for lvl in range(1, 4):
 		opt.add_item(str(labels.get(lvl, "L%d" % lvl)))
 		opt.set_item_metadata(opt.item_count - 1, lvl)
-	opt.select(clampi(_sight_singing_rhythm_level - 1, 0, 2))
+	opt.select(clampi(_sight_singing_runtime.rhythm_level - 1, 0, 2))
 
 
 func _sight_singing_sync_rhythm_level_options() -> void:
@@ -23890,7 +23871,7 @@ func _sight_singing_sync_rhythm_level_options() -> void:
 		var opt := opt_any as OptionButton
 		if opt == null:
 			continue
-		var target_idx := clampi(_sight_singing_rhythm_level - 1, 0, maxi(0, opt.item_count - 1))
+		var target_idx := clampi(_sight_singing_runtime.rhythm_level - 1, 0, maxi(0, opt.item_count - 1))
 		if opt.selected != target_idx:
 			opt.select(target_idx)
 
@@ -23920,23 +23901,23 @@ func _sight_singing_rhythm_templates(level: int) -> Array:
 
 
 func _sight_singing_generate_durations(note_count: int) -> Array[float]:
-	return SightSingingTheoryScript.generate_durations(note_count, _sight_singing_rhythm_level, _sight_singing_rng)
+	return SightSingingTheoryScript.generate_durations(note_count, _sight_singing_runtime.rhythm_level, _sight_singing_rng)
 
 
 func _sight_singing_duration_at(index: int) -> float:
-	return SightSingingTheoryScript.duration_at(_sight_singing_durations, index)
+	return SightSingingTheoryScript.duration_at(_sight_singing_runtime.durations, index)
 
 
 func _sight_singing_total_beats() -> float:
-	return SightSingingTheoryScript.total_beats(_sight_singing_durations, _sight_singing_melody)
+	return SightSingingTheoryScript.total_beats(_sight_singing_runtime.durations, _sight_singing_runtime.melody)
 
 
 func _sight_singing_duration_prefix(end_exclusive: int) -> float:
-	return SightSingingTheoryScript.duration_prefix(_sight_singing_durations, _sight_singing_melody, end_exclusive)
+	return SightSingingTheoryScript.duration_prefix(_sight_singing_runtime.durations, _sight_singing_runtime.melody, end_exclusive)
 
 
 func _sight_singing_uses_varied_rhythm() -> bool:
-	return SightSingingTheoryScript.uses_varied_rhythm(_sight_singing_durations, _sight_singing_rhythm_level)
+	return SightSingingTheoryScript.uses_varied_rhythm(_sight_singing_runtime.durations, _sight_singing_runtime.rhythm_level)
 
 
 func _sight_singing_note_seconds(duration_beats: float) -> float:
@@ -23946,7 +23927,7 @@ func _sight_singing_note_seconds(duration_beats: float) -> float:
 # Builds a StaffRenderer score dict from the current sight-singing melody.
 # Treble clef, 4/4, no tempo metronome (free-pace), title blank.
 func _sight_singing_build_score_dict() -> Dictionary:
-	return SightSingingTheoryScript.build_score_dict(_sight_singing_melody, _sight_singing_durations, _sight_key_signature, ScoreModelScript)
+	return SightSingingTheoryScript.build_score_dict(_sight_singing_runtime.melody, _sight_singing_runtime.durations, _sight_key_signature, ScoreModelScript)
 
 
 func _layout_sight_singing_overlay() -> void:
@@ -23980,20 +23961,20 @@ func _start_sight_singing_round() -> void:
 	# training — 10 questions per round is fatiguing for sight-singing where
 	# each take is ~10 s. Default 5 is a comfortable practice block.
 	if _question_index == 0 or _question_index <= 1:
-		_total_questions = _sight_singing_questions_per_round
+		_total_questions = _sight_singing_runtime.questions_per_round
 	if _sight_singing_rng == null:
 		_sight_singing_rng = RandomNumberGenerator.new()
 		_sight_singing_rng.randomize()
 	var melody: Array = SightSingingMelodyGeneratorScript.generate(
 		_sight_singing_key_pc(), false, 5, _sight_singing_rng
 	)
-	_sight_singing_melody.clear()
+	_sight_singing_runtime.melody.clear()
 	for m in melody:
-		_sight_singing_melody.append(int(m))
-	_sight_singing_durations = _sight_singing_generate_durations(_sight_singing_melody.size())
+		_sight_singing_runtime.melody.append(int(m))
+	_sight_singing_runtime.durations = _sight_singing_generate_durations(_sight_singing_runtime.melody.size())
 	if _sight_singing_session == null:
 		_sight_singing_session = SightSingingSessionScript.new()
-	_sight_singing_session.call("start", _sight_singing_melody)
+	_sight_singing_session.call("start", _sight_singing_runtime.melody)
 	# Hand the melody to the StaffRenderer engine + put the cursor on note 1.
 	if _sight_singing_staff != null:
 		var score_dict: Dictionary = _sight_singing_build_score_dict()
@@ -24016,16 +23997,16 @@ func _start_sight_singing_round() -> void:
 	# (the dancing bird + tutorial chicken) so the screen reads as a focused
 	# music-study surface. Remembered state restored when the round ends.
 	if _bird_sprite != null:
-		_sight_singing_prev_bird_visible = _bird_sprite.visible
+		_sight_singing_runtime.prev_bird_visible = _bird_sprite.visible
 		_bird_sprite.visible = false
 	if _tutorial_chicken != null:
-		_sight_singing_prev_tutorial_chicken_visible = _tutorial_chicken.visible
+		_sight_singing_runtime.prev_tutorial_chicken_visible = _tutorial_chicken.visible
 		_tutorial_chicken.visible = false
 	# Reset the progress label.
 	if _sight_singing_progress_label != null:
-		_sight_singing_progress_label.text = "Rhythm L%d: listen, then sing the full phrase." % _sight_singing_rhythm_level
+		_sight_singing_progress_label.text = "Rhythm L%d: listen, then sing the full phrase." % _sight_singing_runtime.rhythm_level
 		_sight_singing_progress_label.visible = true
-	_sight_singing_started = true
+	_sight_singing_runtime.started = true
 	# SS7 — record this phrase as a lesson activity. Activity is updated each
 	# round; the score is finalised when the phrase is evaluated.
 	_lesson_session_record_activity_start()
@@ -24046,52 +24027,52 @@ func _play_sight_singing_prompt() -> void:
 	if _qa_enabled:
 		await get_tree().create_timer(0.02).timeout
 		return
-	if _sight_singing_play_melody_first and _sight_singing_melody.size() > 1:
+	if _sight_singing_runtime.play_melody_first and _sight_singing_runtime.melody.size() > 1:
 		# Play the full melody as a guided reference, preserving the written
 		# rhythm level with a small inter-note gap for clarity.
 		if _status_label != null:
 			_status_label.text = "♪ Listen to the melody..."
-		for i in range(_sight_singing_melody.size()):
-			await _play_note(int(_sight_singing_melody[i]), _sight_singing_note_seconds(_sight_singing_duration_at(i)))
+		for i in range(_sight_singing_runtime.melody.size()):
+			await _play_note(int(_sight_singing_runtime.melody[i]), _sight_singing_note_seconds(_sight_singing_duration_at(i)))
 			await _push_silence(0.04)
 		await _push_silence(0.35)
 		if _status_label != null:
 			_status_label.text = "Now sing the phrase you just heard."
-	elif not _sight_singing_melody.is_empty():
+	elif not _sight_singing_runtime.melody.is_empty():
 		# Reference-note-only mode (advanced): just the starting pitch.
-		await _play_note(_sight_singing_melody[0], 0.55)
+		await _play_note(_sight_singing_runtime.melody[0], 0.55)
 	await _push_silence(0.10)
 	_reset_mic_capture_buffer()
 	_sight_singing_arm_phrase_recording()
 
 
 func _sight_singing_reset_phrase_state() -> void:
-	_sight_singing_phrase_detections.clear()
-	_sight_singing_phrase_started = false
-	_sight_singing_phrase_recording = false
-	_sight_singing_phrase_start_msec = 0
-	_sight_singing_last_voice_msec = 0
-	_sight_singing_phrase_result.clear()
-	_sight_singing_take_segments.clear()
-	_sight_singing_take_curve.clear()
-	_sight_singing_pitch_candidates.clear()
+	_sight_singing_runtime.phrase_detections.clear()
+	_sight_singing_runtime.phrase_started = false
+	_sight_singing_runtime.phrase_recording = false
+	_sight_singing_runtime.phrase_start_msec = 0
+	_sight_singing_runtime.last_voice_msec = 0
+	_sight_singing_runtime.phrase_result.clear()
+	_sight_singing_runtime.take_segments.clear()
+	_sight_singing_runtime.take_curve.clear()
+	_sight_singing_runtime.pitch_candidates.clear()
 	if _pitch_detector != null and _pitch_detector.has_method("clear_take_recording"):
 		_pitch_detector.call("clear_take_recording")
 	_sight_singing_update_phrase_controls()
 
 
 func _sight_singing_arm_phrase_recording() -> void:
-	if not _is_sight_singing_mode() or _sight_singing_melody.is_empty():
+	if not _is_sight_singing_mode() or _sight_singing_runtime.melody.is_empty():
 		return
-	_sight_singing_phrase_detections.clear()
-	_sight_singing_phrase_result.clear()
-	_sight_singing_take_segments.clear()
-	_sight_singing_take_curve.clear()
-	_sight_singing_pitch_candidates.clear()
-	_sight_singing_phrase_started = false
-	_sight_singing_phrase_recording = true
-	_sight_singing_phrase_start_msec = Time.get_ticks_msec()
-	_sight_singing_last_voice_msec = _sight_singing_phrase_start_msec
+	_sight_singing_runtime.phrase_detections.clear()
+	_sight_singing_runtime.phrase_result.clear()
+	_sight_singing_runtime.take_segments.clear()
+	_sight_singing_runtime.take_curve.clear()
+	_sight_singing_runtime.pitch_candidates.clear()
+	_sight_singing_runtime.phrase_started = false
+	_sight_singing_runtime.phrase_recording = true
+	_sight_singing_runtime.phrase_start_msec = Time.get_ticks_msec()
+	_sight_singing_runtime.last_voice_msec = _sight_singing_runtime.phrase_start_msec
 	# Start the mic NOW (after playback ended) and clear every adaptive state
 	# the detector accumulated during any previous take or playback period.
 	# This guarantees the first frame of the singer's voice is processed with
@@ -24123,11 +24104,11 @@ func _sight_singing_arm_phrase_recording() -> void:
 
 
 func _sight_singing_max_phrase_seconds() -> float:
-	return SightSingingTheoryScript.max_phrase_seconds(_sight_singing_durations, _sight_singing_melody)
+	return SightSingingTheoryScript.max_phrase_seconds(_sight_singing_runtime.durations, _sight_singing_runtime.melody)
 
 
 func _sight_singing_capture_pitch_candidates(result: Dictionary) -> void:
-	if not _sight_singing_phrase_recording:
+	if not _sight_singing_runtime.phrase_recording:
 		return
 	var candidates: Array = []
 	var candidates_any: Variant = result.get("candidates", null)
@@ -24139,13 +24120,13 @@ func _sight_singing_capture_pitch_candidates(result: Dictionary) -> void:
 	if candidates.is_empty():
 		return
 	var now_msec := Time.get_ticks_msec()
-	if _sight_singing_phrase_start_msec <= 0:
-		_sight_singing_phrase_start_msec = now_msec
-	if not _sight_singing_phrase_started:
-		_sight_singing_phrase_started = true
+	if _sight_singing_runtime.phrase_start_msec <= 0:
+		_sight_singing_runtime.phrase_start_msec = now_msec
+	if not _sight_singing_runtime.phrase_started:
+		_sight_singing_runtime.phrase_started = true
 		if _sight_singing_progress_label != null:
 			_sight_singing_progress_label.text = "Recording phrase..."
-	_sight_singing_last_voice_msec = now_msec
+	_sight_singing_runtime.last_voice_msec = now_msec
 	for candidate_any in candidates:
 		var candidate: Dictionary = candidate_any
 		var midi := int(candidate.get("midi", -1))
@@ -24154,30 +24135,30 @@ func _sight_singing_capture_pitch_candidates(result: Dictionary) -> void:
 		var entry := candidate.duplicate(true)
 		var t := float(entry.get("time", -1.0))
 		if t < 0.0:
-			t = float(now_msec - _sight_singing_phrase_start_msec) / 1000.0
+			t = float(now_msec - _sight_singing_runtime.phrase_start_msec) / 1000.0
 		entry["time"] = t
-		_sight_singing_pitch_candidates.append(entry)
-	var elapsed := float(now_msec - _sight_singing_phrase_start_msec) / 1000.0
+		_sight_singing_runtime.pitch_candidates.append(entry)
+	var elapsed := float(now_msec - _sight_singing_runtime.phrase_start_msec) / 1000.0
 	if _sight_singing_progress_label != null:
 		_sight_singing_progress_label.text = "Recording phrase... %.1fs" % elapsed
 
 
 func _sight_singing_phrase_feed_detection(result: Dictionary) -> void:
-	if not _sight_singing_phrase_recording:
+	if not _sight_singing_runtime.phrase_recording:
 		return
 	var detected_midi := int(result.get("midi", -1))
 	if detected_midi < 0:
 		return
 	var now_msec := Time.get_ticks_msec()
-	if _sight_singing_phrase_start_msec <= 0:
-		_sight_singing_phrase_start_msec = now_msec
-	if not _sight_singing_phrase_started:
-		_sight_singing_phrase_started = true
+	if _sight_singing_runtime.phrase_start_msec <= 0:
+		_sight_singing_runtime.phrase_start_msec = now_msec
+	if not _sight_singing_runtime.phrase_started:
+		_sight_singing_runtime.phrase_started = true
 		if _sight_singing_progress_label != null:
 			_sight_singing_progress_label.text = "Recording phrase..."
-	_sight_singing_last_voice_msec = now_msec
-	var t := float(now_msec - _sight_singing_phrase_start_msec) / 1000.0
-	_sight_singing_phrase_detections.append({
+	_sight_singing_runtime.last_voice_msec = now_msec
+	var t := float(now_msec - _sight_singing_runtime.phrase_start_msec) / 1000.0
+	_sight_singing_runtime.phrase_detections.append({
 		"time": t,
 		"midi": detected_midi,
 		"cents_off": float(result.get("cents_off", 0.0)),
@@ -24191,48 +24172,48 @@ func _sight_singing_phrase_feed_detection(result: Dictionary) -> void:
 
 
 func _sight_singing_phrase_tick_no_detection(_result: Dictionary) -> void:
-	if not _sight_singing_phrase_recording or not _sight_singing_phrase_started:
+	if not _sight_singing_runtime.phrase_recording or not _sight_singing_runtime.phrase_started:
 		return
 	var now_msec := Time.get_ticks_msec()
-	var phrase_sec := float(now_msec - _sight_singing_phrase_start_msec) / 1000.0
-	var silence_sec := float(now_msec - _sight_singing_last_voice_msec) / 1000.0
+	var phrase_sec := float(now_msec - _sight_singing_runtime.phrase_start_msec) / 1000.0
+	var silence_sec := float(now_msec - _sight_singing_runtime.last_voice_msec) / 1000.0
 	if phrase_sec >= SIGHT_SINGING_MIN_PHRASE_SEC and silence_sec >= SIGHT_SINGING_END_SILENCE_SEC:
 		_sight_singing_finalize_phrase(false)
 
 
 func _sight_singing_finalize_phrase(force: bool = false) -> void:
-	if not _sight_singing_phrase_recording:
+	if not _sight_singing_runtime.phrase_recording:
 		return
-	if not _sight_singing_phrase_started:
+	if not _sight_singing_runtime.phrase_started:
 		if force and _sight_singing_progress_label != null:
 			_sight_singing_progress_label.text = "No stable pitch captured. Replay the mic take or try again."
 		if force:
 			if _pitch_detector != null and _pitch_detector.has_method("stop_take_recording"):
 				_pitch_detector.call("stop_take_recording")
-			_sight_singing_phrase_recording = false
+			_sight_singing_runtime.phrase_recording = false
 			_accepting_answer = false
 			_quiz_active = false
-			_sight_singing_started = false
+			_sight_singing_runtime.started = false
 			_stop_mic_listening()
 			_sight_singing_update_phrase_controls()
 		return
 	var phrase_duration := maxf(
-		float(_sight_singing_last_voice_msec - _sight_singing_phrase_start_msec) / 1000.0,
+		float(_sight_singing_runtime.last_voice_msec - _sight_singing_runtime.phrase_start_msec) / 1000.0,
 		SIGHT_SINGING_MIN_PHRASE_SEC
 	)
-	if _sight_singing_phrase_detections.is_empty() and _sight_singing_pitch_candidates.is_empty():
+	if _sight_singing_runtime.phrase_detections.is_empty() and _sight_singing_runtime.pitch_candidates.is_empty():
 		if _pitch_detector != null and _pitch_detector.has_method("stop_take_recording"):
 			_pitch_detector.call("stop_take_recording")
 		if _sight_singing_progress_label != null:
 			_sight_singing_progress_label.text = "No sung phrase captured. Check microphone input."
-		_sight_singing_phrase_recording = false
+		_sight_singing_runtime.phrase_recording = false
 		_accepting_answer = false
 		_quiz_active = false
-		_sight_singing_started = false
+		_sight_singing_runtime.started = false
 		_stop_mic_listening()
 		_sight_singing_update_phrase_controls()
 		return
-	_sight_singing_phrase_recording = false
+	_sight_singing_runtime.phrase_recording = false
 	if _pitch_detector != null and _pitch_detector.has_method("stop_take_recording"):
 		_pitch_detector.call("stop_take_recording")
 	# Show a brief "scoring" status — the soft analysis pass runs YIN over the
@@ -24240,7 +24221,7 @@ func _sight_singing_finalize_phrase(force: bool = false) -> void:
 	# gain) and produces a dense candidate stream. Total wall time is well
 	# under a second for a typical phrase but the label gives the user a
 	# concrete signal that something is happening.
-	var live_candidates_enough := _sight_singing_live_candidates_enough(_sight_singing_pitch_candidates, phrase_duration)
+	var live_candidates_enough := _sight_singing_live_candidates_enough(_sight_singing_runtime.pitch_candidates, phrase_duration)
 	if _sight_singing_progress_label != null and not live_candidates_enough:
 		_sight_singing_progress_label.text = "Scoring..."
 	var soft_candidates: Array = []
@@ -24251,25 +24232,25 @@ func _sight_singing_finalize_phrase(force: bool = false) -> void:
 	# one consistent pass over the recorded buffer, no gaps from missed
 	# polls. Fall back to the live-collected candidates if the soft pass
 	# produced nothing (e.g. take buffer empty).
-	var scoring_candidates: Array = soft_candidates if not soft_candidates.is_empty() else _sight_singing_pitch_candidates
+	var scoring_candidates: Array = soft_candidates if not soft_candidates.is_empty() else _sight_singing_runtime.pitch_candidates
 	var candidate_source := "soft" if not soft_candidates.is_empty() else "live"
-	_sight_singing_phrase_result = SightSingingPhraseAnalyzerScript.analyze(
-		_sight_singing_melody,
-		_sight_singing_phrase_detections,
+	_sight_singing_runtime.phrase_result = SightSingingPhraseAnalyzerScript.analyze(
+		_sight_singing_runtime.melody,
+		_sight_singing_runtime.phrase_detections,
 		phrase_duration,
-		_sight_singing_octave_strict,
+		_sight_singing_runtime.octave_strict,
 		scoring_candidates,
-		_sight_singing_durations
+		_sight_singing_runtime.durations
 	)
-	_sight_singing_phrase_result["candidate_source"] = candidate_source
-	_sight_singing_phrase_result["live_candidate_coverage_ok"] = live_candidates_enough
-	_sight_singing_take_segments = _sight_singing_phrase_result.get("segments", [])
-	_sight_singing_take_curve = _sight_singing_phrase_result.get("pitch_curve", [])
-	_sight_singing_apply_phrase_feedback(_sight_singing_phrase_result)
-	_sight_singing_show_phrase_summary(_sight_singing_phrase_result)
+	_sight_singing_runtime.phrase_result["candidate_source"] = candidate_source
+	_sight_singing_runtime.phrase_result["live_candidate_coverage_ok"] = live_candidates_enough
+	_sight_singing_runtime.take_segments = _sight_singing_runtime.phrase_result.get("segments", [])
+	_sight_singing_runtime.take_curve = _sight_singing_runtime.phrase_result.get("pitch_curve", [])
+	_sight_singing_apply_phrase_feedback(_sight_singing_runtime.phrase_result)
+	_sight_singing_show_phrase_summary(_sight_singing_runtime.phrase_result)
 	# Update the top-bar "Correct: X / Y" counter. Pitch and rhythm both affect
 	# whether the phrase earns the point; detailed percentages stay visible.
-	if _sight_singing_phrase_earned_point(_sight_singing_phrase_result):
+	if _sight_singing_phrase_earned_point(_sight_singing_runtime.phrase_result):
 		_score += 1
 	if _score_label != null:
 		_score_label.text = "Correct: %d / %d" % [_score, _question_index]
@@ -24280,19 +24261,19 @@ func _sight_singing_finalize_phrase(force: bool = false) -> void:
 	# Keep _quiz_active = true so the user's Next Phrase press can route
 	# through the session controller (begin_next_question), which is what
 	# advances the Q1/N counter at the top of the screen.
-	_sight_singing_started = false
+	_sight_singing_runtime.started = false
 	_sight_singing_update_phrase_controls()
 
 
 func _sight_singing_live_candidates_enough(candidates: Array, phrase_duration: float) -> bool:
 	return SightSingingTheoryScript.live_candidates_enough(
 		candidates, phrase_duration,
-		_sight_singing_durations, _sight_singing_melody, _sight_singing_rhythm_level
+		_sight_singing_runtime.durations, _sight_singing_runtime.melody, _sight_singing_runtime.rhythm_level
 	)
 
 
 func _sight_singing_phrase_earned_point(result: Dictionary) -> bool:
-	return SightSingingTheoryScript.phrase_earned_point(result, _sight_singing_durations, _sight_singing_rhythm_level)
+	return SightSingingTheoryScript.phrase_earned_point(result, _sight_singing_runtime.durations, _sight_singing_runtime.rhythm_level)
 
 
 func _sight_singing_run_soft_analysis_pass(analysis_hop: int = 1024) -> Array:
@@ -24364,7 +24345,7 @@ func _sight_singing_show_phrase_summary(result: Dictionary) -> void:
 			"  MISSING-SEGMENT" if missing else ""
 		])
 	print("[SightSinging] %d segments built from %d stable detections; %d pitch candidates captured" % [
-		segments.size(), _sight_singing_phrase_detections.size(), int(result.get("candidate_count", _sight_singing_pitch_candidates.size()))
+		segments.size(), _sight_singing_runtime.phrase_detections.size(), int(result.get("candidate_count", _sight_singing_runtime.pitch_candidates.size()))
 	])
 	print("[SightSinging] candidate_source=%s live_coverage_ok=%s timing_offset=%+.3fs vocal_region=%.2f-%.2fs" % [
 		str(result.get("candidate_source", "?")),
@@ -24416,7 +24397,7 @@ func _sight_singing_show_phrase_summary(result: Dictionary) -> void:
 
 
 func _sight_singing_has_take_playback() -> bool:
-	if not _sight_singing_take_segments.is_empty():
+	if not _sight_singing_runtime.take_segments.is_empty():
 		return true
 	if _pitch_detector != null and _pitch_detector.has_method("has_take_recording"):
 		return bool(_pitch_detector.call("has_take_recording"))
@@ -24427,20 +24408,20 @@ func _sight_singing_update_phrase_controls() -> void:
 	if _sight_singing_controls_row == null:
 		return
 	var has_take := _sight_singing_has_take_playback()
-	var show_controls := _is_sight_singing_mode() and (_sight_singing_started or _sight_singing_phrase_recording or not _sight_singing_phrase_result.is_empty() or has_take)
+	var show_controls: bool = _is_sight_singing_mode() and (_sight_singing_runtime.started or _sight_singing_runtime.phrase_recording or not _sight_singing_runtime.phrase_result.is_empty() or has_take)
 	_sight_singing_controls_row.visible = show_controls
 	if _sight_singing_finish_take_button != null:
-		_sight_singing_finish_take_button.disabled = not _sight_singing_phrase_recording
+		_sight_singing_finish_take_button.disabled = not _sight_singing_runtime.phrase_recording
 	if _sight_singing_replay_take_button != null:
 		_sight_singing_replay_take_button.disabled = not has_take
 	if _sight_singing_compare_button != null:
-		_sight_singing_compare_button.disabled = not has_take or _sight_singing_melody.is_empty()
+		_sight_singing_compare_button.disabled = not has_take or _sight_singing_runtime.melody.is_empty()
 	if _sight_singing_next_button != null:
 		# Show Next only once a take has been scored — keeps the row uncluttered
 		# during recording and the very first round.
-		var has_score: bool = not _sight_singing_phrase_result.is_empty()
+		var has_score: bool = not _sight_singing_runtime.phrase_result.is_empty()
 		_sight_singing_next_button.visible = has_score
-		_sight_singing_next_button.disabled = _sight_singing_phrase_recording or _is_prompt_playing
+		_sight_singing_next_button.disabled = _sight_singing_runtime.phrase_recording or _is_prompt_playing
 
 
 func _on_sight_singing_finish_take_pressed() -> void:
@@ -24448,11 +24429,11 @@ func _on_sight_singing_finish_take_pressed() -> void:
 
 
 func _on_sight_singing_octave_strict_toggled(pressed: bool) -> void:
-	_sight_singing_octave_strict = pressed
+	_sight_singing_runtime.octave_strict = pressed
 
 
 func _on_sight_singing_play_melody_first_toggled(pressed: bool) -> void:
-	_sight_singing_play_melody_first = pressed
+	_sight_singing_runtime.play_melody_first = pressed
 	_save_ear_settings()
 
 
@@ -24468,27 +24449,27 @@ func _on_sight_singing_rhythm_level_selected(index: int) -> void:
 		source = _sight_singing_rhythm_level_option
 	if source == null:
 		return
-	_sight_singing_rhythm_level = clampi(int(source.get_item_metadata(index)), 1, 3)
+	_sight_singing_runtime.rhythm_level = clampi(int(source.get_item_metadata(index)), 1, 3)
 	_sight_singing_sync_rhythm_level_options()
 	_save_ear_settings()
 
 
 func _on_sight_singing_questions_changed(value: float) -> void:
-	_sight_singing_questions_per_round = clampi(int(value), 1, 15)
+	_sight_singing_runtime.questions_per_round = clampi(int(value), 1, 15)
 	_save_ear_settings()
 
 
 func _on_sight_singing_next_pressed() -> void:
 	# Guard against double-press during prompt playback.
-	if _is_prompt_playing or _sight_singing_phrase_recording:
+	if _is_prompt_playing or _sight_singing_runtime.phrase_recording:
 		return
 	# Clear the previous take so the controls row hides per-take buttons until
 	# a new take has been recorded.
-	_sight_singing_phrase_result.clear()
-	_sight_singing_phrase_detections.clear()
-	_sight_singing_take_segments.clear()
-	_sight_singing_take_curve.clear()
-	_sight_singing_pitch_candidates.clear()
+	_sight_singing_runtime.phrase_result.clear()
+	_sight_singing_runtime.phrase_detections.clear()
+	_sight_singing_runtime.take_segments.clear()
+	_sight_singing_runtime.take_curve.clear()
+	_sight_singing_runtime.pitch_candidates.clear()
 	if _pitch_detector != null and _pitch_detector.has_method("clear_take_recording"):
 		_pitch_detector.call("clear_take_recording")
 	# Route through the session controller so _question_index advances and the
@@ -24508,13 +24489,13 @@ func _on_sight_singing_replay_take_pressed() -> void:
 	if _status_label != null:
 		_status_label.text = "Replaying your take..."
 	await _play_sight_singing_take()
-	if _status_label != null and not _sight_singing_phrase_result.is_empty():
-		_sight_singing_show_phrase_summary(_sight_singing_phrase_result)
+	if _status_label != null and not _sight_singing_runtime.phrase_result.is_empty():
+		_sight_singing_show_phrase_summary(_sight_singing_runtime.phrase_result)
 	_is_prompt_playing = false
 
 
 func _on_sight_singing_compare_pressed() -> void:
-	if not _sight_singing_has_take_playback() or _sight_singing_melody.is_empty() or _is_prompt_playing:
+	if not _sight_singing_has_take_playback() or _sight_singing_runtime.melody.is_empty() or _is_prompt_playing:
 		return
 	_is_prompt_playing = true
 	if _status_label != null:
@@ -24524,14 +24505,14 @@ func _on_sight_singing_compare_pressed() -> void:
 	if _status_label != null:
 		_status_label.text = "Your take..."
 	await _play_sight_singing_take()
-	if _status_label != null and not _sight_singing_phrase_result.is_empty():
-		_sight_singing_show_phrase_summary(_sight_singing_phrase_result)
+	if _status_label != null and not _sight_singing_runtime.phrase_result.is_empty():
+		_sight_singing_show_phrase_summary(_sight_singing_runtime.phrase_result)
 	_is_prompt_playing = false
 
 
 func _play_sight_singing_target_phrase() -> void:
-	for i in range(_sight_singing_melody.size()):
-		await _play_note(int(_sight_singing_melody[i]), _sight_singing_note_seconds(_sight_singing_duration_at(i)))
+	for i in range(_sight_singing_runtime.melody.size()):
+		await _play_note(int(_sight_singing_runtime.melody[i]), _sight_singing_note_seconds(_sight_singing_duration_at(i)))
 		await _push_silence(0.04)
 
 
@@ -24546,7 +24527,7 @@ func _play_sight_singing_take() -> void:
 			_sight_singing_take_audio_player.stop()
 			return
 	var prev_end := 0.0
-	for seg_any in _sight_singing_take_segments:
+	for seg_any in _sight_singing_runtime.take_segments:
 		var seg: Dictionary = seg_any
 		var start_t := float(seg.get("start_time", prev_end))
 		var gap := clampf(start_t - prev_end, 0.0, 0.75)
@@ -24590,11 +24571,11 @@ func _sight_singing_consume_detection(detected_midi: int, cents_off: float) -> v
 				SingingEvaluatorScript.BAND_PITCHY:  tally += "🟠"
 				SingingEvaluatorScript.BAND_UNCERTAIN: tally += "?"
 				_:                                    tally += "🔴"
-		var current_pos: int = mini(note_idx + 2, _sight_singing_melody.size())
+		var current_pos: int = mini(note_idx + 2, _sight_singing_runtime.melody.size())
 		if complete:
 			_sight_singing_progress_label.text = tally + "   (done)"
 		else:
-			_sight_singing_progress_label.text = "Note %d / %d   %s" % [current_pos, _sight_singing_melody.size(), tally]
+			_sight_singing_progress_label.text = "Note %d / %d   %s" % [current_pos, _sight_singing_runtime.melody.size(), tally]
 	# Unused locals — band is captured for future per-note coloring; suppress warning.
 	var _band_consumed: int = band
 	if complete:
@@ -24618,7 +24599,7 @@ func _show_sight_singing_result() -> void:
 	]
 	_result_box_show("Complete", msg)
 	_stop_mic_listening()
-	_sight_singing_started = false
+	_sight_singing_runtime.started = false
 	_quiz_active = false
 
 
@@ -24664,9 +24645,9 @@ func _hide_legacy_sight_staff_decor() -> void:
 # cleared even if the user bailed mid-melody. Restores the kid-mascot
 # visibility we hid for the focused-study UI.
 func _stop_sight_singing() -> void:
-	if _sight_singing_started:
-		_sight_singing_started = false
-	_sight_singing_phrase_recording = false
+	if _sight_singing_runtime.started:
+		_sight_singing_runtime.started = false
+	_sight_singing_runtime.phrase_recording = false
 	if _pitch_detector != null and _pitch_detector.has_method("stop_take_recording"):
 		_pitch_detector.call("stop_take_recording")
 	if _sight_singing_take_audio_player != null:
@@ -24684,12 +24665,12 @@ func _stop_sight_singing() -> void:
 	if _sight_singing_controls_row != null:
 		_sight_singing_controls_row.visible = false
 	# Restore prior bird/chicken visibility — other modes still expect them.
-	if _bird_sprite != null and _sight_singing_prev_bird_visible:
+	if _bird_sprite != null and _sight_singing_runtime.prev_bird_visible:
 		_bird_sprite.visible = true
-	if _tutorial_chicken != null and _sight_singing_prev_tutorial_chicken_visible:
+	if _tutorial_chicken != null and _sight_singing_runtime.prev_tutorial_chicken_visible:
 		_tutorial_chicken.visible = true
-	_sight_singing_prev_bird_visible = false
-	_sight_singing_prev_tutorial_chicken_visible = false
+	_sight_singing_runtime.prev_bird_visible = false
+	_sight_singing_runtime.prev_tutorial_chicken_visible = false
 
 
 func _pitch_match_clear_keyboard_feedback() -> void:
