@@ -24496,11 +24496,7 @@ func _sight_singing_live_candidates_enough(candidates: Array, phrase_duration: f
 
 
 func _sight_singing_phrase_earned_point(result: Dictionary) -> bool:
-	var pitch_pct := int(result.get("pitch_percent", 0))
-	var rhythm_pct := int(result.get("rhythm_percent", 0))
-	var overall_pct := int(result.get("percent", 0))
-	var rhythm_gate := 60 if _sight_singing_uses_varied_rhythm() else 45
-	return overall_pct >= 70 and pitch_pct >= 60 and rhythm_pct >= rhythm_gate
+	return SightSingingTheoryScript.phrase_earned_point(result, _sight_singing_durations, _sight_singing_rhythm_level)
 
 
 func _sight_singing_run_soft_analysis_pass(analysis_hop: int = 1024) -> Array:

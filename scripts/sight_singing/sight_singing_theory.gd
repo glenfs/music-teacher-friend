@@ -182,6 +182,16 @@ static func build_score_dict(melody: Array, durations: Array, sight_key_signatur
 	)
 
 
+# Did the take earn a point? Pitch ≥60%, overall ≥70%, and rhythm above the
+# stricter gate when the melody actually has rhythmic variety.
+static func phrase_earned_point(result: Dictionary, durations: Array, rhythm_level: int) -> bool:
+	var pitch_pct := int(result.get("pitch_percent", 0))
+	var rhythm_pct := int(result.get("rhythm_percent", 0))
+	var overall_pct := int(result.get("percent", 0))
+	var rhythm_gate := 60 if uses_varied_rhythm(durations, rhythm_level) else 45
+	return overall_pct >= 70 and pitch_pct >= 60 and rhythm_pct >= rhythm_gate
+
+
 # Decide whether the mic listener has captured enough valid pitch candidates
 # to commit a take. Pure analysis over the captured candidate stream — UI
 # layer just feeds in candidates + phrase duration and gets a bool back.
