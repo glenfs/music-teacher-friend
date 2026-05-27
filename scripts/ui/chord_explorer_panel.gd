@@ -98,8 +98,7 @@ var _window_bar: ProgressBar = null
 var _keyboard_keys: Dictionary = {}       # pitch -> Button
 var _inversions_row: HBoxContainer = null
 # Pianistic voicings row — same chord quality, different distribution of
-# the voices (Root / Drop 2 / Drop 3 / Shell / Open). Lives below the
-# inversions row in the chord display.
+# the voices (Root / Drop 2 / Drop 3 / Shell / Open).
 var _voicings_row: HBoxContainer = null
 # Compare row — lets the user pick a second chord quality at the same root
 # as the current chord, then plays the two back-to-back (A → B → A) so the
@@ -107,6 +106,10 @@ var _voicings_row: HBoxContainer = null
 var _compare_row: HBoxContainer = null
 var _compare_option: OptionButton = null
 var _compare_token: int = 0
+# Holds the three chord-detail rows above (Inversions / Voicings / Compare)
+# as tabs — only one is visible at a time. Reduces vertical density on
+# smaller screens from 3 stacked rows to 1 row + tab bar.
+var _chord_detail_tabs: TabContainer = null
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -513,33 +516,35 @@ func _build_ui() -> void:
 	_full_name_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	name_inner.add_child(_full_name_label)
 
-	# Inversions row — shows the currently-identified chord with each chord
-	# tone as bass (C, C/E, C/G ...). Click a button to play that voicing
-	# so the student hears how the chord changes when its bass moves.
+	# Three chord-detail surfaces collapsed into a TabContainer to cut the
+	# vertical density that built up as features piled on:
+	#   - Inversions: chord with each chord tone as bass (C, C/E, C/G ...)
+	#   - Voicings:   Root / Drop 2 / Drop 3 / Shell / Open
+	#   - Compare:    pick a second quality at the same root + play A↔B
+	# Only one tab's row is visible at a time → ~3x vertical savings.
+	_chord_detail_tabs = TabContainer.new()
+	_chord_detail_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_chord_detail_tabs.custom_minimum_size = Vector2(0, 80)
+	_chord_detail_tabs.visible = false
+	name_inner.add_child(_chord_detail_tabs)
+
 	_inversions_row = HBoxContainer.new()
+	_inversions_row.name = "Inversions"
 	_inversions_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_inversions_row.add_theme_constant_override("separation", 8)
-	_inversions_row.visible = false
-	name_inner.add_child(_inversions_row)
+	_chord_detail_tabs.add_child(_inversions_row)
 
-	# Voicings row — pianistic voicing alternatives for the same chord.
-	# Root (notes in original interval order), Drop 2 (top voice -1 moved
-	# down an octave), Drop 3 (top voice -2 moved down), Shell (R+3+7
-	# only — jazz comping), Open (root + 5th low, 3rd + 7th high).
-	# Hidden until a chord is identified, same as the inversions row.
 	_voicings_row = HBoxContainer.new()
+	_voicings_row.name = "Voicings"
 	_voicings_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_voicings_row.add_theme_constant_override("separation", 6)
-	_voicings_row.visible = false
-	name_inner.add_child(_voicings_row)
+	_chord_detail_tabs.add_child(_voicings_row)
 
-	# Compare row — pick a second chord quality at the same root and play
-	# both back-to-back (A → B → A) so the difference is audible.
 	_compare_row = HBoxContainer.new()
+	_compare_row.name = "Compare"
 	_compare_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_compare_row.add_theme_constant_override("separation", 6)
-	_compare_row.visible = false
-	name_inner.add_child(_compare_row)
+	_chord_detail_tabs.add_child(_compare_row)
 	_build_compare_row()
 
 	# Diatonic cheat sheet — always-visible row of the 7 chords in the
@@ -876,21 +881,17 @@ func _refresh_inversions_row() -> void:
 	# Clear previous buttons.
 	for child in _inversions_row.get_children():
 		child.queue_free()
-	# Only show inversions for proper chords (3+ tones).
+	# Only build content for proper chords (2+ tones).
 	if _last_info.is_empty():
-		_inversions_row.visible = false
 		return
 	var quality := str(_last_info.get("quality", ""))
 	if quality == "" or quality == "single" or quality == "interval" or quality == "cluster":
-		_inversions_row.visible = false
 		return
 	var intervals_v: Variant = _last_info.get("intervals_from_root", null)
 	if typeof(intervals_v) != TYPE_ARRAY:
-		_inversions_row.visible = false
 		return
 	var intervals: Array = intervals_v
 	if intervals.size() < 2:
-		_inversions_row.visible = false
 		return
 	var root_pc: int = int(_last_info.get("root_pc", 0))
 	var root_letter: String = str(_last_info.get("root_letter", ""))
@@ -917,7 +918,6 @@ func _refresh_inversions_row() -> void:
 		var captured_idx := i
 		btn.pressed.connect(func(): _play_inversion(base_root_midi, intervals, captured_idx))
 		_inversions_row.add_child(btn)
-	_inversions_row.visible = true
 
 
 func _chord_short_name() -> String:
@@ -1247,19 +1247,15 @@ func _refresh_voicings_row() -> void:
 	for child in _voicings_row.get_children():
 		child.queue_free()
 	if _last_info.is_empty():
-		_voicings_row.visible = false
 		return
 	var quality := str(_last_info.get("quality", ""))
 	if quality == "" or quality == "single" or quality == "interval" or quality == "cluster":
-		_voicings_row.visible = false
 		return
 	var intervals_v: Variant = _last_info.get("intervals_from_root", null)
 	if typeof(intervals_v) != TYPE_ARRAY:
-		_voicings_row.visible = false
 		return
 	var intervals: Array = intervals_v
 	if intervals.size() < 3:
-		_voicings_row.visible = false
 		return
 	var root_pc: int = int(_last_info.get("root_pc", 0))
 	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
@@ -1282,7 +1278,6 @@ func _refresh_voicings_row() -> void:
 		btn.pressed.connect(func(): _play_voicing(base_root_midi, captured_intervals))
 		_apply_voicing_button_style(btn)
 		_voicings_row.add_child(btn)
-	_voicings_row.visible = true
 
 
 # Voicing transformations — return [] when the voicing isn't applicable.
@@ -1497,22 +1492,28 @@ func _build_compare_row() -> void:
 
 
 func _refresh_compare_row() -> void:
-	if _compare_row == null:
+	# Compare-row content (label + dropdown + buttons) is static; the row
+	# itself is always populated by _build_compare_row at startup. The
+	# tab-container-level visibility is now managed centrally — this
+	# function is kept only for symmetry with the other two refresh hooks
+	# and gates the overall tab container together with them.
+	pass
+
+
+# Hides the chord-detail tab container when no chord is staged AND no useful
+# rows can render (cluster / single note). Shows it otherwise so the user
+# can access Inversions / Voicings / Compare via the tab bar.
+func _refresh_chord_detail_tabs_visibility() -> void:
+	if _chord_detail_tabs == null:
 		return
-	# Only show compare when a real chord is identified — need a root and
-	# at least 2 voices so "the same chord" is meaningful.
 	if _last_info.is_empty():
-		_compare_row.visible = false
+		_chord_detail_tabs.visible = false
 		return
 	var quality := str(_last_info.get("quality", ""))
 	if quality == "" or quality == "single" or quality == "cluster":
-		_compare_row.visible = false
+		_chord_detail_tabs.visible = false
 		return
-	var intervals_v: Variant = _last_info.get("intervals_from_root", null)
-	if typeof(intervals_v) != TYPE_ARRAY or (intervals_v as Array).size() < 2:
-		_compare_row.visible = false
-		return
-	_compare_row.visible = true
+	_chord_detail_tabs.visible = true
 
 
 func _compare_play_side(which: String) -> void:
@@ -1734,6 +1735,7 @@ func _refresh_display() -> void:
 		_refresh_inversions_row()
 		_refresh_voicings_row()
 		_refresh_compare_row()
+		_refresh_chord_detail_tabs_visibility()
 		return
 	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _key_pc, _key_is_minor)
 	_last_info = info
@@ -1762,6 +1764,7 @@ func _refresh_display() -> void:
 	_refresh_inversions_row()
 	_refresh_voicings_row()
 	_refresh_compare_row()
+	_refresh_chord_detail_tabs_visibility()
 
 
 func _push_notes_to_renderer(pitches: Array[int]) -> void:
