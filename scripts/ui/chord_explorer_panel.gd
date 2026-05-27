@@ -134,6 +134,7 @@ var _last_applied_layout_breakpoint: int = -1
 #   <  1024  → narrow (staff stacks above chord display, keyboard scales)
 const _LAYOUT_BREAKPOINT_WIDE: int = 1280
 const _LAYOUT_BREAKPOINT_TABLET: int = 1024
+var _quiz_title_label: Label = null
 var _quiz_prompt_label: Label = null
 var _quiz_score_label: Label = null
 var _quiz_feedback_label: Label = null
@@ -143,19 +144,50 @@ var _quiz_next_button: Button = null
 var _quiz_close_button: Button = null
 var _quiz_current_answer: String = ""
 var _quiz_current_chord_notes: Array[int] = []
+# For Compare Quality mode: A-chord notes played first, then B is the
+# answer the student picks.
+var _quiz_compare_a_notes: Array[int] = []
+var _quiz_compare_b_notes: Array[int] = []
 var _quiz_score: int = 0
 var _quiz_question_index: int = 0
 var _quiz_total_questions: int = 10
 var _quiz_answered: bool = false
 var _quiz_session_attribution_pending: bool = false
+var _quiz_play_token: int = 0  # cancels A→B playback if user advances
 
-# Pool of qualities the quiz draws from. Triads + the most-used 7ths.
-const _QUIZ_QUALITIES: Array[String] = [
-	"Major", "Minor", "Dim", "Aug", "Sus4",
-	"Maj7", "Dom7", "Min7", "Half-dim",
-]
+# Mode 0 = Chords in Key, 1 = Compare Quality.
+enum QuizMode { CHORDS_IN_KEY, COMPARE_QUALITY }
+var _quiz_mode: int = QuizMode.CHORDS_IN_KEY
+var _quiz_mode_buttons: Dictionary = {}  # mode -> Button (for highlight refresh)
+
 const _QUIZ_QUESTIONS_PER_ROUND: int = 10
 const _QUIZ_CHOICES_COUNT: int = 4
+
+# Roman labels reused by Chords-in-Key prompts. Order matches scale degree
+# 1..7 for each mode.
+const _QUIZ_ROMAN_MAJOR: Array[String] = ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
+const _QUIZ_ROMAN_MINOR: Array[String] = ["i", "ii°", "III", "iv", "v", "VI", "VII"]
+
+# Quality-comparison pairs for Compare Quality mode. Each entry: chord A
+# quality, chord B quality, and a quality-distractor pool the round draws
+# from to fill the 4 multiple-choice options. Hand-picked so the comparisons
+# are pedagogically meaningful (Maj vs Min, Maj7 vs Dom7, Dim vs Half-dim).
+const _QUIZ_COMPARE_PAIRS: Array[Dictionary] = [
+	{"a": "Major",    "b": "Minor",    "distractors": ["Dim", "Sus4", "Sus2"]},
+	{"a": "Minor",    "b": "Major",    "distractors": ["Sus2", "Sus4", "Aug"]},
+	{"a": "Major",    "b": "Aug",      "distractors": ["Minor", "Sus2", "Sus4"]},
+	{"a": "Major",    "b": "Maj7",     "distractors": ["Dom7", "Min7", "Add9"]},
+	{"a": "Major",    "b": "Dom7",     "distractors": ["Maj7", "Min7", "Maj6"]},
+	{"a": "Maj7",     "b": "Dom7",     "distractors": ["Min7", "mMaj7", "Half-dim"]},
+	{"a": "Dom7",     "b": "Maj7",     "distractors": ["Min7", "mMaj7", "Dim7"]},
+	{"a": "Dom7",     "b": "Min7",     "distractors": ["Maj7", "Half-dim", "mMaj7"]},
+	{"a": "Min7",     "b": "Maj7",     "distractors": ["Dom7", "mMaj7", "Half-dim"]},
+	{"a": "Dim",      "b": "Half-dim", "distractors": ["Dim7", "Minor", "Min7"]},
+	{"a": "Dim7",     "b": "Half-dim", "distractors": ["Dim", "Min7", "Minor"]},
+	{"a": "Major",    "b": "Sus4",     "distractors": ["Sus2", "Minor", "Aug"]},
+	{"a": "Major",    "b": "Sus2",     "distractors": ["Sus4", "Minor", "Add9"]},
+	{"a": "Major",    "b": "Maj6",     "distractors": ["Maj7", "Add9", "Dom7"]},
+]
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -368,7 +400,7 @@ func _build_quiz_overlay() -> void:
 	_quiz_overlay.add_child(center)
 
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(620, 480)
+	card.custom_minimum_size = Vector2(680, 520)
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	var card_style := StyleBoxFlat.new()
 	card_style.bg_color = Color(0.10, 0.16, 0.26, 1.0)
@@ -394,17 +426,38 @@ func _build_quiz_overlay() -> void:
 	card.add_child(card_margin)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
+	col.add_theme_constant_override("separation", 12)
 	card_margin.add_child(col)
 
-	var title := Label.new()
-	title.text = "%s  Name That Chord" % char(0x1F393)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Mode picker row at top — two pills that select the quiz type.
+	# Switching mode resets the round.
+	var mode_row := HBoxContainer.new()
+	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	mode_row.add_theme_constant_override("separation", 8)
+	col.add_child(mode_row)
+	var mode_btn_ck := Button.new()
+	mode_btn_ck.text = "Chords in Key"
+	mode_btn_ck.custom_minimum_size = Vector2(170, 34)
+	mode_btn_ck.add_theme_font_size_override("font_size", 13)
+	mode_btn_ck.pressed.connect(func(): _quiz_select_mode(QuizMode.CHORDS_IN_KEY))
+	mode_row.add_child(mode_btn_ck)
+	_quiz_mode_buttons[QuizMode.CHORDS_IN_KEY] = mode_btn_ck
+	var mode_btn_cq := Button.new()
+	mode_btn_cq.text = "Compare Quality"
+	mode_btn_cq.custom_minimum_size = Vector2(170, 34)
+	mode_btn_cq.add_theme_font_size_override("font_size", 13)
+	mode_btn_cq.pressed.connect(func(): _quiz_select_mode(QuizMode.COMPARE_QUALITY))
+	mode_row.add_child(mode_btn_cq)
+	_quiz_mode_buttons[QuizMode.COMPARE_QUALITY] = mode_btn_cq
+
+	_quiz_title_label = Label.new()
+	_quiz_title_label.text = "%s  Chords in Key" % char(0x1F393)
+	_quiz_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if _ui_title_font != null:
-		title.add_theme_font_override("font", _ui_title_font)
-	title.add_theme_font_size_override("font_size", 26)
-	title.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
-	col.add_child(title)
+		_quiz_title_label.add_theme_font_override("font", _ui_title_font)
+	_quiz_title_label.add_theme_font_size_override("font_size", 24)
+	_quiz_title_label.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	col.add_child(_quiz_title_label)
 
 	_quiz_score_label = Label.new()
 	_quiz_score_label.text = "Question 1 of %d   Score: 0" % _QUIZ_QUESTIONS_PER_ROUND
@@ -414,15 +467,17 @@ func _build_quiz_overlay() -> void:
 	col.add_child(_quiz_score_label)
 
 	_quiz_prompt_label = Label.new()
-	_quiz_prompt_label.text = "Listen, then pick the chord quality."
+	_quiz_prompt_label.text = ""
 	_quiz_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_quiz_prompt_label.add_theme_font_size_override("font_size", 16)
+	_quiz_prompt_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_quiz_prompt_label.add_theme_font_size_override("font_size", 17)
 	_quiz_prompt_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	col.add_child(_quiz_prompt_label)
 
-	# Replay button — re-auditions the staged chord.
+	# Play button — Chords-in-Key uses it to reveal the answer after
+	# submission; Compare-Quality uses it to re-listen to the A → B pair.
 	_quiz_play_button = Button.new()
-	_quiz_play_button.text = "%s  Play chord" % char(0x266A)
+	_quiz_play_button.text = "%s  Play" % char(0x266A)
 	_quiz_play_button.custom_minimum_size = Vector2(180, 44)
 	_quiz_play_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_quiz_play_button.add_theme_font_size_override("font_size", 15)
@@ -437,7 +492,8 @@ func _build_quiz_overlay() -> void:
 	_quiz_feedback_label = Label.new()
 	_quiz_feedback_label.text = ""
 	_quiz_feedback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_quiz_feedback_label.add_theme_font_size_override("font_size", 15)
+	_quiz_feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_quiz_feedback_label.add_theme_font_size_override("font_size", 14)
 	_quiz_feedback_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	col.add_child(_quiz_feedback_label)
 
@@ -449,9 +505,7 @@ func _build_quiz_overlay() -> void:
 	_quiz_next_button.text = "Next %s" % char(0x2192)
 	_quiz_next_button.custom_minimum_size = Vector2(140, 38)
 	_quiz_next_button.add_theme_font_size_override("font_size", 14)
-	_quiz_next_button.disabled = true  # enabled after the user answers
-	# Single dispatcher handles both "next question" and "play again" so
-	# we never have to disconnect/reconnect signals at runtime.
+	_quiz_next_button.disabled = true
 	_quiz_next_button.pressed.connect(_quiz_advance_pressed)
 	actions.add_child(_quiz_next_button)
 	_quiz_close_button = Button.new()
@@ -462,18 +516,61 @@ func _build_quiz_overlay() -> void:
 	actions.add_child(_quiz_close_button)
 
 	_quiz_overlay.visible = false
+	_quiz_refresh_mode_pill_styles()
 
 
-# Start (or restart) a 10-question round.
+# Visually highlight the active mode pill; called whenever mode changes.
+func _quiz_refresh_mode_pill_styles() -> void:
+	for mode_key in _quiz_mode_buttons.keys():
+		var btn: Button = _quiz_mode_buttons[mode_key] as Button
+		if btn == null:
+			continue
+		var active: bool = (int(mode_key) == _quiz_mode)
+		var sb := StyleBoxFlat.new()
+		var accent := MENU_PRIMARY_ACCENT if active else Color(0.36, 0.78, 1.00, 1.0)
+		sb.bg_color = Color(accent.r, accent.g, accent.b, 0.18 if active else 0.08)
+		sb.border_color = Color(accent.r, accent.g, accent.b, 0.90 if active else 0.50)
+		sb.border_width_left = 2 if active else 1
+		sb.border_width_right = 2 if active else 1
+		sb.border_width_top = 2 if active else 1
+		sb.border_width_bottom = 2 if active else 1
+		sb.corner_radius_top_left = 8
+		sb.corner_radius_top_right = 8
+		sb.corner_radius_bottom_left = 8
+		sb.corner_radius_bottom_right = 8
+		btn.add_theme_stylebox_override("normal", sb)
+		var hover := sb.duplicate() as StyleBoxFlat
+		hover.bg_color = Color(accent.r, accent.g, accent.b, 0.26)
+		btn.add_theme_stylebox_override("hover", hover)
+		btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+
+
+func _quiz_select_mode(mode: int) -> void:
+	if mode == _quiz_mode:
+		return
+	_quiz_mode = mode
+	_quiz_refresh_mode_pill_styles()
+	_start_quiz_round()
+
+
+# Start (or restart) a 10-question round for the currently-selected mode.
 func _start_quiz_round() -> void:
 	_quiz_score = 0
 	_quiz_question_index = 0
 	_quiz_session_attribution_pending = true
+	# Reset play button visibility (round summary hides it).
+	if _quiz_play_button != null:
+		_quiz_play_button.visible = true
+	# Update title to match active mode.
+	if _quiz_title_label != null:
+		_quiz_title_label.text = "%s  %s" % [
+			char(0x1F393),
+			"Chords in Key" if _quiz_mode == QuizMode.CHORDS_IN_KEY else "Compare Quality",
+		]
 	_quiz_next_question()
 
 
-# Build a fresh question: pick a random quality, stage notes, render 4
-# choice buttons (correct + 3 distractors), play the chord.
+# Mode dispatcher — runs the right question generator.
 func _quiz_next_question() -> void:
 	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND:
 		_quiz_show_round_summary()
@@ -482,33 +579,66 @@ func _quiz_next_question() -> void:
 	_quiz_answered = false
 	_quiz_feedback_label.text = ""
 	_quiz_next_button.disabled = true
-	# Pick a random quality + random root from KEY_OPTIONS so the student
-	# can't memorize "every quiz chord is C-something".
+	_quiz_play_token += 1  # any in-flight A→B sequence is now stale
+	for child in _quiz_choices_row.get_children():
+		child.queue_free()
+	_quiz_score_label.text = "Question %d of %d   Score: %d" % [_quiz_question_index, _QUIZ_QUESTIONS_PER_ROUND, _quiz_score]
+	match _quiz_mode:
+		QuizMode.COMPARE_QUALITY:
+			_quiz_next_compare_quality()
+		_:
+			_quiz_next_chords_in_key()
+
+
+# CHORDS IN KEY — "Build the {roman} chord in {key_name}".
+# 4 multiple-choice options drawn from the same key's diatonic chords.
+# Play button reveals the correct answer after submission.
+func _quiz_next_chords_in_key() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	_quiz_current_answer = _QUIZ_QUALITIES[rng.randi_range(0, _QUIZ_QUALITIES.size() - 1)]
-	var root_idx: int = rng.randi_range(0, KEY_OPTIONS.size() - 1)
-	var root_pc: int = int(KEY_OPTIONS[root_idx][1])
-	var intervals: Array = _intervals_for_quality(_quiz_current_answer)
+	# Pick a random key (any of the 13 KEY_OPTIONS entries) and a random
+	# mode flavor (major / natural minor) so the student sees both worlds.
+	var key_idx: int = rng.randi_range(0, KEY_OPTIONS.size() - 1)
+	var key_root_pc: int = int(KEY_OPTIONS[key_idx][1])
+	var key_label: String = str(KEY_OPTIONS[key_idx][0])
+	var use_minor: bool = rng.randf() < 0.40  # bias toward major for beginner friendliness
+	var scale_offsets: Array = _MINOR_SCALE if use_minor else _MAJOR_SCALE
+	var defs: Array = _MINOR_DIATONIC if use_minor else _MAJOR_DIATONIC
+	var romans: Array = _QUIZ_ROMAN_MINOR if use_minor else _QUIZ_ROMAN_MAJOR
+	# Pick a random scale degree (1..7) to ask about.
+	var degree_idx: int = rng.randi_range(0, 6)
+	var roman: String = str(romans[degree_idx])
+	# Resolve the 7 diatonic chord pitch-classes + qualities for this key.
+	var diatonic: Array = []
+	for i in 7:
+		var pc: int = ((key_root_pc + int(scale_offsets[i])) % 12 + 12) % 12
+		diatonic.append({
+			"pc": pc,
+			"quality": str(defs[i]["quality"]),
+			"roman": str(romans[i]),
+		})
+	# Correct answer = the chord at the prompted degree.
+	var correct: Dictionary = diatonic[degree_idx]
+	_quiz_current_answer = _quiz_chord_label(int(correct["pc"]), str(correct["quality"]), key_label)
+	# Stage the correct chord so the Play button can reveal it.
+	var intervals: Array = _intervals_for_quality(str(correct["quality"]))
 	if intervals.is_empty():
-		_quiz_current_answer = "Major"
 		intervals = _intervals_for_quality("Major")
-	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
+	var base_root_midi: int = _anchor_root_for_chord(int(correct["pc"]), intervals)
 	_quiz_current_chord_notes.clear()
 	for iv in intervals:
 		_quiz_current_chord_notes.append(base_root_midi + int(iv))
-	# Build 4 unique choices: correct + 3 distractors drawn from the pool.
-	var choices: Array[String] = [_quiz_current_answer]
-	var pool: Array[String] = _QUIZ_QUALITIES.duplicate()
-	pool.erase(_quiz_current_answer)
+	# 3 distractors from the OTHER 6 diatonic chords (all in-key, so the
+	# student is choosing between functionally-related options).
+	var pool: Array = diatonic.duplicate()
+	pool.remove_at(degree_idx)
 	pool.shuffle()
+	var choice_labels: Array[String] = [_quiz_current_answer]
 	for i in mini(_QUIZ_CHOICES_COUNT - 1, pool.size()):
-		choices.append(pool[i])
-	choices.shuffle()
-	# Rebuild choices row.
-	for child in _quiz_choices_row.get_children():
-		child.queue_free()
-	for choice in choices:
+		var d: Dictionary = pool[i]
+		choice_labels.append(_quiz_chord_label(int(d["pc"]), str(d["quality"]), key_label))
+	choice_labels.shuffle()
+	for choice in choice_labels:
 		var btn := Button.new()
 		btn.text = choice
 		btn.custom_minimum_size = Vector2(118, 46)
@@ -516,21 +646,128 @@ func _quiz_next_question() -> void:
 		var captured := choice
 		btn.pressed.connect(func(): _quiz_submit_answer(captured))
 		_quiz_choices_row.add_child(btn)
-	_quiz_score_label.text = "Question %d of %d   Score: %d" % [_quiz_question_index, _QUIZ_QUESTIONS_PER_ROUND, _quiz_score]
-	_quiz_replay_current()
+	# Prompt + UI tweaks specific to this mode.
+	var mode_word: String = "%s minor" % key_label if use_minor else "%s major" % key_label
+	_quiz_prompt_label.text = "Build the %s chord in %s." % [roman, mode_word]
+	_quiz_play_button.text = "%s  Play (reveals answer)" % char(0x266A)
+	_quiz_play_button.disabled = false
 
 
-func _quiz_replay_current() -> void:
-	if _quiz_current_chord_notes.is_empty():
+# COMPARE QUALITY — play A, then B; student picks B's quality.
+# Pulls from _QUIZ_COMPARE_PAIRS so the contrast is always pedagogically
+# meaningful (Maj↔Min, Maj7↔Dom7, Dim↔Half-dim, etc.).
+func _quiz_next_compare_quality() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var pair: Dictionary = _QUIZ_COMPARE_PAIRS[rng.randi_range(0, _QUIZ_COMPARE_PAIRS.size() - 1)]
+	var quality_a: String = str(pair["a"])
+	var quality_b: String = str(pair["b"])
+	# Random shared root for both chords.
+	var root_idx: int = rng.randi_range(0, KEY_OPTIONS.size() - 1)
+	var root_pc: int = int(KEY_OPTIONS[root_idx][1])
+	_quiz_current_answer = quality_b
+	# Stage notes for A and B independently — each gets its own keyboard
+	# anchor (so e.g. an extended B doesn't clip off the top).
+	var intervals_a: Array = _intervals_for_quality(quality_a)
+	var intervals_b: Array = _intervals_for_quality(quality_b)
+	if intervals_a.is_empty() or intervals_b.is_empty():
+		# Fallback to triad pair so the question is never broken.
+		quality_a = "Major"; quality_b = "Minor"
+		intervals_a = _intervals_for_quality(quality_a)
+		intervals_b = _intervals_for_quality(quality_b)
+		_quiz_current_answer = quality_b
+	var anchor_a: int = _anchor_root_for_chord(root_pc, intervals_a)
+	var anchor_b: int = _anchor_root_for_chord(root_pc, intervals_b)
+	_quiz_compare_a_notes.clear()
+	_quiz_compare_b_notes.clear()
+	for iv in intervals_a:
+		_quiz_compare_a_notes.append(anchor_a + int(iv))
+	for iv in intervals_b:
+		_quiz_compare_b_notes.append(anchor_b + int(iv))
+	# Reset current_chord_notes — Compare mode plays sequences via
+	# _quiz_play_compare_sequence, not _play_chord_now on a single chord.
+	_quiz_current_chord_notes = _quiz_compare_b_notes.duplicate()
+	# 4 quality choices: correct + 3 distractors from the pair's distractor list.
+	var distractors: Array = (pair.get("distractors", []) as Array).duplicate()
+	distractors.erase(quality_b)
+	distractors.shuffle()
+	var choice_labels: Array[String] = [quality_b]
+	for i in mini(_QUIZ_CHOICES_COUNT - 1, distractors.size()):
+		choice_labels.append(str(distractors[i]))
+	choice_labels.shuffle()
+	for choice in choice_labels:
+		var btn := Button.new()
+		btn.text = choice
+		btn.custom_minimum_size = Vector2(118, 46)
+		btn.add_theme_font_size_override("font_size", 14)
+		var captured := choice
+		btn.pressed.connect(func(): _quiz_submit_answer(captured))
+		_quiz_choices_row.add_child(btn)
+	_quiz_prompt_label.text = "Listen: %s → ? — what did chord B change to?" % quality_a
+	_quiz_play_button.text = "%s  Play A → B" % char(0x266A)
+	_quiz_play_button.disabled = false
+	# Auto-play the sequence so the student hears the contrast right away.
+	_quiz_play_compare_sequence()
+
+
+# A → 0.5s gap → B, with playback lock for the full duration.
+func _quiz_play_compare_sequence() -> void:
+	if _quiz_compare_a_notes.is_empty() or _quiz_compare_b_notes.is_empty():
 		return
 	if _is_playback_busy():
 		return
-	_lock_playback(1.6)
+	_quiz_play_token += 1
+	var my_token: int = _quiz_play_token
+	_lock_playback(3.2)
 	if _play_chord_callable.is_valid():
-		_play_chord_callable.call(_quiz_current_chord_notes, 1.6)
+		_play_chord_callable.call(_quiz_compare_a_notes, 1.3)
 	elif _play_note_callable.is_valid():
-		for n in _quiz_current_chord_notes:
-			_play_note_callable.call(n, 1.6)
+		for n in _quiz_compare_a_notes:
+			_play_note_callable.call(n, 1.3)
+	await get_tree().create_timer(1.55).timeout
+	if my_token != _quiz_play_token or not is_inside_tree() or not visible:
+		return
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(_quiz_compare_b_notes, 1.3)
+	elif _play_note_callable.is_valid():
+		for n in _quiz_compare_b_notes:
+			_play_note_callable.call(n, 1.3)
+
+
+# Replay button handler — dispatches based on quiz mode.
+func _quiz_replay_current() -> void:
+	if _is_playback_busy():
+		return
+	match _quiz_mode:
+		QuizMode.COMPARE_QUALITY:
+			_quiz_play_compare_sequence()
+		_:
+			# Chords in Key: replay the correct chord — used as the
+			# "reveal" after submission.
+			if _quiz_current_chord_notes.is_empty():
+				return
+			_lock_playback(1.6)
+			if _play_chord_callable.is_valid():
+				_play_chord_callable.call(_quiz_current_chord_notes, 1.6)
+			elif _play_note_callable.is_valid():
+				for n in _quiz_current_chord_notes:
+					_play_note_callable.call(n, 1.6)
+
+
+# Format a chord label for the choice buttons. Uses key-aware enharmonic
+# spelling so chords in Bb show as "Bb / Cm / Dm" not "A# / Cm / Dm".
+func _quiz_chord_label(root_pc: int, quality: String, key_label: String) -> String:
+	var use_flats: bool = key_label.contains("b")
+	var pc: int = ((root_pc % 12) + 12) % 12
+	var name_table: Array = NOTE_NAMES_FLAT if use_flats else NOTE_NAMES_SHARP
+	var letter: String = str(name_table[pc])
+	var suffix: String
+	match quality:
+		"Major": suffix = ""
+		"Minor": suffix = "m"
+		_:
+			suffix = quality
+	return "%s%s" % [letter, suffix]
 
 
 func _quiz_submit_answer(chosen: String) -> void:
@@ -761,6 +998,13 @@ func _apply_responsive_layout() -> void:
 	if vp == null:
 		return
 	var w: float = vp.get_visible_rect().size.x
+	# Defensive guard: during initial scene build the viewport rect can
+	# briefly read as zero. If we run the layout then we'd incorrectly
+	# rotate into narrow mode and the chord display would be cut off.
+	# Defer until the viewport is genuinely sized.
+	if w < 200.0:
+		call_deferred("_apply_responsive_layout")
+		return
 	var bp: int
 	if w >= _LAYOUT_BREAKPOINT_WIDE:
 		bp = 2  # wide
@@ -779,8 +1023,7 @@ func _apply_responsive_layout() -> void:
 			_rotate_top_section(want_vertical)
 	# Tighten section separation on smaller screens.
 	if _top_section != null:
-		if "add_theme_constant_override" in _top_section:
-			_top_section.add_theme_constant_override("separation", 14 if bp == 2 else (10 if bp == 1 else 6))
+		_top_section.add_theme_constant_override("separation", 14 if bp == 2 else (10 if bp == 1 else 6))
 
 
 # Swap top_section between HBoxContainer (side-by-side) and VBoxContainer
@@ -813,9 +1056,10 @@ func _rotate_top_section(vertical: bool) -> void:
 	parent.move_child(new_box, idx)
 	for c in children:
 		new_box.add_child(c)
-		# In vertical mode the side-by-side stretch_ratio no longer applies;
-		# clear it so the children take their natural minimum size.
-		if c is Control and vertical:
+		if c is Control:
+			# In both modes the children should expand to fill their slot.
+			# The original stretch_ratio (4 / 6) is preserved on the Control
+			# itself so going back to HBox restores the 40/60 split.
 			(c as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_top_section = new_box
 
