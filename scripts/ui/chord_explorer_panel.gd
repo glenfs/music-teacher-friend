@@ -201,8 +201,28 @@ func present() -> void:
 	_force_fullscreen_rect()
 	visible = true
 	move_to_front()
+	# Stage a default chord (tonic triad in the current key) so the voicings
+	# / compare / inversions rows are immediately visible — otherwise the
+	# user opens the panel to an empty display and has no idea those rows
+	# exist until they happen to click a diatonic chord button.
+	_stage_default_demo_chord()
 	_refresh_display()
 	presented.emit()
+
+
+# Stages the tonic triad in whatever key is currently selected so the panel
+# never shows up empty. C major by default; if the user opened the panel
+# already in another key (e.g. via _load_preset's side effects) we use it.
+func _stage_default_demo_chord() -> void:
+	var quality: String = "Minor" if _key_is_minor else "Major"
+	var intervals: Array = _intervals_for_quality(quality)
+	if intervals.is_empty():
+		return
+	var base_root_midi: int = _anchor_root_for_chord(_key_pc, intervals)
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	for iv in intervals:
+		_recent_notes[base_root_midi + int(iv)] = now
+	_window_expires_at = now + CLICK_WINDOW_SEC
 
 
 # Hide + clear state. Does not free the panel — parent can present() again.
