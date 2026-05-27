@@ -87,7 +87,10 @@ var _play_button: Button = null
 var _window_bar: ProgressBar = null
 var _keyboard_keys: Dictionary = {}       # pitch -> Button
 var _inversions_row: HBoxContainer = null
-var _presets_row: HBoxContainer = null
+# Presets dropdown lives in the top toolbar next to the key selector.
+# (The old _presets_row HBox under the chord display was removed — that
+# space was crowded; DAW-style toolbar dropdown is cleaner.)
+var _presets_option: OptionButton = null
 var _preset_steps_row: HBoxContainer = null
 # Cached chord list of the currently-loaded preset. Each entry is the raw
 # tuple [root_pc, quality_id, roman] from BUILT_IN_PRESETS. Lets the chord-
@@ -301,6 +304,23 @@ func _build_ui() -> void:
 	_minor_check.toggled.connect(_on_minor_toggled)
 	key_row.add_child(_minor_check)
 
+	# Presets dropdown — index 0 is a disabled placeholder so opening the
+	# panel doesn't auto-trigger a preset. Selecting any other item loads
+	# the corresponding BUILT_IN_PRESETS entry, which populates the
+	# chord-step row + auditions the first chord.
+	var presets_spacer := Control.new()
+	presets_spacer.custom_minimum_size = Vector2(16, 0)
+	key_row.add_child(presets_spacer)
+	_presets_option = OptionButton.new()
+	_presets_option.custom_minimum_size = Vector2(220, 38)
+	_presets_option.add_item("Quick presets...")
+	_presets_option.set_item_disabled(0, true)
+	for preset in BUILT_IN_PRESETS:
+		_presets_option.add_item(str(preset.get("label", "Preset")))
+	_presets_option.selected = 0
+	_presets_option.item_selected.connect(_on_presets_option_selected)
+	key_row.add_child(_presets_option)
+
 	if _score_font_picker_builder.is_valid():
 		_score_font_picker_builder.call(key_row)
 
@@ -442,14 +462,6 @@ func _build_ui() -> void:
 	_inversions_row.add_theme_constant_override("separation", 8)
 	_inversions_row.visible = false
 	name_inner.add_child(_inversions_row)
-
-	# Teacher presets row — saved chord+key setups the teacher can load with
-	# one click ("Modal mixture in C", "ii-V-I cycle", etc.).
-	_presets_row = HBoxContainer.new()
-	_presets_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_presets_row.add_theme_constant_override("separation", 6)
-	name_inner.add_child(_presets_row)
-	_build_presets_row()
 
 	# Chord-step row — populated when a preset loads. Each chord in the preset
 	# becomes a clickable button (with Roman numeral underneath) so the
@@ -840,24 +852,19 @@ func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> 
 # --- Teacher presets row ---
 
 
-func _build_presets_row() -> void:
-	if _presets_row == null:
+func _on_presets_option_selected(idx: int) -> void:
+	# Dropdown index 0 is the disabled "Quick presets..." placeholder; real
+	# presets start at index 1 and map 1:1 to BUILT_IN_PRESETS.
+	if idx <= 0:
 		return
-	for child in _presets_row.get_children():
-		child.queue_free()
-	var label := Label.new()
-	label.text = "Quick presets:"
-	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.82))
-	_presets_row.add_child(label)
-	for preset in BUILT_IN_PRESETS:
-		var btn := Button.new()
-		btn.text = str(preset.get("label", "Preset"))
-		btn.custom_minimum_size = Vector2(140, 30)
-		btn.add_theme_font_size_override("font_size", 12)
-		var captured := preset
-		btn.pressed.connect(func(): _load_preset(captured))
-		_presets_row.add_child(btn)
+	var preset_idx := idx - 1
+	if preset_idx < 0 or preset_idx >= BUILT_IN_PRESETS.size():
+		return
+	_load_preset(BUILT_IN_PRESETS[preset_idx])
+	# Snap the OptionButton back to the placeholder so re-selecting the same
+	# preset later re-triggers the load (item_selected only fires on changes).
+	if _presets_option != null:
+		_presets_option.select(0)
 
 
 func _load_preset(preset: Dictionary) -> void:
