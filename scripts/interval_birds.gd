@@ -130,8 +130,13 @@ const RECOGNIZER_QUALITY_TO_CHOICE := {
 	"sus2": "Sus2", "sus4": "Sus4",
 	"7": "Dom7", "maj7": "Maj7", "m7": "Min7", "dim7": "Dim7", "m7b5": "Half-dim",
 	"mMaj7": "mMaj7", "aug7": "Aug7", "augMaj7": "AugMaj7", "7sus4": "7sus4",
-	"6": "Maj6", "m6": "Min6", "6/9": "6-9",
+	"6": "Maj6", "m6": "Min6", "6/9": "6/9",
 	"9": "Dom9", "maj9": "Maj9", "m9": "Min9", "add9": "Add9",
+	"madd9": "Madd9",
+	"11": "Dom11", "m11": "Min11", "maj11": "Maj11",
+	"13": "Dom13",
+	"maj7#11": "Maj7#11",
+	"7b5": "7b5", "7b9": "7b9", "7#9": "7#9",
 }
 const LearningMapScript = preload("res://scripts/learning/learning_map.gd")
 const LessonPlayerScript = preload("res://scripts/learning/lesson_player.gd")

@@ -47,6 +47,13 @@ const CHORD_TEMPLATES := {
 	"2,4,5,7,10":    ["11",         "Dominant 11",            3],
 	"2,3,5,7,10":    ["m11",        "Minor 11",               3],
 	"2,4,5,7,11":    ["maj11",      "Major 11",               4],
+	# 13ths (note: natural 11 omitted on Dom13 because it clashes with the M3)
+	"2,4,7,9,10":    ["13",         "Dominant 13",            3],
+	# Lydian color
+	"2,4,6,7,11":    ["maj7#11",    "Major 7 ♯11 (Lydian)",   3],
+	"2,4,6,11":      ["maj7#11",    "Major 7 ♯11 (no 5)",     4],
+	# Minor add 9
+	"2,3,7":         ["madd9",      "Minor Add 9",            3],
 	# Quartal/clusters (less common but useful for jazz)
 	"5,10":          ["sus4(no5)",  "Quartal Stack",          5],
 }
