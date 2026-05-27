@@ -755,6 +755,29 @@ func _play_note_soft(pitch: int, sample_map: Dictionary) -> void:
 # --- Display refresh ---
 
 
+# Returns a root-MIDI anchor that keeps the chord rooted in the C4-octave
+# whenever possible and never lets the top voice exceed KEYBOARD_HIGH (C6).
+# Keyboard layout is C2-C6 (36-84) — we cap at 84 and floor at C3 (48) so
+# even the widest chords stay visible + clickable on the on-screen piano.
+func _anchor_root_for_chord(root_pc: int, intervals: Array) -> int:
+	var pc: int = ((int(root_pc) % 12) + 12) % 12
+	var base: int = 60 + pc  # default: C4-anchored root (60..71)
+	if intervals.is_empty():
+		return base
+	var max_iv: int = 0
+	for iv in intervals:
+		max_iv = maxi(max_iv, int(iv))
+	# Drop an octave at a time while the top voice clips above the keyboard.
+	while base + max_iv > KEYBOARD_HIGH and base > 48:
+		base -= 12
+	# Don't let the root fall below C3 (48). If the chord is so wide that
+	# even C3 + max_iv > C6, we accept the clip on the high end rather than
+	# burying the root below the keyboard.
+	if base < 48:
+		base = 48
+	return base
+
+
 # --- Inversions row ---
 
 
@@ -783,11 +806,10 @@ func _refresh_inversions_row() -> void:
 	var root_pc: int = int(_last_info.get("root_pc", 0))
 	var root_letter: String = str(_last_info.get("root_letter", ""))
 	var current_bass_pc: int = int(_last_info.get("bass_pc", root_pc))
-	# Base root MIDI anchored near middle of the keyboard so inversions land
-	# in a comfortable listening range (C4 = 60).
-	var base_root_midi: int = 60 + ((root_pc - 0 + 12) % 12)
-	if base_root_midi >= 72:
-		base_root_midi -= 12
+	# Anchor inversions in the same C4-octave-with-C6-ceiling window as the
+	# preset playback uses, so the student isn't surprised by a higher /
+	# lower register when they click a different inversion of the same chord.
+	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
 	# Build a button per chord-tone-as-bass.
 	for i in intervals.size():
 		var iv: int = int(intervals[i])
@@ -924,10 +946,10 @@ func _play_preset_step(idx: int) -> void:
 	var intervals: Array = _intervals_for_quality(quality)
 	if intervals.is_empty():
 		return
-	# Anchor root note in a comfortable register near middle C.
-	var base_root_midi: int = 60 + root_pc
-	if base_root_midi >= 72:
-		base_root_midi -= 12
+	# Anchor in C4-octave (root in 60..71) then drop another octave only if
+	# the top voice would sail above the virtual keyboard's C6 (84). Also
+	# clamp the floor at C3 (48) so we never go below the keyboard low.
+	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
 	var now: float = float(Time.get_ticks_msec()) / 1000.0
 	_recent_notes.clear()
 	for iv in intervals:

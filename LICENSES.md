@@ -15,11 +15,16 @@ Status: draft. Complete all `TBD` entries before public distribution.
   - Source: Google Fonts (Righteous)
   - License: SIL Open Font License 1.1
 
-- `assets/fonts/Baloo2-SemiBold.ttf`
+- `assets/fonts/Inter-Light.ttf`, `assets/fonts/Inter-Regular.ttf`, `assets/fonts/Inter-Medium.ttf` (primary UI font)
+  - Source: Rasmus Andersson — https://github.com/rsms/inter
+  - Copyright: 2016-2023 The Inter Project Authors
+  - License: SIL Open Font License 1.1 (full text in `assets/fonts/Inter-LICENSE.txt`)
+
+- `assets/fonts/Baloo2-SemiBold.ttf` (legacy — kept for theme compatibility)
   - Source: Google Fonts (Baloo 2)
   - License: SIL Open Font License 1.1
 
-- `assets/fonts/Nunito-Regular.ttf`
+- `assets/fonts/Nunito-Regular.ttf` (legacy — kept for theme compatibility)
   - Source: Google Fonts (Nunito)
   - License: SIL Open Font License 1.1
 

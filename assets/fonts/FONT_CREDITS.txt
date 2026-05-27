@@ -1,16 +1,19 @@
 Fonts used by this project
 
-Title / button font:
-- Baloo 2 (variable weight)
-- Copyright 2010-2021 Ek Type (www.ektype.in)
+Primary UI font (body + buttons + titles):
+- Inter (Light + Regular + Medium weights)
+- Copyright 2016-2023 The Inter Project Authors (https://github.com/rsms/inter)
 - License: SIL Open Font License, Version 1.1
+- License text: see Inter-LICENSE.txt in this folder
 
-Body / description font:
-- Nunito (variable weight)
-- Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
-- License: SIL Open Font License, Version 1.1
+Music notation fonts (SMuFL musical symbols):
+- Bravura — License: SIL Open Font License, Version 1.1 — see BRAVURA_README.md
+- Leland (Steinberg) — License: SIL Open Font License, Version 1.1
+- Petaluma (Steinberg) — License: SIL Open Font License, Version 1.1
 
-Legacy fonts (no longer primary):
-- Poppins
-- Copyright 2014 The Poppins Project Authors
-- License: SIL Open Font License, Version 1.1
+Legacy / no longer primary (kept for backward compatibility with saved
+themes that referenced them):
+- Baloo 2 (variable weight) — OFL 1.1 — Ek Type
+- Nunito (variable weight) — OFL 1.1 — Google Fonts
+- Poppins — OFL 1.1
+- Righteous — OFL 1.1
