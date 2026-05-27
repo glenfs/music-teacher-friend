@@ -112,6 +112,12 @@ var _compare_token: int = 0
 var _chord_detail_tabs: TabContainer = null
 # One-screen lesson overlay invoked from the toolbar "?" button.
 var _help_overlay: PanelContainer = null
+# Playback busy lock: while non-zero, all chord-playback buttons are
+# disabled + a "♪ Playing..." indicator shows. Token bumped on every
+# new lock so a stale auto-unlock can't re-enable buttons mid-sequence.
+var _playback_busy_until: float = 0.0
+var _playback_lock_token: int = 0
+var _playback_indicator: Label = null
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -231,6 +237,59 @@ func _stage_default_demo_chord() -> void:
 
 
 # Hide + clear state. Does not free the panel — parent can present() again.
+# --- Playback busy lock ---
+
+
+# Returns true if there's an in-flight chord/voicing/preset playback that
+# should block another click from firing. Caller handlers should bail at
+# entry when this returns true.
+func _is_playback_busy() -> bool:
+	return (float(Time.get_ticks_msec()) / 1000.0) < _playback_busy_until
+
+
+# Disable all chord-playback buttons for `duration` seconds + show the
+# "♪ Playing..." indicator. Token-guarded so a longer lock isn't undone
+# by an earlier auto-unlock that fires later.
+func _lock_playback(duration: float) -> void:
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	_playback_busy_until = max(_playback_busy_until, now + duration)
+	_playback_lock_token += 1
+	var my_token: int = _playback_lock_token
+	_set_playback_buttons_disabled(true)
+	if _playback_indicator != null:
+		_playback_indicator.visible = true
+	# Schedule the auto-unlock. Use the tree timer (not await) so the
+	# caller doesn't have to be async.
+	if is_inside_tree():
+		var t := get_tree().create_timer(duration)
+		t.timeout.connect(func(): _auto_unlock_playback(my_token))
+
+
+func _auto_unlock_playback(token: int) -> void:
+	if token != _playback_lock_token:
+		return
+	_playback_busy_until = 0.0
+	_set_playback_buttons_disabled(false)
+	if _playback_indicator != null:
+		_playback_indicator.visible = false
+
+
+# Walks every chord-playback row and toggles `disabled` on each Button
+# child. The set rebuilds every refresh so we re-walk live — no static
+# button registry to keep in sync.
+func _set_playback_buttons_disabled(disabled: bool) -> void:
+	var rows: Array = [
+		_diatonic_row, _preset_steps_row,
+		_inversions_row, _voicings_row, _compare_row,
+	]
+	for row in rows:
+		if row == null:
+			continue
+		for child in row.get_children():
+			if child is Button:
+				(child as Button).disabled = disabled
+
+
 # --- Help overlay (lesson card) ---
 
 
@@ -651,6 +710,19 @@ func _build_ui() -> void:
 	_full_name_label.add_theme_font_size_override("font_size", 18)
 	_full_name_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	name_inner.add_child(_full_name_label)
+
+	# Playback "♪ Playing..." indicator — appears while any chord playback
+	# is in flight. Visual confirmation that the previous click was
+	# received + a brake on click-spamming.
+	_playback_indicator = Label.new()
+	_playback_indicator.text = "%s  Playing..." % char(0x266A)
+	_playback_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_playback_indicator.add_theme_font_size_override("font_size", 13)
+	_playback_indicator.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	if _ui_font != null:
+		_playback_indicator.add_theme_font_override("font", _ui_font)
+	_playback_indicator.visible = false
+	name_inner.add_child(_playback_indicator)
 
 	# Three chord-detail surfaces collapsed into a TabContainer to cut the
 	# vertical density that built up as features piled on:
@@ -1096,6 +1168,8 @@ func _apply_inversion_button_style(btn: Button, is_current: bool) -> void:
 func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> void:
 	if bass_index < 0 or bass_index >= intervals.size():
 		return
+	if _is_playback_busy():
+		return
 	var rotated: Array[int] = []
 	for i in range(bass_index, intervals.size()):
 		rotated.append(int(intervals[i]))
@@ -1104,6 +1178,16 @@ func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> 
 	var chord_notes: Array[int] = []
 	for offset in rotated:
 		chord_notes.append(base_root_midi + offset)
+	# Stage the rotated voicing so the staff, virtual keyboard, and
+	# recognizer (chord-name chip + bass/inversion chip) ALL reflect the
+	# inversion the user clicked — not just the audio.
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	_recent_notes.clear()
+	for n in chord_notes:
+		_recent_notes[n] = now
+	_window_expires_at = now + CLICK_WINDOW_SEC
+	_refresh_display()
+	_lock_playback(1.6)
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(chord_notes, 1.6)
 	elif _play_note_callable.is_valid():
@@ -1169,6 +1253,8 @@ func _load_preset(preset: Dictionary) -> void:
 func _play_preset_step(idx: int) -> void:
 	if idx < 0 or idx >= _active_preset_chords.size():
 		return
+	if _is_playback_busy():
+		return
 	var chord_v: Variant = _active_preset_chords[idx]
 	if typeof(chord_v) != TYPE_ARRAY or (chord_v as Array).size() < 2:
 		return
@@ -1197,6 +1283,7 @@ func _play_preset_step(idx: int) -> void:
 	var chord_notes: Array[int] = []
 	for iv in intervals:
 		chord_notes.append(base_root_midi + int(iv))
+	_lock_playback(1.6)
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(chord_notes, 1.6)
 	elif _play_note_callable.is_valid():
@@ -1210,18 +1297,59 @@ func _play_preset_step(idx: int) -> void:
 func _play_all_preset_steps() -> void:
 	if _active_preset_chords.is_empty():
 		return
+	if _is_playback_busy():
+		return
 	_play_all_token += 1
 	var my_token: int = _play_all_token
+	# Lock for the whole sequence up front so the per-step _play_preset_step
+	# calls don't each try to re-lock for just 1.6s (which would let other
+	# buttons re-enable between steps).
+	_lock_playback(_active_preset_chords.size() * 1.8 + 0.1)
 	for i in _active_preset_chords.size():
 		if my_token != _play_all_token:
 			return  # superseded by a newer Play-All / preset load
 		if not is_inside_tree() or not visible:
 			return
-		_play_preset_step(i)
+		# Bypass _play_preset_step's busy-check by calling its core staging
+		# directly — we hold the lock for the whole sequence.
+		_play_preset_step_unlocked(i)
 		# Hold each chord for ~1.8s before stepping to the next. The chord
 		# voicing itself plays for 1.6s; the extra 0.2s lets the ear settle
 		# before the harmony changes.
 		await get_tree().create_timer(1.8).timeout
+
+
+# Same as _play_preset_step but skips the busy-check + per-step lock.
+# Used by _play_all_preset_steps which holds one lock for the whole loop.
+func _play_preset_step_unlocked(idx: int) -> void:
+	if idx < 0 or idx >= _active_preset_chords.size():
+		return
+	var chord_v: Variant = _active_preset_chords[idx]
+	if typeof(chord_v) != TYPE_ARRAY or (chord_v as Array).size() < 2:
+		return
+	var chord: Array = chord_v
+	var root_pc: int = int(chord[0])
+	var quality: String = str(chord[1])
+	var intervals: Array = _intervals_for_quality(quality)
+	if intervals.is_empty():
+		return
+	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	_recent_notes.clear()
+	for iv in intervals:
+		_recent_notes[base_root_midi + int(iv)] = now
+	_window_expires_at = now + CLICK_WINDOW_SEC
+	_active_preset_step_idx = idx
+	_refresh_display()
+	_restyle_preset_step_buttons()
+	var chord_notes: Array[int] = []
+	for iv in intervals:
+		chord_notes.append(base_root_midi + int(iv))
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(chord_notes, 1.6)
+	elif _play_note_callable.is_valid():
+		for n in chord_notes:
+			_play_note_callable.call(n, 1.6)
 
 
 # Rebuilds the chord-step row UI: one labelled button per chord in the
@@ -1521,6 +1649,8 @@ func _voicing_open(intervals: Array) -> Array:
 
 
 func _play_voicing(base_root_midi: int, voicing_intervals: Array) -> void:
+	if _is_playback_busy():
+		return
 	# Re-anchor so the highest voice still respects the keyboard ceiling
 	# even after open-voicing transposition pushes notes up an octave.
 	var anchor: int = base_root_midi
@@ -1541,6 +1671,7 @@ func _play_voicing(base_root_midi: int, voicing_intervals: Array) -> void:
 	var chord_notes: Array[int] = []
 	for iv in voicing_intervals:
 		chord_notes.append(anchor + int(iv))
+	_lock_playback(1.6)
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(chord_notes, 1.6)
 	elif _play_note_callable.is_valid():
@@ -1660,6 +1791,8 @@ func _compare_play_side(which: String) -> void:
 	# A = current chord, B = same root + quality picked in the dropdown.
 	if _compare_option == null or _last_info.is_empty():
 		return
+	if _is_playback_busy():
+		return
 	var root_pc: int = int(_last_info.get("root_pc", 0))
 	var intervals_a_v: Variant = _last_info.get("intervals_from_root", null)
 	if typeof(intervals_a_v) != TYPE_ARRAY:
@@ -1687,10 +1820,14 @@ func _compare_play_side(which: String) -> void:
 	var my_token: int = _compare_token
 	match which:
 		"a":
+			_lock_playback(1.4)
 			_play_chord_now(notes_a)
 		"b":
+			_lock_playback(1.4)
 			_play_chord_now(notes_b)
 		"ab":
+			# A → B → A is ~3 × 1.55s + 0.1 safety.
+			_lock_playback(4.75)
 			await _play_compare_sequence(notes_a, notes_b, my_token)
 
 
@@ -1805,6 +1942,8 @@ func _rebuild_diatonic_row() -> void:
 
 
 func _stage_and_play_diatonic_chord(root_pc: int, quality: String) -> void:
+	if _is_playback_busy():
+		return
 	var intervals: Array = _intervals_for_quality(quality)
 	if intervals.is_empty():
 		return
