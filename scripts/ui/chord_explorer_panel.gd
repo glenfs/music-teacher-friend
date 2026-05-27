@@ -39,6 +39,7 @@ const MENU_TITLE_TEXT := Color(0.9176, 0.9529, 1.0, 1.0)
 const MENU_PRIMARY_ACCENT := Color(0.9098, 0.6275, 0.1255, 1.0)
 
 const NOTE_NAMES_SHARP := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+const NOTE_NAMES_FLAT  := ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
 
 const KEY_OPTIONS := [
 	["C", 0], ["G", 7], ["D", 2], ["A", 9], ["E", 4], ["B", 11], ["F#", 6],
@@ -71,6 +72,10 @@ var _play_chord_callable: Callable = Callable()          # (notes:Array[int], du
 # --- Internal state ---
 var _key_pc: int = 0
 var _key_is_minor: bool = false
+# Tracks whether the user picked a flat-spelled key (Bb, Eb, Ab, Db, Gb, F).
+# Drives enharmonic spelling in _spell_pc_in_key — without this every chord
+# in flat keys shows up as sharps (Bb → "A#m" etc.).
+var _key_uses_flats: bool = false
 var _recent_notes: Dictionary = {}        # pitch (int) -> last note-on time (float)
 var _window_expires_at: float = -1.0
 var _last_info: Dictionary = {}
@@ -741,6 +746,9 @@ func _on_key_changed(idx: int) -> void:
 	if idx < 0 or idx >= KEY_OPTIONS.size():
 		return
 	_key_pc = int(KEY_OPTIONS[idx][1])
+	# The label tells us which enharmonic the user picked — "Bb" means flats,
+	# "A#" would mean sharps. KEY_OPTIONS uses "b" suffix for flat spellings.
+	_key_uses_flats = String(KEY_OPTIONS[idx][0]).contains("b")
 	_rebuild_diatonic_row()
 	_refresh_display()
 
@@ -940,12 +948,15 @@ func _load_preset(preset: Dictionary) -> void:
 		for i in range(_key_option.item_count):
 			if i < KEY_OPTIONS.size() and int(KEY_OPTIONS[i][1]) == key_pc:
 				_key_option.select(i)
+				_key_uses_flats = String(KEY_OPTIONS[i][0]).contains("b")
 				break
 	if _minor_check != null:
 		_minor_check.set_pressed_no_signal(is_minor)
 	# Cache the preset's chord list and build the per-step button row, then
 	# stage the first chord so the student sees immediate feedback.
 	var chords_v: Variant = preset.get("chords", null)
+	# Key may have changed when loading the preset — refresh the cheat sheet.
+	_rebuild_diatonic_row()
 	if typeof(chords_v) != TYPE_ARRAY or (chords_v as Array).is_empty():
 		_active_preset_chords = []
 		_rebuild_preset_steps_row()
@@ -1081,7 +1092,7 @@ func _restyle_preset_step_buttons() -> void:
 # Uses the note letter from NOTE_NAMES_SHARP + a small quality suffix map.
 func _chord_short_label(root_pc: int, quality: String) -> String:
 	var pc: int = ((root_pc % 12) + 12) % 12
-	var root_letter: String = NOTE_NAMES_SHARP[pc]
+	var root_letter: String = _spell_pc_in_key(pc)
 	var suffix: String
 	match quality:
 		"Major": suffix = ""
@@ -1089,6 +1100,17 @@ func _chord_short_label(root_pc: int, quality: String) -> String:
 		_:
 			suffix = quality
 	return "%s%s" % [root_letter, suffix]
+
+
+# Enharmonic spelling based on the currently-selected key. Flat keys use the
+# flat names (Bb, Eb, Ab...); sharp keys use the sharp names (F#, C#, G#...).
+# Picked from the KEY_OPTIONS label the user clicked — that lets pc=6 read
+# as F# OR Gb depending on which entry they chose.
+func _spell_pc_in_key(pc: int) -> String:
+	var pc_clamped: int = ((int(pc) % 12) + 12) % 12
+	if _key_uses_flats:
+		return NOTE_NAMES_FLAT[pc_clamped]
+	return NOTE_NAMES_SHARP[pc_clamped]
 
 
 func _apply_preset_step_button_style(btn: Button, is_active: bool) -> void:
