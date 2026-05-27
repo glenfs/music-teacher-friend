@@ -16,6 +16,8 @@ signal closed                                       # user clicked "← Home" (p
 signal presented                                    # panel just became visible (parent should open MIDI inputs, hide MIDI viz)
 signal chord_cleared                                # user clicked Clear (parent should clear MIDI viz lights)
 signal note_pressed_via_keyboard(pitch: int)        # user tapped an on-screen key (parent should light MIDI viz)
+signal build_quiz_requested                         # user clicked the Build quiz launcher in the toolbar
+
 
 
 # --- Constants ---
@@ -1244,6 +1246,17 @@ func _build_ui() -> void:
 	quiz_btn.add_theme_font_size_override("font_size", 14)
 	quiz_btn.pressed.connect(_show_quiz_overlay)
 	key_row.add_child(quiz_btn)
+
+	# Build Chord Quiz — launches the dedicated note-input quiz panel
+	# (Build / Identify / Compare modes). Emits the build_quiz_requested
+	# signal so the parent can dismiss this panel + present the quiz.
+	var build_btn := Button.new()
+	build_btn.text = "%s  Build" % char(0x1F3B9)  # piano keys
+	build_btn.custom_minimum_size = Vector2(96, 38)
+	build_btn.tooltip_text = "Build chords on a keyboard (or MIDI), identify chords by ear, or compare two sounds."
+	build_btn.add_theme_font_size_override("font_size", 14)
+	build_btn.pressed.connect(func(): build_quiz_requested.emit())
+	key_row.add_child(build_btn)
 
 	# Music-notation font picker removed from Chord Explorer header — it now
 	# lives only in the home Settings page so the toolbar stays focused on

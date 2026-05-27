@@ -102,6 +102,7 @@ const LearningStepFactoryScript = preload("res://scripts/learning/learning_step_
 const ChordExplorerTheoryScript = preload("res://scripts/music_theory/chord_explorer_theory.gd")
 const PianoKeyStylesScript = preload("res://scripts/ui/piano_key_styles.gd")
 const ChordExplorerPanelScript = preload("res://scripts/ui/chord_explorer_panel.gd")
+const BuildChordQuizPanelScript = preload("res://scripts/ui/build_chord_quiz_panel.gd")
 const PracticeDrillsPanelScript = preload("res://scripts/ui/practice_drills_panel.gd")
 const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_dialog.gd")
 const MidiPianoVizScript = preload("res://scripts/ui/midi_piano_viz.gd")
@@ -704,6 +705,7 @@ var _learning_lesson_player: Control
 
 # --- Chord Explorer mode (panel owns widgets + recent-notes state internally) ---
 var _chord_explorer_panel: PanelContainer = null  # actually ChordExplorerPanel
+var _build_chord_quiz_panel: PanelContainer = null  # actually BuildChordQuizPanel
 var _chord_explorer_active: bool = false
 
 # --- Practice Drills (technical exercises) — panel owns its own state internally ---
@@ -25684,6 +25686,45 @@ func _build_chord_explorer_panel() -> void:
 	_chord_explorer_panel.chord_cleared.connect(_on_chord_explorer_panel_chord_cleared)
 	_chord_explorer_panel.note_pressed_via_keyboard.connect(_on_chord_explorer_panel_keyboard_note)
 	_chord_explorer_panel.chord_quiz_completed.connect(_on_chord_quiz_completed)
+	_chord_explorer_panel.build_quiz_requested.connect(_on_open_build_chord_quiz)
+
+
+# Build Chord Quiz panel — a separate screen with three exercise modes
+# (Build / Identify / Compare). Lives alongside Chord Explorer in the
+# panel hierarchy; opened via _on_open_build_chord_quiz.
+func _build_build_chord_quiz_panel() -> void:
+	_build_chord_quiz_panel = BuildChordQuizPanelScript.new()
+	add_child(_build_chord_quiz_panel)
+	_build_chord_quiz_panel.setup(
+		_ui_font,
+		_ui_title_font,
+		Callable(self, "_play_note"),
+		Callable(self, "_play_chord_for_explorer")
+	)
+	_build_chord_quiz_panel.closed.connect(_on_build_chord_quiz_closed)
+	_build_chord_quiz_panel.chord_quiz_completed.connect(_on_chord_quiz_completed)
+
+
+func _on_open_build_chord_quiz() -> void:
+	if _build_chord_quiz_panel == null:
+		_build_build_chord_quiz_panel()
+	if _build_chord_quiz_panel == null:
+		return
+	# Close chord explorer if open so the quiz panel takes over the screen.
+	if _chord_explorer_panel != null and _chord_explorer_panel.has_method("dismiss"):
+		_chord_explorer_panel.call("dismiss")
+	# Open MIDI for the BUILD mode's note input.
+	if _midi_enabled and _midi_platform_supported():
+		_open_midi_inputs_for_detection()
+		_midi_active = true
+	_build_chord_quiz_panel.call("present")
+
+
+func _on_build_chord_quiz_closed() -> void:
+	# Stop MIDI listening + return to home.
+	_midi_active = false
+	_close_midi_inputs()
+	_show_home()
 
 
 # Attributes a Chord Explorer quiz round to the active student so the
@@ -27032,6 +27073,12 @@ func _handle_midi_note_on(pitch: int) -> void:
 		return
 	_midi_piano_viz_light(pitch, true)         # safe no-op when small viz not built
 	_sight_big_piano_light(pitch, true)        # new: light the big sight piano on MIDI press
+	# Build Chord Quiz takes precedence when its panel is on screen — the
+	# whole point of that quiz is MIDI-driven note input.
+	if _build_chord_quiz_panel != null and _build_chord_quiz_panel.visible:
+		if _build_chord_quiz_panel.has_method("handle_midi_note_on"):
+			_build_chord_quiz_panel.call("handle_midi_note_on", pitch)
+		return
 	if _chord_explorer_active:
 		_handle_midi_note_on_for_chord_explorer(pitch)
 		return
