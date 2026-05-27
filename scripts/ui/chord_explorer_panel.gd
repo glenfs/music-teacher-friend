@@ -837,8 +837,10 @@ func _load_preset(preset: Dictionary) -> void:
 	_key_pc = key_pc
 	_key_is_minor = is_minor
 	if _key_option != null:
+		# Item order in _key_option mirrors KEY_OPTIONS (no metadata is set on
+		# items, so look up the pitch class from KEY_OPTIONS by index).
 		for i in range(_key_option.item_count):
-			if int(_key_option.get_item_metadata(i)) == key_pc:
+			if i < KEY_OPTIONS.size() and int(KEY_OPTIONS[i][1]) == key_pc:
 				_key_option.select(i)
 				break
 	if _minor_check != null:
