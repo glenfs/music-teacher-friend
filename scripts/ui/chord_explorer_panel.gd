@@ -97,6 +97,9 @@ var _inversions_row: HBoxContainer = null
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
 var _presets_option: OptionButton = null
 var _preset_steps_row: HBoxContainer = null
+# Always-visible diatonic chord cheat sheet — shows the 7 chords in the
+# current key with Roman numerals. Refreshes on key / minor toggle.
+var _diatonic_row: HBoxContainer = null
 # Cached chord list of the currently-loaded preset. Each entry is the raw
 # tuple [root_pc, quality_id, roman] from BUILT_IN_PRESETS. Lets the chord-
 # step buttons reload a step without re-walking the preset definitions.
@@ -470,6 +473,16 @@ func _build_ui() -> void:
 	_inversions_row.visible = false
 	name_inner.add_child(_inversions_row)
 
+	# Diatonic cheat sheet — always-visible row of the 7 chords in the
+	# current key (I, ii, iii, IV, V, vi, vii° for major; i, ii°, III, iv,
+	# v, VI, VII for minor). Lives ABOVE the preset-step row so it never
+	# fights for space with a loaded progression. Refreshed via
+	# _rebuild_diatonic_row whenever key / minor toggle changes.
+	_diatonic_row = HBoxContainer.new()
+	_diatonic_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_diatonic_row.add_theme_constant_override("separation", 6)
+	name_inner.add_child(_diatonic_row)
+
 	# Chord-step row — populated when a preset loads. Each chord in the preset
 	# becomes a clickable button (with Roman numeral underneath) so the
 	# teacher can walk through the progression at their own pace, plus a
@@ -481,6 +494,8 @@ func _build_ui() -> void:
 	name_inner.add_child(_preset_steps_row)
 
 	_build_keyboard(chord_body)
+	# Initial diatonic row population (key starts at C major by default).
+	_rebuild_diatonic_row()
 
 
 func _build_chip(parent: Control, initial_text: String, accent: Color) -> Label:
@@ -714,11 +729,13 @@ func _on_key_changed(idx: int) -> void:
 	if idx < 0 or idx >= KEY_OPTIONS.size():
 		return
 	_key_pc = int(KEY_OPTIONS[idx][1])
+	_rebuild_diatonic_row()
 	_refresh_display()
 
 
 func _on_minor_toggled(pressed: bool) -> void:
 	_key_is_minor = pressed
+	_rebuild_diatonic_row()
 	_refresh_display()
 
 
@@ -1108,12 +1125,121 @@ func _intervals_for_quality(quality: String) -> Array:
 	var table := {
 		"Major": [0, 4, 7],
 		"Minor": [0, 3, 7],
+		"Dim": [0, 3, 6],
+		"Aug": [0, 4, 8],
 		"Dom7": [0, 4, 7, 10],
 		"Min7": [0, 3, 7, 10],
 		"Maj7": [0, 4, 7, 11],
 		"Maj7#11": [0, 4, 7, 11, 14, 18],
 	}
 	return table.get(quality, [])
+
+
+# --- Diatonic cheat-sheet row ---
+
+
+# Scale degree offsets (semitones from tonic) for the major + natural-minor
+# scales. The 7 diatonic triads stack thirds at degrees [1,3,5] from each
+# scale step — already encoded in the quality patterns below.
+const _MAJOR_SCALE := [0, 2, 4, 5, 7, 9, 11]
+const _MINOR_SCALE := [0, 2, 3, 5, 7, 8, 10]
+
+# Per-degree triad quality + Roman label for each mode. Index 0 = tonic.
+const _MAJOR_DIATONIC := [
+	{"quality": "Major",  "roman": "I"},
+	{"quality": "Minor",  "roman": "ii"},
+	{"quality": "Minor",  "roman": "iii"},
+	{"quality": "Major",  "roman": "IV"},
+	{"quality": "Major",  "roman": "V"},
+	{"quality": "Minor",  "roman": "vi"},
+	{"quality": "Dim",    "roman": "vii°"},  # vii°
+]
+const _MINOR_DIATONIC := [
+	{"quality": "Minor",  "roman": "i"},
+	{"quality": "Dim",    "roman": "ii°"},
+	{"quality": "Major",  "roman": "III"},
+	{"quality": "Minor",  "roman": "iv"},
+	{"quality": "Minor",  "roman": "v"},
+	{"quality": "Major",  "roman": "VI"},
+	{"quality": "Major",  "roman": "VII"},
+]
+
+
+func _rebuild_diatonic_row() -> void:
+	if _diatonic_row == null:
+		return
+	for child in _diatonic_row.get_children():
+		child.queue_free()
+	var label := Label.new()
+	label.text = "Key chords:"
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.78))
+	if _ui_font != null:
+		label.add_theme_font_override("font", _ui_font)
+	_diatonic_row.add_child(label)
+	var scale := _MINOR_SCALE if _key_is_minor else _MAJOR_SCALE
+	var defs := _MINOR_DIATONIC if _key_is_minor else _MAJOR_DIATONIC
+	for i in 7:
+		var degree_offset: int = int(scale[i])
+		var degree_pc: int = ((_key_pc + degree_offset) % 12 + 12) % 12
+		var quality: String = str(defs[i]["quality"])
+		var roman: String = str(defs[i]["roman"])
+		var chord_short: String = _chord_short_label(degree_pc, quality)
+		var btn := Button.new()
+		btn.text = "%s\n%s" % [chord_short, roman]
+		btn.custom_minimum_size = Vector2(72, 50)
+		btn.add_theme_font_size_override("font_size", 13)
+		var captured_pc := degree_pc
+		var captured_quality := quality
+		btn.pressed.connect(func(): _stage_and_play_diatonic_chord(captured_pc, captured_quality))
+		_apply_diatonic_button_style(btn)
+		_diatonic_row.add_child(btn)
+	_diatonic_row.visible = true
+
+
+func _stage_and_play_diatonic_chord(root_pc: int, quality: String) -> void:
+	var intervals: Array = _intervals_for_quality(quality)
+	if intervals.is_empty():
+		return
+	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	_recent_notes.clear()
+	for iv in intervals:
+		_recent_notes[base_root_midi + int(iv)] = now
+	_window_expires_at = now + CLICK_WINDOW_SEC
+	# Clicking a diatonic chord is independent of any loaded preset — clear
+	# the active preset step highlight so the chord-step row doesn't lie.
+	_active_preset_step_idx = -1
+	_restyle_preset_step_buttons()
+	_refresh_display()
+	var chord_notes: Array[int] = []
+	for iv in intervals:
+		chord_notes.append(base_root_midi + int(iv))
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(chord_notes, 1.6)
+	elif _play_note_callable.is_valid():
+		for n in chord_notes:
+			_play_note_callable.call(n, 1.6)
+
+
+func _apply_diatonic_button_style(btn: Button) -> void:
+	var sb := StyleBoxFlat.new()
+	var accent := Color(0.45, 0.92, 0.62, 1.0)  # green — same as in-key chip
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.08)
+	sb.border_color = Color(accent.r, accent.g, accent.b, 0.55)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(accent.r, accent.g, accent.b, 0.20)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 
 
 func _active_pitches() -> Array[int]:
