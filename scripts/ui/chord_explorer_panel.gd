@@ -97,6 +97,10 @@ var _play_button: Button = null
 var _window_bar: ProgressBar = null
 var _keyboard_keys: Dictionary = {}       # pitch -> Button
 var _inversions_row: HBoxContainer = null
+# Pianistic voicings row — same chord quality, different distribution of
+# the voices (Root / Drop 2 / Drop 3 / Shell / Open). Lives below the
+# inversions row in the chord display.
+var _voicings_row: HBoxContainer = null
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -489,6 +493,17 @@ func _build_ui() -> void:
 	_inversions_row.add_theme_constant_override("separation", 8)
 	_inversions_row.visible = false
 	name_inner.add_child(_inversions_row)
+
+	# Voicings row — pianistic voicing alternatives for the same chord.
+	# Root (notes in original interval order), Drop 2 (top voice -1 moved
+	# down an octave), Drop 3 (top voice -2 moved down), Shell (R+3+7
+	# only — jazz comping), Open (root + 5th low, 3rd + 7th high).
+	# Hidden until a chord is identified, same as the inversions row.
+	_voicings_row = HBoxContainer.new()
+	_voicings_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_voicings_row.add_theme_constant_override("separation", 6)
+	_voicings_row.visible = false
+	name_inner.add_child(_voicings_row)
 
 	# Diatonic cheat sheet — always-visible row of the 7 chords in the
 	# current key (I, ii, iii, IV, V, vi, vii° for major; i, ii°, III, iv,
@@ -1169,6 +1184,214 @@ func _intervals_for_quality(quality: String) -> Array:
 	return table.get(quality, [])
 
 
+# --- Voicings row (pianistic voicing variations of the current chord) ---
+
+
+# Voicing definitions: ordered list rendered as buttons. Each "fn" is the
+# name of a helper that takes the chord's interval list (semitones from
+# root, e.g. [0,4,7,11] for Cmaj7) and returns the transformed interval
+# list. Buttons whose voicing returns [] for the current chord are hidden.
+const _VOICING_DEFS: Array[Dictionary] = [
+	{"id": "root",   "label": "Root",    "fn": "_voicing_root"},
+	{"id": "drop2",  "label": "Drop 2",  "fn": "_voicing_drop2"},
+	{"id": "drop3",  "label": "Drop 3",  "fn": "_voicing_drop3"},
+	{"id": "shell",  "label": "Shell",   "fn": "_voicing_shell"},
+	{"id": "open",   "label": "Open",    "fn": "_voicing_open"},
+]
+
+
+func _refresh_voicings_row() -> void:
+	if _voicings_row == null:
+		return
+	for child in _voicings_row.get_children():
+		child.queue_free()
+	if _last_info.is_empty():
+		_voicings_row.visible = false
+		return
+	var quality := str(_last_info.get("quality", ""))
+	if quality == "" or quality == "single" or quality == "interval" or quality == "cluster":
+		_voicings_row.visible = false
+		return
+	var intervals_v: Variant = _last_info.get("intervals_from_root", null)
+	if typeof(intervals_v) != TYPE_ARRAY:
+		_voicings_row.visible = false
+		return
+	var intervals: Array = intervals_v
+	if intervals.size() < 3:
+		_voicings_row.visible = false
+		return
+	var root_pc: int = int(_last_info.get("root_pc", 0))
+	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
+	var label := Label.new()
+	label.text = "Voicings:"
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.78))
+	if _ui_font != null:
+		label.add_theme_font_override("font", _ui_font)
+	_voicings_row.add_child(label)
+	for vdef in _VOICING_DEFS:
+		var voicing_intervals: Array = call(str(vdef["fn"]), intervals)
+		if voicing_intervals.is_empty():
+			continue  # voicing not applicable to this chord (e.g. Shell on a triad)
+		var btn := Button.new()
+		btn.text = str(vdef["label"])
+		btn.custom_minimum_size = Vector2(78, 32)
+		btn.add_theme_font_size_override("font_size", 12)
+		var captured_intervals := voicing_intervals
+		btn.pressed.connect(func(): _play_voicing(base_root_midi, captured_intervals))
+		_apply_voicing_button_style(btn)
+		_voicings_row.add_child(btn)
+	_voicings_row.visible = true
+
+
+# Voicing transformations — return [] when the voicing isn't applicable.
+
+
+func _voicing_root(intervals: Array) -> Array:
+	# Identity — original close-position voicing.
+	var out: Array = []
+	for iv in intervals:
+		out.append(int(iv))
+	return out
+
+
+func _voicing_drop2(intervals: Array) -> Array:
+	# Drop the SECOND-from-top voice down an octave. Classic jazz/guitar
+	# voicing — opens up the chord without losing any tones. Needs at
+	# least 4 voices; returns [] for triads.
+	if intervals.size() < 4:
+		return []
+	var voices: Array[int] = []
+	for iv in intervals:
+		voices.append(int(iv))
+	voices.sort()
+	# Identify the 2nd-from-top index; drop that voice by an octave.
+	var drop_idx: int = voices.size() - 2
+	voices[drop_idx] -= 12
+	voices.sort()
+	return voices
+
+
+func _voicing_drop3(intervals: Array) -> Array:
+	# Drop the THIRD-from-top voice. Wider, more open spread.
+	if intervals.size() < 4:
+		return []
+	var voices: Array[int] = []
+	for iv in intervals:
+		voices.append(int(iv))
+	voices.sort()
+	var drop_idx: int = voices.size() - 3
+	voices[drop_idx] -= 12
+	voices.sort()
+	return voices
+
+
+func _voicing_shell(intervals: Array) -> Array:
+	# Shell voicing: root + 3rd + 7th, dropping the 5th. Only meaningful
+	# for 7th chords (need a 7th — interval 10 or 11). Triads + 9ths fall
+	# through here too if they have a 7th.
+	var has_seventh: bool = false
+	for iv in intervals:
+		var n: int = ((int(iv) % 12) + 12) % 12
+		if n == 10 or n == 11:
+			has_seventh = true
+			break
+	if not has_seventh:
+		return []
+	# Pick root (0), the lowest 3rd (3 or 4), and the 7th (10 or 11).
+	var third: int = -1
+	var seventh: int = -1
+	for iv in intervals:
+		var pc: int = ((int(iv) % 12) + 12) % 12
+		if (pc == 3 or pc == 4) and third < 0:
+			third = int(iv)
+		if (pc == 10 or pc == 11) and seventh < 0:
+			seventh = int(iv)
+	if third < 0 or seventh < 0:
+		return []
+	return [0, third, seventh]
+
+
+func _voicing_open(intervals: Array) -> Array:
+	# Open voicing: root low, 5th below middle, 3rd above middle, top
+	# tone (7th if present, else 5th up an octave) high. Spreads the
+	# chord across roughly 2 octaves — the "wide pianistic" sound.
+	if intervals.size() < 3:
+		return []
+	# Sort + identify root / 3rd / 5th / 7th by pitch class.
+	var third: int = -1
+	var fifth: int = -1
+	var seventh: int = -1
+	for iv in intervals:
+		var pc: int = ((int(iv) % 12) + 12) % 12
+		if (pc == 3 or pc == 4) and third < 0:
+			third = int(iv)
+		if (pc == 6 or pc == 7 or pc == 8) and fifth < 0:
+			fifth = int(iv)
+		if (pc == 10 or pc == 11) and seventh < 0:
+			seventh = int(iv)
+	# Build wide voicing: root, third up octave, fifth or seventh higher.
+	var out: Array = [0]
+	if fifth >= 0:
+		out.append(fifth)  # keep 5th close to root for stability
+	if third >= 0:
+		out.append(third + 12)  # 3rd one octave up
+	if seventh >= 0:
+		out.append(seventh + 12)
+	# Need >= 3 unique pitches and at least 1 octave span to feel "open".
+	if out.size() < 3:
+		return []
+	return out
+
+
+func _play_voicing(base_root_midi: int, voicing_intervals: Array) -> void:
+	# Re-anchor so the highest voice still respects the keyboard ceiling
+	# even after open-voicing transposition pushes notes up an octave.
+	var anchor: int = base_root_midi
+	var max_iv: int = 0
+	for iv in voicing_intervals:
+		max_iv = maxi(max_iv, int(iv))
+	while anchor + max_iv > KEYBOARD_HIGH and anchor > 36:
+		anchor -= 12
+	# Don't drop below the keyboard low — accept a clipped top if needed.
+	if anchor < 36:
+		anchor = 36
+	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	_recent_notes.clear()
+	for iv in voicing_intervals:
+		_recent_notes[anchor + int(iv)] = now
+	_window_expires_at = now + CLICK_WINDOW_SEC
+	_refresh_display()
+	var chord_notes: Array[int] = []
+	for iv in voicing_intervals:
+		chord_notes.append(anchor + int(iv))
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(chord_notes, 1.6)
+	elif _play_note_callable.is_valid():
+		for n in chord_notes:
+			_play_note_callable.call(n, 1.6)
+
+
+func _apply_voicing_button_style(btn: Button) -> void:
+	var sb := StyleBoxFlat.new()
+	var accent := Color(0.78, 0.74, 1.00, 1.0)  # lavender — extension chip color
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.10)
+	sb.border_color = Color(accent.r, accent.g, accent.b, 0.55)
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(accent.r, accent.g, accent.b, 0.22)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+
+
 # --- Diatonic cheat-sheet row ---
 
 
@@ -1302,6 +1525,7 @@ func _refresh_display() -> void:
 		_last_info = {}
 		_refresh_keyboard_lighting()
 		_refresh_inversions_row()
+		_refresh_voicings_row()
 		return
 	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _key_pc, _key_is_minor)
 	_last_info = info
@@ -1328,6 +1552,7 @@ func _refresh_display() -> void:
 	else:
 		_set_chip(_intervals_label, "")
 	_refresh_inversions_row()
+	_refresh_voicings_row()
 
 
 func _push_notes_to_renderer(pitches: Array[int]) -> void:
