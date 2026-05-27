@@ -208,6 +208,10 @@ var _target_roman: String = ""  # for Function / Progression
 
 # BUILD-mode selection
 var _selected_notes: Dictionary = {}
+# True after a wrong submission — _refresh_build_keyboard_highlight uses
+# this to paint target notes green + wrong selections red on the keyboard.
+# Cleared on next question / clear / new round.
+var _show_wrong_feedback: bool = false
 
 # COMPARE
 var _compare_a_notes: Array[int] = []
@@ -257,18 +261,35 @@ func setup(ui_font: Font, ui_title_font: Font, play_note: Callable, play_chord: 
 	_ui_title_font = ui_title_font
 	_play_note_callable = play_note
 	_play_chord_callable = play_chord
-	set_anchors_preset(PRESET_FULL_RECT)
+	# Pin to the viewport corners and zero the offsets so the panel really
+	# covers the whole screen — without explicit offsets the panel can end
+	# up smaller than viewport when its parent has its own margins.
+	set_anchors_preset(PRESET_FULL_RECT, true)  # `keep_offsets=true` shouldn't matter since we set them next
+	offset_left = 0
+	offset_top = 0
+	offset_right = 0
+	offset_bottom = 0
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	z_as_relative = false
-	z_index = 800
+	z_index = 1000  # above chord-explorer (780), home-menu cards, everything
+	# Solid opaque dark background — without this the home-menu image
+	# bleeds through wherever the inner content doesn't reach.
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.06, 0.11, 0.19, 1.0)
+	bg.border_color = Color(0, 0, 0, 0)
 	add_theme_stylebox_override("panel", bg)
 	_build_ui()
 
 
 func present() -> void:
+	# Re-pin offsets on every present in case the parent's layout pass
+	# clobbered them between dismiss and re-present.
+	set_anchors_preset(PRESET_FULL_RECT, true)
+	offset_left = 0
+	offset_top = 0
+	offset_right = 0
+	offset_bottom = 0
 	visible = true
 	move_to_front()
 	_start_round()
@@ -314,10 +335,11 @@ func _build_ui() -> void:
 	top_bar.add_theme_constant_override("separation", 14)
 	root_vbox.add_child(top_bar)
 	_back_button = Button.new()
-	_back_button.text = char(0x2302)
-	_back_button.tooltip_text = "Back to home"
+	_back_button.text = char(0x2190)  # left-arrow — consistent "back" affordance
+	_back_button.tooltip_text = "Back to Chord Explorer"
 	_back_button.custom_minimum_size = Vector2(46, 46)
 	_back_button.add_theme_font_size_override("font_size", 24)
+	_apply_nav_icon_style(_back_button)
 	_back_button.pressed.connect(_on_back_pressed)
 	top_bar.add_child(_back_button)
 	var title := Label.new()
@@ -510,7 +532,7 @@ func _build_keyboard_widgets() -> void:
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.position = Vector2(white_x, 0)
 		btn.size = Vector2(WHITE_W, WHITE_H)
-		_apply_white_key_style(btn, false)
+		_apply_white_key_style(btn, KeyState.NORMAL)
 		var captured := pitch
 		btn.pressed.connect(func(): _toggle_build_note(captured))
 		_build_keyboard_root.add_child(btn)
@@ -544,16 +566,34 @@ func _build_keyboard_widgets() -> void:
 		var bx: float = float(white_positions[prev_white]) + WHITE_W - BLACK_W * 0.5
 		btn.position = Vector2(bx, 0)
 		btn.size = Vector2(BLACK_W, BLACK_H)
-		_apply_black_key_style(btn, false)
+		_apply_black_key_style(btn, KeyState.NORMAL)
 		var captured := pitch
 		btn.pressed.connect(func(): _toggle_build_note(captured))
 		_build_keyboard_root.add_child(btn)
 		_build_keyboard_keys[pitch] = btn
 
 
-func _apply_white_key_style(btn: Button, selected: bool) -> void:
+# Key state for keyboard styling:
+#   NORMAL   — unselected, unhighlighted
+#   SELECTED — student has it in their answer (blue)
+#   TARGET   — wrong-answer feedback: this note is in the correct chord
+#              (green) regardless of whether they picked it
+#   WRONG    — wrong-answer feedback: they picked this but it isn't in
+#              the correct chord (red)
+enum KeyState { NORMAL, SELECTED, TARGET, WRONG }
+
+
+func _apply_white_key_style(btn: Button, state: int) -> void:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.95, 0.94, 0.88, 1.0) if not selected else Color(0.55, 0.88, 1.0, 1.0)
+	match state:
+		KeyState.TARGET:
+			sb.bg_color = Color(0.50, 0.92, 0.55, 1.0)  # green — "should have played"
+		KeyState.WRONG:
+			sb.bg_color = Color(0.96, 0.50, 0.42, 1.0)  # red — "shouldn't have played"
+		KeyState.SELECTED:
+			sb.bg_color = Color(0.55, 0.88, 1.0, 1.0)   # blue — currently selected
+		_:
+			sb.bg_color = Color(0.95, 0.94, 0.88, 1.0)  # cream
 	sb.border_color = Color(0.62, 0.60, 0.58, 1.0)
 	sb.border_width_left = 1
 	sb.border_width_right = 1
@@ -565,9 +605,17 @@ func _apply_white_key_style(btn: Button, selected: bool) -> void:
 	btn.add_theme_stylebox_override("pressed", sb.duplicate())
 
 
-func _apply_black_key_style(btn: Button, selected: bool) -> void:
+func _apply_black_key_style(btn: Button, state: int) -> void:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.10, 0.10, 0.12, 1.0) if not selected else Color(0.36, 0.78, 1.00, 1.0)
+	match state:
+		KeyState.TARGET:
+			sb.bg_color = Color(0.32, 0.78, 0.40, 1.0)  # green
+		KeyState.WRONG:
+			sb.bg_color = Color(0.82, 0.30, 0.26, 1.0)  # red
+		KeyState.SELECTED:
+			sb.bg_color = Color(0.36, 0.78, 1.00, 1.0)  # blue
+		_:
+			sb.bg_color = Color(0.10, 0.10, 0.12, 1.0)  # black
 	sb.border_color = Color(0.02, 0.02, 0.04, 1.0)
 	sb.border_width_left = 1
 	sb.border_width_right = 1
@@ -671,6 +719,7 @@ func _next_question() -> void:
 	_question_index += 1
 	_answered = false
 	_hint_stage = 0
+	_show_wrong_feedback = false
 	_feedback_label.text = ""
 	_next_button.disabled = true
 	_play_token += 1
@@ -916,16 +965,36 @@ func _toggle_build_note(pitch: int) -> void:
 
 
 func _refresh_build_keyboard_highlight() -> void:
+	# Pre-compute pitch-class sets so per-key state resolution is O(1).
+	# Wrong-answer feedback: target PCs glow green; student's wrong PCs
+	# glow red; correct selections (in both sets) win green so the
+	# correct answer is what the eye lands on.
+	var target_pcs: Dictionary = {}
+	if _show_wrong_feedback:
+		for n in _target_notes:
+			target_pcs[((int(n) % 12) + 12) % 12] = true
+	var selected_pcs: Dictionary = {}
+	if _show_wrong_feedback:
+		for p in _selected_notes.keys():
+			selected_pcs[((int(p) % 12) + 12) % 12] = true
 	for pitch_key in _build_keyboard_keys.keys():
 		var pitch := int(pitch_key)
 		var btn: Button = _build_keyboard_keys[pitch_key] as Button
 		if btn == null:
 			continue
-		var selected: bool = _selected_notes.has(pitch)
+		var state: int = KeyState.NORMAL
+		if _show_wrong_feedback:
+			var pc := ((pitch % 12) + 12) % 12
+			if target_pcs.has(pc):
+				state = KeyState.TARGET
+			elif selected_pcs.has(pc):
+				state = KeyState.WRONG
+		elif _selected_notes.has(pitch):
+			state = KeyState.SELECTED
 		if _is_black(pitch):
-			_apply_black_key_style(btn, selected)
+			_apply_black_key_style(btn, state)
 		else:
-			_apply_white_key_style(btn, selected)
+			_apply_white_key_style(btn, state)
 
 
 func _update_build_selected_label() -> void:
@@ -1031,6 +1100,11 @@ func _on_build_submit() -> void:
 			])
 		_feedback_label.text = "%s  %s" % [char(0x2717), "  ".join(msg_parts)]
 		_feedback_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45, 1.0))
+		# Paint the keyboard: target notes green, the user's wrong picks
+		# red. Visual feedback complements the text message so the student
+		# can see what they should have played at a glance.
+		_show_wrong_feedback = true
+		_refresh_build_keyboard_highlight()
 		if _play_chord_callable.is_valid():
 			_play_chord_callable.call(_target_notes, 1.4)
 	_update_score_label()
@@ -1043,6 +1117,7 @@ func _on_build_clear() -> void:
 	if _answered:
 		return
 	_selected_notes.clear()
+	_show_wrong_feedback = false
 	_refresh_build_keyboard_highlight()
 	_update_build_selected_label()
 
@@ -1271,6 +1346,33 @@ func _midi_to_name(pitch: int) -> String:
 	var pc := ((int(pitch) % 12) + 12) % 12
 	var octave: int = int(pitch / 12) - 1
 	return "%s%d" % [_spell_root(pc, _target_key_label.contains("b")), octave]
+
+
+# Round-icon nav-button styling that mirrors the sight-reader /
+# ear-training header buttons (46x46 round, navy bg, gold border).
+# Kept inline so the panel doesn't need a parent-injected styler.
+func _apply_nav_icon_style(btn: Button) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.09, 0.17, 0.29, 0.86)
+	normal.border_color = Color(0.92, 0.78, 0.32, 0.92)
+	normal.border_width_left = 2
+	normal.border_width_top = 2
+	normal.border_width_right = 2
+	normal.border_width_bottom = 2
+	normal.corner_radius_top_left = 23
+	normal.corner_radius_top_right = 23
+	normal.corner_radius_bottom_left = 23
+	normal.corner_radius_bottom_right = 23
+	normal.shadow_color = Color(0, 0, 0, 0.32)
+	normal.shadow_size = 6
+	btn.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.13, 0.22, 0.34, 0.96)
+	btn.add_theme_stylebox_override("hover", hover)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(0.07, 0.13, 0.22, 0.96)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_color_override("font_color", Color(0.96, 0.96, 0.99, 1.0))
 
 
 func _on_back_pressed() -> void:

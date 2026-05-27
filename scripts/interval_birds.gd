@@ -25685,7 +25685,6 @@ func _build_chord_explorer_panel() -> void:
 	_chord_explorer_panel.closed.connect(_on_chord_explorer_panel_closed)
 	_chord_explorer_panel.chord_cleared.connect(_on_chord_explorer_panel_chord_cleared)
 	_chord_explorer_panel.note_pressed_via_keyboard.connect(_on_chord_explorer_panel_keyboard_note)
-	_chord_explorer_panel.chord_quiz_completed.connect(_on_chord_quiz_completed)
 	_chord_explorer_panel.build_quiz_requested.connect(_on_open_build_chord_quiz)
 
 
@@ -25721,7 +25720,14 @@ func _on_open_build_chord_quiz() -> void:
 
 
 func _on_build_chord_quiz_closed() -> void:
-	# Stop MIDI listening + return to home.
+	# Practice closes back to Chord Explorer (the screen it was launched
+	# from), not all the way home. Keeps MIDI inputs open since the
+	# chord explorer also uses MIDI input.
+	if _chord_explorer_panel != null and _chord_explorer_panel.has_method("present"):
+		_chord_explorer_panel.call("present")
+		_chord_explorer_active = true
+		return
+	# Fallback: no chord explorer available, go to home.
 	_midi_active = false
 	_close_midi_inputs()
 	_show_home()
