@@ -529,10 +529,22 @@ func _build_ui() -> void:
 	_key_option.item_selected.connect(_on_key_changed)
 	key_row.add_child(_key_option)
 
-	_minor_check = CheckButton.new()
-	_minor_check.text = "Minor"
-	_minor_check.toggled.connect(_on_minor_toggled)
-	key_row.add_child(_minor_check)
+	# Three-mode key flavor picker: Major / Natural Minor / Harmonic Minor.
+	# Replaces the old Minor checkbox so classical-theory cadence teaching
+	# (V Major + vii° in minor) is selectable. Drives _key_flavor +
+	# _key_is_minor (= true when either Natural or Harmonic minor).
+	_minor_check = CheckButton.new()  # kept as a hidden ghost var so any
+	_minor_check.visible = false       # external references don't NPE
+	add_child(_minor_check)
+	var flavor_option := OptionButton.new()
+	flavor_option.custom_minimum_size = Vector2(140, 38)
+	flavor_option.add_item("Major")
+	flavor_option.add_item("Minor (natural)")
+	flavor_option.add_item("Minor (harmonic)")
+	flavor_option.selected = 0
+	flavor_option.tooltip_text = "Major: I, ii, iii, IV, V, vi, vii°.\nNatural minor: i, ii°, III, iv, v, VI, VII.\nHarmonic minor: i, ii°, III+, iv, V, VI, vii° (raised 7th — gives the strong cadence V → i)."
+	flavor_option.item_selected.connect(_on_key_flavor_selected)
+	key_row.add_child(flavor_option)
 
 	# Presets dropdown — index 0 is a disabled placeholder so opening the
 	# panel doesn't auto-trigger a preset. Selecting any other item loads
@@ -1023,7 +1035,16 @@ func _on_key_changed(idx: int) -> void:
 
 
 func _on_minor_toggled(pressed: bool) -> void:
+	# Kept for backward-compat (the hidden ghost _minor_check still emits).
 	_key_is_minor = pressed
+	_key_flavor = KeyFlavor.NATURAL_MINOR if pressed else KeyFlavor.MAJOR
+	_rebuild_diatonic_row()
+	_refresh_display()
+
+
+func _on_key_flavor_selected(idx: int) -> void:
+	_key_flavor = clampi(idx, 0, 2)
+	_key_is_minor = _key_flavor != KeyFlavor.MAJOR
 	_rebuild_diatonic_row()
 	_refresh_display()
 
@@ -1188,11 +1209,35 @@ func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> 
 	_window_expires_at = now + CLICK_WINDOW_SEC
 	_refresh_display()
 	_lock_playback(1.6)
+	# Visual cue: pulse the bass key so the student connects slash
+	# notation (C/E) to the actual lowest sounding note.
+	var bass_note: int = chord_notes[0]
+	for note_for_bass in chord_notes:
+		if note_for_bass < bass_note:
+			bass_note = note_for_bass
+	_pulse_keyboard_key(bass_note)
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(chord_notes, 1.6)
 	elif _play_note_callable.is_valid():
 		for n in chord_notes:
 			_play_note_callable.call(n, 1.6)
+
+
+# Brief scale-pulse on a keyboard key. Used to draw the eye to the bass
+# note when the user clicks an inversion. Safe no-op if the keyboard
+# hasn't been built yet or the pitch is outside the visible range.
+func _pulse_keyboard_key(pitch: int) -> void:
+	var btn_v: Variant = _keyboard_keys.get(pitch, null)
+	if btn_v == null or not is_instance_valid(btn_v):
+		return
+	var btn := btn_v as Button
+	btn.pivot_offset = btn.size * 0.5
+	btn.scale = Vector2.ONE
+	var t := create_tween()
+	t.set_trans(Tween.TRANS_BACK)
+	t.set_ease(Tween.EASE_OUT)
+	t.tween_property(btn, "scale", Vector2(1.18, 1.18), 0.18)
+	t.tween_property(btn, "scale", Vector2.ONE, 0.42)
 
 
 # --- Teacher presets row ---
@@ -1214,31 +1259,37 @@ func _on_presets_option_selected(idx: int) -> void:
 
 
 func _load_preset(preset: Dictionary) -> void:
-	var key_pc: int = int(preset.get("key_pc", 0))
-	var is_minor: bool = bool(preset.get("is_minor", false))
-	_key_pc = key_pc
-	_key_is_minor = is_minor
-	if _key_option != null:
-		# Item order in _key_option mirrors KEY_OPTIONS (no metadata is set on
-		# items, so look up the pitch class from KEY_OPTIONS by index).
-		for i in range(_key_option.item_count):
-			if i < KEY_OPTIONS.size() and int(KEY_OPTIONS[i][1]) == key_pc:
-				_key_option.select(i)
-				_key_uses_flats = String(KEY_OPTIONS[i][0]).contains("b")
-				break
-	if _minor_check != null:
-		_minor_check.set_pressed_no_signal(is_minor)
+	# Transpose the preset's C-rooted chord roots so the progression plays
+	# in whatever key the user has currently selected. Preserves the
+	# pedagogical pattern (ii-V-I, blues, modal mixture, etc.) without
+	# forcing the user back into C.
+	# If they haven't picked a key yet (still on default C), this is a no-op
+	# because _key_pc = 0 = the preset's source key.
+	var source_key_pc: int = int(preset.get("key_pc", 0))
+	var target_key_pc: int = _key_pc  # use the user's currently-selected key
+	var transpose_semis: int = ((target_key_pc - source_key_pc) % 12 + 12) % 12
 	# Cache the preset's chord list and build the per-step button row, then
 	# stage the first chord so the student sees immediate feedback.
 	var chords_v: Variant = preset.get("chords", null)
-	# Key may have changed when loading the preset — refresh the cheat sheet.
 	_rebuild_diatonic_row()
 	if typeof(chords_v) != TYPE_ARRAY or (chords_v as Array).is_empty():
 		_active_preset_chords = []
 		_rebuild_preset_steps_row()
 		_refresh_display()
 		return
-	_active_preset_chords = (chords_v as Array).duplicate(true)
+	# Apply transpose to each chord's root_pc. Roman numerals + qualities
+	# are key-relative so they don't need transposing.
+	var transposed: Array = []
+	for chord_v in (chords_v as Array):
+		if typeof(chord_v) != TYPE_ARRAY or (chord_v as Array).size() < 2:
+			continue
+		var orig_root: int = int(chord_v[0])
+		var new_root: int = ((orig_root + transpose_semis) % 12 + 12) % 12
+		var t_chord: Array = [new_root]
+		for i in range(1, (chord_v as Array).size()):
+			t_chord.append(chord_v[i])
+		transposed.append(t_chord)
+	_active_preset_chords = transposed
 	_active_preset_step_idx = -1
 	# Invalidate any in-flight Play-All loop from a previous preset.
 	_play_all_token += 1
@@ -1501,11 +1552,16 @@ func _intervals_for_quality(quality: String) -> Array:
 # root, e.g. [0,4,7,11] for Cmaj7) and returns the transformed interval
 # list. Buttons whose voicing returns [] for the current chord are hidden.
 const _VOICING_DEFS: Array[Dictionary] = [
-	{"id": "root",   "label": "Root",    "fn": "_voicing_root"},
-	{"id": "drop2",  "label": "Drop 2",  "fn": "_voicing_drop2"},
-	{"id": "drop3",  "label": "Drop 3",  "fn": "_voicing_drop3"},
-	{"id": "shell",  "label": "Shell",   "fn": "_voicing_shell"},
-	{"id": "open",   "label": "Open",    "fn": "_voicing_open"},
+	{"id": "root", "label": "Root", "fn": "_voicing_root",
+		"tooltip": "Closed position: notes stacked in thirds, root at the bottom."},
+	{"id": "drop2", "label": "Drop 2", "fn": "_voicing_drop2",
+		"tooltip": "Drop 2: the second-highest voice moves down an octave. Classic guitar/jazz wide voicing."},
+	{"id": "drop3", "label": "Drop 3", "fn": "_voicing_drop3",
+		"tooltip": "Drop 3: the third-highest voice moves down an octave. Wider, more open spread than Drop 2."},
+	{"id": "shell", "label": "Shell", "fn": "_voicing_shell",
+		"tooltip": "Shell: just root + 3rd + 7th (no 5th). The bare-bones jazz comping skeleton."},
+	{"id": "open", "label": "Open", "fn": "_voicing_open",
+		"tooltip": "Open: voices spread across two octaves (root low, 3rd + 7th high). The wide pianistic sound."},
 ]
 
 
@@ -1542,6 +1598,7 @@ func _refresh_voicings_row() -> void:
 		btn.text = str(vdef["label"])
 		btn.custom_minimum_size = Vector2(78, 32)
 		btn.add_theme_font_size_override("font_size", 12)
+		btn.tooltip_text = str(vdef.get("tooltip", ""))
 		var captured_intervals := voicing_intervals
 		btn.pressed.connect(func(): _play_voicing(base_root_midi, captured_intervals))
 		_apply_voicing_button_style(btn)
@@ -1738,11 +1795,13 @@ func _build_compare_row() -> void:
 	for q in _COMPARE_QUALITIES:
 		_compare_option.add_item(str(q["label"]))
 	_compare_option.selected = 1  # default to Minor — most-used compare for Major
+	_compare_option.tooltip_text = "Quality of chord B (same root as the staged chord). E.g. Maj7 vs Dom7."
 	_compare_row.add_child(_compare_option)
 	var btn_a := Button.new()
 	btn_a.text = "▶ A"
 	btn_a.custom_minimum_size = Vector2(56, 32)
 	btn_a.add_theme_font_size_override("font_size", 12)
+	btn_a.tooltip_text = "Play the currently-staged chord (A)."
 	btn_a.pressed.connect(func(): _compare_play_side("a"))
 	_apply_compare_button_style(btn_a, false)
 	_compare_row.add_child(btn_a)
@@ -1750,6 +1809,7 @@ func _build_compare_row() -> void:
 	btn_b.text = "▶ B"
 	btn_b.custom_minimum_size = Vector2(56, 32)
 	btn_b.add_theme_font_size_override("font_size", 12)
+	btn_b.tooltip_text = "Play the comparison chord (B): same root, picked quality."
 	btn_b.pressed.connect(func(): _compare_play_side("b"))
 	_apply_compare_button_style(btn_b, false)
 	_compare_row.add_child(btn_b)
@@ -1757,6 +1817,7 @@ func _build_compare_row() -> void:
 	btn_ab.text = "▶ A → B → A"
 	btn_ab.custom_minimum_size = Vector2(140, 32)
 	btn_ab.add_theme_font_size_override("font_size", 12)
+	btn_ab.tooltip_text = "Play A, then B, then A again — the back-to-back contrast that locks the difference in your ear."
 	btn_ab.pressed.connect(func(): _compare_play_side("ab"))
 	_apply_compare_button_style(btn_ab, true)
 	_compare_row.add_child(btn_ab)
@@ -1885,6 +1946,9 @@ func _apply_compare_button_style(btn: Button, emphasized: bool) -> void:
 # scale step — already encoded in the quality patterns below.
 const _MAJOR_SCALE := [0, 2, 4, 5, 7, 9, 11]
 const _MINOR_SCALE := [0, 2, 3, 5, 7, 8, 10]
+# Harmonic minor: like natural minor but with raised 7th (10 → 11).
+# Common-practice teaching uses this for V (Major) + vii° in minor keys.
+const _HARMONIC_MINOR_SCALE := [0, 2, 3, 5, 7, 8, 11]
 
 # Per-degree triad quality + Roman label for each mode. Index 0 = tonic.
 const _MAJOR_DIATONIC := [
@@ -1894,7 +1958,7 @@ const _MAJOR_DIATONIC := [
 	{"quality": "Major",  "roman": "IV"},
 	{"quality": "Major",  "roman": "V"},
 	{"quality": "Minor",  "roman": "vi"},
-	{"quality": "Dim",    "roman": "vii°"},  # vii°
+	{"quality": "Dim",    "roman": "vii°"},
 ]
 const _MINOR_DIATONIC := [
 	{"quality": "Minor",  "roman": "i"},
@@ -1905,6 +1969,24 @@ const _MINOR_DIATONIC := [
 	{"quality": "Major",  "roman": "VI"},
 	{"quality": "Major",  "roman": "VII"},
 ]
+# Harmonic minor diatonic triads — V becomes Major (the leading-tone V
+# central to cadence teaching) and vii° becomes a true Diminished triad.
+const _HARMONIC_MINOR_DIATONIC := [
+	{"quality": "Minor",  "roman": "i"},
+	{"quality": "Dim",    "roman": "ii°"},
+	{"quality": "Aug",    "roman": "III+"},
+	{"quality": "Minor",  "roman": "iv"},
+	{"quality": "Major",  "roman": "V"},
+	{"quality": "Major",  "roman": "VI"},
+	{"quality": "Dim",    "roman": "vii°"},
+]
+
+
+# Three-mode key flavor — drives both the diatonic row and the preset key
+# label. Major + natural minor are the existing toggle; harmonic minor is
+# the new third option that classical teachers need for cadence work.
+enum KeyFlavor { MAJOR, NATURAL_MINOR, HARMONIC_MINOR }
+var _key_flavor: int = KeyFlavor.MAJOR
 
 
 func _rebuild_diatonic_row() -> void:
@@ -1921,8 +2003,18 @@ func _rebuild_diatonic_row() -> void:
 	label.tooltip_text = "The 7 diatonic chords in the current key. Click any to play it."
 	label.mouse_filter = Control.MOUSE_FILTER_STOP
 	_diatonic_row.add_child(label)
-	var scale := _MINOR_SCALE if _key_is_minor else _MAJOR_SCALE
-	var defs := _MINOR_DIATONIC if _key_is_minor else _MAJOR_DIATONIC
+	var scale: Array
+	var defs: Array
+	match _key_flavor:
+		KeyFlavor.HARMONIC_MINOR:
+			scale = _HARMONIC_MINOR_SCALE
+			defs = _HARMONIC_MINOR_DIATONIC
+		KeyFlavor.NATURAL_MINOR:
+			scale = _MINOR_SCALE
+			defs = _MINOR_DIATONIC
+		_:
+			scale = _MAJOR_SCALE
+			defs = _MAJOR_DIATONIC
 	for i in 7:
 		var degree_offset: int = int(scale[i])
 		var degree_pc: int = ((_key_pc + degree_offset) % 12 + 12) % 12
