@@ -56,6 +56,17 @@ const CHORD_TEMPLATES := {
 	"2,3,7":         ["madd9",      "Minor Add 9",            3],
 	# Quartal/clusters (less common but useful for jazz)
 	"5,10":          ["sus4(no5)",  "Quartal Stack",          5],
+	# Shell voicings — root + 3rd + 7th only, the 5th omitted. Classic jazz
+	# comping voicing the Chord Explorer offers under "Shell". Recognized
+	# at low priority so a full voicing of the same chord still wins when
+	# both are possible.
+	"4,11":          ["maj7",       "Major 7 (shell)",        5],
+	"4,10":          ["7",          "Dominant 7 (shell)",     5],
+	"3,10":          ["m7",         "Minor 7 (shell)",        5],
+	"3,11":          ["mMaj7",      "Minor-Major 7 (shell)",  5],
+	# 6th-chord shells (root + 3rd + 6th, no 5th)
+	"4,9":           ["6",          "Major 6 (shell)",        5],
+	"3,9":           ["m6",         "Minor 6 (shell)",        5],
 }
 
 # Roman numeral by scale degree for major and minor keys.
