@@ -110,6 +110,8 @@ var _compare_token: int = 0
 # as tabs — only one is visible at a time. Reduces vertical density on
 # smaller screens from 3 stacked rows to 1 row + tab bar.
 var _chord_detail_tabs: TabContainer = null
+# One-screen lesson overlay invoked from the toolbar "?" button.
+var _help_overlay: PanelContainer = null
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -229,6 +231,124 @@ func _stage_default_demo_chord() -> void:
 
 
 # Hide + clear state. Does not free the panel — parent can present() again.
+# --- Help overlay (lesson card) ---
+
+
+# Toggles the in-panel help card. Lazy-built on first open so the cost
+# isn't paid by users who never need it. The card has a single dismiss
+# button + click-outside-to-close behavior.
+func _show_help_overlay() -> void:
+	if _help_overlay == null:
+		_build_help_overlay()
+	if _help_overlay == null:
+		return
+	_help_overlay.visible = true
+	_help_overlay.move_to_front()
+
+
+func _hide_help_overlay() -> void:
+	if _help_overlay != null:
+		_help_overlay.visible = false
+
+
+func _build_help_overlay() -> void:
+	# Full-screen scrim + centered card. Lives at the panel root so it
+	# overlays the staff + keyboard + everything.
+	_help_overlay = PanelContainer.new()
+	_help_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_help_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_help_overlay.z_as_relative = false
+	_help_overlay.z_index = 900
+	var scrim_style := StyleBoxFlat.new()
+	scrim_style.bg_color = Color(0.02, 0.04, 0.08, 0.82)
+	_help_overlay.add_theme_stylebox_override("panel", scrim_style)
+	add_child(_help_overlay)
+
+	# Click on the scrim (outside the card) to dismiss.
+	var scrim_button := Button.new()
+	scrim_button.set_anchors_preset(PRESET_FULL_RECT)
+	scrim_button.flat = true
+	scrim_button.modulate = Color(1, 1, 1, 0)
+	scrim_button.pressed.connect(_hide_help_overlay)
+	_help_overlay.add_child(scrim_button)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_help_overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(720, 520)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.10, 0.16, 0.26, 1.0)
+	card_style.border_color = MENU_PRIMARY_ACCENT
+	card_style.border_width_left = 2
+	card_style.border_width_right = 2
+	card_style.border_width_top = 2
+	card_style.border_width_bottom = 2
+	card_style.corner_radius_top_left = 14
+	card_style.corner_radius_top_right = 14
+	card_style.corner_radius_bottom_left = 14
+	card_style.corner_radius_bottom_right = 14
+	card_style.shadow_color = Color(0, 0, 0, 0.55)
+	card_style.shadow_size = 18
+	card.add_theme_stylebox_override("panel", card_style)
+	center.add_child(card)
+
+	var card_margin := MarginContainer.new()
+	card_margin.add_theme_constant_override("margin_left", 28)
+	card_margin.add_theme_constant_override("margin_right", 28)
+	card_margin.add_theme_constant_override("margin_top", 24)
+	card_margin.add_theme_constant_override("margin_bottom", 20)
+	card.add_child(card_margin)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 12)
+	card_margin.add_child(col)
+
+	var title := Label.new()
+	title.text = "Chord Explorer — Quick Guide"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_title_font != null:
+		title.add_theme_font_override("font", _ui_title_font)
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	col.add_child(title)
+
+	# Body — RichTextLabel so we can bold the row names + indent the
+	# explanations. Auto-wraps so long lines don't overflow the card.
+	var body := RichTextLabel.new()
+	body.bbcode_enabled = true
+	body.fit_content = true
+	body.scroll_active = false
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	if _ui_font != null:
+		body.add_theme_font_override("normal_font", _ui_font)
+		body.add_theme_font_override("bold_font", _ui_font)
+	body.add_theme_font_size_override("normal_font_size", 14)
+	body.add_theme_font_size_override("bold_font_size", 14)
+	body.add_theme_color_override("default_color", MENU_TITLE_TEXT)
+	body.text = "Play notes on the keyboard or your MIDI device — the chord name + grand staff update live.\n\n" + \
+		"[b][color=#E8A020]Quick presets[/color][/b]   Pick a key + chord progression from the dropdown (top toolbar). Loads ii-V-I, blues, Neapolitan, etc.\n\n" + \
+		"[b][color=#73EB9E]Key chords[/color][/b]   The 7 diatonic chords in the current key, labeled with Roman numerals (I, ii, iii, IV, V, vi, vii°). Click any to play it.\n\n" + \
+		"[b][color=#5CD0FF]Inversions[/color][/b]   Same chord, different note in the bass. C, C/E, C/G show how the bass moves while the harmony stays the same.\n\n" + \
+		"[b][color=#C7BDFF]Voicings[/color][/b]   Same chord, different spacing of the notes. Try [b]Open[/b] for a wide pianistic sound, or [b]Shell[/b] for the bare jazz-comping skeleton (root + 3rd + 7th).\n\n" + \
+		"[b][color=#F381CD]Compare[/color][/b]   Pick a second chord quality at the same root and click [b]A → B → A[/b] to hear them back-to-back. Best way to learn Maj7 vs Dom7, Major vs Minor, etc.\n\n" + \
+		"Click [b]Clear[/b] (right side) to start fresh. Press [b]?[/b] any time to reopen this guide."
+	col.add_child(body)
+
+	var close_btn := Button.new()
+	close_btn.text = "Got it"
+	close_btn.custom_minimum_size = Vector2(160, 42)
+	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	close_btn.add_theme_font_size_override("font_size", 15)
+	close_btn.pressed.connect(_hide_help_overlay)
+	col.add_child(close_btn)
+	_help_overlay.visible = false
+
+
 func dismiss() -> void:
 	_recent_notes.clear()
 	_window_expires_at = -1.0
@@ -239,6 +359,7 @@ func dismiss() -> void:
 	# Invalidate any in-flight A→B→A sequence too.
 	_compare_token += 1
 	_rebuild_preset_steps_row()
+	_hide_help_overlay()
 	visible = false
 
 
@@ -369,7 +490,22 @@ func _build_ui() -> void:
 		_presets_option.add_item(str(preset.get("label", "Preset")))
 	_presets_option.selected = 0
 	_presets_option.item_selected.connect(_on_presets_option_selected)
+	_presets_option.tooltip_text = "Pre-built lesson setups. Each preset loads a key + a short chord progression you can step through."
 	key_row.add_child(_presets_option)
+
+	# Help button — opens a one-screen lesson card explaining presets,
+	# diatonic chords, inversions, voicings, and the compare row. Sits
+	# immediately right of the Quick Presets dropdown.
+	var help_spacer := Control.new()
+	help_spacer.custom_minimum_size = Vector2(6, 0)
+	key_row.add_child(help_spacer)
+	var help_btn := Button.new()
+	help_btn.text = "?"
+	help_btn.custom_minimum_size = Vector2(38, 38)
+	help_btn.tooltip_text = "Open the Chord Explorer guide"
+	help_btn.add_theme_font_size_override("font_size", 18)
+	help_btn.pressed.connect(_show_help_overlay)
+	key_row.add_child(help_btn)
 
 	if _score_font_picker_builder.is_valid():
 		_score_font_picker_builder.call(key_row)
@@ -546,6 +682,10 @@ func _build_ui() -> void:
 	_compare_row.add_theme_constant_override("separation", 6)
 	_chord_detail_tabs.add_child(_compare_row)
 	_build_compare_row()
+	# Per-tab tooltips so hover on the tab title explains what's inside.
+	_chord_detail_tabs.set_tab_tooltip(0, "Same chord, different note in the bass (root position, 1st, 2nd...).")
+	_chord_detail_tabs.set_tab_tooltip(1, "Same chord, different spacing of the notes — closed, drop-2, shell, open.")
+	_chord_detail_tabs.set_tab_tooltip(2, "Pick a second chord quality at this root and hear the two back-to-back.")
 
 	# Diatonic cheat sheet — always-visible row of the 7 chords in the
 	# current key (I, ii, iii, IV, V, vi, vii° for major; i, ii°, III, iv,
@@ -1641,6 +1781,8 @@ func _rebuild_diatonic_row() -> void:
 	label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.78))
 	if _ui_font != null:
 		label.add_theme_font_override("font", _ui_font)
+	label.tooltip_text = "The 7 diatonic chords in the current key. Click any to play it."
+	label.mouse_filter = Control.MOUSE_FILTER_STOP
 	_diatonic_row.add_child(label)
 	var scale := _MINOR_SCALE if _key_is_minor else _MAJOR_SCALE
 	var defs := _MINOR_DIATONIC if _key_is_minor else _MAJOR_DIATONIC
