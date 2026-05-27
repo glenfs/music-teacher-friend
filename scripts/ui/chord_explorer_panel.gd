@@ -61,6 +61,11 @@ var _play_note_callable: Callable = Callable()           # (pitch:int, dur:float
 var _sample_map_callable: Callable = Callable()          # () -> Dictionary
 var _nearest_sample_callable: Callable = Callable()      # (pitch:int, map:Dictionary) -> int
 var _score_font_picker_builder: Callable = Callable()    # (parent:Control) -> void (optional)
+# Plays multiple notes simultaneously through the chord-player pool with a
+# small loudness boost. Used for preset playback so all voices actually
+# sound together (vs. _play_note_callable which uses a single shared
+# player and clobbers itself when called in rapid succession).
+var _play_chord_callable: Callable = Callable()          # (notes:Array[int], dur:float) -> void
 
 
 # --- Internal state ---
@@ -150,7 +155,8 @@ func setup(
 	play_note: Callable,
 	sample_map_fn: Callable,
 	nearest_sample_fn: Callable,
-	score_font_picker_builder: Callable
+	score_font_picker_builder: Callable,
+	play_chord: Callable = Callable()
 ) -> void:
 	_ui_font = ui_font
 	_ui_title_font = ui_title_font
@@ -158,6 +164,7 @@ func setup(
 	_sample_map_callable = sample_map_fn
 	_nearest_sample_callable = nearest_sample_fn
 	_score_font_picker_builder = score_font_picker_builder
+	_play_chord_callable = play_chord
 	_force_fullscreen_rect()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
@@ -836,8 +843,6 @@ func _apply_inversion_button_style(btn: Button, is_current: bool) -> void:
 # Rotates intervals: the chosen tone moves to position 0, everything below it
 # gets +12 semitones to keep the chord intact.
 func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> void:
-	if not _play_note_callable.is_valid():
-		return
 	if bass_index < 0 or bass_index >= intervals.size():
 		return
 	var rotated: Array[int] = []
@@ -845,8 +850,14 @@ func _play_inversion(base_root_midi: int, intervals: Array, bass_index: int) -> 
 		rotated.append(int(intervals[i]))
 	for i in range(0, bass_index):
 		rotated.append(int(intervals[i]) + 12)
+	var chord_notes: Array[int] = []
 	for offset in rotated:
-		_play_note_callable.call(base_root_midi + offset, 1.6)
+		chord_notes.append(base_root_midi + offset)
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(chord_notes, 1.6)
+	elif _play_note_callable.is_valid():
+		for n in chord_notes:
+			_play_note_callable.call(n, 1.6)
 
 
 # --- Teacher presets row ---
@@ -925,9 +936,18 @@ func _play_preset_step(idx: int) -> void:
 	_active_preset_step_idx = idx
 	_refresh_display()
 	_restyle_preset_step_buttons()
-	if _play_note_callable.is_valid():
-		for iv in intervals:
-			_play_note_callable.call(base_root_midi + int(iv), 1.6)
+	# Build the absolute MIDI note list and play as a single chord through
+	# the pooled chord player. Falls back to the single-note callable (one
+	# voice at a time) only if a parent that hasn't been updated didn't
+	# pass play_chord into setup().
+	var chord_notes: Array[int] = []
+	for iv in intervals:
+		chord_notes.append(base_root_midi + int(iv))
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(chord_notes, 1.6)
+	elif _play_note_callable.is_valid():
+		for n in chord_notes:
+			_play_note_callable.call(n, 1.6)
 
 
 # Plays every chord in the active preset in sequence with a short gap.

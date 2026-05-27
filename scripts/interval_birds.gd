@@ -21532,6 +21532,19 @@ func _voice_normalize_db(voice_count: int) -> float:
 	return -3.0 * log(float(voice_count)) / log(2.0)
 
 
+# Chord Explorer playback wrapper — uses the chord-player pool (so all
+# voices sound simultaneously instead of a stomping single-AudioStreamPlayer)
+# and applies a small +4 dB gain plus the fade variant's piano-like roll so
+# the chord feels present in the room without being harsh.
+# Pure-note prior call site was _play_note in a loop — that re-used ONE
+# player and the prior note got stopped before the next started, so only the
+# top voice actually sustained.
+func _play_chord_for_explorer(notes: Array[int], duration: float) -> void:
+	if notes.is_empty():
+		return
+	await _play_chord_block_with_fade(notes, duration, 0.18, 4.0)
+
+
 func _play_chord_block(notes: Array[int], duration: float) -> void:
 	if notes.is_empty():
 		return
@@ -25639,7 +25652,8 @@ func _build_chord_explorer_panel() -> void:
 		Callable(self, "_play_note"),
 		Callable(self, "_sample_map_for_current_mode"),
 		Callable(self, "_nearest_sample_midi_from_map"),
-		Callable(self, "_build_score_font_picker")
+		Callable(self, "_build_score_font_picker"),
+		Callable(self, "_play_chord_for_explorer")
 	)
 	_chord_explorer_panel.closed.connect(_on_chord_explorer_panel_closed)
 	_chord_explorer_panel.chord_cleared.connect(_on_chord_explorer_panel_chord_cleared)
