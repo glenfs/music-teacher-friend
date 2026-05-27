@@ -101,6 +101,12 @@ var _inversions_row: HBoxContainer = null
 # the voices (Root / Drop 2 / Drop 3 / Shell / Open). Lives below the
 # inversions row in the chord display.
 var _voicings_row: HBoxContainer = null
+# Compare row — lets the user pick a second chord quality at the same root
+# as the current chord, then plays the two back-to-back (A → B → A) so the
+# difference is audible side-by-side without re-staging notes.
+var _compare_row: HBoxContainer = null
+var _compare_option: OptionButton = null
+var _compare_token: int = 0
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -207,6 +213,8 @@ func dismiss() -> void:
 	_active_preset_chords = []
 	_active_preset_step_idx = -1
 	_play_all_token += 1
+	# Invalidate any in-flight A→B→A sequence too.
+	_compare_token += 1
 	_rebuild_preset_steps_row()
 	visible = false
 
@@ -504,6 +512,15 @@ func _build_ui() -> void:
 	_voicings_row.add_theme_constant_override("separation", 6)
 	_voicings_row.visible = false
 	name_inner.add_child(_voicings_row)
+
+	# Compare row — pick a second chord quality at the same root and play
+	# both back-to-back (A → B → A) so the difference is audible.
+	_compare_row = HBoxContainer.new()
+	_compare_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_compare_row.add_theme_constant_override("separation", 6)
+	_compare_row.visible = false
+	name_inner.add_child(_compare_row)
+	_build_compare_row()
 
 	# Diatonic cheat sheet — always-visible row of the 7 chords in the
 	# current key (I, ii, iii, IV, V, vi, vii° for major; i, ii°, III, iv,
@@ -1176,9 +1193,13 @@ func _intervals_for_quality(quality: String) -> Array:
 		"Minor": [0, 3, 7],
 		"Dim": [0, 3, 6],
 		"Aug": [0, 4, 8],
+		"Sus2": [0, 2, 7],
+		"Sus4": [0, 5, 7],
 		"Dom7": [0, 4, 7, 10],
 		"Min7": [0, 3, 7, 10],
 		"Maj7": [0, 4, 7, 11],
+		"Dim7": [0, 3, 6, 9],
+		"Half-dim": [0, 3, 6, 10],
 		"Maj7#11": [0, 4, 7, 11, 14, 18],
 	}
 	return table.get(quality, [])
@@ -1392,6 +1413,172 @@ func _apply_voicing_button_style(btn: Button) -> void:
 	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 
 
+# --- Compare row (A/B chord listening) ---
+
+
+# Comparison qualities offered in the dropdown. Same set as the chord
+# explorer's main library — kept small and focused on the comparisons
+# students actually need ("Maj vs Min", "Maj7 vs Dom7", "Dom7 vs Dim7").
+const _COMPARE_QUALITIES: Array[Dictionary] = [
+	{"label": "Major",   "quality": "Major"},
+	{"label": "Minor",   "quality": "Minor"},
+	{"label": "Dim",     "quality": "Dim"},
+	{"label": "Aug",     "quality": "Aug"},
+	{"label": "Sus2",    "quality": "Sus2"},
+	{"label": "Sus4",    "quality": "Sus4"},
+	{"label": "Maj7",    "quality": "Maj7"},
+	{"label": "Dom7",    "quality": "Dom7"},
+	{"label": "Min7",    "quality": "Min7"},
+	{"label": "Dim7",    "quality": "Dim7"},
+	{"label": "Half-dim","quality": "Half-dim"},
+	{"label": "Maj7#11", "quality": "Maj7#11"},
+]
+
+
+func _build_compare_row() -> void:
+	if _compare_row == null:
+		return
+	for child in _compare_row.get_children():
+		child.queue_free()
+	var label := Label.new()
+	label.text = "Compare with:"
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.78))
+	if _ui_font != null:
+		label.add_theme_font_override("font", _ui_font)
+	_compare_row.add_child(label)
+	_compare_option = OptionButton.new()
+	_compare_option.custom_minimum_size = Vector2(140, 32)
+	for q in _COMPARE_QUALITIES:
+		_compare_option.add_item(str(q["label"]))
+	_compare_option.selected = 1  # default to Minor — most-used compare for Major
+	_compare_row.add_child(_compare_option)
+	var btn_a := Button.new()
+	btn_a.text = "▶ A"
+	btn_a.custom_minimum_size = Vector2(56, 32)
+	btn_a.add_theme_font_size_override("font_size", 12)
+	btn_a.pressed.connect(func(): _compare_play_side("a"))
+	_apply_compare_button_style(btn_a, false)
+	_compare_row.add_child(btn_a)
+	var btn_b := Button.new()
+	btn_b.text = "▶ B"
+	btn_b.custom_minimum_size = Vector2(56, 32)
+	btn_b.add_theme_font_size_override("font_size", 12)
+	btn_b.pressed.connect(func(): _compare_play_side("b"))
+	_apply_compare_button_style(btn_b, false)
+	_compare_row.add_child(btn_b)
+	var btn_ab := Button.new()
+	btn_ab.text = "▶ A → B → A"
+	btn_ab.custom_minimum_size = Vector2(140, 32)
+	btn_ab.add_theme_font_size_override("font_size", 12)
+	btn_ab.pressed.connect(func(): _compare_play_side("ab"))
+	_apply_compare_button_style(btn_ab, true)
+	_compare_row.add_child(btn_ab)
+
+
+func _refresh_compare_row() -> void:
+	if _compare_row == null:
+		return
+	# Only show compare when a real chord is identified — need a root and
+	# at least 2 voices so "the same chord" is meaningful.
+	if _last_info.is_empty():
+		_compare_row.visible = false
+		return
+	var quality := str(_last_info.get("quality", ""))
+	if quality == "" or quality == "single" or quality == "cluster":
+		_compare_row.visible = false
+		return
+	var intervals_v: Variant = _last_info.get("intervals_from_root", null)
+	if typeof(intervals_v) != TYPE_ARRAY or (intervals_v as Array).size() < 2:
+		_compare_row.visible = false
+		return
+	_compare_row.visible = true
+
+
+func _compare_play_side(which: String) -> void:
+	# A = current chord, B = same root + quality picked in the dropdown.
+	if _compare_option == null or _last_info.is_empty():
+		return
+	var root_pc: int = int(_last_info.get("root_pc", 0))
+	var intervals_a_v: Variant = _last_info.get("intervals_from_root", null)
+	if typeof(intervals_a_v) != TYPE_ARRAY:
+		return
+	var intervals_a: Array = intervals_a_v
+	var sel: int = _compare_option.selected
+	if sel < 0 or sel >= _COMPARE_QUALITIES.size():
+		return
+	var quality_b: String = str(_COMPARE_QUALITIES[sel]["quality"])
+	var intervals_b: Array = _intervals_for_quality(quality_b)
+	if intervals_b.is_empty():
+		return
+	# Anchor each chord independently so wide voicings (Maj7#11 etc.) still
+	# fit on the keyboard. Same anchoring as preset playback.
+	var anchor_a: int = _anchor_root_for_chord(root_pc, intervals_a)
+	var anchor_b: int = _anchor_root_for_chord(root_pc, intervals_b)
+	var notes_a: Array[int] = []
+	for iv in intervals_a:
+		notes_a.append(anchor_a + int(iv))
+	var notes_b: Array[int] = []
+	for iv in intervals_b:
+		notes_b.append(anchor_b + int(iv))
+	# Token-guard so a new compare press aborts any in-flight sequence.
+	_compare_token += 1
+	var my_token: int = _compare_token
+	match which:
+		"a":
+			_play_chord_now(notes_a)
+		"b":
+			_play_chord_now(notes_b)
+		"ab":
+			await _play_compare_sequence(notes_a, notes_b, my_token)
+
+
+# Plays a single chord through the chord callable (single-note fallback).
+func _play_chord_now(notes: Array[int]) -> void:
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(notes, 1.4)
+	elif _play_note_callable.is_valid():
+		for n in notes:
+			_play_note_callable.call(n, 1.4)
+
+
+# A → short gap → B → short gap → A. The return-to-A is the pedagogical
+# magic — students hear the contrast both forward and backward, which
+# locks in the difference. ~0.45s gap so each chord has clean attack.
+func _play_compare_sequence(notes_a: Array[int], notes_b: Array[int], my_token: int) -> void:
+	if my_token != _compare_token:
+		return
+	_play_chord_now(notes_a)
+	await get_tree().create_timer(1.55).timeout
+	if my_token != _compare_token or not is_inside_tree() or not visible:
+		return
+	_play_chord_now(notes_b)
+	await get_tree().create_timer(1.55).timeout
+	if my_token != _compare_token or not is_inside_tree() or not visible:
+		return
+	_play_chord_now(notes_a)
+
+
+func _apply_compare_button_style(btn: Button, emphasized: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	var accent := MENU_PRIMARY_ACCENT if emphasized else Color(0.95, 0.50, 0.85, 1.0)
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.20 if emphasized else 0.12)
+	sb.border_color = Color(accent.r, accent.g, accent.b, 0.90 if emphasized else 0.60)
+	sb.border_width_left = 2 if emphasized else 1
+	sb.border_width_right = 2 if emphasized else 1
+	sb.border_width_top = 2 if emphasized else 1
+	sb.border_width_bottom = 2 if emphasized else 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(accent.r, accent.g, accent.b, 0.30)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+
+
 # --- Diatonic cheat-sheet row ---
 
 
@@ -1526,6 +1713,7 @@ func _refresh_display() -> void:
 		_refresh_keyboard_lighting()
 		_refresh_inversions_row()
 		_refresh_voicings_row()
+		_refresh_compare_row()
 		return
 	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _key_pc, _key_is_minor)
 	_last_info = info
@@ -1553,6 +1741,7 @@ func _refresh_display() -> void:
 		_set_chip(_intervals_label, "")
 	_refresh_inversions_row()
 	_refresh_voicings_row()
+	_refresh_compare_row()
 
 
 func _push_notes_to_renderer(pitches: Array[int]) -> void:
