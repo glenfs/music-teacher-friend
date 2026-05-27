@@ -1113,12 +1113,14 @@ func _build_ui() -> void:
 	top_bar.add_theme_constant_override("separation", 16)
 	root_vbox.add_child(top_bar)
 
+	# Home button — matches the sight-reader / ear-training back-icon style
+	# for cross-module consistency (46x46 round icon with the house glyph).
 	_back_button = Button.new()
-	_back_button.text = "← Home"
-	_back_button.custom_minimum_size = Vector2(120, 42)
-	if _ui_title_font != null:
-		_back_button.add_theme_font_override("font", _ui_title_font)
-	_back_button.add_theme_font_size_override("font_size", 16)
+	_back_button.text = char(0x2302)
+	_back_button.tooltip_text = "Back to home"
+	_back_button.custom_minimum_size = Vector2(46, 46)
+	_back_button.add_theme_font_size_override("font_size", 24)
+	_back_button.set_meta("hud_nav_btn", true)
 	_back_button.pressed.connect(_on_back_pressed)
 	top_bar.add_child(_back_button)
 
@@ -1211,8 +1213,9 @@ func _build_ui() -> void:
 	quiz_btn.pressed.connect(_show_quiz_overlay)
 	key_row.add_child(quiz_btn)
 
-	if _score_font_picker_builder.is_valid():
-		_score_font_picker_builder.call(key_row)
+	# Music-notation font picker removed from Chord Explorer header — it now
+	# lives only in the home Settings page so the toolbar stays focused on
+	# chord-exploration controls. Default font is Leland (set globally).
 
 	var chord_body_scroll := ScrollContainer.new()
 	chord_body_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -773,7 +773,7 @@ var _mic_listening := false
 var _mic_status_label: Label = null
 var _midi_enabled := false
 var _midi_any_octave := true
-var _score_font_name := "Bravura"  # SMuFL font for music notation rendering; user-selectable
+var _score_font_name := "Leland"  # SMuFL font for music notation rendering; default Leland (modern clean), user-selectable in home Settings
 var _score_font_options: Array[OptionButton] = []  # all dropdown instances (kept in sync)
 var _midi_inputs_open := false
 var _midi_active := false
@@ -4452,6 +4452,14 @@ func _build_ui() -> void:
 
 	# Practice mode toggle lives on the home page footer button
 
+	# Music notation font picker — moved here from Chord Explorer +
+	# Practice Drills so it's centralized in one place (home Settings).
+	var font_pick_row := HBoxContainer.new()
+	font_pick_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	font_pick_row.add_theme_constant_override("separation", 10)
+	_ear_settings_more_panel.add_child(font_pick_row)
+	_build_score_font_picker(font_pick_row)
+
 	# Diagnostics section — Codex P2 review item: Settings needs to be useful
 	# for real support cases. Build/version, sync, MIDI, mic, support link.
 	_build_settings_diagnostics_section(_ear_settings_screen)
@@ -4471,7 +4479,10 @@ func _build_ui() -> void:
 	_refresh_ear_settings_ui()
 
 	_interval_options_box = VBoxContainer.new()
-	_interval_options_box.add_theme_constant_override("separation", 16)
+	# Tightened separation 16 → 6 so the "Pick scale degrees..." hint sits
+	# directly under the section title (no blank-line gap that previously
+	# made the interval setup look orphaned from its header).
+	_interval_options_box.add_theme_constant_override("separation", 6)
 	_home_panel.add_child(_interval_options_box)
 
 	var intervals_label := Label.new()
@@ -9416,17 +9427,25 @@ func _set_ear_mode_card_visibility(btn: Button, visible: bool) -> void:
 func _ear_mode_card_stylebox(bg: Color, border: Color, selected: bool, disabled: bool) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
+	# Selected cards get a noticeably thicker golden border (3px all around)
+	# so "this is the active mode" is unmistakeable at a glance. Unselected
+	# stay at a thin 1px cyan border for visual hierarchy.
 	sb.border_color = border
-	sb.border_width_left = 2 if selected else 1
-	sb.border_width_top = 2 if selected else 1
-	sb.border_width_right = 2 if selected else 1
+	sb.border_width_left = 3 if selected else 1
+	sb.border_width_top = 3 if selected else 1
+	sb.border_width_right = 3 if selected else 1
 	sb.border_width_bottom = 3 if selected else 1
 	sb.corner_radius_top_left = 8
 	sb.corner_radius_top_right = 8
 	sb.corner_radius_bottom_left = 8
 	sb.corner_radius_bottom_right = 8
-	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.20 if selected else 0.12)
-	sb.shadow_size = 8 if selected else 4
+	# Soft gold glow on selected for extra emphasis without harsh contrast.
+	if selected:
+		sb.shadow_color = Color(border.r, border.g, border.b, 0.42)
+		sb.shadow_size = 10
+	else:
+		sb.shadow_color = Color(0.0, 0.0, 0.0, 0.12)
+		sb.shadow_size = 4
 	sb.content_margin_left = 0
 	sb.content_margin_right = 0
 	sb.content_margin_top = 0
@@ -11822,8 +11841,9 @@ func _refresh_sight_notes_chords_skin() -> void:
 	elif _sight_notes_chords_skin_active:
 		_restore_sight_notes_chords_skin()
 	elif _sight_settings_button != null:
-		var home_visible := _is_home_ui_active()
-		_sight_settings_button.visible = home_visible
+		# Settings gear is HOME-OVERVIEW ONLY. Hidden on mode-detail setup
+		# screens, in-game, and any other in-app surface.
+		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active
 	var in_continuous_game := _is_continuous_flow_sight_mode() and _game_panel != null and _game_panel.visible
 	if in_continuous_game:
 		_apply_continuous_sight_skin()

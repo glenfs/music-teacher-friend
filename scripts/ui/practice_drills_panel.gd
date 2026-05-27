@@ -123,7 +123,7 @@ func setup(
 	_score_font_picker_builder = score_font_picker_builder
 	_dialog_style_callable = dialog_style
 	_weakest_skill_family_callable = weakest_skill_family_fn
-	set_anchors_preset(PRESET_FULL_RECT)
+	_force_fullscreen_rect()
 	visible = false
 	z_as_relative = false
 	z_index = 200
@@ -134,7 +134,9 @@ func setup(
 
 
 func present() -> void:
+	_force_fullscreen_rect()
 	visible = true
+	move_to_front()
 	if _status_label != null:
 		_status_label.text = ""
 	_refresh_score_renderer()
@@ -154,6 +156,10 @@ func stop_playback(reset_cursor: bool = true) -> void:
 	_keyboard_clear_highlight()
 	if reset_cursor:
 		_clear_staff_highlight()
+
+
+func _force_fullscreen_rect() -> void:
+	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 
 
 # --- Styling helpers ---
@@ -250,13 +256,14 @@ func _build_ui() -> void:
 	var top_bar := HBoxContainer.new()
 	top_bar.add_theme_constant_override("separation", 14)
 	root_vbox.add_child(top_bar)
+	# Home button — matches the sight-reader / ear-training back-icon style
+	# for cross-module consistency (46x46 round icon with the house glyph).
 	_back_button = Button.new()
-	_back_button.text = "← Home"
-	_back_button.custom_minimum_size = Vector2(152, 52)
-	if _ui_title_font != null:
-		_back_button.add_theme_font_override("font", _ui_title_font)
-	_back_button.add_theme_font_size_override("font_size", 20)
-	_style_input(_back_button, Vector2(152, 52))
+	_back_button.text = char(0x2302)
+	_back_button.tooltip_text = "Back to home"
+	_back_button.custom_minimum_size = Vector2(46, 46)
+	_back_button.add_theme_font_size_override("font_size", 24)
+	_back_button.set_meta("hud_nav_btn", true)
 	_back_button.pressed.connect(_on_back_pressed)
 	top_bar.add_child(_back_button)
 
@@ -271,7 +278,7 @@ func _build_ui() -> void:
 	top_bar.add_child(heading)
 
 	var right_reserve := Control.new()
-	right_reserve.custom_minimum_size = Vector2(284, 1)
+	right_reserve.custom_minimum_size = Vector2(152, 1)
 	top_bar.add_child(right_reserve)
 
 	_tempo_label = Label.new()
@@ -311,16 +318,13 @@ func _build_ui() -> void:
 	controls_top.add_theme_constant_override("separation", 16)
 	controls_vbox.add_child(controls_top)
 
+	# Music-notation font picker removed from Practice Drills header — it
+	# now lives only on the home Settings page. Default font is Leland.
+	# (Empty placeholder kept so any code that referenced font_group by
+	#  index still aligns; the var is unused otherwise.)
 	var font_group := HBoxContainer.new()
-	font_group.alignment = BoxContainer.ALIGNMENT_CENTER
-	font_group.add_theme_constant_override("separation", 10)
+	font_group.visible = false
 	controls_top.add_child(font_group)
-	if _score_font_picker_builder.is_valid():
-		_score_font_picker_builder.call(font_group)
-		# Find the just-added OptionButton and style it
-		for child in font_group.get_children():
-			if child is OptionButton:
-				_style_input(child, Vector2(390, 42))
 
 	_skill_option = OptionButton.new()
 	for pair in ExerciseLibraryScript.skill_options():
@@ -872,32 +876,39 @@ func _on_play_pressed() -> void:
 	var bpm: float = float(_current_exercise.get("tempo_bpm", 80))
 	var seconds_per_beat: float = 60.0 / maxf(40.0, bpm)
 	var sample_map: Dictionary = _sample_map_callable.call() if _sample_map_callable.is_valid() else {}
+	var playback_start_sec := float(Time.get_ticks_msec()) / 1000.0
+	var final_end_beat := 0.0
 	for i in range(events.size()):
 		if token != _playback_token or not _playback_active:
 			break
 		_playback_index = i
 		var event: Dictionary = events[i]
+		var beat_offset := float(event.get("beat_offset", 0.0))
 		var midis: Array = event.get("midis", [])
 		var note_durs: Array = event.get("note_durations", [])
 		var dur_beats: float = float(event.get("duration_beats", 0.5))
-		var wait_beats: float = dur_beats
-		if i < events.size() - 1:
-			var cur_beat: float = float(event.get("beat_offset", 0.0))
-			var next_beat: float = float(events[i + 1].get("beat_offset", 0.0))
-			wait_beats = next_beat - cur_beat
-		var wait_sec: float = wait_beats * seconds_per_beat
+		final_end_beat = maxf(final_end_beat, beat_offset + dur_beats)
+		var target_start_sec := playback_start_sec + (beat_offset * seconds_per_beat)
+		var wait_sec := target_start_sec - (float(Time.get_ticks_msec()) / 1000.0)
+		if wait_sec > 0.001:
+			await get_tree().create_timer(wait_sec).timeout
+			if token != _playback_token or not _playback_active:
+				break
 		if _staff_area != null:
 			if _staff_area.has_method("set_highlight_beat"):
-				_staff_area.set_highlight_beat(float(event.get("beat_offset", 0.0)))
+				_staff_area.set_highlight_beat(beat_offset)
 			elif _staff_area.has_method("set_highlight_index"):
 				_staff_area.set_highlight_index(i)
-		_scroll_to_playback_beat(float(event.get("beat_offset", 0.0)))
+		_scroll_to_playback_beat(beat_offset)
 		_keyboard_show_event(event)
 		for ni in range(midis.size()):
 			var note_dur_beats: float = float(note_durs[ni]) if ni < note_durs.size() else dur_beats
 			var note_sound_sec: float = note_dur_beats * seconds_per_beat
 			_spawn_note(int(midis[ni]), maxf(0.05, note_sound_sec * 0.97), sample_map)
-		await get_tree().create_timer(wait_sec).timeout
+	if token == _playback_token and _playback_active:
+		var tail_wait := (playback_start_sec + (final_end_beat * seconds_per_beat)) - (float(Time.get_ticks_msec()) / 1000.0)
+		if tail_wait > 0.001:
+			await get_tree().create_timer(tail_wait).timeout
 	if token == _playback_token:
 		_playback_active = false
 		_playback_index = -1
