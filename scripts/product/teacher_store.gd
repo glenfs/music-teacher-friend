@@ -224,14 +224,17 @@ func apply_metric_update(
 	mode_chord: int,
 	mode_pitch_match: int,
 	mode_sight: int,
-	last_session_value: String
+	last_session_value: String,
+	mode_progression: int = -999,
+	mode_scale_mode: int = -999,
+	mode_cadence: int = -999
 ) -> Dictionary:
 	var metrics: Dictionary = _dictionary_from_variant(student.get("metrics", {}))
 	var ear_sessions: int = int(metrics.get("ear_sessions", 0))
 	var sight_sessions: int = int(metrics.get("sight_sessions", 0))
 	var ear_accuracy: int = int(metrics.get("ear_accuracy", 0))
 	var sight_accuracy: int = int(metrics.get("sight_accuracy", 0))
-	if mode == mode_interval or mode == mode_chord or mode == mode_pitch_match:
+	if mode == mode_interval or mode == mode_chord or mode == mode_pitch_match or mode == mode_progression or mode == mode_scale_mode or mode == mode_cadence:
 		ear_accuracy = int(round((float(ear_accuracy * ear_sessions) + float(accuracy_pct)) / float(ear_sessions + 1)))
 		ear_sessions += 1
 	elif mode == mode_sight:
@@ -258,7 +261,10 @@ func record_session_metrics(
 	last_session_value: String,
 	session_history_date: String,
 	mode_label_for_mode: Callable,
-	best_streak: int = 0
+	best_streak: int = 0,
+	mode_progression: int = -999,
+	mode_scale_mode: int = -999,
+	mode_cadence: int = -999
 ) -> Dictionary:
 	var sid: String = get_active_student_id(selected_student_id)
 	if sid == "":
@@ -282,7 +288,10 @@ func record_session_metrics(
 		mode_chord,
 		mode_pitch_match,
 		mode_sight,
-		last_session_value
+		last_session_value,
+		mode_progression,
+		mode_scale_mode,
+		mode_cadence
 	)
 	var sessions: Array = _array_from_variant(student.get("session_history", []))
 	var mode_label: String = str(mode_label_for_mode.call(mode)) if mode_label_for_mode.is_valid() else str(mode)
@@ -451,6 +460,16 @@ func mark_tech_done(student_id: String, target_title: String) -> Dictionary:
 
 
 func add_assignment(student_id: String, task: String, due: String, created_at: String) -> Dictionary:
+	return add_assignment_entry(student_id, {
+		"task": task,
+		"due": due,
+		"done": false,
+		"created_at": created_at,
+		"done_at": ""
+	}, created_at)
+
+
+func add_assignment_entry(student_id: String, assignment: Dictionary, created_at: String) -> Dictionary:
 	var idx: int = find_index_by_id(student_id)
 	if idx < 0:
 		return {"updated": false}
@@ -460,13 +479,18 @@ func add_assignment(student_id: String, task: String, due: String, created_at: S
 		return {"updated": false}
 	var student: Dictionary = (student_any as Dictionary).duplicate(true)
 	var assignments: Array = _array_from_variant(student.get("assignments", []))
-	assignments.append({
-		"task": task,
-		"due": due,
-		"done": false,
-		"created_at": created_at,
-		"done_at": ""
-	})
+	var next_assignment := assignment.duplicate(true)
+	if not next_assignment.has("task"):
+		next_assignment["task"] = ""
+	if not next_assignment.has("due"):
+		next_assignment["due"] = ""
+	if not next_assignment.has("done"):
+		next_assignment["done"] = false
+	if not next_assignment.has("created_at") or str(next_assignment.get("created_at", "")).is_empty():
+		next_assignment["created_at"] = created_at
+	if not next_assignment.has("done_at"):
+		next_assignment["done_at"] = ""
+	assignments.append(next_assignment)
 	student["assignments"] = assignments
 	students[idx] = student
 	data["students"] = students
@@ -475,6 +499,61 @@ func add_assignment(student_id: String, task: String, due: String, created_at: S
 		"student_id": student_id,
 		"student": student
 	}
+
+
+# Append a Chord Explorer quiz attempt to a student's history. Keeps the
+# last 50 entries so the dashboard can show recent activity without the
+# save file bloating over time. `entry` shape:
+#   {"date": "YYYY-MM-DD", "score": int, "total": int, "percent": int,
+#    "timestamp": unix_seconds}
+func record_chord_quiz_attempt(student_id: String, entry: Dictionary) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var history_v: Variant = student.get("chord_quiz_history", null)
+	var history: Array = []
+	if typeof(history_v) == TYPE_ARRAY:
+		history = (history_v as Array).duplicate()
+	history.append(entry.duplicate(true))
+	while history.size() > 50:
+		history.pop_front()
+	student["chord_quiz_history"] = history
+	students[idx] = student
+	data["students"] = students
+	# Persistence is the caller's responsibility — same convention as
+	# record_confusion_stats / record_session_metrics in this module.
+	return {"updated": true, "history_size": history.size()}
+
+
+func record_confusion_stats(student_id: String, confusion_stats: Dictionary) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {"updated": false}
+	var students: Array = students_array().duplicate(true)
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var all_confusions: Dictionary = _dictionary_from_variant(student.get("confusion_stats", {}))
+	for category in confusion_stats:
+		var cat_in_any: Variant = confusion_stats.get(category, {})
+		if typeof(cat_in_any) != TYPE_DICTIONARY:
+			continue
+		var cat_out: Dictionary = _dictionary_from_variant(all_confusions.get(category, {}))
+		var cat_in: Dictionary = cat_in_any as Dictionary
+		for correct_key in cat_in:
+			var chosen_map_any: Variant = cat_in.get(correct_key, {})
+			if typeof(chosen_map_any) != TYPE_DICTIONARY:
+				continue
+			var chosen_out: Dictionary = _dictionary_from_variant(cat_out.get(str(correct_key), {}))
+			var chosen_map: Dictionary = chosen_map_any as Dictionary
+			for chosen_key in chosen_map:
+				chosen_out[str(chosen_key)] = int(chosen_out.get(str(chosen_key), 0)) + int(chosen_map.get(chosen_key, 0))
+			cat_out[str(correct_key)] = chosen_out
+		all_confusions[str(category)] = cat_out
+	student["confusion_stats"] = all_confusions
+	students[idx] = student
+	data["students"] = students
+	return {"updated": true, "student_id": student_id}
 
 
 func mark_assignment_done(student_id: String, assignment_idx: int, done_at: String) -> Dictionary:
@@ -714,7 +793,7 @@ func ensure_student_defaults(student: Dictionary) -> Dictionary:
 		s["age"] = 0
 	if not s.has("lesson_duration_min"):
 		s["lesson_duration_min"] = 30
-	var dict_defaults := {"current_book": {"name": "", "part": ""}, "metrics": {}, "training_stats": {}}
+	var dict_defaults := {"current_book": {"name": "", "part": ""}, "metrics": {}, "training_stats": {}, "confusion_stats": {}}
 	for key in dict_defaults:
 		if not s.has(key) or typeof(s[key]) != TYPE_DICTIONARY:
 			s[key] = dict_defaults[key]

@@ -25663,6 +25663,48 @@ func _build_chord_explorer_panel() -> void:
 	_chord_explorer_panel.closed.connect(_on_chord_explorer_panel_closed)
 	_chord_explorer_panel.chord_cleared.connect(_on_chord_explorer_panel_chord_cleared)
 	_chord_explorer_panel.note_pressed_via_keyboard.connect(_on_chord_explorer_panel_keyboard_note)
+	_chord_explorer_panel.chord_quiz_completed.connect(_on_chord_quiz_completed)
+
+
+# Attributes a Chord Explorer quiz round to the active student so the
+# teacher dashboard's per-student activity surfaces it. Falls through
+# silently in Student Edition (no teacher_store) or when no student
+# is selected — local persistence still records the round under the
+# device-wide chord_quiz_history fallback.
+func _on_chord_quiz_completed(score: int, total: int) -> void:
+	var pct: int = int(round(float(score) / float(maxi(1, total)) * 100.0))
+	var entry: Dictionary = {
+		"date": Time.get_datetime_string_from_system(true).substr(0, 10),
+		"score": score,
+		"total": total,
+		"percent": pct,
+		"timestamp": Time.get_unix_time_from_system(),
+	}
+	# Append to device-wide history (works in Student + Teacher Edition).
+	var history_v: Variant = _lifetime_stats.get("chord_quiz_history", null)
+	var history: Array = []
+	if typeof(history_v) == TYPE_ARRAY:
+		history = (history_v as Array).duplicate()
+	history.append(entry)
+	# Keep the last 50 — enough for the teacher dashboard to show recent
+	# trends without bloating the save file.
+	while history.size() > 50:
+		history.pop_front()
+	_lifetime_stats["chord_quiz_history"] = history
+	_save_progress_data()
+	# Teacher-edition: also bump the active student's per-student record.
+	if not IS_TEACHER_EDITION:
+		return
+	if _teacher_store == null:
+		return
+	if _active_student == null or not _active_student.has_active_student():
+		return
+	var sid: String = _active_student.get_active_id()
+	if sid == "" or sid == ActiveStudentScript.RESERVED_ID_PRACTICE:
+		return
+	if _teacher_store.has_method("record_chord_quiz_attempt"):
+		_teacher_store.call("record_chord_quiz_attempt", sid, entry)
+		_save_teacher_data()
 
 
 func _on_chord_explorer_open() -> void:

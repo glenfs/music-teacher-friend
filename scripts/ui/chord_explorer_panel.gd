@@ -118,6 +118,44 @@ var _help_overlay: PanelContainer = null
 var _playback_busy_until: float = 0.0
 var _playback_lock_token: int = 0
 var _playback_indicator: Label = null
+
+# Quiz mode — "what chord is this?" multiple-choice exercise. Modal overlay
+# launched from the toolbar Quiz button. Tracks per-session score and
+# attributes the run to the active student (teacher-edition only).
+var _quiz_overlay: PanelContainer = null
+# Top section (staff + chord display) — built as HBoxContainer for the
+# default desktop side-by-side layout. _apply_responsive_layout reads
+# viewport width and rotates this into a vertical stack at narrow widths.
+var _top_section: Container = null
+var _last_applied_layout_breakpoint: int = -1
+# Breakpoints (window width):
+#   >= 1280  → wide   (40/60 side-by-side, full keyboard)
+#   >= 1024  → tablet (still side-by-side but tighter margins)
+#   <  1024  → narrow (staff stacks above chord display, keyboard scales)
+const _LAYOUT_BREAKPOINT_WIDE: int = 1280
+const _LAYOUT_BREAKPOINT_TABLET: int = 1024
+var _quiz_prompt_label: Label = null
+var _quiz_score_label: Label = null
+var _quiz_feedback_label: Label = null
+var _quiz_choices_row: HBoxContainer = null
+var _quiz_play_button: Button = null
+var _quiz_next_button: Button = null
+var _quiz_close_button: Button = null
+var _quiz_current_answer: String = ""
+var _quiz_current_chord_notes: Array[int] = []
+var _quiz_score: int = 0
+var _quiz_question_index: int = 0
+var _quiz_total_questions: int = 10
+var _quiz_answered: bool = false
+var _quiz_session_attribution_pending: bool = false
+
+# Pool of qualities the quiz draws from. Triads + the most-used 7ths.
+const _QUIZ_QUALITIES: Array[String] = [
+	"Major", "Minor", "Dim", "Aug", "Sus4",
+	"Maj7", "Dom7", "Min7", "Half-dim",
+]
+const _QUIZ_QUESTIONS_PER_ROUND: int = 10
+const _QUIZ_CHOICES_COUNT: int = 4
 # Presets dropdown lives in the top toolbar next to the key selector.
 # (The old _presets_row HBox under the chord display was removed — that
 # space was crowded; DAW-style toolbar dropdown is cleaner.)
@@ -210,6 +248,7 @@ func present() -> void:
 	_recent_notes.clear()
 	_window_expires_at = -1.0
 	_force_fullscreen_rect()
+	_apply_responsive_layout()
 	visible = true
 	move_to_front()
 	# Stage a default chord (tonic triad in the current key) so the voicings
@@ -288,6 +327,277 @@ func _set_playback_buttons_disabled(disabled: bool) -> void:
 		for child in row.get_children():
 			if child is Button:
 				(child as Button).disabled = disabled
+
+
+# --- Quiz mode overlay ---
+
+
+# Opens the quiz modal — lazy-builds on first use, then starts a fresh
+# round each time it's opened.
+func _show_quiz_overlay() -> void:
+	if _quiz_overlay == null:
+		_build_quiz_overlay()
+	if _quiz_overlay == null:
+		return
+	_quiz_overlay.visible = true
+	_quiz_overlay.move_to_front()
+	_start_quiz_round()
+
+
+func _hide_quiz_overlay() -> void:
+	if _quiz_overlay != null:
+		_quiz_overlay.visible = false
+	# Cancel any pending busy-state lock so panel returns clean.
+	_playback_lock_token += 1
+
+
+func _build_quiz_overlay() -> void:
+	_quiz_overlay = PanelContainer.new()
+	_quiz_overlay.set_anchors_preset(PRESET_FULL_RECT)
+	_quiz_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_quiz_overlay.z_as_relative = false
+	_quiz_overlay.z_index = 910
+	var scrim_style := StyleBoxFlat.new()
+	scrim_style.bg_color = Color(0.02, 0.04, 0.08, 0.88)
+	_quiz_overlay.add_theme_stylebox_override("panel", scrim_style)
+	add_child(_quiz_overlay)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_quiz_overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(620, 480)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.10, 0.16, 0.26, 1.0)
+	card_style.border_color = MENU_PRIMARY_ACCENT
+	card_style.border_width_left = 2
+	card_style.border_width_right = 2
+	card_style.border_width_top = 2
+	card_style.border_width_bottom = 2
+	card_style.corner_radius_top_left = 14
+	card_style.corner_radius_top_right = 14
+	card_style.corner_radius_bottom_left = 14
+	card_style.corner_radius_bottom_right = 14
+	card_style.shadow_color = Color(0, 0, 0, 0.55)
+	card_style.shadow_size = 18
+	card.add_theme_stylebox_override("panel", card_style)
+	center.add_child(card)
+
+	var card_margin := MarginContainer.new()
+	card_margin.add_theme_constant_override("margin_left", 28)
+	card_margin.add_theme_constant_override("margin_right", 28)
+	card_margin.add_theme_constant_override("margin_top", 22)
+	card_margin.add_theme_constant_override("margin_bottom", 18)
+	card.add_child(card_margin)
+
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	card_margin.add_child(col)
+
+	var title := Label.new()
+	title.text = "%s  Name That Chord" % char(0x1F393)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if _ui_title_font != null:
+		title.add_theme_font_override("font", _ui_title_font)
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	col.add_child(title)
+
+	_quiz_score_label = Label.new()
+	_quiz_score_label.text = "Question 1 of %d   Score: 0" % _QUIZ_QUESTIONS_PER_ROUND
+	_quiz_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_quiz_score_label.add_theme_font_size_override("font_size", 14)
+	_quiz_score_label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.92))
+	col.add_child(_quiz_score_label)
+
+	_quiz_prompt_label = Label.new()
+	_quiz_prompt_label.text = "Listen, then pick the chord quality."
+	_quiz_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_quiz_prompt_label.add_theme_font_size_override("font_size", 16)
+	_quiz_prompt_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	col.add_child(_quiz_prompt_label)
+
+	# Replay button — re-auditions the staged chord.
+	_quiz_play_button = Button.new()
+	_quiz_play_button.text = "%s  Play chord" % char(0x266A)
+	_quiz_play_button.custom_minimum_size = Vector2(180, 44)
+	_quiz_play_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_quiz_play_button.add_theme_font_size_override("font_size", 15)
+	_quiz_play_button.pressed.connect(_quiz_replay_current)
+	col.add_child(_quiz_play_button)
+
+	_quiz_choices_row = HBoxContainer.new()
+	_quiz_choices_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_quiz_choices_row.add_theme_constant_override("separation", 10)
+	col.add_child(_quiz_choices_row)
+
+	_quiz_feedback_label = Label.new()
+	_quiz_feedback_label.text = ""
+	_quiz_feedback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_quiz_feedback_label.add_theme_font_size_override("font_size", 15)
+	_quiz_feedback_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+	col.add_child(_quiz_feedback_label)
+
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	col.add_child(actions)
+	_quiz_next_button = Button.new()
+	_quiz_next_button.text = "Next %s" % char(0x2192)
+	_quiz_next_button.custom_minimum_size = Vector2(140, 38)
+	_quiz_next_button.add_theme_font_size_override("font_size", 14)
+	_quiz_next_button.disabled = true  # enabled after the user answers
+	# Single dispatcher handles both "next question" and "play again" so
+	# we never have to disconnect/reconnect signals at runtime.
+	_quiz_next_button.pressed.connect(_quiz_advance_pressed)
+	actions.add_child(_quiz_next_button)
+	_quiz_close_button = Button.new()
+	_quiz_close_button.text = "Close"
+	_quiz_close_button.custom_minimum_size = Vector2(120, 38)
+	_quiz_close_button.add_theme_font_size_override("font_size", 14)
+	_quiz_close_button.pressed.connect(_hide_quiz_overlay)
+	actions.add_child(_quiz_close_button)
+
+	_quiz_overlay.visible = false
+
+
+# Start (or restart) a 10-question round.
+func _start_quiz_round() -> void:
+	_quiz_score = 0
+	_quiz_question_index = 0
+	_quiz_session_attribution_pending = true
+	_quiz_next_question()
+
+
+# Build a fresh question: pick a random quality, stage notes, render 4
+# choice buttons (correct + 3 distractors), play the chord.
+func _quiz_next_question() -> void:
+	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND:
+		_quiz_show_round_summary()
+		return
+	_quiz_question_index += 1
+	_quiz_answered = false
+	_quiz_feedback_label.text = ""
+	_quiz_next_button.disabled = true
+	# Pick a random quality + random root from KEY_OPTIONS so the student
+	# can't memorize "every quiz chord is C-something".
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	_quiz_current_answer = _QUIZ_QUALITIES[rng.randi_range(0, _QUIZ_QUALITIES.size() - 1)]
+	var root_idx: int = rng.randi_range(0, KEY_OPTIONS.size() - 1)
+	var root_pc: int = int(KEY_OPTIONS[root_idx][1])
+	var intervals: Array = _intervals_for_quality(_quiz_current_answer)
+	if intervals.is_empty():
+		_quiz_current_answer = "Major"
+		intervals = _intervals_for_quality("Major")
+	var base_root_midi: int = _anchor_root_for_chord(root_pc, intervals)
+	_quiz_current_chord_notes.clear()
+	for iv in intervals:
+		_quiz_current_chord_notes.append(base_root_midi + int(iv))
+	# Build 4 unique choices: correct + 3 distractors drawn from the pool.
+	var choices: Array[String] = [_quiz_current_answer]
+	var pool: Array[String] = _QUIZ_QUALITIES.duplicate()
+	pool.erase(_quiz_current_answer)
+	pool.shuffle()
+	for i in mini(_QUIZ_CHOICES_COUNT - 1, pool.size()):
+		choices.append(pool[i])
+	choices.shuffle()
+	# Rebuild choices row.
+	for child in _quiz_choices_row.get_children():
+		child.queue_free()
+	for choice in choices:
+		var btn := Button.new()
+		btn.text = choice
+		btn.custom_minimum_size = Vector2(118, 46)
+		btn.add_theme_font_size_override("font_size", 14)
+		var captured := choice
+		btn.pressed.connect(func(): _quiz_submit_answer(captured))
+		_quiz_choices_row.add_child(btn)
+	_quiz_score_label.text = "Question %d of %d   Score: %d" % [_quiz_question_index, _QUIZ_QUESTIONS_PER_ROUND, _quiz_score]
+	_quiz_replay_current()
+
+
+func _quiz_replay_current() -> void:
+	if _quiz_current_chord_notes.is_empty():
+		return
+	if _is_playback_busy():
+		return
+	_lock_playback(1.6)
+	if _play_chord_callable.is_valid():
+		_play_chord_callable.call(_quiz_current_chord_notes, 1.6)
+	elif _play_note_callable.is_valid():
+		for n in _quiz_current_chord_notes:
+			_play_note_callable.call(n, 1.6)
+
+
+func _quiz_submit_answer(chosen: String) -> void:
+	if _quiz_answered:
+		return
+	_quiz_answered = true
+	var correct: bool = chosen == _quiz_current_answer
+	if correct:
+		_quiz_score += 1
+		_quiz_feedback_label.text = "%s  Correct! That was %s." % [char(0x2713), _quiz_current_answer]
+		_quiz_feedback_label.add_theme_color_override("font_color", Color(0.45, 0.92, 0.62, 1.0))
+	else:
+		_quiz_feedback_label.text = "%s  Not quite — that was %s." % [char(0x2717), _quiz_current_answer]
+		_quiz_feedback_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45, 1.0))
+	# Disable choice buttons so the user can't change their answer.
+	for child in _quiz_choices_row.get_children():
+		if child is Button:
+			(child as Button).disabled = true
+	_quiz_score_label.text = "Question %d of %d   Score: %d" % [_quiz_question_index, _QUIZ_QUESTIONS_PER_ROUND, _quiz_score]
+	_quiz_next_button.disabled = false
+	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND:
+		_quiz_next_button.text = "See result %s" % char(0x2192)
+
+
+func _quiz_show_round_summary() -> void:
+	var pct: int = int(round(float(_quiz_score) / float(_QUIZ_QUESTIONS_PER_ROUND) * 100.0))
+	var stars: String = ""
+	if pct >= 90: stars = "%s%s%s" % [char(0x1F3C6), char(0x1F3C6), char(0x1F3C6)]
+	elif pct >= 70: stars = "%s%s" % [char(0x2B50), char(0x2B50)]
+	elif pct >= 50: stars = "%s" % char(0x2B50)
+	else: stars = "%s  Keep practicing!" % char(0x1F4AA)
+	_quiz_prompt_label.text = "Round complete!  %d / %d  (%d%%)\n%s" % [_quiz_score, _QUIZ_QUESTIONS_PER_ROUND, pct, stars]
+	_quiz_feedback_label.text = ""
+	_quiz_score_label.text = ""
+	for child in _quiz_choices_row.get_children():
+		child.queue_free()
+	_quiz_play_button.visible = false
+	_quiz_next_button.text = "Play again"
+	_quiz_next_button.disabled = false
+	_quiz_record_round_result(_quiz_score, _QUIZ_QUESTIONS_PER_ROUND)
+
+
+# Single dispatcher for the Next button — answers either "next question"
+# or "start new round" based on whether the round is finished. Avoids the
+# disconnect/reconnect signal dance.
+func _quiz_advance_pressed() -> void:
+	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND and _quiz_answered:
+		# Round was just finalized — reset Play button visibility + start fresh.
+		if _quiz_play_button != null:
+			_quiz_play_button.visible = true
+		_quiz_next_button.text = "Next %s" % char(0x2192)
+		_start_quiz_round()
+		return
+	_quiz_next_question()
+
+
+# Teacher-edition attribution: surface the quiz round as an "activity" so
+# the teacher dashboard's per-student summary picks it up. Falls back
+# silently in Student Edition where no teacher_store exists.
+func _quiz_record_round_result(score: int, total: int) -> void:
+	if not _quiz_session_attribution_pending:
+		return
+	_quiz_session_attribution_pending = false
+	chord_quiz_completed.emit(score, total)
+
+
+signal chord_quiz_completed(score: int, total: int)
 
 
 # --- Help overlay (lesson card) ---
@@ -419,6 +729,7 @@ func dismiss() -> void:
 	_compare_token += 1
 	_rebuild_preset_steps_row()
 	_hide_help_overlay()
+	_hide_quiz_overlay()
 	visible = false
 
 
@@ -439,6 +750,74 @@ func tick(_delta: float) -> void:
 	var progress := clampf(remaining / ARPEGGIO_WINDOW_SEC, 0.0, 1.0)
 	_window_bar.value = progress
 	_window_bar.modulate.a = lerpf(0.55, 1.0, progress)
+
+
+func _apply_responsive_layout() -> void:
+	# Reads current viewport width, picks a layout breakpoint (wide /
+	# tablet / narrow), and reconfigures the top section + chord-body
+	# margins accordingly. Idempotent — guarded by
+	# _last_applied_layout_breakpoint so resize spam doesn't thrash.
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var w: float = vp.get_visible_rect().size.x
+	var bp: int
+	if w >= _LAYOUT_BREAKPOINT_WIDE:
+		bp = 2  # wide
+	elif w >= _LAYOUT_BREAKPOINT_TABLET:
+		bp = 1  # tablet
+	else:
+		bp = 0  # narrow
+	if bp == _last_applied_layout_breakpoint:
+		return
+	_last_applied_layout_breakpoint = bp
+	# Rotation: HBox for wide+tablet (side-by-side), VBox for narrow (stack).
+	if _top_section != null and is_instance_valid(_top_section):
+		var want_vertical: bool = (bp == 0)
+		var is_vertical: bool = _top_section is VBoxContainer
+		if want_vertical != is_vertical:
+			_rotate_top_section(want_vertical)
+	# Tighten section separation on smaller screens.
+	if _top_section != null:
+		if "add_theme_constant_override" in _top_section:
+			_top_section.add_theme_constant_override("separation", 14 if bp == 2 else (10 if bp == 1 else 6))
+
+
+# Swap top_section between HBoxContainer (side-by-side) and VBoxContainer
+# (stacked) by replacing the node and re-parenting its children. Godot
+# doesn't expose a runtime "change orientation" so we rebuild the
+# container in-place.
+func _rotate_top_section(vertical: bool) -> void:
+	if _top_section == null or not is_instance_valid(_top_section):
+		return
+	var parent := _top_section.get_parent()
+	if parent == null:
+		return
+	var children: Array[Node] = []
+	for c in _top_section.get_children():
+		children.append(c)
+	for c in children:
+		_top_section.remove_child(c)
+	var idx := _top_section.get_index()
+	parent.remove_child(_top_section)
+	_top_section.queue_free()
+	var new_box: Container
+	if vertical:
+		new_box = VBoxContainer.new()
+	else:
+		new_box = HBoxContainer.new()
+	new_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	new_box.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	new_box.add_theme_constant_override("separation", 8 if vertical else 14)
+	parent.add_child(new_box)
+	parent.move_child(new_box, idx)
+	for c in children:
+		new_box.add_child(c)
+		# In vertical mode the side-by-side stretch_ratio no longer applies;
+		# clear it so the children take their natural minimum size.
+		if c is Control and vertical:
+			(c as Control).size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_top_section = new_box
 
 
 func _force_fullscreen_rect() -> void:
@@ -578,6 +957,16 @@ func _build_ui() -> void:
 	help_btn.pressed.connect(_show_help_overlay)
 	key_row.add_child(help_btn)
 
+	# Quiz mode — opens a multiple-choice "what chord is this?" exercise.
+	# Counts as a teacher assignment activity when a student is active.
+	var quiz_btn := Button.new()
+	quiz_btn.text = "%s  Quiz" % char(0x1F393)  # mortarboard
+	quiz_btn.custom_minimum_size = Vector2(92, 38)
+	quiz_btn.tooltip_text = "Test your chord ear: app plays a chord, you pick the quality (10 questions)."
+	quiz_btn.add_theme_font_size_override("font_size", 14)
+	quiz_btn.pressed.connect(_show_quiz_overlay)
+	key_row.add_child(quiz_btn)
+
 	if _score_font_picker_builder.is_valid():
 		_score_font_picker_builder.call(key_row)
 
@@ -597,11 +986,14 @@ func _build_ui() -> void:
 	# on the right. Frees vertical space so the virtual keyboard stays
 	# visible without scrolling — a single chord never needed the staff's
 	# full width anyway.
-	var top_section := HBoxContainer.new()
-	top_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_section.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top_section.add_theme_constant_override("separation", 14)
-	chord_body.add_child(top_section)
+	# top_section starts as side-by-side HBox; _apply_responsive_layout
+	# may swap it to vertical stacking on narrow viewports.
+	_top_section = HBoxContainer.new()
+	_top_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_top_section.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_top_section.add_theme_constant_override("separation", 14)
+	chord_body.add_child(_top_section)
+	var top_section := _top_section
 
 	# Staff area (left, 40% of width via stretch_ratio = 4 against right=6)
 	var staff_wrap := PanelContainer.new()
@@ -794,6 +1186,12 @@ func _build_ui() -> void:
 	_build_keyboard(chord_body)
 	# Initial diatonic row population (key starts at C major by default).
 	_rebuild_diatonic_row()
+	# Hook viewport resize so the layout swaps wide↔narrow live when
+	# the user rotates a tablet or resizes the desktop window.
+	var vp := get_viewport()
+	if vp != null and not vp.size_changed.is_connected(_apply_responsive_layout):
+		vp.size_changed.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 
 
 func _build_chip(parent: Control, initial_text: String, accent: Color) -> Label:
