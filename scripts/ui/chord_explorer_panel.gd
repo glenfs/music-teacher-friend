@@ -1247,13 +1247,14 @@ func _build_ui() -> void:
 	quiz_btn.pressed.connect(_show_quiz_overlay)
 	key_row.add_child(quiz_btn)
 
-	# Build Chord Quiz — launches the dedicated note-input quiz panel
-	# (Build / Identify / Compare modes). Emits the build_quiz_requested
-	# signal so the parent can dismiss this panel + present the quiz.
+	# Guided Practice — launches the dedicated full-screen guided-mode
+	# panel (5 modes: Build / Identify / Compare / Function / Progression
+	# with difficulty levels and escalating hints). Emits build_quiz_requested
+	# signal so the parent can dismiss this panel + present Guided Practice.
 	var build_btn := Button.new()
-	build_btn.text = "%s  Build" % char(0x1F3B9)  # piano keys
-	build_btn.custom_minimum_size = Vector2(96, 38)
-	build_btn.tooltip_text = "Build chords on a keyboard (or MIDI), identify chords by ear, or compare two sounds."
+	build_btn.text = "%s  Practice" % char(0x1F3AF)  # bullseye
+	build_btn.custom_minimum_size = Vector2(108, 38)
+	build_btn.tooltip_text = "Open Guided Practice: build chords, identify by ear, compare sounds, chord function in key, or build progressions."
 	build_btn.add_theme_font_size_override("font_size", 14)
 	build_btn.pressed.connect(func(): build_quiz_requested.emit())
 	key_row.add_child(build_btn)
