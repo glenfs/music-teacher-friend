@@ -73,12 +73,38 @@ const CHORD_TEMPLATES := {
 const ROMAN_MAJOR := ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
 const ROMAN_MINOR := ["i", "ii°", "III", "iv", "v", "VI", "VII"]
 
-# Major/minor scale intervals from tonic (semitones)
+# Scale intervals from tonic (semitones)
 const MAJOR_SCALE_INTERVALS := [0, 2, 4, 5, 7, 9, 11]
 const MINOR_SCALE_INTERVALS := [0, 2, 3, 5, 7, 8, 10]
+# Harmonic minor — like natural minor with raised 7th (10→11). Used by the
+# diatonic-membership check so V (Major triad on degree 5) and vii° are
+# correctly recognized as in-key, not as borrowed chords.
+const HARMONIC_MINOR_SCALE_INTERVALS := [0, 2, 3, 5, 7, 8, 11]
+
+# Key flavors — caller picks which scale the recognizer uses for the
+# in-key / borrowed badge.
+enum KeyFlavor { MAJOR, NATURAL_MINOR, HARMONIC_MINOR }
 
 
-static func recognize(pitches: Array, key_root_pc: int = -1, key_is_minor: bool = false) -> Dictionary:
+# recognize() accepts:
+# - pitches: array of MIDI notes the user played.
+# - key_root_pc: tonic pitch class (0..11) for spelling + diatonic check.
+#   -1 = no key context (default to sharps + skip diatonic).
+# - key_is_minor: legacy flag, kept for backward compat. New callers
+#   should prefer key_flavor.
+# - key_uses_flats: forces flat-name spelling for the active key (Bb vs A#,
+#   Gb vs F#). Without this the recognizer infers from key letter, which
+#   can't distinguish chosen F# from chosen Gb (same pc 6).
+# - key_flavor: KeyFlavor (or int 0/1/2). Drives the diatonic-membership
+#   check. Defaults to natural minor when key_is_minor is true and no
+#   flavor is supplied.
+static func recognize(
+	pitches: Array,
+	key_root_pc: int = -1,
+	key_is_minor: bool = false,
+	key_uses_flats: bool = false,
+	key_flavor: int = -1
+) -> Dictionary:
 	if pitches == null or pitches.is_empty():
 		return _empty_result()
 	var sorted_pitches: Array = []
@@ -163,7 +189,7 @@ static func recognize(pitches: Array, key_root_pc: int = -1, key_is_minor: bool 
 	if candidates.is_empty():
 		var played_names: Array[String] = []
 		for pc in pcs:
-			played_names.append(_spell_pc(pc, key_root_pc))
+			played_names.append(_spell_pc(pc, key_root_pc, key_uses_flats))
 		return {
 			"recognized": false,
 			"short_name": "?",
@@ -182,8 +208,8 @@ static func recognize(pitches: Array, key_root_pc: int = -1, key_is_minor: bool 
 
 	candidates.sort_custom(func(a, b): return int(a["score"]) < int(b["score"]))
 	var best: Dictionary = candidates[0]
-	var root_letter := _spell_pc(int(best["root_pc"]), key_root_pc)
-	var bass_letter := _spell_pc(((bass % 12) + 12) % 12, key_root_pc)
+	var root_letter := _spell_pc(int(best["root_pc"]), key_root_pc, key_uses_flats)
+	var bass_letter := _spell_pc(((bass % 12) + 12) % 12, key_root_pc, key_uses_flats)
 	var quality_short := str(best["short"])
 	var suffix := _quality_to_suffix(quality_short)
 	var base_name := "%s%s" % [root_letter, suffix]
@@ -192,7 +218,11 @@ static func recognize(pitches: Array, key_root_pc: int = -1, key_is_minor: bool 
 	if int(best["inversion"]) > 0:
 		display_name = "%s/%s" % [base_name, bass_letter]
 		inversion_label = _inversion_ordinal(((bass % 12) + 12) % 12, int(best["root_pc"]))
-	var diatonic := _chord_is_diatonic(best["intervals"], int(best["root_pc"]), key_root_pc, key_is_minor)
+	# Resolve flavor: explicit arg wins; else infer from key_is_minor.
+	var effective_flavor: int = key_flavor
+	if effective_flavor < 0:
+		effective_flavor = KeyFlavor.NATURAL_MINOR if key_is_minor else KeyFlavor.MAJOR
+	var diatonic := _chord_is_diatonic_flavor(best["intervals"], int(best["root_pc"]), key_root_pc, effective_flavor)
 	var roman_str := _roman_for_root(int(best["root_pc"]), quality_short, key_root_pc, key_is_minor)
 	return {
 		"recognized": true,
@@ -257,8 +287,13 @@ static func _intervals_to_key(intervals: Array) -> String:
 	return ",".join(parts)
 
 
-static func _spell_pc(pc: int, key_root_pc: int) -> String:
+static func _spell_pc(pc: int, key_root_pc: int, force_flats: bool = false) -> String:
 	var pc_clamped := ((int(pc) % 12) + 12) % 12
+	# Explicit override from caller — used when the user chose a specifically
+	# flat-spelled key (Bb, Eb, Ab, Db, Gb). Without this the pc-only key
+	# letter can't distinguish chosen F# from chosen Gb (same pc 6).
+	if force_flats:
+		return NOTE_NAMES_FLAT[pc_clamped]
 	var use_sharps := true
 	if key_root_pc >= 0:
 		var key_letter: String = NOTE_NAMES_SHARP[((int(key_root_pc) % 12) + 12) % 12]
@@ -302,6 +337,29 @@ static func _chord_is_diatonic(intervals: Array, root_pc: int, key_root_pc: int,
 	for iv in intervals:
 		var pc := (int(root_pc) + int(iv)) % 12
 		if not _is_pc_in_key(pc, key_root_pc, key_is_minor):
+			return false
+	return true
+
+
+# Flavor-aware diatonic check used by the new recognize() entry point.
+# Falls back to the legacy major/natural-minor variant for those flavors,
+# but uses the harmonic-minor scale (raised 7th) for the third option so
+# V Major + vii° register as in-key instead of "Borrowed".
+static func _chord_is_diatonic_flavor(intervals: Array, root_pc: int, key_root_pc: int, flavor: int) -> bool:
+	if key_root_pc < 0:
+		return false
+	var scale: Array
+	match flavor:
+		KeyFlavor.HARMONIC_MINOR:
+			scale = HARMONIC_MINOR_SCALE_INTERVALS
+		KeyFlavor.NATURAL_MINOR:
+			scale = MINOR_SCALE_INTERVALS
+		_:
+			scale = MAJOR_SCALE_INTERVALS
+	for iv in intervals:
+		var pc := (int(root_pc) + int(iv)) % 12
+		var degree := ((pc - int(key_root_pc)) + 12) % 12
+		if not (degree in scale):
 			return false
 	return true
 

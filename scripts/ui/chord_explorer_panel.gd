@@ -154,6 +154,10 @@ var _quiz_total_questions: int = 10
 var _quiz_answered: bool = false
 var _quiz_session_attribution_pending: bool = false
 var _quiz_play_token: int = 0  # cancels A→B playback if user advances
+# True after the round-summary screen has been rendered. Used by the
+# Next/Play-again dispatcher to know whether the next click should start
+# a fresh round (after summary) or show the summary first (after Q10).
+var _quiz_summary_shown: bool = false
 
 # Mode 0 = Chords in Key, 1 = Compare Quality.
 enum QuizMode { CHORDS_IN_KEY, COMPARE_QUALITY }
@@ -379,8 +383,18 @@ func _show_quiz_overlay() -> void:
 func _hide_quiz_overlay() -> void:
 	if _quiz_overlay != null:
 		_quiz_overlay.visible = false
-	# Cancel any pending busy-state lock so panel returns clean.
+	# Fully reset playback busy state when closing — the previous version
+	# only bumped the lock token, leaving _playback_busy_until still in
+	# the future + _playback_indicator visible + chord-detail buttons
+	# disabled. User would return to the explorer with stale "Playing..."
+	# UI and unresponsive controls.
 	_playback_lock_token += 1
+	_playback_busy_until = 0.0
+	_set_playback_buttons_disabled(false)
+	if _playback_indicator != null:
+		_playback_indicator.visible = false
+	# Cancel any in-flight A→B compare sequence so it doesn't fire after close.
+	_quiz_play_token += 1
 
 
 func _build_quiz_overlay() -> void:
@@ -558,6 +572,7 @@ func _start_quiz_round() -> void:
 	_quiz_score = 0
 	_quiz_question_index = 0
 	_quiz_session_attribution_pending = true
+	_quiz_summary_shown = false
 	# Reset play button visibility (round summary hides it).
 	if _quiz_play_button != null:
 		_quiz_play_button.visible = true
@@ -648,9 +663,14 @@ func _quiz_next_chords_in_key() -> void:
 		_quiz_choices_row.add_child(btn)
 	# Prompt + UI tweaks specific to this mode.
 	var mode_word: String = "%s minor" % key_label if use_minor else "%s major" % key_label
-	_quiz_prompt_label.text = "Build the %s chord in %s." % [roman, mode_word]
-	_quiz_play_button.text = "%s  Play (reveals answer)" % char(0x266A)
-	_quiz_play_button.disabled = false
+	# "Choose" not "Build" — the task is multiple-choice selection, not
+	# constructing the chord on a keyboard. QA flagged the wording mismatch.
+	_quiz_prompt_label.text = "Choose the %s chord in %s." % [roman, mode_word]
+	# Reveal-via-Play disabled until the student has answered. Prevents
+	# accidental answer-leak; the play button becomes a verify-after-the-fact
+	# tool rather than a giveaway.
+	_quiz_play_button.text = "%s  Play (after answering)" % char(0x266A)
+	_quiz_play_button.disabled = true
 
 
 # COMPARE QUALITY — play A, then B; student picks B's quality.
@@ -786,6 +806,11 @@ func _quiz_submit_answer(chosen: String) -> void:
 	for child in _quiz_choices_row.get_children():
 		if child is Button:
 			(child as Button).disabled = true
+	# Chords-in-Key: enable Play (now safe — answer is locked in) and
+	# update its label to verify-mode wording.
+	if _quiz_mode == QuizMode.CHORDS_IN_KEY and _quiz_play_button != null:
+		_quiz_play_button.disabled = false
+		_quiz_play_button.text = "%s  Hear the chord" % char(0x266A)
 	_quiz_score_label.text = "Question %d of %d   Score: %d" % [_quiz_question_index, _QUIZ_QUESTIONS_PER_ROUND, _quiz_score]
 	_quiz_next_button.disabled = false
 	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND:
@@ -807,19 +832,26 @@ func _quiz_show_round_summary() -> void:
 	_quiz_play_button.visible = false
 	_quiz_next_button.text = "Play again"
 	_quiz_next_button.disabled = false
+	_quiz_summary_shown = true
 	_quiz_record_round_result(_quiz_score, _QUIZ_QUESTIONS_PER_ROUND)
 
 
-# Single dispatcher for the Next button — answers either "next question"
-# or "start new round" based on whether the round is finished. Avoids the
-# disconnect/reconnect signal dance.
+# Single dispatcher for the Next button. Three click states:
+#   1. Mid-round (answered): advance to the next question.
+#   2. Last question answered (Q10): show the round summary.
+#   3. Summary on screen: start a fresh round.
+# Without the explicit _quiz_summary_shown flag, state 2 was being
+# treated as state 3 — the summary screen + chord_quiz_completed signal
+# both got skipped, breaking teacher attribution + the player's closure.
 func _quiz_advance_pressed() -> void:
-	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND and _quiz_answered:
-		# Round was just finalized — reset Play button visibility + start fresh.
+	if _quiz_summary_shown:
 		if _quiz_play_button != null:
 			_quiz_play_button.visible = true
 		_quiz_next_button.text = "Next %s" % char(0x2192)
 		_start_quiz_round()
+		return
+	if _quiz_question_index >= _QUIZ_QUESTIONS_PER_ROUND and _quiz_answered:
+		_quiz_show_round_summary()
 		return
 	_quiz_next_question()
 
@@ -2184,7 +2216,13 @@ func _intervals_for_quality(quality: String) -> Array:
 		"Maj7": [0, 4, 7, 11],
 		"Dim7": [0, 3, 6, 9],
 		"Half-dim": [0, 3, 6, 10],
+		"mMaj7": [0, 3, 7, 11],
 		"Maj7#11": [0, 4, 7, 11, 14, 18],
+		"Maj6": [0, 4, 7, 9],
+		"Min6": [0, 3, 7, 9],
+		"Add9": [0, 4, 7, 14],
+		"Madd9": [0, 3, 7, 14],
+		"7sus4": [0, 5, 7, 10],
 	}
 	return table.get(quality, [])
 
@@ -2698,6 +2736,9 @@ func _stage_and_play_diatonic_chord(root_pc: int, quality: String) -> void:
 	var chord_notes: Array[int] = []
 	for iv in intervals:
 		chord_notes.append(base_root_midi + int(iv))
+	# Lock playback like preset / voicing / compare paths so click-spam on
+	# the diatonic row can't overlap chord audio.
+	_lock_playback(1.6)
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(chord_notes, 1.6)
 	elif _play_note_callable.is_valid():
@@ -2755,7 +2796,9 @@ func _refresh_display() -> void:
 		_refresh_compare_row()
 		_refresh_chord_detail_tabs_visibility()
 		return
-	var info: Dictionary = ChordRecognizerScript.recognize(pitches, _key_pc, _key_is_minor)
+	var info: Dictionary = ChordRecognizerScript.recognize(
+		pitches, _key_pc, _key_is_minor, _key_uses_flats, _key_flavor
+	)
 	_last_info = info
 	_refresh_keyboard_lighting()
 	_chord_name_label.text = str(info.get("short_name", ""))
