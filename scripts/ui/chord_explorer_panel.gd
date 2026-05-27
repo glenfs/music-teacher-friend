@@ -88,43 +88,51 @@ var _window_bar: ProgressBar = null
 var _keyboard_keys: Dictionary = {}       # pitch -> Button
 var _inversions_row: HBoxContainer = null
 var _presets_row: HBoxContainer = null
+var _preset_steps_row: HBoxContainer = null
+# Cached chord list of the currently-loaded preset. Each entry is the raw
+# tuple [root_pc, quality_id, roman] from BUILT_IN_PRESETS. Lets the chord-
+# step buttons reload a step without re-walking the preset definitions.
+var _active_preset_chords: Array = []
+var _active_preset_step_idx: int = -1
+# Used so a Play-All loop can detect the user clicking another step (or
+# leaving the panel) and abort cleanly.
+var _play_all_token: int = 0
 
 # Built-in teacher presets — chord+key setups ready to load. Loading a preset
-# clears the played notes, picks the key, and plays the first chord. Teachers
-# can extend this dict via saved presets (TODO: persist user-saved presets in
-# user://chord_explorer_presets.json once the load/save UI lands).
+# clears the played notes, picks the key, builds the chord-step row, and
+# stages the first chord. Each chord tuple: [root_pc, quality_id, roman]
+# where quality_id matches a CHORD_INTERVALS key and `roman` is the function
+# label shown under the chord-step button.
 const BUILT_IN_PRESETS: Array[Dictionary] = [
 	{
 		"id": "ii_V_I_C",
 		"label": "ii-V-I in C",
 		"key_pc": 0, "is_minor": false,
-		# Each chord: [root_pc, quality_id] — quality must match CHORD_INTERVALS keys.
-		"chords": [[2, "Min7"], [7, "Dom7"], [0, "Maj7"]],
+		"chords": [[2, "Min7", "ii"], [7, "Dom7", "V"], [0, "Maj7", "I"]],
 	},
 	{
 		"id": "modal_mix_C",
 		"label": "Modal mixture in C",
 		"key_pc": 0, "is_minor": false,
-		# bVII, bIII, bVI — classic borrowed-chord palette from C minor.
-		"chords": [[10, "Major"], [3, "Major"], [8, "Major"]],
+		"chords": [[10, "Major", "bVII"], [3, "Major", "bIII"], [8, "Major", "bVI"]],
 	},
 	{
 		"id": "neapolitan_C",
 		"label": "Neapolitan (bII) in C",
 		"key_pc": 0, "is_minor": false,
-		"chords": [[1, "Major"], [7, "Dom7"], [0, "Major"]],
+		"chords": [[1, "Major", "bII"], [7, "Dom7", "V"], [0, "Major", "I"]],
 	},
 	{
 		"id": "blues_C",
 		"label": "12-bar blues in C",
 		"key_pc": 0, "is_minor": false,
-		"chords": [[0, "Dom7"], [5, "Dom7"], [7, "Dom7"]],
+		"chords": [[0, "Dom7", "I7"], [5, "Dom7", "IV7"], [7, "Dom7", "V7"]],
 	},
 	{
 		"id": "jazz_color_C",
 		"label": "Jazz color (Maj7#11)",
 		"key_pc": 0, "is_minor": false,
-		"chords": [[0, "Maj7#11"], [5, "Maj7#11"], [10, "Maj7#11"]],
+		"chords": [[0, "Maj7#11", "I"], [5, "Maj7#11", "IV"], [10, "Maj7#11", "bVII"]],
 	},
 ]
 
@@ -173,6 +181,11 @@ func present() -> void:
 func dismiss() -> void:
 	_recent_notes.clear()
 	_window_expires_at = -1.0
+	# Tear down preset state so re-presenting starts fresh.
+	_active_preset_chords = []
+	_active_preset_step_idx = -1
+	_play_all_token += 1
+	_rebuild_preset_steps_row()
 	visible = false
 
 
@@ -438,6 +451,16 @@ func _build_ui() -> void:
 	name_inner.add_child(_presets_row)
 	_build_presets_row()
 
+	# Chord-step row — populated when a preset loads. Each chord in the preset
+	# becomes a clickable button (with Roman numeral underneath) so the
+	# teacher can walk through the progression at their own pace, plus a
+	# "▶ Play all" button to hear the sequence.
+	_preset_steps_row = HBoxContainer.new()
+	_preset_steps_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_preset_steps_row.add_theme_constant_override("separation", 8)
+	_preset_steps_row.visible = false
+	name_inner.add_child(_preset_steps_row)
+
 	_build_keyboard(chord_body)
 
 
@@ -638,6 +661,12 @@ func _on_back_pressed() -> void:
 func _on_clear_pressed() -> void:
 	_recent_notes.clear()
 	_window_expires_at = -1.0
+	# Discard any loaded preset + cancel an in-flight Play-All so the panel
+	# returns to a neutral state.
+	_active_preset_chords = []
+	_active_preset_step_idx = -1
+	_play_all_token += 1
+	_rebuild_preset_steps_row()
 	chord_cleared.emit()
 	_refresh_display()
 
@@ -845,37 +874,182 @@ func _load_preset(preset: Dictionary) -> void:
 				break
 	if _minor_check != null:
 		_minor_check.set_pressed_no_signal(is_minor)
-	# Stage the FIRST chord in the preset so the student sees something
-	# immediately. The remaining chords are surfaced via the preset's
-	# implicit "play these in sequence" — caller can extend later.
+	# Cache the preset's chord list and build the per-step button row, then
+	# stage the first chord so the student sees immediate feedback.
 	var chords_v: Variant = preset.get("chords", null)
 	if typeof(chords_v) != TYPE_ARRAY or (chords_v as Array).is_empty():
+		_active_preset_chords = []
+		_rebuild_preset_steps_row()
 		_refresh_display()
 		return
-	var first: Array = (chords_v as Array)[0]
-	if first.size() < 2:
+	_active_preset_chords = (chords_v as Array).duplicate(true)
+	_active_preset_step_idx = -1
+	# Invalidate any in-flight Play-All loop from a previous preset.
+	_play_all_token += 1
+	_rebuild_preset_steps_row()
+	# Stage chord 0 so the teacher sees what they loaded.
+	_play_preset_step(0)
+
+
+# Stages the chord at `idx` in the active preset (root_pc, quality from the
+# cached tuple). Plays it, refreshes the display, and updates the step-row
+# highlight so the active chord is visually distinguished.
+func _play_preset_step(idx: int) -> void:
+	if idx < 0 or idx >= _active_preset_chords.size():
 		return
-	var root_pc: int = int(first[0])
-	var quality: String = str(first[1])
-	# Stage virtual notes — the recognizer will pick this up via _refresh_display.
-	var base_root_midi: int = 60 + root_pc
-	if base_root_midi >= 72:
-		base_root_midi -= 12
-	_recent_notes.clear()
-	# Load intervals from the parent's CHORD_INTERVALS via the chord-explorer
-	# theory module so we don't need to hard-code them here.
+	var chord_v: Variant = _active_preset_chords[idx]
+	if typeof(chord_v) != TYPE_ARRAY or (chord_v as Array).size() < 2:
+		return
+	var chord: Array = chord_v
+	var root_pc: int = int(chord[0])
+	var quality: String = str(chord[1])
 	var intervals: Array = _intervals_for_quality(quality)
 	if intervals.is_empty():
 		return
+	# Anchor root note in a comfortable register near middle C.
+	var base_root_midi: int = 60 + root_pc
+	if base_root_midi >= 72:
+		base_root_midi -= 12
 	var now: float = float(Time.get_ticks_msec()) / 1000.0
+	_recent_notes.clear()
 	for iv in intervals:
 		_recent_notes[base_root_midi + int(iv)] = now
 	_window_expires_at = now + CLICK_WINDOW_SEC
+	_active_preset_step_idx = idx
 	_refresh_display()
-	# Audition the chord so the teacher / student hear it immediately.
+	_restyle_preset_step_buttons()
 	if _play_note_callable.is_valid():
 		for iv in intervals:
 			_play_note_callable.call(base_root_midi + int(iv), 1.6)
+
+
+# Plays every chord in the active preset in sequence with a short gap.
+# A token is bumped on entry so a second click (or a new preset load) can
+# abort the previous loop cleanly without overlapping audio.
+func _play_all_preset_steps() -> void:
+	if _active_preset_chords.is_empty():
+		return
+	_play_all_token += 1
+	var my_token: int = _play_all_token
+	for i in _active_preset_chords.size():
+		if my_token != _play_all_token:
+			return  # superseded by a newer Play-All / preset load
+		if not is_inside_tree() or not visible:
+			return
+		_play_preset_step(i)
+		# Hold each chord for ~1.8s before stepping to the next. The chord
+		# voicing itself plays for 1.6s; the extra 0.2s lets the ear settle
+		# before the harmony changes.
+		await get_tree().create_timer(1.8).timeout
+
+
+# Rebuilds the chord-step row UI: one labelled button per chord in the
+# active preset + a trailing "▶ Play all" button. Hides the row entirely
+# when no preset is loaded.
+func _rebuild_preset_steps_row() -> void:
+	if _preset_steps_row == null:
+		return
+	for child in _preset_steps_row.get_children():
+		child.queue_free()
+	if _active_preset_chords.is_empty():
+		_preset_steps_row.visible = false
+		return
+	for i in _active_preset_chords.size():
+		var chord_v: Variant = _active_preset_chords[i]
+		if typeof(chord_v) != TYPE_ARRAY or (chord_v as Array).size() < 2:
+			continue
+		var chord: Array = chord_v
+		var root_pc: int = int(chord[0])
+		var quality: String = str(chord[1])
+		var roman: String = str(chord[2]) if chord.size() >= 3 else ""
+		var chord_short: String = _chord_short_label(root_pc, quality)
+		var btn := Button.new()
+		# Two-line label: chord short name on top, Roman numeral underneath.
+		btn.text = "%s\n%s" % [chord_short, roman]
+		btn.custom_minimum_size = Vector2(96, 50)
+		btn.add_theme_font_size_override("font_size", 14)
+		var captured_idx := i
+		btn.pressed.connect(func(): _play_preset_step(captured_idx))
+		_apply_preset_step_button_style(btn, i == _active_preset_step_idx)
+		_preset_steps_row.add_child(btn)
+	# Play-all button at the end.
+	var play_all_btn := Button.new()
+	play_all_btn.text = "%s  Play all" % char(0x25B6)
+	play_all_btn.custom_minimum_size = Vector2(120, 50)
+	play_all_btn.add_theme_font_size_override("font_size", 14)
+	play_all_btn.pressed.connect(_play_all_preset_steps)
+	_apply_play_all_button_style(play_all_btn)
+	_preset_steps_row.add_child(play_all_btn)
+	_preset_steps_row.visible = true
+
+
+# Re-applies the active/inactive styling to each step button so the
+# currently-playing chord stands out. Called from _play_preset_step rather
+# than rebuilding the row, so click responses stay instant.
+func _restyle_preset_step_buttons() -> void:
+	if _preset_steps_row == null:
+		return
+	var children := _preset_steps_row.get_children()
+	for i in _active_preset_chords.size():
+		if i >= children.size():
+			break
+		var btn := children[i] as Button
+		if btn == null:
+			continue
+		_apply_preset_step_button_style(btn, i == _active_preset_step_idx)
+
+
+# Returns a short chord label for the step button (e.g. "Dm7", "Cmaj7").
+# Uses the note letter from NOTE_NAMES_SHARP + a small quality suffix map.
+func _chord_short_label(root_pc: int, quality: String) -> String:
+	var pc: int = ((root_pc % 12) + 12) % 12
+	var root_letter: String = NOTE_NAMES_SHARP[pc]
+	var suffix: String
+	match quality:
+		"Major": suffix = ""
+		"Minor": suffix = "m"
+		_:
+			suffix = quality
+	return "%s%s" % [root_letter, suffix]
+
+
+func _apply_preset_step_button_style(btn: Button, is_active: bool) -> void:
+	var sb := StyleBoxFlat.new()
+	var accent := MENU_PRIMARY_ACCENT if is_active else Color(0.36, 0.78, 1.00, 1.0)
+	sb.bg_color = Color(accent.r, accent.g, accent.b, 0.22 if is_active else 0.10)
+	sb.border_color = Color(accent.r, accent.g, accent.b, 0.92 if is_active else 0.55)
+	sb.border_width_left = 2 if is_active else 1
+	sb.border_width_right = 2 if is_active else 1
+	sb.border_width_top = 2 if is_active else 1
+	sb.border_width_bottom = 2 if is_active else 1
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(accent.r, accent.g, accent.b, 0.30)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
+
+
+func _apply_play_all_button_style(btn: Button) -> void:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(MENU_PRIMARY_ACCENT.r, MENU_PRIMARY_ACCENT.g, MENU_PRIMARY_ACCENT.b, 0.28)
+	sb.border_color = Color(MENU_PRIMARY_ACCENT.r, MENU_PRIMARY_ACCENT.g, MENU_PRIMARY_ACCENT.b, 0.95)
+	sb.border_width_left = 2
+	sb.border_width_right = 2
+	sb.border_width_top = 2
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 8
+	sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8
+	sb.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(MENU_PRIMARY_ACCENT.r, MENU_PRIMARY_ACCENT.g, MENU_PRIMARY_ACCENT.b, 0.40)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 
 
 # Resolves a quality id to its semitone interval array. Local table covers
