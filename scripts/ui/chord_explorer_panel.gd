@@ -346,9 +346,20 @@ func _build_ui() -> void:
 	chord_body.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	chord_body_scroll.add_child(chord_body)
 
-	# Staff area (centered)
+	# Side-by-side top section: staff (40%) on the left, chord display (60%)
+	# on the right. Frees vertical space so the virtual keyboard stays
+	# visible without scrolling — a single chord never needed the staff's
+	# full width anyway.
+	var top_section := HBoxContainer.new()
+	top_section.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top_section.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top_section.add_theme_constant_override("separation", 14)
+	chord_body.add_child(top_section)
+
+	# Staff area (left, 40% of width via stretch_ratio = 4 against right=6)
 	var staff_wrap := PanelContainer.new()
 	staff_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	staff_wrap.size_flags_stretch_ratio = 4.0
 	staff_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var staff_wrap_style := StyleBoxFlat.new()
 	staff_wrap_style.bg_color = Color(0.99, 0.98, 0.95, 0.96)
@@ -359,10 +370,10 @@ func _build_ui() -> void:
 	staff_wrap_style.shadow_color = Color(0.0, 0.0, 0.0, 0.32)
 	staff_wrap_style.shadow_size = 8
 	staff_wrap.add_theme_stylebox_override("panel", staff_wrap_style)
-	chord_body.add_child(staff_wrap)
+	top_section.add_child(staff_wrap)
 
 	_staff_area = StaffRendererScript.new()
-	_staff_area.custom_minimum_size = Vector2(720, 240)
+	_staff_area.custom_minimum_size = Vector2(380, 240)
 	_staff_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_staff_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_staff_area.set("draw_paper", true)
@@ -370,14 +381,15 @@ func _build_ui() -> void:
 	_staff_area.set("inter_staff_gap_spaces", 5.0)
 	staff_wrap.add_child(_staff_area)
 
-	# Chord display
+	# Chord display (right, 60% via stretch_ratio = 6)
 	var name_wrap := HBoxContainer.new()
 	name_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
 	name_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_wrap.size_flags_stretch_ratio = 6.0
 	name_wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	chord_body.add_child(name_wrap)
+	top_section.add_child(name_wrap)
 	var name_panel := PanelContainer.new()
-	name_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	name_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_panel.custom_minimum_size = Vector2(560, 0)
 	var name_panel_style := StyleBoxFlat.new()
 	name_panel_style.bg_color = Color(0.10, 0.16, 0.26, 0.96)
