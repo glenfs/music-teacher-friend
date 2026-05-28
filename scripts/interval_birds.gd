@@ -195,9 +195,13 @@ const SIGHT_CLEF_ANCHOR_FACTOR_TREBLE := 1.02
 const SIGHT_CLEF_ANCHOR_FACTOR_BASS := 1.62
 const SIGHT_CLEF_EXTRA_RAISE_TREBLE := -10.0
 const SIGHT_CLEF_EXTRA_RAISE_BASS := 27.0
+const SIGHT_TREBLE_CLEF_RAISE_SPACES := 1.0
+const SIGHT_NOTE_FLOW_CLEF_EXTRA_RAISE_SPACES := 1.0
+const NOTE_CHASE_TREBLE_CLEF_LOWER_SPACES := 0.5
 const SIGHT_ACCIDENTAL_X_OFFSET := 18.0
 const GRAND_STAFF_ACCIDENTAL_X_OFFSET := 16.0
 const SIGHT_ACCIDENTAL_RAISE_Y := 3.0
+const SIGHT_KEY_SIGNATURE_LOWER_Y := 3.0
 const SIGHT_GRAND_STAFF_REPLAY_DURATION := 1.35
 const SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS := 0.28
 const SIGHT_GRAND_STAFF_REPLAY_VERTICAL_GAP := 14.0
@@ -729,6 +733,7 @@ var _home_mode_label: Label
 var _home_mode_buttons_row: Control
 var _home_q_row: HBoxContainer
 var _home_settings_button: Button
+var _home_edit_profile_button: Button
 var _home_start_button: Button
 var _home_start_action_row: HBoxContainer
 var _home_footer_bar: PanelContainer
@@ -743,7 +748,7 @@ var _ear_settings_back_button: Button
 var _ear_settings_more_panel: VBoxContainer
 var _settings_exit_button: Button
 var _ear_choice_count_select: OptionButton
-var _ear_theme_select: OptionButton
+# _ear_theme_select removed — theme picker UI deleted, app uses one fixed palette.
 var _ear_settings_header_label: Label
 var _sight_settings_header_label: Label
 var _ear_choice_label: Label
@@ -1533,7 +1538,7 @@ var _ear_choice_count := 6
 var _ear_question_count := 10
 var _sight_question_count := 10
 var _suppress_round_count_save := false
-var _ui_theme_id := FIXED_MENU_THEME_ID
+# _ui_theme_id removed — theme picker deleted, palette is hard-coded to FIXED_MENU_THEME_ID.
 var _ear_settings_screen_active := false
 var _qa_enabled := false
 var _qa_runner: Node = null
@@ -1660,7 +1665,8 @@ func _ready() -> void:
 	_progress_store = ProgressStoreScript.new()
 	_session_controller = SessionControllerScript.new()
 	_sight_renderer = SightRendererScript.new()
-	_teacher_store = TeacherStoreScript.new()
+	if IS_TEACHER_EDITION:
+		_teacher_store = TeacherStoreScript.new()
 	_progression_review_queue = ReviewQueueScript.new()
 	_scale_review_queue = ReviewQueueScript.new()
 	_cadence_review_queue = ReviewQueueScript.new()
@@ -2448,6 +2454,7 @@ func _sight_renderer_config() -> Dictionary:
 		"sight_chord_note_center_offset_y": SIGHT_CHORD_NOTE_CENTER_OFFSET_Y,
 		"sight_accidental_x_offset": SIGHT_ACCIDENTAL_X_OFFSET,
 		"sight_accidental_raise_y": SIGHT_ACCIDENTAL_RAISE_Y,
+		"sight_key_signature_lower_y": SIGHT_KEY_SIGNATURE_LOWER_Y,
 		"grand_staff_second_interval_shift_ratio": GRAND_STAFF_SECOND_INTERVAL_SHIFT_RATIO,
 		"sight_chord_second_interval_shift_ratio": SIGHT_CHORD_SECOND_INTERVAL_SHIFT_RATIO,
 		"grand_staff_accidental_x_offset": GRAND_STAFF_ACCIDENTAL_X_OFFSET,
@@ -3496,9 +3503,6 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	if _ear_choice_count_select != null:
 		_ear_choice_count_select.custom_minimum_size = Vector2(96, 42) if is_tablet else Vector2(80, 34)
 		_ear_choice_count_select.add_theme_font_size_override("font_size", int(roundf((18 if is_tablet else 14) * large_scale)))
-	if _ear_theme_select != null:
-		_ear_theme_select.custom_minimum_size = Vector2(240, 42) if is_tablet else Vector2(180, 34)
-		_ear_theme_select.add_theme_font_size_override("font_size", int(roundf((18 if is_tablet else 14) * large_scale)))
 	if _sight_question_spin != null:
 		_sight_question_spin.custom_minimum_size = Vector2(96, 40) if is_tablet else Vector2(76, 32)
 		_sight_question_spin.add_theme_font_size_override("font_size", int(roundf((18 if is_tablet else 14) * large_scale)))
@@ -4234,6 +4238,7 @@ func _build_ui() -> void:
 		profile_btn.pressed.connect(_on_edit_profile_pressed)
 		_home_footer_row.add_child(profile_btn)
 		_home_material_buttons.append(profile_btn)
+		_home_edit_profile_button = profile_btn
 
 	_home_footer_version_label = Label.new()
 	_home_footer_version_label.text = "Clefira %s" % APP_VERSION_LABEL
@@ -4314,24 +4319,9 @@ func _build_ui() -> void:
 	_ear_settings_more_panel.visible = true
 	_ear_settings_screen.add_child(_ear_settings_more_panel)
 
-	var theme_row := HBoxContainer.new()
-	theme_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	theme_row.add_theme_constant_override("separation", 10)
-	theme_row.visible = false  # Theme selector hidden for MVP release
-	_ear_settings_more_panel.add_child(theme_row)
-
-	var theme_label := Label.new()
-	theme_label.text = "Theme:"
-	theme_row.add_child(theme_label)
-
-	_ear_theme_select = OptionButton.new()
-	_ear_theme_select.custom_minimum_size = Vector2(220, 42)
-	if _home_tokens != null:
-		for theme_id in _home_tokens.theme_ids():
-			_ear_theme_select.add_item(_home_tokens.theme_label(theme_id))
-			_ear_theme_select.set_item_metadata(_ear_theme_select.item_count - 1, theme_id)
-	_ear_theme_select.item_selected.connect(_on_theme_selected)
-	theme_row.add_child(_ear_theme_select)
+	# (Theme picker removed — app uses a single fixed palette so there's
+	#  nothing for the user to switch between. FIXED_MENU_THEME_ID is the
+	#  single source of truth in home_menu_tokens.)
 
 	_ear_settings_header_label = Label.new()
 	_ear_settings_header_label.text = "Ear Training"
@@ -7365,7 +7355,7 @@ func _build_ui_game_panel() -> void:
 	_result_overlay.add_child(result_center)
 
 	_result_box_panel = PanelContainer.new()
-	_result_box_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	_result_box_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_result_box_panel.z_as_relative = false
 	_result_box_panel.z_index = 761
 	result_center.add_child(_result_box_panel)
@@ -9036,8 +9026,8 @@ func _connect_card_hover_feedback(card: Control, btn: Button) -> void:
 		var sb: Variant = card.get_theme_stylebox("panel") if card is PanelContainer else null
 		if sb is StyleBoxFlat:
 			var base_sb := sb as StyleBoxFlat
-			var cached_base_v: Variant = card.get_meta("_hover_base_sb", null)
-			var cached_hover_v: Variant = card.get_meta("_hover_hover_sb", null)
+			var cached_base_v: Variant = card.get_meta("_hover_base_sb") if card.has_meta("_hover_base_sb") else null
+			var cached_hover_v: Variant = card.get_meta("_hover_hover_sb") if card.has_meta("_hover_hover_sb") else null
 			var hover_sb: StyleBoxFlat = null
 			if cached_base_v is StyleBoxFlat and cached_hover_v is StyleBoxFlat and cached_base_v == base_sb:
 				hover_sb = cached_hover_v as StyleBoxFlat
@@ -12410,7 +12400,7 @@ func _on_result_action_primary_pressed() -> void:
 
 func _on_result_action_focus_pressed() -> void:
 	_play_ui_click_sfx()
-	_focus_missed_ids = _compute_missed_ids()
+	_focus_missed_ids = _filter_focus_ids_for_mode(_selected_mode, _compute_missed_ids())
 	if _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_CADENCE] and _question_spin != null:
 		_suppress_round_count_save = true
 		_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
@@ -12483,7 +12473,7 @@ func _compute_confusion_drill_ids(mode: int) -> Array[String]:
 
 func _on_confusion_drill_pressed() -> void:
 	_play_ui_click_sfx()
-	var drill_ids := _compute_confusion_drill_ids(_selected_mode)
+	var drill_ids := _filter_focus_ids_for_mode(_selected_mode, _compute_confusion_drill_ids(_selected_mode))
 	if drill_ids.is_empty():
 		if _status_label != null:
 			_status_label.text = "No confusion data yet — play a round first."
@@ -12576,6 +12566,33 @@ func _compute_missed_ids() -> Array[String]:
 	else:
 		return []
 	return _ensure_progress_store().compute_missed_ids(stats_asked, stats_correct)
+
+
+func _filter_focus_ids_for_mode(mode: int, ids: Array) -> Array[String]:
+	var out: Array[String] = []
+	for id_any in ids:
+		var id := str(id_any).strip_edges()
+		if id.is_empty() or out.has(id):
+			continue
+		var valid := false
+		match mode:
+			MODE_INTERVAL:
+				valid = INTERVAL_DATA.has(id)
+			MODE_CHORD:
+				valid = CHORD_INTERVALS.has(id)
+			MODE_CADENCE:
+				valid = CADENCE_DEFS.has(id)
+			MODE_PROGRESSION:
+				valid = PROGRESSION_DEFS.has(id)
+			MODE_SCALE_MODE:
+				valid = SCALE_MODE_DEFS.has(id)
+			MODE_PITCH_MATCH:
+				valid = true
+			MODE_SIGHT:
+				valid = true
+		if valid:
+			out.append(id)
+	return out
 
 
 func _sight_adaptive_result_text() -> String:
@@ -13371,7 +13388,6 @@ func _load_ear_settings() -> void:
 	_ear_choice_count = 6
 	_ear_question_count = 10
 	_sight_question_count = 10
-	_ui_theme_id = FIXED_MENU_THEME_ID
 	_use_descending_intervals = false
 	_use_harmonic_intervals = false
 	_ear_tempo = 90
@@ -13389,13 +13405,13 @@ func _load_ear_settings() -> void:
 	if not FileAccess.file_exists(EAR_SETTINGS_PATH):
 		_rhythm_flow_ensure_saved_maps_slots()
 		if _home_tokens != null:
-			_home_tokens.set_theme(_ui_theme_id)
+			_home_tokens.set_theme(FIXED_MENU_THEME_ID)
 		_update_first_run_assessment_pending()
 		return
 	var f := FileAccess.open(EAR_SETTINGS_PATH, FileAccess.READ)
 	if f == null:
 		if _home_tokens != null:
-			_home_tokens.set_theme(_ui_theme_id)
+			_home_tokens.set_theme(FIXED_MENU_THEME_ID)
 		_update_first_run_assessment_pending()
 		return
 	var txt := f.get_as_text()
@@ -13411,8 +13427,7 @@ func _load_ear_settings() -> void:
 		_ear_question_count = clampi(int(d["ear_question_count"]), 1, 100)
 	if d.has("sight_question_count"):
 		_sight_question_count = clampi(int(d["sight_question_count"]), 1, 100)
-	# Keep one fixed menu palette; ignore persisted theme_id.
-	_ui_theme_id = FIXED_MENU_THEME_ID
+	# (Theme picker removed — palette is hard-coded to FIXED_MENU_THEME_ID.)
 	if d.has("use_descending_intervals"):
 		_use_descending_intervals = bool(d["use_descending_intervals"])
 	if d.has("use_harmonic_intervals"):
@@ -13585,8 +13600,7 @@ func _load_ear_settings() -> void:
 	_rhythm_flow_ensure_saved_maps_slots()
 	_sync_home_state_from_runtime()
 	if _home_tokens != null:
-		_home_tokens.set_theme(_ui_theme_id)
-		_ui_theme_id = _home_tokens.theme_id()
+		_home_tokens.set_theme(FIXED_MENU_THEME_ID)
 	_update_first_run_assessment_pending()
 
 
@@ -13596,7 +13610,6 @@ func _save_ear_settings() -> void:
 		"choice_count": _ear_choice_count,
 		"ear_question_count": _ear_question_count,
 		"sight_question_count": _sight_question_count,
-		"theme_id": _ui_theme_id,
 		"use_descending_intervals": _use_descending_intervals,
 		"use_harmonic_intervals": _use_harmonic_intervals,
 		"ear_tempo": _ear_tempo,
@@ -14464,12 +14477,6 @@ func _rhythm_flow_slot_is_filled(slot_idx: int) -> bool:
 
 func _rhythm_flow_now_stamp() -> String:
 	return RhythmFlowLibraryScript.now_stamp()
-	if _ear_theme_select != null:
-		for i in range(_ear_theme_select.item_count):
-			var v := str(_ear_theme_select.get_item_metadata(i))
-			if v == _ui_theme_id:
-				_ear_theme_select.select(i)
-				break
 
 
 func _refresh_ear_settings_subscreen() -> void:
@@ -14572,6 +14579,8 @@ func _on_mode_selected() -> void:
 		# hides the gear icon on mode-setup screens too, which Codex/UX review
 		# flagged as competing with the in-mode controls.
 		_sight_settings_button.visible = show_overview and not _first_run_assessment_pending
+	if _home_edit_profile_button != null:
+		_home_edit_profile_button.visible = show_overview and not _first_run_assessment_pending and not IS_TEACHER_EDITION
 	_apply_top_hud_nav_button_skin()
 	_refresh_home_badges_card()
 	if _home_sight_mode_row != null:
@@ -14606,7 +14615,7 @@ func _on_mode_selected() -> void:
 	if _mic_toggle_button != null:
 		_mic_toggle_button.visible = show_detail and _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
 	if _home_footer_bar != null:
-		var show_footer_actions := (_home_settings_button != null and _home_settings_button.visible) or (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible)
+		var show_footer_actions := (_home_settings_button != null and _home_settings_button.visible) or (_home_edit_profile_button != null and _home_edit_profile_button.visible) or (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible)
 		if _home_footer_row != null:
 			_home_footer_row.visible = show_footer_actions
 		var footer_active := show_home_main and not show_settings and (show_footer_actions or (_home_footer_version_label != null))
@@ -16133,23 +16142,7 @@ func _on_sight_question_count_changed(value: float) -> void:
 		_home_info_label.text = "Sight round: %d questions." % _sight_question_count
 
 
-func _on_theme_selected(index: int) -> void:
-	if _ear_theme_select == null:
-		return
-	if index < 0:
-		return
-	_ui_theme_id = FIXED_MENU_THEME_ID
-	if _home_tokens != null:
-		_home_tokens.set_theme(_ui_theme_id)
-		_ui_theme_id = _home_tokens.theme_id()
-	_invalidate_button_palette_cache()
-	_apply_pro_style()
-	_style_home_footer_bar()
-	_style_home_footer_buttons()
-	_save_ear_settings()
-	_refresh_ear_settings_ui()
-	if _home_info_label != null and _home_info_label.text.begins_with("Theme:"):
-		_home_info_label.text = ""
+# _on_theme_selected removed — no theme picker means no handler.
 
 
 func _on_teacher_open_pressed() -> void:
@@ -16157,6 +16150,8 @@ func _on_teacher_open_pressed() -> void:
 
 
 func _ensure_teacher_store() -> TeacherStore:
+	if not IS_TEACHER_EDITION:
+		return null
 	if _teacher_store == null:
 		_teacher_store = TeacherStoreScript.new()
 	return _teacher_store
@@ -19079,6 +19074,14 @@ func _show_game() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _startup_boot_blocking_input():
 		return
+	if _result_overlay != null and _result_overlay.visible:
+		if (event is InputEventKey or event is InputEventJoypadButton) and event.is_action_pressed("ui_cancel"):
+			_on_result_action_secondary_pressed()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey or event is InputEventJoypadButton:
+			get_viewport().set_input_as_handled()
+		return
 	var gameplay_input_active := _game_panel != null and _game_panel.visible and _quiz_active
 	if event is InputEventScreenTouch:
 		var st_any := event as InputEventScreenTouch
@@ -20794,11 +20797,15 @@ func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 			# Grand staff: smaller treble clef to fit the reduced line gap
 			size_factor = 1.02
 			effective_anchor_x += clampf(gap * 0.55, 8.0, 14.0) + GRAND_STAFF_CLEF_RIGHT_NUDGE + GRAND_STAFF_TREBLE_CLEF_EXTRA_RIGHT
-			clef_y = top_y - (gap * 1.10) - 14.0 + (gap * GRAND_STAFF_CLEF_DOWN_SPACES)
+			clef_y = top_y - (gap * 1.10) - 14.0 + (gap * GRAND_STAFF_CLEF_DOWN_SPACES) - (gap * SIGHT_TREBLE_CLEF_RAISE_SPACES)
 		elif _selected_clef == "Bass":
 			clef_y = top_y - (gap * SIGHT_CLEF_ANCHOR_FACTOR_BASS) - SIGHT_CLEF_EXTRA_RAISE_BASS
 		else:
-			clef_y = top_y - (gap * SIGHT_CLEF_ANCHOR_FACTOR_TREBLE) - SIGHT_CLEF_EXTRA_RAISE_TREBLE
+			clef_y = top_y - (gap * SIGHT_CLEF_ANCHOR_FACTOR_TREBLE) - SIGHT_CLEF_EXTRA_RAISE_TREBLE - (gap * SIGHT_TREBLE_CLEF_RAISE_SPACES)
+		if _sight_mode == "Continuous":
+			clef_y -= gap * SIGHT_NOTE_FLOW_CLEF_EXTRA_RAISE_SPACES
+	elif _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble":
+		clef_y += gap * NOTE_CHASE_TREBLE_CLEF_LOWER_SPACES
 	var font_sz := int(round(clampf(span * size_factor, 60.0, 172.0)))
 	_staff_clef_label.add_theme_font_size_override("font_size", font_sz)
 	_staff_clef_label.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
@@ -20818,8 +20825,8 @@ func _key_sig_letter_steps() -> Array:
 	return _ensure_sight_renderer().key_sig_letter_steps(_sight_key_signature)
 
 
-func _key_signature_step_for_letter(letter: String, clef_name: String) -> int:
-	return _ensure_sight_renderer().key_signature_step_for_letter(letter, clef_name)
+func _key_signature_step_for_letter(letter: String, clef_name: String, is_sharp: bool = true) -> int:
+	return _ensure_sight_renderer().key_signature_step_for_letter(letter, clef_name, is_sharp)
 func _layout_staff_key_signature() -> void:
 	_ensure_sight_renderer().layout_key_signature_labels(
 		_staff_key_sig_labels,
@@ -20835,7 +20842,8 @@ func _layout_staff_key_signature() -> void:
 		_active_staff_step_y(),
 		_active_staff_line_gap_y(),
 		Callable(self, "_staff_center_y_for_step"),
-		Callable(self, "_key_signature_step_for_letter")
+		Callable(self, "_key_signature_step_for_letter"),
+		SIGHT_KEY_SIGNATURE_LOWER_Y
 	)
 
 
@@ -21074,7 +21082,8 @@ func _generate_round() -> void:
 	if _selected_mode == MODE_INTERVAL:
 		if _active_intervals.is_empty():
 			_active_intervals = _build_interval_pool_for_settings()
-		var _ask_pool: Array[String] = _focus_missed_ids if not _focus_missed_ids.is_empty() else _active_intervals
+		var focused_intervals := _filter_focus_ids_for_mode(MODE_INTERVAL, _focus_missed_ids)
+		var _ask_pool: Array[String] = focused_intervals if not focused_intervals.is_empty() else _active_intervals
 		# First question: pick the most recognizable interval for an immediate win
 		# (only in normal mode — in focus mode, every interval needs practice)
 		if _question_index == 1 and _focus_missed_ids.is_empty():
@@ -21110,7 +21119,8 @@ func _generate_round() -> void:
 	elif _selected_mode == MODE_CHORD:
 		if _current_available_chord_types.is_empty():
 			_current_available_chord_types = _get_available_chord_types()
-		var _chord_ask_pool: Array[String] = _focus_missed_ids if not _focus_missed_ids.is_empty() else _current_available_chord_types
+		var focused_chords := _filter_focus_ids_for_mode(MODE_CHORD, _focus_missed_ids)
+		var _chord_ask_pool: Array[String] = focused_chords if not focused_chords.is_empty() else _current_available_chord_types
 		if _chord_ask_pool.is_empty():
 			_chord_ask_pool = _current_available_chord_types
 		# First question: start with the most recognisable chord for an easy opening win
@@ -23546,8 +23556,8 @@ func _compute_home_recommendation() -> Dictionary:
 	var interval_weak: Array[String] = []
 	var chord_weak: Array[String] = []
 	if typeof(item_stats) == TYPE_DICTIONARY:
-		interval_weak = _collect_weak_ids_from_category(item_stats.get("interval", {}))
-		chord_weak = _collect_weak_ids_from_category(item_stats.get("chord", {}))
+		interval_weak = _filter_focus_ids_for_mode(MODE_INTERVAL, _collect_weak_ids_from_category(item_stats.get("interval", {})))
+		chord_weak = _filter_focus_ids_for_mode(MODE_CHORD, _collect_weak_ids_from_category(item_stats.get("chord", {})))
 	if interval_weak.is_empty() and chord_weak.is_empty():
 		# Student is new (or hasn't accumulated per-student stats yet). Fall back
 		# to the device-wide stats so the card still has something to show.
@@ -23583,8 +23593,8 @@ func _compute_home_recommendation_device_wide() -> Dictionary:
 	var stats: Dictionary = _progress_store.get_stats()
 	if stats.is_empty():
 		return {}
-	var interval_weak: Array[String] = _collect_weak_ids_from_device_bucket(stats.get("interval", {}))
-	var chord_weak: Array[String] = _collect_weak_ids_from_device_bucket(stats.get("chord", {}))
+	var interval_weak: Array[String] = _filter_focus_ids_for_mode(MODE_INTERVAL, _collect_weak_ids_from_device_bucket(stats.get("interval", {})))
+	var chord_weak: Array[String] = _filter_focus_ids_for_mode(MODE_CHORD, _collect_weak_ids_from_device_bucket(stats.get("chord", {})))
 	if interval_weak.is_empty() and chord_weak.is_empty():
 		return {}
 	var pick_interval: bool = interval_weak.size() >= chord_weak.size()
@@ -23779,21 +23789,15 @@ func _refresh_home_recommended_card() -> void:
 func _on_home_recommended_start_pressed(mode: int, focus_ids: Array) -> void:
 	# Pre-load the focus filter so the mode's _generate_round restricts its
 	# pool to these weak items. The user still confirms with Let's Play.
-	var ids: Array[String] = []
-	for f in focus_ids:
-		ids.append(str(f))
-	_focus_missed_ids = ids
-	_on_mode_button_pressed(mode)
+	_focus_missed_ids = _filter_focus_ids_for_mode(mode, focus_ids)
+	_open_recommended_practice_mode(mode)
 
 
 # SS6 — Quick Focus Drill: like _on_home_recommended_start_pressed but
 # additionally clamps the question count to FOCUS_MISSES_QUESTION_COUNT (5)
 # for a snappier targeted session.
 func _on_home_focus_drill_start_pressed(mode: int, focus_ids: Array) -> void:
-	var ids: Array[String] = []
-	for f in focus_ids:
-		ids.append(str(f))
-	_focus_missed_ids = ids
+	_focus_missed_ids = _filter_focus_ids_for_mode(mode, focus_ids)
 	# Set the per-mode question spin to the focus count. _question_spin covers
 	# interval/chord; _sight_question_spin covers sight. We update both so the
 	# user's normal preferences are preserved when they leave focus mode.
@@ -23805,6 +23809,15 @@ func _on_home_focus_drill_start_pressed(mode: int, focus_ids: Array) -> void:
 			_suppress_round_count_save = true
 			_sight_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
 			_suppress_round_count_save = false
+	_open_recommended_practice_mode(mode)
+
+
+func _open_recommended_practice_mode(mode: int) -> void:
+	if mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_PROGRESSION, MODE_SCALE_MODE, MODE_CADENCE]:
+		_on_mode_button_pressed(MODE_INTERVAL)
+		if mode != MODE_INTERVAL:
+			_on_ear_mode_button_pressed(mode)
+		return
 	_on_mode_button_pressed(mode)
 
 
@@ -25220,6 +25233,12 @@ func _build_sight_big_piano() -> void:
 		# text sits low on the key surface.
 		_bias_button_text_to_bottom(btn)
 
+	for pitch in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
+		if _ce_pitch_is_black(pitch):
+			var black_btn := _sight_big_piano_keys.get(pitch, null) as Button
+			if black_btn != null:
+				black_btn.move_to_front()
+
 	_layout_sight_big_piano()
 
 	# Auto-relayout on viewport size changes (window resize on desktop, rotation on tablet/phone).
@@ -25294,6 +25313,7 @@ func _layout_sight_big_piano() -> void:
 			var bx: float = float(white_positions[prev_white]) + white_w - black_w * 0.5
 			btn.position = Vector2(bx, 0)
 			btn.size = Vector2(black_w, black_h)
+			btn.move_to_front()
 
 	# Scale the white-key letter font down on narrow keys so text fits
 	# (clamped 10-16pt). Then reapply persistent label styling so the deep
@@ -25738,7 +25758,7 @@ func _on_build_chord_quiz_closed() -> void:
 # silently in Student Edition (no teacher_store) or when no student
 # is selected — local persistence still records the round under the
 # device-wide chord_quiz_history fallback.
-func _on_chord_quiz_completed(score: int, total: int) -> void:
+func _on_chord_quiz_completed(score: int, total: int, report: Dictionary = {}) -> void:
 	var pct: int = int(round(float(score) / float(maxi(1, total)) * 100.0))
 	var entry: Dictionary = {
 		"date": Time.get_datetime_string_from_system(true).substr(0, 10),
@@ -25747,6 +25767,8 @@ func _on_chord_quiz_completed(score: int, total: int) -> void:
 		"percent": pct,
 		"timestamp": Time.get_unix_time_from_system(),
 	}
+	for k in report.keys():
+		entry[k] = report[k]
 	# Append to device-wide history (works in Student + Teacher Edition).
 	var history_v: Variant = _lifetime_stats.get("chord_quiz_history", null)
 	var history: Array = []

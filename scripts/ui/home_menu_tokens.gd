@@ -167,19 +167,15 @@ func profile_for_viewport(vp: Vector2) -> Dictionary:
 		return LAYOUTS["small_phone"]
 	return LAYOUTS["large_phone"]
 
-func theme_ids() -> Array[String]:
-	return [FIXED_THEME_ID]
-
+# Theme picker removed — the app uses a single fixed palette. set_theme is
+# kept as a no-op so existing callers don't NPE; theme_id is kept for any
+# legacy debug logging that might reference it. theme_ids / theme_label
+# were only used by the (now-deleted) picker UI.
 func set_theme(_theme_id: String) -> void:
-	# Keep a single stable palette across menu/config screens.
 	_theme_id = FIXED_THEME_ID
 
 func theme_id() -> String:
 	return _theme_id
-
-func theme_label(_theme_id: String) -> String:
-	var d: Dictionary = THEMES.get(FIXED_THEME_ID, THEMES["azure_cascade"])
-	return str(d.get("label", FIXED_THEME_ID))
 
 func colors(high_contrast: bool) -> Dictionary:
 	if high_contrast:
