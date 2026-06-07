@@ -178,7 +178,7 @@ static func easy_chord_first_pick(chord_ask_pool: Array) -> String:
 
 
 # Pick the next interval question. Tries up to 16 attempts to avoid repeating
-# the previous question's signature.
+# the previous exact signature or one of the recent visible interval ids.
 #
 # Returns { interval_id, root_midi, second_midi, signature } — caller stores
 # the signature and applies the rest to its current-question state.
@@ -190,11 +190,20 @@ static func pick_interval_question(
 	ask_pool: Array[String],
 	weighted_pick: String,
 	last_signature: String,
+	recent_visible_ids: Array,
 	q_ratio: float,
 	interval_data: Dictionary,
 	interval_id_for_semitones_fn: Callable,
 	rng: RandomNumberGenerator
 ) -> Dictionary:
+	var valid_pool: Array[String] = []
+	for id_any in ask_pool:
+		var id := str(id_any)
+		if interval_data.has(id) and not valid_pool.has(id):
+			valid_pool.append(id)
+	if valid_pool.is_empty():
+		for id_any in interval_data.keys():
+			valid_pool.append(str(id_any))
 	var range_v := interval_root_range(q_ratio)
 	var root_min: int = range_v.x
 	var root_max: int = range_v.y
@@ -203,10 +212,10 @@ static func pick_interval_question(
 	var second_midi := 60
 	var sig := ""
 	for attempt in range(16):
-		if weighted_pick != "" and attempt == 0:
+		if weighted_pick != "" and interval_data.has(weighted_pick) and attempt == 0:
 			picked_id = weighted_pick
 		else:
-			picked_id = ask_pool[rng.randi_range(0, ask_pool.size() - 1)]
+			picked_id = valid_pool[rng.randi_range(0, valid_pool.size() - 1)]
 		var semitone_options: Array = interval_data[picked_id]["semitones"]
 		var semitones: int = int(semitone_options[rng.randi_range(0, semitone_options.size() - 1)])
 		root_midi = rng.randi_range(root_min, root_max)
@@ -214,7 +223,8 @@ static func pick_interval_question(
 		# Re-derive id from actual semitones (interval ids can repeat octaves)
 		picked_id = str(interval_id_for_semitones_fn.call(second_midi - root_midi))
 		sig = "%s:%d:%d" % [picked_id, root_midi, second_midi]
-		if sig != last_signature or attempt == 15:
+		var visible_repeat := recent_visible_ids.has(picked_id)
+		if (sig != last_signature and not visible_repeat) or attempt == 15:
 			break
 	return {
 		"interval_id": picked_id,
@@ -225,29 +235,38 @@ static func pick_interval_question(
 
 
 # Pick the next chord question. Tries up to 16 attempts to avoid repeating
-# the previous question's signature. Returns { quality, root_midi, inversion,
-# notes, signature }. Inversion is only applied when allowed AND the
+# the previous exact signature or one of the recent visible chord qualities.
+# Returns { quality, root_midi, inversion, notes, signature }. Inversion is only applied when allowed AND the
 # inversion toggle is on; allow_inversions itself is the caller's
 # precomputed flag (true when the user has any non-triads selected).
 static func pick_chord_question(
 	chord_ask_pool: Array[String],
 	weighted_pick: String,
 	last_signature: String,
+	recent_visible_ids: Array,
 	allow_inversions: bool,
 	inversion_toggle_on: bool,
 	chord_intervals: Dictionary,
 	rng: RandomNumberGenerator
 ) -> Dictionary:
+	var valid_pool: Array[String] = []
+	for quality_any in chord_ask_pool:
+		var candidate_quality := str(quality_any)
+		if chord_intervals.has(candidate_quality) and not valid_pool.has(candidate_quality):
+			valid_pool.append(candidate_quality)
+	if valid_pool.is_empty():
+		for quality_any in chord_intervals.keys():
+			valid_pool.append(str(quality_any))
 	var quality := ""
 	var root_midi := 60
 	var inversion := 0
 	var notes: Array[int] = []
 	var sig := ""
 	for attempt in range(16):
-		if attempt == 0 and not weighted_pick.is_empty():
+		if attempt == 0 and not weighted_pick.is_empty() and chord_intervals.has(weighted_pick):
 			quality = weighted_pick
 		else:
-			quality = chord_ask_pool[rng.randi_range(0, chord_ask_pool.size() - 1)]
+			quality = valid_pool[rng.randi_range(0, valid_pool.size() - 1)]
 		root_midi = rng.randi_range(50, 60)
 		inversion = 0
 		if allow_inversions and inversion_toggle_on:
@@ -256,7 +275,8 @@ static func pick_chord_question(
 				inversion = rng.randi_range(0, max_inversion)
 		notes = chord_notes(root_midi, quality, inversion, chord_intervals)
 		sig = "%s:%d:%d" % [quality, root_midi, inversion]
-		if sig != last_signature or attempt == 15:
+		var visible_repeat := recent_visible_ids.has(quality)
+		if (sig != last_signature and not visible_repeat) or attempt == 15:
 			break
 	return {
 		"quality": quality,

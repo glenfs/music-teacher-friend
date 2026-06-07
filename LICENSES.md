@@ -53,15 +53,20 @@ Status: draft. Complete all `TBD` entries before public distribution.
   - Notes: Hand-drawn / jazz lead-sheet style. Casual look ideal for jazz and
     lead-sheet exercises. Free for any use including commercial.
 
-## Audio — Piano samples (BLOCKER — fill before ship)
+## Audio — Piano samples
 
-- `assets/audio/piano/piano/1.mp3` … `88.mp3` (numbered 88-key sample bank, 1 = A0)
-  - Source: `TBD — supply origin (Pianobook? UI Sounds? Salamander? own recording?)`
-  - License: `TBD`
+- `assets/audio/piano/piano/1.mp3` … `88.mp3` (numbered 88-key sample bank, 1 = A0 / MIDI 21, 88 = C8 / MIDI 108)
+  - Source: Salamander Grand Piano V3 by Alexander Holm
+  - Project page: https://archive.org/details/SalamanderGrandPianoV3 (Archive.org mirror)
+  - Original author site: https://sfzinstruments.github.io/pianos/salamander
+  - Instrument: Yamaha C5 Concert Grand
+  - License: Creative Commons Attribution 3.0 (CC-BY 3.0) — https://creativecommons.org/licenses/by/3.0/
+  - Attribution requirement (must appear in app + store page): "Salamander Grand Piano by Alexander Holm, licensed under CC-BY 3.0"
+  - Notes: Industry-standard free piano library used by Linux MuseScore, Carla, and many indie music apps. Project ships one selected velocity layer per note (downloaded + converted via `scripts/tools/fetch_salamander.ps1`). The full library is 16 velocity layers per note (~700 MB compressed); subset shipped is ~30-80 MB compressed.
+  - Modifications: Salamander V3 samples every minor third (A/C/D#/F# per octave) rather than every chromatic note. To produce a full 88-key set, samples were (1) filtered to a single velocity layer (v9 - mezzo-forte), (2) pitch-shifted by +/-1 semitone via ffmpeg's asetrate filter to cover chromatic notes between sampled pitches, (3) re-encoded to 160 kbps MP3 to match the project's existing numbered-file loader convention. The CC-BY 3.0 license permits these modifications provided attribution is retained.
 
-- `assets/audio/piano/sampled/*.ogg` (fallback / sampled bank, octave overrides)
-  - Source: `TBD`
-  - License: `TBD`
+- `assets/audio/piano/sampled/*.ogg` (fallback / sampled bank, octave overrides) — DEPRECATED
+  - Status: superseded by Salamander Grand Piano. Remove this directory before ship if no longer referenced.
 
 ## Audio — SFX (mixed: freesound.org + own + TBD)
 
@@ -111,6 +116,18 @@ Origin not yet identified — likely free packs or AI tools:
 
 - `assets/icons/dumbbell.svg`, `ear.svg`, `flame.svg`, `graduation-cap.svg`, `piano.svg`, `scroll-text.svg`
   - These filenames also exist in Lucide. `Verify` whether copied from Lucide (ISC) or hand-drawn — and mark accordingly.
+
+- `assets/icons/bullseye.svg`
+  - Source: Original artwork drawn for Clefira (concentric-ring bullseye in the
+    Clefira navy/gold palette). License: Original / In-house — owned by the
+    Clefira project. No third-party attribution required.
+
+- `assets/icons/memorize.svg`, `vanish.svg`, `recall.svg`, `correct.svg`,
+  `wrong.svg`, `interval-up.svg`, `interval-down.svg`, `progress.svg`
+  - Source: Original artwork drawn for Clefira (Note Recall + Interval Reading
+    UI icon set, in the Clefira navy/gold/teal/coral palette). Replaces font
+    emoji in those modes. License: Original / In-house — owned by the Clefira
+    project. No third-party attribution required.
 
 ## Branding (Clefira identity — likely in-house or commissioned)
 

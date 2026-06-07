@@ -8,8 +8,12 @@ signal review_weak_pressed
 
 const LMD = preload("res://scripts/learning/learning_module_data.gd")
 const RegistryScript = preload("res://scripts/learning/learning_module_registry.gd")
-const FONT_TITLE := preload("res://assets/fonts/Baloo2-SemiBold.ttf")
-const FONT_BODY := preload("res://assets/fonts/Nunito-Regular.ttf")
+# Unified with the main app's Inter family (2026-05-30) — was Baloo2-SemiBold
+# + Nunito-Regular. The learning module's chunky rounded type clashed with the
+# rest of the app's thinner Inter look; the swap brings everything into one
+# typographic voice without changing the chicken-themed iconography.
+const FONT_TITLE := preload("res://assets/fonts/Inter-Thin.ttf")
+const FONT_BODY := preload("res://assets/fonts/Inter-Light.ttf")
 const CHICKEN_TEXTURE := preload("res://assets/birds/chicken.svg")
 
 const MAP_BG_TOP := Color(0.18, 0.42, 0.28, 1.0)

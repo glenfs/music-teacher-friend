@@ -1,0 +1,21 @@
+{
+  "name": "single_bass_E2",
+  "wav": "D:\\My Projects\\godot projects\\musiced\\poc\\basic_pitch_poc\\chords\\single_bass_E2.wav",
+  "n_windows": 2,
+  "original_length": 35280,
+  "n_times": 137,
+  "n_freq": 88,
+  "frames_per_window": 172,
+  "n_overlap": 30,
+  "min_note_len": 10,
+  "onset_thresh": 0.5,
+  "frame_thresh": 0.45,
+  "note_events": [
+    [
+      1,
+      135,
+      40,
+      0.8391267657279968
+    ]
+  ]
+}

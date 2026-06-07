@@ -78,6 +78,18 @@ static func chord_family_id_from_name(quality_name: String) -> String:
 		return "halfdim"
 	if q.find("dim7") >= 0 or q.find("diminished 7") >= 0:
 		return "dim7"
+	# Upper extensions (11ths/13ths) and altered dominants. Catch these BEFORE the
+	# *9 / add9 checks below so they don't fall through to "major" (which would tell
+	# the student a tense, unresolved dominant is a "bright, settled major triad")
+	# and so "madd9" isn't mistaken for the major "add9".
+	if q.find("dom11") >= 0 or q.find("dom13") >= 0 or q.find("7b5") >= 0 or q.find("7#9") >= 0 or q.find("7b9") >= 0:
+		return "dom7"
+	if q.find("maj7#11") >= 0 or q.find("maj11") >= 0:
+		return "maj7"
+	if q.find("min11") >= 0:
+		return "min7"
+	if q.find("madd9") >= 0:
+		return "minor"
 	if q == "maj9" or q.find("maj9") >= 0:
 		return "maj9"
 	if q == "min9" or q.find("min9") >= 0:

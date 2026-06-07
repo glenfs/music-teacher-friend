@@ -296,6 +296,113 @@ const ENTRIES := {
 		"kind": "scale",
 		"style_profile": {},
 	},
+	# --- Smart Drill Library expansion: rhythmic variants ---
+	"scale_16ths": {
+		"id": "scale_16ths",
+		"name": "Scale — 16th notes",
+		"category": "scale",
+		"skill_tags": ["velocity", "evenness", "finger_strength"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"arpeggio_16ths": {
+		"id": "arpeggio_16ths",
+		"name": "Arpeggio — 16th notes",
+		"category": "arpeggio",
+		"skill_tags": ["velocity", "chord_voicing", "stretching"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"scale_triplets": {
+		"id": "scale_triplets",
+		"name": "Scale — Triplets",
+		"category": "scale",
+		"skill_tags": ["evenness", "velocity", "independence"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"arpeggio_triplets": {
+		"id": "arpeggio_triplets",
+		"name": "Arpeggio — Triplets",
+		"category": "arpeggio",
+		"skill_tags": ["chord_voicing", "evenness", "velocity"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"bass_movement_16ths": {
+		"id": "bass_movement_16ths",
+		"name": "Bass Movement — 16ths (I-IV-V-I)",
+		"category": "scale",
+		"skill_tags": ["hand_independence", "velocity", "evenness"],
+		"min_level": 6, "max_level": 10,
+		"two_hand_friendly": false,
+	},
+	# --- Simple chord exercises ---
+	"chord_diatonic_triads": {
+		"id": "chord_diatonic_triads",
+		"name": "Diatonic Triads (I–vii° → I)",
+		"category": "chord",
+		"skill_tags": ["chord_voicing", "reading"],
+		"min_level": 3, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"chord_progression_classical": {
+		"id": "chord_progression_classical",
+		"name": "I-IV-V-I Cadence",
+		"category": "chord",
+		"skill_tags": ["chord_voicing", "reading"],
+		"min_level": 2, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"chord_progression_pop": {
+		"id": "chord_progression_pop",
+		"name": "I-V-vi-IV Pop Progression",
+		"category": "chord",
+		"skill_tags": ["chord_voicing", "reading"],
+		"min_level": 2, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"chord_diatonic_sevenths": {
+		"id": "chord_diatonic_sevenths",
+		"name": "Diatonic 7ths (Imaj7–viim7♭5)",
+		"category": "chord",
+		"skill_tags": ["chord_voicing", "stretching", "reading"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	# --- Jazz exercises ---
+	"jazz_ii_v_i_major": {
+		"id": "jazz_ii_v_i_major",
+		"name": "Jazz ii-V-I (Major)",
+		"category": "jazz",
+		"skill_tags": ["chord_voicing", "reading"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"jazz_ii_v_i_minor": {
+		"id": "jazz_ii_v_i_minor",
+		"name": "Jazz ii-V-i (Minor, with ♭9)",
+		"category": "jazz",
+		"skill_tags": ["chord_voicing", "reading", "stretching"],
+		"min_level": 6, "max_level": 10,
+		"two_hand_friendly": true,
+	},
+	"jazz_stride_bass": {
+		"id": "jazz_stride_bass",
+		"name": "Stride Bass (I-V-vi-IV)",
+		"category": "jazz",
+		"skill_tags": ["hand_independence", "chord_voicing"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": false,
+	},
+	"jazz_walking_bass": {
+		"id": "jazz_walking_bass",
+		"name": "Walking Bass — Turnaround",
+		"category": "jazz",
+		"skill_tags": ["hand_independence", "reading"],
+		"min_level": 5, "max_level": 10,
+		"two_hand_friendly": false,
+	},
 }
 
 # Display order for the dropdown when no filter is active. Generator entries
@@ -314,6 +421,14 @@ const DEFAULT_ORDER := [
 	"hanon_5_finger_random", "hanon_alternating_random", "hanon_any_random",
 	"czerny_random",
 	"scale_random",
+	# --- Smart Drill Library expansion ---
+	"scale_16ths", "arpeggio_16ths",
+	"scale_triplets", "arpeggio_triplets",
+	"bass_movement_16ths",
+	"chord_diatonic_triads", "chord_progression_classical",
+	"chord_progression_pop", "chord_diatonic_sevenths",
+	"jazz_ii_v_i_major", "jazz_ii_v_i_minor",
+	"jazz_stride_bass", "jazz_walking_bass",
 ]
 
 
@@ -360,7 +475,7 @@ static func entry(id: String) -> Dictionary:
 
 
 static func display_name(id: String) -> String:
-	return str(ENTRIES.get(id, {}).get("name", id))
+	return str(ENTRIES.get(id, {}).get("name", id)).replace("—", "-").replace("–", "-").replace("−", "-")
 
 
 # Returns the catalog entry's mode (template vs generator). Entries without an

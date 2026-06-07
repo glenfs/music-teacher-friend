@@ -1,0 +1,590 @@
+{
+  "summary": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "duration_sec": 11.338
+  },
+  "cases": [
+    {
+      "name": "Debug server health",
+      "tags": [
+        "smoke"
+      ],
+      "started_unix": 1780069895.4050515,
+      "duration_sec": 0.708,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Service responds with build info",
+          "action": "assert",
+          "ok": true,
+          "duration_ms": 703,
+          "observed": false,
+          "expected": [
+            true,
+            false
+          ],
+          "message": ""
+        }
+      ],
+      "screenshots": [],
+      "failure_reason": null
+    },
+    {
+      "name": "Generate scale + play + audio fires",
+      "tags": [
+        "smoke",
+        "drills"
+      ],
+      "started_unix": 1780069896.1126971,
+      "duration_sec": 0.733,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Generate C major scale at level 3",
+          "action": "drill_start",
+          "ok": true,
+          "duration_ms": 264,
+          "observed": {
+            "exercise_id": "scale",
+            "note_count": 16,
+            "seed": 12345,
+            "title": "C Major \u2014 Scale (Level 3)",
+            "total_beats": 8.0
+          },
+          "expected": ">0 notes",
+          "message": ""
+        },
+        {
+          "name": "Press Play",
+          "action": "drill_play",
+          "ok": true,
+          "duration_ms": 7,
+          "observed": {
+            "playing": true
+          },
+          "expected": true,
+          "message": ""
+        },
+        {
+          "name": "Wait for first note to fire",
+          "action": "wait_ms",
+          "ok": true,
+          "duration_ms": 401,
+          "observed": 400,
+          "expected": 400,
+          "message": ""
+        },
+        {
+          "name": "Audio probe contains middle-C",
+          "action": "assert_audio",
+          "ok": true,
+          "duration_ms": 21,
+          "observed": [
+            60,
+            62
+          ],
+          "expected": 60,
+          "message": ""
+        },
+        {
+          "name": "Stop",
+          "action": "drill_stop",
+          "ok": true,
+          "duration_ms": 35,
+          "observed": {
+            "stopped": true
+          },
+          "expected": true,
+          "message": ""
+        }
+      ],
+      "screenshots": [],
+      "failure_reason": null
+    },
+    {
+      "name": "Mode transition matrix",
+      "tags": [
+        "smoke",
+        "modes"
+      ],
+      "started_unix": 1780069896.8453162,
+      "duration_sec": 0.744,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Switch to Interval",
+          "action": "switch_mode",
+          "ok": true,
+          "duration_ms": 186,
+          "observed": {
+            "mode": 0,
+            "name": "Interval"
+          },
+          "expected": "Interval",
+          "message": ""
+        },
+        {
+          "name": "Wait for refresh",
+          "action": "wait_ms",
+          "ok": true,
+          "duration_ms": 201,
+          "observed": 200,
+          "expected": 200,
+          "message": ""
+        },
+        {
+          "name": "Switch to Chord",
+          "action": "switch_mode",
+          "ok": true,
+          "duration_ms": 151,
+          "observed": {
+            "mode": 1,
+            "name": "Chord"
+          },
+          "expected": "Chord",
+          "message": ""
+        },
+        {
+          "name": "Switch to Note Chase",
+          "action": "switch_mode",
+          "ok": true,
+          "duration_ms": 197,
+          "observed": {
+            "mode": 4,
+            "name": "Note Chase"
+          },
+          "expected": "Note Chase",
+          "message": ""
+        }
+      ],
+      "screenshots": [],
+      "failure_reason": null
+    },
+    {
+      "name": "MIDI roundtrip \u2014 perfect-play accuracy",
+      "tags": [
+        "midi"
+      ],
+      "started_unix": 1780069897.5892675,
+      "duration_sec": 8.305,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Open scale exercise",
+          "action": "drill_start",
+          "ok": true,
+          "duration_ms": 20,
+          "observed": {
+            "exercise_id": "scale",
+            "note_count": 16,
+            "seed": 4242,
+            "title": "C Major \u2014 Scale (Level 2)",
+            "total_beats": 8.0
+          },
+          "expected": ">0 notes",
+          "message": ""
+        },
+        {
+          "name": "Start playback",
+          "action": "drill_play",
+          "ok": true,
+          "duration_ms": 27,
+          "observed": {
+            "playing": true
+          },
+          "expected": true,
+          "message": ""
+        },
+        {
+          "name": "Let play loop settle (a few frames)",
+          "action": "wait_ms",
+          "ok": true,
+          "duration_ms": 100,
+          "observed": 100,
+          "expected": 100,
+          "message": ""
+        },
+        {
+          "name": "Verify grading became active",
+          "action": "assert",
+          "ok": true,
+          "duration_ms": 4,
+          "observed": true,
+          "expected": true,
+          "message": ""
+        },
+        {
+          "name": "Tap C4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 13,
+          "observed": {
+            "pitch": 60,
+            "velocity": 96
+          },
+          "expected": 60,
+          "message": ""
+        },
+        {
+          "name": "Tap D4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 15,
+          "observed": {
+            "pitch": 62,
+            "velocity": 96
+          },
+          "expected": 62,
+          "message": ""
+        },
+        {
+          "name": "Tap E4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 17,
+          "observed": {
+            "pitch": 64,
+            "velocity": 96
+          },
+          "expected": 64,
+          "message": ""
+        },
+        {
+          "name": "Tap F4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 27,
+          "observed": {
+            "pitch": 65,
+            "velocity": 96
+          },
+          "expected": 65,
+          "message": ""
+        },
+        {
+          "name": "Tap G4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 6,
+          "observed": {
+            "pitch": 67,
+            "velocity": 96
+          },
+          "expected": 67,
+          "message": ""
+        },
+        {
+          "name": "Tap A4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 26,
+          "observed": {
+            "pitch": 69,
+            "velocity": 96
+          },
+          "expected": 69,
+          "message": ""
+        },
+        {
+          "name": "Tap B4",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 6,
+          "observed": {
+            "pitch": 71,
+            "velocity": 96
+          },
+          "expected": 71,
+          "message": ""
+        },
+        {
+          "name": "Tap C5",
+          "action": "midi_inject",
+          "ok": true,
+          "duration_ms": 20,
+          "observed": {
+            "pitch": 72,
+            "velocity": 96
+          },
+          "expected": 72,
+          "message": ""
+        },
+        {
+          "name": "Let playback finish + scoring",
+          "action": "wait_ms",
+          "ok": true,
+          "duration_ms": 8000,
+          "observed": 8000,
+          "expected": 8000,
+          "message": ""
+        },
+        {
+          "name": "Grading ran (accuracy >= 0)",
+          "action": "assert",
+          "ok": true,
+          "duration_ms": 11,
+          "observed": 0.133333333333333,
+          "expected": 0.0,
+          "message": ""
+        }
+      ],
+      "screenshots": [],
+      "failure_reason": null
+    },
+    {
+      "name": "Smart Drill Library \u2014 16th-note scale",
+      "tags": [
+        "drills",
+        "library"
+      ],
+      "started_unix": 1780069905.894196,
+      "duration_sec": 0.042,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Generate scale_16ths at level 6",
+          "action": "drill_start",
+          "ok": true,
+          "duration_ms": 33,
+          "observed": {
+            "exercise_id": "scale_16ths",
+            "note_count": 31,
+            "seed": 9001,
+            "title": "G Major \u2014 Scale \u2014 16th notes",
+            "total_beats": 8.0
+          },
+          "expected": ">0 notes",
+          "message": ""
+        },
+        {
+          "name": "Screenshot \u2014 16ths render",
+          "action": "screenshot",
+          "ok": true,
+          "duration_ms": 7,
+          "observed": "skipped: headless",
+          "expected": "scale_16ths_G_major",
+          "message": ""
+        }
+      ],
+      "screenshots": [
+        "skipped: headless"
+      ],
+      "failure_reason": null
+    },
+    {
+      "name": "Smart Drill Library \u2014 Jazz ii-V-I",
+      "tags": [
+        "drills",
+        "library",
+        "jazz"
+      ],
+      "started_unix": 1780069905.9359772,
+      "duration_sec": 0.712,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Generate jazz_ii_v_i_major in C",
+          "action": "drill_start",
+          "ok": true,
+          "duration_ms": 33,
+          "observed": {
+            "exercise_id": "jazz_ii_v_i_major",
+            "note_count": 16,
+            "seed": -1,
+            "title": "C Major \u2014 Jazz ii-V-I (Major)",
+            "total_beats": 16.0
+          },
+          "expected": ">0 notes",
+          "message": ""
+        },
+        {
+          "name": "Screenshot \u2014 ii-V-I render",
+          "action": "screenshot",
+          "ok": true,
+          "duration_ms": 6,
+          "observed": "skipped: headless",
+          "expected": "jazz_ii_v_i_C_major",
+          "message": ""
+        },
+        {
+          "name": "Play it to verify chord-block audio fires",
+          "action": "drill_play",
+          "ok": true,
+          "duration_ms": 29,
+          "observed": {
+            "playing": true
+          },
+          "expected": true,
+          "message": ""
+        },
+        {
+          "name": "Wait for first chord",
+          "action": "wait_ms",
+          "ok": true,
+          "duration_ms": 600,
+          "observed": 600,
+          "expected": 600,
+          "message": ""
+        },
+        {
+          "name": "Audio probe contains C (root of resolution)",
+          "action": "assert_audio",
+          "ok": true,
+          "duration_ms": 5,
+          "observed": [
+            60,
+            62,
+            64,
+            65,
+            67,
+            69,
+            71,
+            72,
+            71,
+            69,
+            67,
+            65,
+            64,
+            62,
+            60,
+            62,
+            65,
+            69,
+            72
+          ],
+          "expected": 60,
+          "message": ""
+        },
+        {
+          "name": "Stop",
+          "action": "drill_stop",
+          "ok": true,
+          "duration_ms": 34,
+          "observed": {
+            "stopped": true
+          },
+          "expected": true,
+          "message": ""
+        }
+      ],
+      "screenshots": [
+        "skipped: headless"
+      ],
+      "failure_reason": null
+    },
+    {
+      "name": "Smart Drill Library \u2014 Stride bass (left hand)",
+      "tags": [
+        "drills",
+        "library",
+        "jazz"
+      ],
+      "started_unix": 1780069906.6482897,
+      "duration_sec": 0.036,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Generate stride bass in F",
+          "action": "drill_start",
+          "ok": true,
+          "duration_ms": 23,
+          "observed": {
+            "exercise_id": "jazz_stride_bass",
+            "note_count": 32,
+            "seed": -1,
+            "title": "F Major \u2014 Stride Bass (I-V-vi-IV)",
+            "total_beats": 16.0
+          },
+          "expected": ">0 notes",
+          "message": ""
+        },
+        {
+          "name": "Screenshot \u2014 stride render",
+          "action": "screenshot",
+          "ok": true,
+          "duration_ms": 6,
+          "observed": "skipped: headless",
+          "expected": "stride_bass_F_major",
+          "message": ""
+        }
+      ],
+      "screenshots": [
+        "skipped: headless"
+      ],
+      "failure_reason": null
+    },
+    {
+      "name": "Bass 8vb \u2014 Hanon in low octave",
+      "tags": [
+        "drills",
+        "ottava"
+      ],
+      "started_unix": 1780069906.6846805,
+      "duration_sec": 0.044,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Generate Hanon No. 1 for left hand, dropped octave",
+          "action": "drill_start",
+          "ok": true,
+          "duration_ms": 21,
+          "observed": {
+            "exercise_id": "hanon_1",
+            "note_count": 64,
+            "seed": -1,
+            "title": "Hanon No. 1 \u2014 C Major (Five-finger independence)",
+            "total_beats": 32.0
+          },
+          "expected": ">0 notes",
+          "message": ""
+        },
+        {
+          "name": "Screenshot \u2014 should render with 8vb bracket when notes go below C2",
+          "action": "screenshot",
+          "ok": true,
+          "duration_ms": 21,
+          "observed": "skipped: headless",
+          "expected": "hanon_lh_8vb_check",
+          "message": ""
+        }
+      ],
+      "screenshots": [
+        "skipped: headless"
+      ],
+      "failure_reason": null
+    },
+    {
+      "name": "Settings: choice count defaults sane",
+      "tags": [
+        "settings"
+      ],
+      "started_unix": 1780069906.728566,
+      "duration_sec": 0.014,
+      "ok": true,
+      "steps": [
+        {
+          "name": "Choice count between 2 and 6",
+          "action": "assert",
+          "ok": true,
+          "duration_ms": 5,
+          "observed": 4,
+          "expected": 2.0,
+          "message": ""
+        },
+        {
+          "name": "Choice count at most 6",
+          "action": "assert",
+          "ok": true,
+          "duration_ms": 6,
+          "observed": 4,
+          "expected": 6.0,
+          "message": ""
+        }
+      ],
+      "screenshots": [],
+      "failure_reason": null
+    }
+  ]
+}

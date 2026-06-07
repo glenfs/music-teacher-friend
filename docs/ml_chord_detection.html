@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clefira — Hearing Chords: the ML Note-Detection Approach</title>
+<style>
+  :root{
+    --ink:#1f2933; --muted:#5b6770; --line:#e3e8ef;
+    --bg:#fbfcfe; --card:#ffffff; --accent:#2f7d5b; --accent2:#c9803a;
+    --good:#2f7d5b; --bad:#c0492f; --warn:#b8860b; --chip:#eef4f0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.65 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);}
+  .wrap{max-width:880px;margin:0 auto;padding:32px 22px 80px;}
+  header.hero{background:linear-gradient(135deg,#2f7d5b,#26694c);color:#fff;border-radius:16px;
+       padding:34px 30px;margin-bottom:10px;}
+  header.hero h1{margin:0 0 8px;font-size:30px;line-height:1.2;}
+  header.hero p{margin:0;opacity:.92;font-size:17px;}
+  .tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+       padding:3px 10px;border-radius:999px;font-size:12.5px;margin-top:14px;letter-spacing:.3px}
+  h2{font-size:23px;margin:42px 0 6px;padding-top:8px;border-top:2px solid var(--line);}
+  h2 .n{color:var(--accent2);font-weight:800;margin-right:8px}
+  h3{font-size:18px;margin:24px 0 6px;color:#243b4a}
+  p{margin:10px 0}
+  .lead{font-size:17.5px;color:#33444f}
+  .muted{color:var(--muted)}
+  code{background:#f1f4f8;padding:1px 6px;border-radius:5px;font-size:90%;
+       font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:18px 20px;margin:14px 0;
+        box-shadow:0 1px 2px rgba(20,40,60,.03)}
+  .callout{border-left:4px solid var(--accent);background:#f3f8f5;border-radius:8px;padding:12px 16px;margin:16px 0}
+  .callout.warn{border-left-color:var(--warn);background:#fcf8ec}
+  .callout.key{border-left-color:var(--accent2);background:#fcf4ec}
+  .callout b{color:#243b4a}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--chip);font-weight:700}
+  td.v{font-weight:700}
+  .pick{background:#eaf5ee !important;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+  .pill.yes{background:#e3f1e8;color:var(--good)}
+  .pill.no{background:#f7e7e2;color:var(--bad)}
+  .pill.mid{background:#f6efda;color:var(--warn)}
+  ol.steps{counter-reset:s;list-style:none;padding-left:0;margin:18px 0}
+  ol.steps>li{position:relative;padding:14px 16px 14px 56px;border:1px solid var(--line);
+       border-radius:11px;margin:10px 0;background:#fff}
+  ol.steps>li:before{counter-increment:s;content:counter(s);position:absolute;left:14px;top:14px;
+       width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;
+       display:flex;align-items:center;justify-content:center;font-size:14px}
+  ol.steps b{display:block;margin-bottom:2px}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0;font-size:13.5px}
+  .flow .box{background:#fff;border:1.5px solid var(--accent);border-radius:9px;padding:8px 11px;font-weight:600}
+  .flow .arr{color:var(--accent2);font-weight:800}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 16px;text-align:center}
+  .stat .big{font-size:26px;font-weight:800;color:var(--accent)}
+  .stat .lbl{font-size:13px;color:var(--muted)}
+  .toc{background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 18px;margin:18px 0}
+  .toc a{color:#2a6;text-decoration:none}
+  .toc ol{margin:6px 0;padding-left:20px}
+  footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+  .analogy{font-style:italic;color:#3a5a48}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>Hearing Chords 🎹🐔</h1>
+  <p>How Clefira learned to recognise every note a student plays — not just one.</p>
+  <span class="tag">Plain-language engineering doc · ML note detection</span>
+</header>
+
+<p class="lead">This document explains, in everyday terms, a feature we built: letting a
+student <b>play a whole chord on their piano</b> and have the app check <b>every note</b> they
+played. It covers the problem, the options we weighed, the one we chose, and what it took to
+ship it on both Windows and Android.</p>
+
+<div class="toc">
+  <b>Contents</b>
+  <ol>
+    <li><a href="#problem">The problem</a></li>
+    <li><a href="#primer">A 60-second primer: one note vs. many</a></li>
+    <li><a href="#options">The options we had</a></li>
+    <li><a href="#choice">What we chose — and why</a></li>
+    <li><a href="#onnx">A key sub-decision: ONNX, not TensorFlow</a></li>
+    <li><a href="#deploy">What deploying it involved</a></li>
+    <li><a href="#today">How it works today</a></li>
+    <li><a href="#results">Results</a></li>
+    <li><a href="#gotchas">Surprises &amp; gotchas</a></li>
+    <li><a href="#left">What's left</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</div>
+
+<h2 id="problem"><span class="n">1</span>The problem</h2>
+<p>Clefira can listen through the microphone and tell what note you sing or play. The original
+listener used a classic algorithm called <b>YIN</b>. YIN is excellent at one thing and one
+thing only: hearing a <b>single</b> note at a time.</p>
+
+<p>But a piano is <b>polyphonic</b> — you can press several keys at once. When a student played a
+chord, YIN didn't politely fail. It picked <em>one</em> pitch out of the blur and reported it
+confidently. Worse, it sometimes reported a note that <b>wasn't even played</b> — a "phantom"
+pitch that a chord can create. So:</p>
+
+<div class="callout warn">
+  <b>The bug the user reported:</b> "When a note is shown I play a chord on my piano, it says I'm
+  right — but I may not have played that note at all." A chord was sneaking past as a correct
+  single answer.
+</div>
+
+<p>The root cause isn't a coding mistake — it's a <b>mismatch of tool to task</b>. Asking a
+one-note detector to judge a chord is like asking someone to read out a single word from five
+people talking at once. They'll say <em>a</em> word, but you can't trust it.</p>
+
+<h2 id="primer"><span class="n">2</span>A 60-second primer: one note vs. many</h2>
+<p class="analogy">Think of sound as a stack of pure tones. A single piano note is actually a
+"family" of evenly-spaced tones (the fundamental plus its harmonics). A chord is several of
+those families layered together.</p>
+<ul>
+  <li><b>Monophonic detection</b> (YIN, CREPE): finds the <b>one</b> repeating pattern in the
+  sound. Fast, accurate — for one note. Blind to chords.</li>
+  <li><b>Polyphonic detection</b> (the hard problem): pulls <b>all</b> the simultaneous notes
+  apart. This is what every "play-along piano app" needs, and it's genuinely difficult.</li>
+  <li><b>MIDI</b>: not detection at all — the keyboard sends the exact notes over a cable. Always
+  perfect, but needs a digital keyboard plugged in.</li>
+</ul>
+
+<h2 id="options"><span class="n">3</span>The options we had</h2>
+<p>We looked at how the big commercial apps (Simply Piano, Yousician, flowkey) solve this, then
+mapped our realistic choices:</p>
+
+<table>
+  <tr><th>Option</th><th>What it is</th><th>Effort</th><th>Handles chords?</th><th>Verdict</th></tr>
+  <tr>
+    <td class="v">Keep YIN + refuse chords</td>
+    <td>Detect that the input is polyphonic and say "play one note at a time."</td>
+    <td><span class="pill yes">Low</span></td>
+    <td><span class="pill no">No (rejects them)</span></td>
+    <td>Done as a quick safety guard, but doesn't give the feature.</td>
+  </tr>
+  <tr>
+    <td class="v">Classic DSP polyphony</td>
+    <td>Hand-built signal processing (CQT + harmonic subtraction / NMF).</td>
+    <td><span class="pill mid">Medium</span></td>
+    <td><span class="pill mid">Partly</span></td>
+    <td>Workable but fiddly and less accurate than modern ML.</td>
+  </tr>
+  <tr class="pick">
+    <td class="v">Pre-trained ML model</td>
+    <td>Use an existing neural network (Spotify <b>Basic Pitch</b>) that already does this well.</td>
+    <td><span class="pill mid">Medium</span></td>
+    <td><span class="pill yes">Yes</span></td>
+    <td><b>✅ Chosen.</b> Free, proven, lightweight.</td>
+  </tr>
+  <tr>
+    <td class="v">Train our own ML model</td>
+    <td>Build and train a neural network from scratch on labelled piano data.</td>
+    <td><span class="pill no">Very high</span></td>
+    <td><span class="pill yes">Yes</span></td>
+    <td>Months of work to re-invent something that already exists for free.</td>
+  </tr>
+  <tr>
+    <td class="v">MIDI only</td>
+    <td>Tell users to plug in a digital keyboard; skip detection entirely.</td>
+    <td><span class="pill yes">Low</span></td>
+    <td><span class="pill yes">Perfect</span></td>
+    <td>Kept as the gold-standard path — but not everyone has a MIDI cable.</td>
+  </tr>
+</table>
+
+<div class="callout">
+  <b>What the pros do:</b> Simply Piano's own engineers say "common signal-processing algorithms
+  are not enough" and use <b>deep learning</b> for the microphone. Every one of them <b>also</b>
+  recommends MIDI for perfect accuracy. So our two-track answer — ML for the mic, MIDI for the
+  cable — mirrors the industry.
+</div>
+
+<h2 id="choice"><span class="n">4</span>What we chose — and why</h2>
+<p>We chose to integrate <b>Spotify Basic Pitch</b>, an open-source neural network for turning
+audio into notes.</p>
+<div class="grid2">
+  <div class="card"><b>Why this model</b>
+    <ul style="margin:8px 0 0">
+      <li><b>It's free &amp; commercial-safe</b> — Apache-2.0 licence, including the model itself.</li>
+      <li><b>It's tiny</b> — the model file is just <b>230 KB</b>.</li>
+      <li><b>It's genuinely polyphonic</b> — returns every note, across instruments.</li>
+      <li><b>It's proven</b> — competitive accuracy from a small, fast network.</li>
+    </ul>
+  </div>
+  <div class="card"><b>Why not the others</b>
+    <ul style="margin:8px 0 0">
+      <li>Training our own: huge cost to rebuild what Basic Pitch already gives us.</li>
+      <li>Classic DSP: more brittle, lower accuracy, still a lot of code.</li>
+      <li>MIDI-only: great, but excludes acoustic-piano students with no cable.</li>
+    </ul>
+  </div>
+</div>
+<p>Before committing, we <b>tested it on Clefira's own piano sound</b> (we built test chords from
+the app's actual piano samples). It recovered the notes essentially perfectly — see
+<a href="#results">Results</a>.</p>
+
+<h2 id="onnx"><span class="n">5</span>A key sub-decision: ONNX, not TensorFlow</h2>
+<p>The model can run under different "engines." The default for desktop experiments is
+<b>TensorFlow</b> — but you can't ship TensorFlow inside a game:</p>
+<table>
+  <tr><th></th><th>TensorFlow</th><th>ONNX Runtime <span class="pill yes">chosen</span></th></tr>
+  <tr><td class="v">Size on disk</td><td>~300–500 MB</td><td>~15 MB</td></tr>
+  <tr><td class="v">Runs inside Godot?</td><td><span class="pill no">No plug-in exists</span></td><td><span class="pill yes">Yes</span></td></tr>
+  <tr><td class="v">Speed per chord (desktop)</td><td>~1,800 ms</td><td>~64–120 ms</td></tr>
+  <tr><td class="v">Accuracy</td><td colspan="2">Identical — it's the same trained model, just a different engine running it.</td></tr>
+</table>
+<p>So ONNX gives us the <b>same answers</b>, ~28× faster, in a package small enough to put in an
+app. That's the version we ship on both Windows and Android.</p>
+
+<h2 id="deploy"><span class="n">6</span>What deploying it involved</h2>
+<p>We rolled it out in careful, verifiable stages — each one proven before moving on, so we never
+built on an unproven assumption.</p>
+
+<ol class="steps">
+  <li><b>Prove the idea (Python)</b>
+     Ran Basic Pitch on chords built from Clefira's piano. It found every note — the concept was
+     sound, so it was worth continuing.</li>
+  <li><b>Confirm the shippable engine (ONNX)</b>
+     Re-ran with the lightweight ONNX engine to confirm it stayed accurate <em>and</em> got
+     dramatically faster. This is the version that can actually go in the app.</li>
+  <li><b>Prove it runs in native code</b>
+     Got ONNX Runtime running the model in C++ and confirmed the output matched Python
+     <em>exactly</em> — the foundation everything else sits on.</li>
+  <li><b>Port the "notes from numbers" logic</b>
+     The model outputs raw probabilities; turning those into clean note events is ~200 lines of
+     logic. We re-wrote it in C++ and checked it against the original, note-for-note.</li>
+  <li><b>Wrap it as a Godot add-on</b>
+     Packaged it as a <code>PolyphonyDetector</code> the game can call from one line of script,
+     and verified inside Godot that raw audio in → correct notes out.</li>
+  <li><b>Build for Android</b>
+     Recompiled the <em>same</em> C++ for phones (arm64) against the Android version of ONNX
+     Runtime, producing a ready-to-bundle library.</li>
+  <li><b>Wire it into a lesson</b>
+     Added a <b>"🎤 Play it"</b> button to Sight Reading Chords: the student plays the displayed
+     chord, and the app reports which notes were right, missing, or extra.</li>
+</ol>
+
+<div class="callout key">
+  <b>One codebase, two platforms.</b> The clever part of the final design is that Windows and
+  Android run the <em>exact same</em> C++ — only the engine library underneath differs. Less code
+  to maintain, and no chance of the two platforms drifting apart.
+</div>
+
+<h2 id="today"><span class="n">7</span>How it works today</h2>
+<p>When a student taps "Play it" and plays a chord, this happens in about a tenth of a second:</p>
+<div class="flow">
+  <span class="box">🎤 Record a few seconds</span><span class="arr">→</span>
+  <span class="box">Tidy the audio</span><span class="arr">→</span>
+  <span class="box">🧠 Basic Pitch (ONNX)</span><span class="arr">→</span>
+  <span class="box">Extract the notes</span><span class="arr">→</span>
+  <span class="box">Remove duplicates</span><span class="arr">→</span>
+  <span class="box">✅ Compare to the chord</span>
+</div>
+<p>The student then sees feedback like <em>"✓ Yes! You played every note,"</em> or
+<em>"Close — missing C♯; extra G."</em> Behind the scenes this is the new
+<code>ChordDetection</code> helper calling the native detector; if the detector isn't available
+on a given build, the button simply doesn't appear and nothing breaks.</p>
+
+<h2 id="results"><span class="n">8</span>Results</h2>
+<p>Measured on chords built from Clefira's own piano samples (single notes, triads, 7th chords,
+wide voicings, close clusters):</p>
+<div class="grid2">
+  <div class="stat"><div class="big">100%</div><div class="lbl">of played notes found (recall)</div></div>
+  <div class="stat"><div class="big">0.99</div><div class="lbl">note-name accuracy (F1)</div></div>
+  <div class="stat"><div class="big">~64 ms</div><div class="lbl">to analyse a chord (desktop, ONNX)</div></div>
+  <div class="stat"><div class="big">230 KB</div><div class="lbl">model size shipped in the app</div></div>
+</div>
+<p class="muted">Crucially, it never invented a phantom note that wasn't played — the exact failure
+the original YIN approach had. Where it occasionally erred, it only added a harmless octave of a
+note that <em>was</em> present, which our duplicate-removal step cleans up.</p>
+
+<h2 id="gotchas"><span class="n">9</span>Surprises &amp; gotchas</h2>
+<ul>
+  <li><b>The model eats raw audio.</b> We expected to feed it a "picture" of the sound (a
+  spectrogram); it turns out that step is built <em>into</em> the model, which made our job
+  simpler.</li>
+  <li><b>A hidden precision trap.</b> One sub-step secretly used 64-bit maths; copying it in 32-bit
+  shifted a note's boundary by a hair. We caught it only because we compared results
+  <em>exactly</em>, not "close enough."</li>
+  <li><b>Windows vs. Android string types.</b> The engine wants file paths in different formats on
+  each OS — a one-line fix, but it broke the first Android build until spotted.</li>
+  <li><b>MIDI remains king.</b> Even after all this, plugging in a digital keyboard is still the
+  most accurate path — exactly what the commercial apps say. The ML mic path is for students
+  <em>without</em> a cable.</li>
+</ul>
+
+<h2 id="left"><span class="n">10</span>What's left</h2>
+<ul>
+  <li><b>On-device check:</b> the Android library is built and bundled, but running it on a real
+  phone/emulator is the final confirmation step.</li>
+  <li><b>Polish:</b> tune the listening window and feedback wording from real-classroom testing.</li>
+  <li><b>Reuse:</b> the same <code>ChordDetection</code> helper can later power Chord Explorer and
+  Practice Drills, not just Sight Reading Chords.</li>
+</ul>
+
+<h2 id="glossary"><span class="n">11</span>Glossary</h2>
+<table>
+  <tr><th>Term</th><th>Plain meaning</th></tr>
+  <tr><td class="v">Monophonic / Polyphonic</td><td>One note at a time / many notes at once.</td></tr>
+  <tr><td class="v">YIN</td><td>The classic one-note detector Clefira used for the mic.</td></tr>
+  <tr><td class="v">Basic Pitch</td><td>Spotify's free, open-source neural network that turns audio into notes — handles chords.</td></tr>
+  <tr><td class="v">ONNX Runtime</td><td>A small, fast engine for running neural networks; small enough to ship in an app.</td></tr>
+  <tr><td class="v">TensorFlow</td><td>A powerful but very large ML engine — fine for a lab, too big for a game.</td></tr>
+  <tr><td class="v">GDExtension</td><td>A way to add fast native (C++) features to the Godot game engine.</td></tr>
+  <tr><td class="v">MIDI</td><td>A cable/standard where a digital keyboard sends exact note data — no listening needed.</td></tr>
+  <tr><td class="v">Pitch class</td><td>A note's name ignoring octave (every C is pitch class "C").</td></tr>
+</table>
+
+<footer>
+  Clefira engineering note · ML chord detection · Basic Pitch (Apache-2.0) + ONNX Runtime (MIT).
+  Technical build details live in <code>native/polyphony/README.md</code>.
+</footer>
+
+</div>
+</body>
+</html>

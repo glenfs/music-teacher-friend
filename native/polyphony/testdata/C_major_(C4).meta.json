@@ -1,0 +1,33 @@
+{
+  "name": "C_major_(C4)",
+  "wav": "D:\\My Projects\\godot projects\\musiced\\poc\\basic_pitch_poc\\chords\\C_major_(C4).wav",
+  "n_windows": 2,
+  "original_length": 35280,
+  "n_times": 137,
+  "n_freq": 88,
+  "frames_per_window": 172,
+  "n_overlap": 30,
+  "min_note_len": 10,
+  "onset_thresh": 0.5,
+  "frame_thresh": 0.45,
+  "note_events": [
+    [
+      2,
+      135,
+      67,
+      0.7351198196411133
+    ],
+    [
+      1,
+      133,
+      64,
+      0.7476762533187866
+    ],
+    [
+      1,
+      134,
+      60,
+      0.7245475053787231
+    ]
+  ]
+}

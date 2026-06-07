@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Clefira "Vanish" — a sparkle/twinkle as the notes fade. Original artwork. -->
+  <circle cx="32" cy="32" r="29" fill="#0E2237" stroke="#F0C24B" stroke-width="2.5"/>
+  <path d="M31 13 Q33.5 28 47 30.5 Q33.5 33 31 48 Q28.5 33 15 30.5 Q28.5 28 31 13 Z" fill="#F7D67A" stroke="#F0C24B" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M46 16 Q47 21 51 22 Q47 23 46 28 Q45 23 41 22 Q45 21 46 16 Z" fill="#FFF6E0" stroke="#F0C24B" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M19 41 Q19.7 44.3 23 45 Q19.7 45.7 19 49 Q18.3 45.7 15 45 Q18.3 44.3 19 41 Z" fill="#2FB7A8" stroke="#0E2237" stroke-width="0.8" stroke-linejoin="round"/>
+</svg>

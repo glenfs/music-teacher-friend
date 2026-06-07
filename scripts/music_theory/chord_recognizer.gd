@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ChordRecognizer
 
+const _ChordToneSpelling = preload("res://scripts/music_theory/chord_tone_spelling.gd")
+
 const NOTE_NAMES_SHARP := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 const NOTE_NAMES_FLAT := ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
 const SHARP_KEYS := ["C", "G", "D", "A", "E", "B", "F#"]
@@ -120,7 +122,10 @@ static func recognize(
 	pcs.sort()
 
 	if pcs.size() == 1:
-		var single_name: String = _spell_pc(pcs[0], key_root_pc)
+		var single_name: String = _spell_pc(pcs[0], key_root_pc, key_uses_flats)
+		var effective_flavor: int = key_flavor
+		if effective_flavor < 0:
+			effective_flavor = KeyFlavor.NATURAL_MINOR if key_is_minor else KeyFlavor.MAJOR
 		return {
 			"recognized": true,
 			"short_name": single_name,
@@ -132,16 +137,19 @@ static func recognize(
 			"intervals_from_root": [0],
 			"bass_pc": ((bass % 12) + 12) % 12,
 			"bass_letter": single_name,
-			"is_diatonic": _is_pc_in_key(pcs[0], key_root_pc, key_is_minor),
-			"roman": _roman_for_root(pcs[0], "single", key_root_pc, key_is_minor),
+			"is_diatonic": _pc_is_in_key_flavor(pcs[0], key_root_pc, effective_flavor),
+			"roman": _roman_for_root(pcs[0], "single", key_root_pc, key_is_minor, effective_flavor),
 			"played_pcs": pcs.duplicate(),
 		}
 
 	if pcs.size() == 2:
 		var iv := ((pcs[1] - pcs[0]) + 12) % 12
 		var iv_label := _interval_short_name(iv)
-		var note_a: String = _spell_pc(pcs[0], key_root_pc)
-		var note_b: String = _spell_pc(pcs[1], key_root_pc)
+		var note_a: String = _spell_pc(pcs[0], key_root_pc, key_uses_flats)
+		var note_b: String = _spell_pc(pcs[1], key_root_pc, key_uses_flats)
+		var effective_flavor: int = key_flavor
+		if effective_flavor < 0:
+			effective_flavor = KeyFlavor.NATURAL_MINOR if key_is_minor else KeyFlavor.MAJOR
 		return {
 			"recognized": true,
 			"short_name": "%s+%s" % [note_a, note_b],
@@ -152,8 +160,8 @@ static func recognize(
 			"inversion_label": "",
 			"intervals_from_root": [0, iv],
 			"bass_pc": ((bass % 12) + 12) % 12,
-			"bass_letter": _spell_pc(((bass % 12) + 12) % 12, key_root_pc),
-			"is_diatonic": _is_pc_in_key(pcs[0], key_root_pc, key_is_minor) and _is_pc_in_key(pcs[1], key_root_pc, key_is_minor),
+			"bass_letter": _spell_pc(((bass % 12) + 12) % 12, key_root_pc, key_uses_flats),
+			"is_diatonic": _pc_is_in_key_flavor(pcs[0], key_root_pc, effective_flavor) and _pc_is_in_key_flavor(pcs[1], key_root_pc, effective_flavor),
 			"roman": "",
 			"played_pcs": pcs.duplicate(),
 		}
@@ -200,7 +208,7 @@ static func recognize(
 			"inversion_label": "",
 			"intervals_from_root": [],
 			"bass_pc": ((bass % 12) + 12) % 12,
-			"bass_letter": _spell_pc(((bass % 12) + 12) % 12, key_root_pc),
+			"bass_letter": _spell_pc(((bass % 12) + 12) % 12, key_root_pc, key_uses_flats),
 			"is_diatonic": false,
 			"roman": "",
 			"played_pcs": pcs.duplicate(),
@@ -208,9 +216,20 @@ static func recognize(
 
 	candidates.sort_custom(func(a, b): return int(a["score"]) < int(b["score"]))
 	var best: Dictionary = candidates[0]
-	var root_letter := _spell_pc(int(best["root_pc"]), key_root_pc, key_uses_flats)
-	var bass_letter := _spell_pc(((bass % 12) + 12) % 12, key_root_pc, key_uses_flats)
 	var quality_short := str(best["short"])
+	# Spell the root by what engraves the whole chord cleanest (e.g. Bb, not A#,
+	# for a Bb triad) rather than the naive key-based enharmonic — otherwise the
+	# chord tones inherit a bad root and sprout double accidentals on the staff.
+	var _rspell: Dictionary = _ChordToneSpelling.best_root_spelling(
+		int(best["root_pc"]), best["intervals"], quality_short, key_uses_flats)
+	var _root_letter_only: String = str(_rspell.get("letter", "C"))
+	var _root_acc: int = int(_rspell.get("acc", 0))
+	var root_letter := _ChordToneSpelling.format_pitch(_root_letter_only, _root_acc)
+	# Bass spelled as the matching chord tone (correct enharmonic for inversions).
+	var bass_letter := _ChordToneSpelling.spell_chord_bass(
+		_root_letter_only, _root_acc, best["intervals"], quality_short, ((bass % 12) + 12) % 12)
+	if bass_letter == "":
+		bass_letter = _spell_pc(((bass % 12) + 12) % 12, key_root_pc, key_uses_flats)
 	var suffix := _quality_to_suffix(quality_short)
 	var base_name := "%s%s" % [root_letter, suffix]
 	var display_name := base_name
@@ -223,7 +242,7 @@ static func recognize(
 	if effective_flavor < 0:
 		effective_flavor = KeyFlavor.NATURAL_MINOR if key_is_minor else KeyFlavor.MAJOR
 	var diatonic := _chord_is_diatonic_flavor(best["intervals"], int(best["root_pc"]), key_root_pc, effective_flavor)
-	var roman_str := _roman_for_root(int(best["root_pc"]), quality_short, key_root_pc, key_is_minor)
+	var roman_str := _roman_for_root(int(best["root_pc"]), quality_short, key_root_pc, key_is_minor, effective_flavor)
 	return {
 		"recognized": true,
 		"short_name": display_name,
@@ -331,6 +350,22 @@ static func _is_pc_in_key(pc: int, key_root_pc: int, key_is_minor: bool) -> bool
 	return degree in scale
 
 
+static func _pc_is_in_key_flavor(pc: int, key_root_pc: int, flavor: int) -> bool:
+	if key_root_pc < 0:
+		return false
+	var pc_clamped := ((int(pc) % 12) + 12) % 12
+	var degree := ((pc_clamped - int(key_root_pc)) + 12) % 12
+	var scale: Array
+	match flavor:
+		KeyFlavor.HARMONIC_MINOR:
+			scale = HARMONIC_MINOR_SCALE_INTERVALS
+		KeyFlavor.NATURAL_MINOR:
+			scale = MINOR_SCALE_INTERVALS
+		_:
+			scale = MAJOR_SCALE_INTERVALS
+	return degree in scale
+
+
 static func _chord_is_diatonic(intervals: Array, root_pc: int, key_root_pc: int, key_is_minor: bool) -> bool:
 	if key_root_pc < 0:
 		return false
@@ -364,16 +399,30 @@ static func _chord_is_diatonic_flavor(intervals: Array, root_pc: int, key_root_p
 	return true
 
 
-static func _roman_for_root(root_pc: int, quality_short: String, key_root_pc: int, key_is_minor: bool) -> String:
+static func _roman_for_root(root_pc: int, quality_short: String, key_root_pc: int, key_is_minor: bool, key_flavor: int = -1) -> String:
 	if key_root_pc < 0:
 		return ""
 	var pc_clamped := ((int(root_pc) % 12) + 12) % 12
 	var degree := ((pc_clamped - int(key_root_pc)) + 12) % 12
-	var scale := MINOR_SCALE_INTERVALS if key_is_minor else MAJOR_SCALE_INTERVALS
+	var effective_flavor: int = key_flavor
+	if effective_flavor < 0:
+		effective_flavor = KeyFlavor.NATURAL_MINOR if key_is_minor else KeyFlavor.MAJOR
+	var scale: Array
+	var romans: Array
+	match effective_flavor:
+		KeyFlavor.HARMONIC_MINOR:
+			scale = HARMONIC_MINOR_SCALE_INTERVALS
+			romans = ["i", "ii°", "III+", "iv", "V", "VI", "vii°"]
+		KeyFlavor.NATURAL_MINOR:
+			scale = MINOR_SCALE_INTERVALS
+			romans = ROMAN_MINOR
+		_:
+			scale = MAJOR_SCALE_INTERVALS
+			romans = ROMAN_MAJOR
 	var deg_idx := scale.find(degree)
 	if deg_idx < 0:
 		return ""
-	var base: String = ROMAN_MINOR[deg_idx] if key_is_minor else ROMAN_MAJOR[deg_idx]
+	var base: String = str(romans[deg_idx])
 	# Append quality decoration for 7ths/extensions
 	if quality_short.ends_with("7") or quality_short == "maj7" or quality_short == "m7" or quality_short == "dim7" or quality_short == "m7b5":
 		if not base.ends_with("7"):

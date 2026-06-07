@@ -18,6 +18,7 @@ const PatternPrimitivesScript = preload("res://scripts/exercises/patterns/patter
 const SequenceTransformsScript = preload("res://scripts/exercises/patterns/sequence_transforms.gd")
 const ScoreModelScript = preload("res://scripts/score_engine/score_model.gd")
 const ExerciseValidatorScript = preload("res://scripts/exercises/exercise_validator.gd")
+const FingeringRulesScript = preload("res://scripts/exercises/fingering_rules.gd")
 
 # =============================================================================
 # Phase 6 — Hanon-style stochastic sampler.
@@ -95,15 +96,19 @@ static func generate_random(
 		if include_descending:
 			pitches = SequenceTransformsScript.append_reversed(pitches)
 		var notes: Array = SequenceTransformsScript.pitches_to_eighth_notes(pitches)
-		# Per-position fingering: replay the heuristic fingering once per motif length.
+		# Per-position fingering: replay the heuristic fingering once per
+		# motif length. Routed through FingeringRules.apply_fingering_pattern
+		# so the LH mirror is applied centrally — see the contract block
+		# in fingering_rules.gd for the rationale.
 		var fingering: Array = motif_dict.get("fingering", [])
-		if not fingering.is_empty():
-			var fl: int = fingering.size()
-			for i in range(notes.size()):
-				(notes[i] as Dictionary)["fingering"] = int(fingering[i % fl])
+		FingeringRulesScript.apply_fingering_pattern(notes, fingering, hand)
 		notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 0.5)
 		var ex := _wrap_random(notes, key_pc, key_is_minor, level, tempo_bpm, hand, motif_dict.get("constraints_used", {}), generator_id)
-		if ExerciseValidatorScript.ok(ex):
+		# Accept only if the exercise is mechanically valid AND its LH fingering is
+		# clean (no thumb on the lowest note). A random motif can start on a high
+		# finger, which the LH 6−f mirror turns into a thumb on the bottom note;
+		# resample past those rather than ship a wrong LH fingering. (No-op for RH.)
+		if ExerciseValidatorScript.ok(ex) and ExerciseValidatorScript.validate_left_hand_fingering(ex).is_empty():
 			return ex
 	# Exhausted retries: degrade gracefully to canonical Hanon No. 1.
 	var fallback: Dictionary = generate(1, key_pc, key_is_minor, tempo_bpm, hand, false)
@@ -351,12 +356,11 @@ static func generate(
 		pitches = SequenceTransformsScript.append_reversed(pitches)
 
 	var notes: Array = SequenceTransformsScript.pitches_to_eighth_notes(pitches)
-	# Attach Hanon's standard fingering: the 8-note pattern fingering repeats per position.
+	# Hanon's standard fingering, replayed per motif position. Routed
+	# through the central FingeringRules helper so the LH mirror is
+	# applied uniformly with every other composer.
 	var fingering: Array = template.get("fingering", [])
-	if not fingering.is_empty():
-		var pat_len: int = fingering.size()
-		for i in range(notes.size()):
-			(notes[i] as Dictionary)["fingering"] = int(fingering[i % pat_len])
+	FingeringRulesScript.apply_fingering_pattern(notes, fingering, hand)
 	notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 0.5)
 
 	var fifths: int = _key_to_fifths(key_pc, key_is_minor)

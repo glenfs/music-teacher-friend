@@ -49,6 +49,8 @@ const SightSingingPhraseAnalyzerScript = preload("res://scripts/sight_singing/ph
 # (The custom sight_singing_staff.gd Control is no longer used — Sight Singing
 # now reuses StaffRendererScript so the engraving matches Practice Drills.)
 const PitchDetectorScript = preload("res://scripts/audio/pitch_detector.gd")
+const MicListenerScript = preload("res://scripts/audio/mic_listener.gd")
+const ChordDetectionScript = preload("res://scripts/audio/chord_detection.gd")
 const _CLEFIRA_LOGO_PATH := "res://assets/logos/clefira-logo.svg"
 const _CLEFIRA_LOGO_FALLBACK := "res://assets/branding/clefira-splash-mark-transparent-512.png"
 var CLEFIRA_LOGO_TEXTURE: Texture2D = null
@@ -102,6 +104,7 @@ const LearningStepFactoryScript = preload("res://scripts/learning/learning_step_
 const ChordExplorerTheoryScript = preload("res://scripts/music_theory/chord_explorer_theory.gd")
 const PianoKeyStylesScript = preload("res://scripts/ui/piano_key_styles.gd")
 const ChordExplorerPanelScript = preload("res://scripts/ui/chord_explorer_panel.gd")
+const FunctionalEarPanelScript = preload("res://scripts/ui/functional_ear_panel.gd")
 const BuildChordQuizPanelScript = preload("res://scripts/ui/build_chord_quiz_panel.gd")
 const PracticeDrillsPanelScript = preload("res://scripts/ui/practice_drills_panel.gd")
 const EndOfLessonDialogScript = preload("res://scripts/students/end_of_lesson_dialog.gd")
@@ -162,6 +165,14 @@ const LEARNING_MODE_ENABLED := false
 # rhythm scoring; the staff renderer overlays the student's pitch curve.
 # Real mic testing on a desktop with a working microphone is required.
 const SIGHT_SINGING_ENABLED := true
+const MIN_STANDARD_ROUND_QUESTIONS := 5
+# Note Chase — gamified note-name-recognition mode. Disabled 2026-05-30 because
+# it overlaps with Sight Reader Notes pedagogically (pattern-matching vs real
+# reading) and the product direction has shifted toward serious-learner/
+# teacher features. Runtime + assets are left in place so the mode can be
+# re-enabled by flipping this constant; only the home-screen entry point is
+# gated, not the mode itself.
+const NOTE_CHASE_ENABLED := false
 # Edition flag — export-feature driven for the SKU split.
 # Teacher Edition: full app with teacher dashboard, student switching, per-student
 # attribution. Student Edition (export with the "student" feature): solo workflow,
@@ -172,7 +183,7 @@ var EDITION_LABEL: String = "Teacher Edition" if IS_TEACHER_EDITION else "Studen
 # Keeping the old constant name avoids touching every existing gate.
 var TEACHER_MODE_ENABLED: bool = IS_TEACHER_EDITION
 const MVP_LOCKED_HINT_TITLE := "Not in this version yet"
-const MVP_LOCKED_HINT_BODY := "Were polishing this module. Itll be available in a future update."
+const MVP_LOCKED_HINT_BODY := "We're polishing this module. It'll be available in a future update."
 const STAFF_LEFT_X := 56.0
 const STAFF_LINE_WIDTH := 620.0
 const STAFF_TOP_LINE_Y := 104.0
@@ -180,6 +191,10 @@ const STAFF_LINE_GAP_Y := 54.0
 const STAFF_STEP_Y := 27.0
 const STAFF_NOTE_SNAP_X := 223.0
 const SIGHT_NOTE_CENTER_OFFSET_Y := 7.0
+# Replay (mistake-review) only: nudge the draggable note panel down so the
+# notehead graphic lands on the line/space (Placement otherwise skips the
+# center offset above, so its noteheads sit a touch high). Replay-gated only.
+const SIGHT_REPLAY_NOTE_DROP_Y := 6.0
 const SIGHT_CHORD_NOTE_CENTER_OFFSET_Y := 5.0
 const GRAND_STAFF_NOTEHEAD_HEIGHT_RATIO := 0.88
 const GRAND_STAFF_NOTEHEAD_WIDTH_RATIO := 1.14
@@ -327,6 +342,11 @@ const CHORD_TIER_EXTENSIONS := ["Dom9", "Maj9", "Min9", "Add9", "Madd9"]
 const CHORD_TIER_UPPERS := ["Dom11", "Maj11", "Min11", "Dom13", "Maj7#11"]
 const CHORD_TIER_ALTERED := ["7#9", "7b9", "7b5"]
 const CHORD_TIER_AUGSIXTHS := ["It+6", "Fr+6", "Ger+6"]
+# NOTE: Augmented-sixth chords are intentionally NOT offered in ear-training chord
+# mode. Ger+6 [0,4,7,10] is the exact pitch set of Dom7, and Fr+6 [0,4,6,10] equals
+# 7b5 — they are distinguished only by spelling/function, which the ear cannot hear.
+# Offering them by ear would make those questions unanswerable. They remain available
+# for SIGHT reading (SIGHT_CHORD_TIER_IDS tier 8), where the notation disambiguates.
 const CHORD_TIERS := {
 	"Triads": CHORD_TIER_TRIADS,
 	"7th Chords": CHORD_TIER_7THS,
@@ -334,9 +354,8 @@ const CHORD_TIERS := {
 	"Extensions": CHORD_TIER_EXTENSIONS,
 	"11ths & 13ths": CHORD_TIER_UPPERS,
 	"Altered Dominants": CHORD_TIER_ALTERED,
-	"Augmented Sixths": CHORD_TIER_AUGSIXTHS,
 }
-const CHORD_TIER_ORDER := ["Triads", "7th Chords", "6th Chords", "Extensions", "11ths & 13ths", "Altered Dominants", "Augmented Sixths"]
+const CHORD_TIER_ORDER := ["Triads", "7th Chords", "6th Chords", "Extensions", "11ths & 13ths", "Altered Dominants"]
 const CHORD_DEFAULT_SELECTED := ["Major", "Minor"]
 const PROGRESSION_DEFS := {
 	"IVviIV": {"label": "IV-vi-IV", "steps": [3, 5, 3]},
@@ -365,12 +384,17 @@ const SCALE_MODE_DEFS := {
 	"Phrygian": [0, 1, 3, 5, 7, 8, 10, 12]
 }
 const CADENCE_DEFS := {
-	"Perfect":       {"label": "Perfect (V-I)",       "steps": [4, 0]},
-	"Plagal":        {"label": "Plagal (IV-I)",        "steps": [3, 0]},
-	"Half":          {"label": "Half (I-V)",           "steps": [0, 4]},
-	"Deceptive":     {"label": "Deceptive (V-vi)",     "steps": [4, 5]},
-	"Interrupted":   {"label": "Interrupted (V-IV)",   "steps": [4, 3]},
-	"ImperfectAuth": {"label": "Imperfect (VII-I)",    "steps": [6, 0]},
+	"Perfect":       {"label": "Perfect / Authentic (V-I)",     "steps": [4, 0]},
+	"Plagal":        {"label": "Plagal (IV-I)",                 "steps": [3, 0]},
+	"Half":          {"label": "Imperfect / Half (I-V)",        "steps": [0, 4]},
+	"Deceptive":     {"label": "Interrupted / Deceptive (V-vi)", "steps": [4, 5]},
+}
+# Display names (with alternative cadence names) for the setup toggle buttons.
+const CADENCE_BUTTON_NAMES := {
+	"Perfect": "Perfect / Authentic",
+	"Plagal": "Plagal",
+	"Half": "Imperfect / Half",
+	"Deceptive": "Interrupted / Deceptive",
 }
 # C3, D3, F3, G3 — comfortable key rotation for cadence training
 const CADENCE_KEY_ROOTS := [48, 50, 53, 55]
@@ -453,7 +477,16 @@ const BIRD_SPRITESHEET_FRAME_W := 914
 const BIRD_SPRITESHEET_FRAME_H := 838
 const BIRD_SPRITESHEET_COLS := 8
 const UI_FONT_PATH := "res://assets/fonts/Inter-Light.ttf"
-const UI_TITLE_FONT_PATH := "res://assets/fonts/Inter-Medium.ttf"
+# Title font swapped from Inter-Medium → Inter-Thin (2026-05-30) for a
+# noticeably airier feel across all 79 heading/title sites. Inter-Light is
+# the fallback when the Thin file isn't available (e.g. asset-stripped builds).
+const UI_TITLE_FONT_PATH := "res://assets/fonts/Inter-Thin.ttf"
+# Bold weight kept on hand for the home-screen hero mode cards (Sight Reading,
+# Ear Training, Practice Drills, Chord Explorer, Learning, Teacher Dashboard)
+# so the top-level navigation reads with clear hierarchy against the airy
+# Inter-Thin used everywhere else.
+const UI_BOLD_FONT_PATH := "res://assets/fonts/Inter-Medium.ttf"
+const ICON_BULLSEYE_PATH := "res://assets/icons/bullseye.svg"   # Clefira's own bullseye
 const SIGHT_BACK_ICON_PATH := "res://assets/icons/lucide/arrow-big-left.svg"
 const SIGHT_HOME_ICON_PATH := "res://assets/icons/heroicons/home.svg"
 const SIGHT_SETTINGS_ICON_PATH := "res://assets/icons/lucide/settings.svg"
@@ -461,6 +494,15 @@ const SIGHT_FEED_WHEAT_ICON_PATH := "res://assets/icons/lucide/wheat.svg"
 const ICON_EAR_PATH        := "res://assets/icons/ear.svg"
 const ICON_PIANO_PATH      := "res://assets/icons/piano.svg"
 const ICON_SCROLL_PATH     := "res://assets/icons/scroll-text.svg"
+# Custom Clefira icon art for Note Recall + Interval Reading (replaces font emoji).
+const ICON_PROGRESS_PATH      := "res://assets/icons/progress.svg"
+const ICON_MEMORIZE_PATH      := "res://assets/icons/memorize.svg"
+const ICON_VANISH_PATH        := "res://assets/icons/vanish.svg"
+const ICON_RECALL_PATH        := "res://assets/icons/recall.svg"
+const ICON_CORRECT_PATH       := "res://assets/icons/correct.svg"
+const ICON_WRONG_PATH         := "res://assets/icons/wrong.svg"
+const ICON_INTERVAL_UP_PATH   := "res://assets/icons/interval-up.svg"
+const ICON_INTERVAL_DOWN_PATH := "res://assets/icons/interval-down.svg"
 const ICON_FLAME_PATH      := "res://assets/icons/flame.svg"
 const ICON_DUMBBELL_PATH   := "res://assets/icons/dumbbell.svg"
 const ICON_GRADUATION_PATH := "res://assets/icons/graduation-cap.svg"
@@ -573,6 +615,8 @@ var _shield_activate_sfx: AudioStream
 var _note_chase_bgm: AudioStream
 var _ui_font: Font
 var _ui_title_font: Font
+# Bolder weight used for the home-screen hero mode cards. See UI_BOLD_FONT_PATH.
+var _ui_bold_font: Font
 var _sight_back_icon: Texture2D
 var _sight_home_icon: Texture2D
 var _sight_settings_icon: Texture2D
@@ -696,6 +740,7 @@ var _home_sync_status_label: Label = null
 var _settings_diag_version_label: Label = null
 var _settings_diag_sync_label: Label = null
 var _settings_diag_midi_label: Label = null
+var _settings_diag_mic_label: Label = null
 var _settings_diag_support_label: Label = null
 var _home_overview_grid: GridContainer
 var _home_overview_section_grids: Array[GridContainer] = []
@@ -709,6 +754,8 @@ var _learning_lesson_player: Control
 
 # --- Chord Explorer mode (panel owns widgets + recent-notes state internally) ---
 var _chord_explorer_panel: PanelContainer = null  # actually ChordExplorerPanel
+var _functional_ear_panel: PanelContainer = null  # actually FunctionalEarPanel
+var _functional_ear_active: bool = false
 var _build_chord_quiz_panel: PanelContainer = null  # actually BuildChordQuizPanel
 var _chord_explorer_active: bool = false
 
@@ -772,10 +819,39 @@ var _clef_buttons: Dictionary = {}
 var _selected_clef := "Treble"
 var _sight_mode_buttons: Dictionary = {}
 var _sight_note_chase_button: Button
-var _sight_mode := "Notes" # Notes | Chords | Placement
+var _sight_mode := "Notes" # Notes | Chords | Placement | Vanishing
 var _mic_mode_enabled := false
 var _mic_toggle_button: Button = null
+# Sight Notes mic input — separate MicListener so it's independent of the
+# legacy _mic_mode_enabled flag. Built on _sight_answer_overlay as a floating
+# pill; visible only while a Sight Notes round is accepting answers.
+var _sight_notes_mic_listener: RefCounted = null
+var _sight_notes_mic_button: Button = null
+# Reject mic detections until this timestamp — used to ignore speaker bleed
+# from the prompt note plus a short reverb-tail. Without this guard the
+# detector picks up the prompt's own audio and commits an answer with no
+# user input.
+var _sight_notes_mic_resume_at_msec: int = 0
+var _sight_notes_mic_pending_midi: int = -999
+var _sight_notes_mic_pending_count: int = 0
+var _sight_notes_mic_pending_first_msec: int = 0
+# Edge-detect the _is_prompt_playing flag so we know exactly when a prompt
+# finishes; that's when we arm the cooldown timer above.
+var _sight_notes_last_prompt_playing: bool = false
+const _SIGHT_NOTES_MIC_PROMPT_TAIL_MSEC := 500
+const _SIGHT_NOTES_MIC_CONFIRMATIONS := 2
+const _SIGHT_NOTES_MIC_CONFIRM_WINDOW_MSEC := 650
+const _SIGHT_NOTES_MIC_MIN_CONFIRM_AGE_MSEC := 80
 var _pitch_detector: RefCounted = null
+# Sight Chords "Play it" — polyphonic mic check via the native PolyphonyDetector
+# (Basic Pitch / ONNX). The student plays the displayed chord on their piano and
+# we grade every note actually played. Button only appears when the extension is
+# loaded for this platform/build; otherwise chord answers stay button-only.
+var _chord_detection: RefCounted = null
+var _chord_detection_checked := false
+var _sight_chord_mic_button: Button = null
+var _chord_mic_check_active := false
+const _CHORD_MIC_CAPTURE_SEC := 3.0
 var _mic_listening := false
 var _mic_status_label: Label = null
 var _midi_enabled := false
@@ -816,6 +892,7 @@ var _sight_chord_tier_row: HBoxContainer
 var _sight_chord_tier_buttons: Dictionary = {}
 var _sight_accidentals_toggle: CheckButton
 var _sight_accidentals_row: HBoxContainer
+var _sight_adaptive_row: HBoxContainer
 var _read_module_buttons: Dictionary = {}
 var _selected_read_module := 1
 var _sight_range_container: VBoxContainer
@@ -852,6 +929,17 @@ var _sight_selector_last_start_note := ""
 var _sight_selector_last_end_note := ""
 var _sight_range_min_step := 6
 var _sight_range_max_step := 12
+# --- Sight Reading Chords adaptive difficulty (single Treble/Bass clef) ---
+# A per-clef vertical reading window [min_step, max_step] (smaller step = higher
+# pitch) that starts small around the home position and expands BOTH directions
+# as the student proves fluency, contracting on misses. Persisted per student in
+# _lifetime_stats["sight_chord_adaptive"]. Grand Staff stays on a fixed range.
+const SIGHT_CHORD_PROMOTE_STREAK := 4   # consecutive correct → widen the window
+const SIGHT_CHORD_DEMOTE_MISSES := 2    # consecutive misses → narrow the window
+var _sight_chord_adaptive_enabled := true
+var _sight_chord_window_by_clef: Dictionary = {}   # clef -> [min_step, max_step]
+var _sight_chord_adaptive_streak := 0
+var _sight_chord_adaptive_misses := 0
 var _sight_selected_notes_by_clef: Dictionary = {
 	"Treble": PackedStringArray(),
 	"Bass": PackedStringArray()
@@ -1048,6 +1136,7 @@ const RHYTHM_FLOW_SESSION_PLAYING := RhythmFlowLibraryScript.SESSION_PLAYING
 const RHYTHM_FLOW_SESSION_DEMO := RhythmFlowLibraryScript.SESSION_DEMO
 
 var _status_label: Label
+var _sight_status_icon: TextureRect = null
 var _score_label: Label
 var _progress_label: Label
 var _sight_progress_track: PanelContainer
@@ -1159,14 +1248,17 @@ var _result_action_primary_button: Button
 var _result_action_secondary_button: Button
 var _result_action_home_button: Button
 var _result_action_focus_button: Button
+var _result_box_bounce_tween: Tween = null
 # End-of-session "Mark Assignment Done" — shown only when active student has
 # open teacher-assigned drills. Opens a checkbox dialog to mark one or more done.
 var _result_action_assignments_button: Button = null
 # SR6 — celebration container (accuracy badge + focus next chip + confetti).
 # Populated by _build_result_celebration_content() each time result box opens.
 var _result_celebration_container: VBoxContainer = null
+var _streak_toast_panel: PanelContainer = null
 var _streak_toast_label: Label = null
 var _streak_toast_tween: Tween = null
+var _session_unlock_messages: Array[String] = []
 var _quiz_start_time: float = 0.0
 var _hud_left_style_cache: StyleBoxFlat = null
 var _ear_intro_overlay: ColorRect
@@ -1234,6 +1326,7 @@ const SIGHT_BIG_PIANO_MAX_HOLD_SEC := 1.5  # auto-release if no note-off arrives
 var _slow_toggle: CheckBox
 var _end_button: Button
 var _restart_button: Button
+var _sight_mistake_review_next_button: Button = null
 var _game_home_button: Button
 var _control_row: HBoxContainer
 var _interval_center_top_spacer: Control
@@ -1352,6 +1445,7 @@ var _last_interval_signature := ""
 var _last_chord_signature := ""
 var _last_sight_signature := ""
 var _last_pitch_match_signature := ""
+var _recent_visible_question_ids: Dictionary = {}
 var _score := 0
 var _question_index := 0
 var _total_questions := 10
@@ -1365,11 +1459,6 @@ var _progression_broken := false
 var _progression_tempo := 90
 var _ear_tempo := 90
 var _ear_context_tonic_enabled := true
-var _ear_melodic_context_enabled := false
-var _ear_count_in_enabled := false
-# Audible 4-beat metronome before each ear prompt (drives tempo training).
-# Distinct from `_ear_count_in_enabled` (which is the legacy 2-beat high-pitch beep).
-var _ear_metronome_enabled := false
 # Tempo training: best-ever BPM at >=85% accuracy. Keyed "mode_id" for ear modes,
 # and "sight:<key_sig>" for sight reading. Persisted in ear_settings.json.
 var _max_bpm_records: Dictionary = {}
@@ -1386,10 +1475,7 @@ var _ear_sfx_volume_db := -2
 var _ear_tempo_spin: SpinBox = null
 var _ear_prompt_volume_spin: SpinBox = null
 var _ear_sfx_volume_spin: SpinBox = null
-var _ear_count_in_toggle: CheckButton = null
-var _ear_metronome_toggle: CheckButton = null
 var _ear_context_tonic_toggle: CheckButton = null
-var _ear_melodic_context_toggle: CheckButton = null
 var _ear_replay_limit_toggle: CheckButton = null
 var _ear_replay_limit_spin: SpinBox = null
 var _scale_root := "C"
@@ -1441,6 +1527,7 @@ var _sight_singing_next_button: Button = null
 var _sight_singing_octave_strict_toggle: CheckButton = null
 var _sight_singing_play_melody_first_toggle: CheckButton = null
 var _sight_singing_rhythm_setup_row: HBoxContainer = null
+var _sight_singing_beta_notice: Label = null
 var _sight_singing_rhythm_setup_option: OptionButton = null
 var _sight_singing_rhythm_level_option: OptionButton = null
 var _sight_singing_questions_stepper: SpinBox = null
@@ -1451,7 +1538,7 @@ const SIGHT_SINGING_SECONDS_PER_NOTE_LIMIT := SightSingingTheoryScript.SECONDS_P
 const SIGHT_SINGING_REFERENCE_SECONDS_PER_BEAT := SightSingingTheoryScript.REFERENCE_SECONDS_PER_BEAT
 # prev_bird_visible / prev_tutorial_chicken_visible moved into runtime.
 var _cadence_key := "C"
-var _cadence_selected: Array[String] = ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]
+var _cadence_selected: Array[String] = ["Perfect", "Plagal", "Half", "Deceptive"]
 var _cadence_broken := false
 var _cadence_tempo := 90
 var _cadence_play_root: int = 48  # randomized key per question
@@ -1535,12 +1622,41 @@ var _active_sight_assignment_title := ""
 var _sight_assignment_start_pending := false
 var _tutorial_module_recorded := false
 var _ear_choice_count := 6
-var _ear_question_count := 10
-var _sight_question_count := 10
+var _ear_question_count := MIN_STANDARD_ROUND_QUESTIONS
+var _sight_question_count := MIN_STANDARD_ROUND_QUESTIONS
 var _suppress_round_count_save := false
 # _ui_theme_id removed — theme picker deleted, palette is hard-coded to FIXED_MENU_THEME_ID.
 var _ear_settings_screen_active := false
 var _qa_enabled := false
+# Sister flag for the external AI-orchestrated QA pipeline. Set by the
+# --debug-server bootstrap. Keeps the audio probe + a few other QA-only
+# code paths alive even when --qa isn't passed alongside --debug-server.
+var _debug_server_active := false
+# QA audio probe: when _qa_enabled, _play_note / _play_chord_block push
+# {usec, midi, dur} dicts here so the bot can assert audio was actually
+# scheduled (not just that the handler returned). Capped at 256 entries
+# to keep memory bounded during long sessions.
+var _qa_audio_probe: Array = []
+const _QA_AUDIO_PROBE_MAX: int = 256
+
+
+func _qa_audio_probe_push(midi: int, dur: float) -> void:
+	# Probe runs when EITHER the in-engine QA harness is active OR the
+	# external debug server is on. The orchestrator's audio-fire asserts
+	# need the probe filled even when --qa isn't also passed.
+	if not _qa_enabled and not _debug_server_active:
+		return
+	_qa_audio_probe.append({
+		"usec": Time.get_ticks_usec(),
+		"midi": midi,
+		"dur": dur,
+	})
+	if _qa_audio_probe.size() > _QA_AUDIO_PROBE_MAX:
+		_qa_audio_probe.pop_front()
+
+
+func _qa_audio_probe_reset() -> void:
+	_qa_audio_probe.clear()
 var _qa_runner: Node = null
 var _qa_runner_started := false
 var _qa_seed := 0
@@ -1560,6 +1676,9 @@ var _button_style_cache_theme_id: String = ""
 var _last_responsive_vp: Vector2 = Vector2.ZERO
 var _cached_staff_frame_sb: StyleBoxFlat = null
 var _cached_staff_frame_border: Color = Color()
+var _bordered_frame_template: StyleBoxFlat = null   # original bordered frame style (template)
+var _borderless_frame_sb: StyleBoxFlat = null       # soft no-line frame for Recall/Interval
+var _frame_style_key: String = ""
 var _cached_glass_btn_sb: StyleBoxFlat = null
 var _last_setup_theme_active := false
 var _setup_theme_dirty := true
@@ -1579,6 +1698,91 @@ var _practice_mode_enabled: bool = true
 var _home_practice_toggle: Button = null
 # Fix 9: Focus Misses — interval/chord IDs to restrict next session to
 var _focus_missed_ids: Array[String] = []
+var _sight_note_mistake_review_items: Array[Dictionary] = []
+var _sight_mistake_review_active := false
+var _sight_mistake_review_index := 0
+var _sight_mistake_review_phase := ""
+var _sight_mistake_review_return_mode := "Notes"
+# Vanishing Notes difficulty ladder. A 5-step curve gives a gentler ramp than the
+# original 2/4/8 jump (8 notes after just two correct 4-note rounds felt like a
+# cliff). Reveal time scales so notes-per-second stays roughly constant-to-tightening:
+# ~0.8s/note at the bottom down to ~0.46s/note at the top.
+const VANISHING_SEQUENCE_LENGTHS := [2, 3, 4, 6, 8]
+const VANISHING_REVEAL_SECONDS := [1.6, 2.0, 2.4, 3.1, 3.7]
+var _vanishing_note_panels: Array[Panel] = []
+var _vanishing_sequence: Array[Dictionary] = []
+var _vanishing_input_index := 0
+var _vanishing_level := 0
+var _vanishing_level_streak := 0
+# Which note in the revealed row the player is quizzed on (0-based). One random
+# position is asked per drill — the player must still read+hold every note since
+# they don't know in advance which slot will be tested.
+var _vanishing_target_index := 0
+var _vanishing_slot_marker: Panel = null
+var _vanishing_marker_tween: Tween = null
+# #8 Adaptive Memory Pace — manual pace (0=Relaxed,1=Normal,2=Fast) times an
+# auto-adapt multiplier that shrinks the reveal window as the student succeeds and
+# grows it after a miss. #9 Full-recall — recall the whole sequence in order vs one
+# random note.
+var _vanishing_pace_id := 1
+var _vanishing_adapt_mult := 1.0
+var _vanishing_full_recall := false
+var _vanishing_options_row: HBoxContainer = null
+var _vanishing_pace_option: OptionButton = null
+var _vanishing_recall_option: OptionButton = null
+const VANISHING_PACE_MULTS := [1.35, 1.0, 0.72]
+const VANISHING_PACE_NAMES := ["Relaxed", "Normal", "Fast"]
+
+# --- Interval Reading (Sight Reader sub-mode "Intervals") -------------------
+# Train reading by SHAPE/DISTANCE instead of naming every note: show two notes
+# and ask the interval between them. 4-level ladder, melodic (side-by-side) by
+# default with an optional harmonic (stacked) display. Reuses the Note Recall
+# notehead panels (_vanishing_note_panels[0]/[1]) for rendering, so no new staff
+# nodes are needed — the two modes are never active at the same time.
+# Level meaning: 0 = Same/Step/Skip (no direction), 1 = + direction,
+# 2 = named 2nd–5th, 3 = named 2nd–octave. Harmonic display drops direction.
+var _interval_reading_level := 0
+var _interval_reading_streak := 0
+var _interval_reading_use_harmonic := false
+var _interval_reading_correct := ""        # correct answer key for this round
+var _interval_reading_answer_row: Control = null
+var _interval_reading_grid: GridContainer = null
+var _interval_reading_buttons: Array[Button] = []
+var _interval_reading_harmonic_toggle: Button = null
+var _interval_reading_midi1 := -1
+var _interval_reading_midi2 := -1
+const INTERVAL_READING_MAX_LEVEL := 3
+# #1 Melodic Phrase Reading — a variant of Interval Reading that shows a short
+# melodic line and walks the student through each successive interval. Reuses the
+# interval answer grid + grading; a miss ends the line (like full-recall).
+var _interval_reading_phrase := false
+var _phrase_steps: Array[int] = []
+var _phrase_midis: Array[int] = []
+var _phrase_correct: Array[String] = []
+var _phrase_index := 0
+# #2 Landmark → Name the Note — a variant where one labelled anchor note is shown,
+# then the next note is read BY INTERVAL and the student names it (note keyboard).
+var _interval_reading_landmark := false
+var _landmark_answer := ""        # correct note letter+accidental of the target
+var _landmark_anchor_label: Label = null
+var _interval_options_row: HBoxContainer = null
+var _interval_variant_option: OptionButton = null
+# Player-selected interval sizes to practise (1 = 2nd … 7 = octave). When non-empty
+# the round pool + answer buttons use exactly these (named, with direction in
+# melodic). Empty = fall back to the auto-level ladder (Same/Step/Skip → named).
+var _interval_custom_sizes: Array[int] = [1, 2, 3, 4, 5, 6, 7]
+var _interval_sizes_row: HBoxContainer = null
+var _interval_size_chips: Array[Button] = []
+
+# --- #7 Skill stats (weakness heatmap / dashboard) -------------------------
+# Per-item correct/total tallies, keyed by category ("note", "interval") then by
+# item ("C", "F#", "Step", "3rd", …). Persisted in progress data. Drives the
+# strengths/weaknesses heatmap and the "focus my weak spots" targeted drill.
+var _skill_stats: Dictionary = {}
+var _skill_heatmap_overlay: ColorRect = null
+var _skill_heatmap_body: VBoxContainer = null
+var _skill_focus_items: Dictionary = {}  # category -> Array[String] to bias toward
+var _skill_progress_button: Button = null
 # Confusion drill state: when true, the next session is restricted to items
 # from the student's top confused pairs. Cleared at session end so subsequent
 # sessions go back to normal pool.
@@ -1644,6 +1848,31 @@ func _ready() -> void:
 	var qa_args: PackedStringArray = OS.get_cmdline_args()
 	var qa_user_args: PackedStringArray = OS.get_cmdline_user_args()
 	_qa_enabled = qa_args.has("--qa") or qa_user_args.has("--qa")
+	# AI-orchestrated QA pipeline: --debug-server [port] spins up an HTTP
+	# debug API on localhost so an external Python driver can drive the
+	# game (see docs/prompts/ai-orchetrated-qa-pipeline-for-exe.txt and
+	# scripts/qa/debug_server.gd). Opt-in only; never enabled by default.
+	if qa_args.has("--debug-server") or qa_user_args.has("--debug-server"):
+		# Use runtime load() + ResourceLoader.exists() rather than preload()
+		# so builds that exclude this script (some export presets strip
+		# QA-only files) don't fail to PARSE this script entirely. The flag
+		# becomes a no-op on those builds instead of a crash on launch.
+		# debug_server.gd lives at scripts/ (not scripts/qa/) because the
+		# Student preset's exclude_filter wildcards out scripts/qa/* and
+		# Godot's include_filter doesn't override it — easier to host the
+		# file in a folder no preset excludes.
+		const _DBG_SERVER_PATH := "res://scripts/debug_server.gd"
+		if ResourceLoader.exists(_DBG_SERVER_PATH):
+			_debug_server_active = true
+			var port: int = _parse_debug_server_port(qa_args, qa_user_args)
+			var DebugServerScript = load(_DBG_SERVER_PATH)
+			var debug_server: Node = DebugServerScript.new()
+			debug_server.name = "DebugServer"
+			add_child(debug_server)
+			debug_server.call("setup", self, port)
+			debug_server.call("start")
+		else:
+			push_warning("--debug-server flag passed but debug_server.gd not in build; skipping.")
 	_parse_qa_runtime_flags(qa_args, qa_user_args)
 	if _qa_enabled:
 		_qa_seed = _resolve_qa_seed(qa_args, qa_user_args)
@@ -2118,6 +2347,22 @@ func _ensure_rhythm_tap_input_action() -> void:
 		var ev: InputEvent = ev_any
 		if not InputMap.action_has_event("tap", ev):
 			InputMap.action_add_event("tap", ev)
+
+
+func _parse_debug_server_port(args: PackedStringArray, user_args: PackedStringArray) -> int:
+	# Accept either --debug-server=PORT or --debug-server PORT.
+	for src in [args, user_args]:
+		for i in src.size():
+			var arg := str(src[i])
+			if arg.begins_with("--debug-server="):
+				var v := arg.trim_prefix("--debug-server=").strip_edges()
+				if v.is_valid_int():
+					return int(v)
+			elif arg == "--debug-server" and i + 1 < src.size():
+				var nxt := str(src[i + 1])
+				if nxt.is_valid_int():
+					return int(nxt)
+	return 8765
 
 
 func _parse_qa_runtime_flags(args: PackedStringArray, user_args: PackedStringArray) -> void:
@@ -2640,7 +2885,7 @@ func _normalize_sight_mode(mode_name: String) -> String:
 	# half-built setup screen. Ship-blocker SR1 — clean v1 deferral.
 	if v == "Sight Singing" and not SIGHT_SINGING_ENABLED:
 		return "Notes"
-	if v == "Notes" or v == "Chords" or v == "Continuous" or v == "Rhythm Flow" or v == "Sight Singing":
+	if v == "Notes" or v == "Chords" or v == "Continuous" or v == "Rhythm Flow" or v == "Sight Singing" or v == "Vanishing" or v == "Intervals":
 		return v
 	return "Notes"
 
@@ -2658,12 +2903,12 @@ func _mvp_is_ear_mode_enabled(mode: int) -> bool:
 
 func _mvp_is_sight_mode_enabled(mode_name: String) -> bool:
 	var normalized := _normalize_sight_mode(mode_name)
-	return normalized == "Notes" or normalized == "Chords" or normalized == "Sight Singing"
+	return normalized == "Notes" or normalized == "Chords" or normalized == "Sight Singing" or normalized == "Vanishing" or normalized == "Intervals"
 
 
 func _mvp_is_sight_key_signature_enabled(sig_name: String, mode_name: String = "") -> bool:
 	var normalized_mode := _normalize_sight_mode(mode_name if mode_name != "" else _sight_mode)
-	if normalized_mode == "Notes" or normalized_mode == "Chords":
+	if normalized_mode == "Notes" or normalized_mode == "Chords" or normalized_mode == "Vanishing":
 		return sig_name in ["C", "1#", "2#", "3#", "1b", "2b", "3b"]
 	return true
 
@@ -2787,6 +3032,9 @@ func _clear_gameplay_transient_visuals() -> void:
 	_hide_preview_ledger()
 	_set_staff_highlight_none()
 	_hide_target_dotted_oval()
+	_clear_vanishing_notes()
+	if _sight_mistake_review_next_button != null:
+		_sight_mistake_review_next_button.visible = false
 	_clear_staff_ledger_lines()
 	if _staff_note != null:
 		_staff_note.modulate = Color(1, 1, 1, 1)
@@ -3013,11 +3261,34 @@ func _process(delta: float) -> void:
 		# always uses it (the mic IS the input device).
 		if _mic_listening and _quiz_active and (_sight_mode == "Notes" or _sight_mode == "Sight Singing"):
 			_poll_mic_pitch()
+		# Sight Notes mic via MicListener (independent of the legacy
+		# _mic_listening / _mic_mode_enabled flags).
+		if _sight_notes_mic_listener != null and _sight_notes_mic_listener.is_listening() and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
+			# Edge-detect the prompt-playing flag: when the prompt finishes,
+			# arm a short cooldown to ignore the reverb tail + speaker decay
+			# so the detector doesn't react to its own audio.
+			if _sight_notes_last_prompt_playing and not _is_prompt_playing:
+				_sight_notes_mic_resume_at_msec = Time.get_ticks_msec() + _SIGHT_NOTES_MIC_PROMPT_TAIL_MSEC
+				_reset_sight_notes_mic_pending()
+				# Wipe whatever the detector accumulated while the speaker was
+				# bleeding into the mic — a fresh baseline + median buffer
+				# avoids the next real note being misread.
+				if _pitch_detector != null and _pitch_detector.has_method("reset_voice_state"):
+					_pitch_detector.call("reset_voice_state")
+			_sight_notes_last_prompt_playing = _is_prompt_playing
+			_sight_notes_mic_listener.tick()
 	if _midi_active:
 		_midi_piano_viz_tick(delta)        # safe no-op when small viz not built
 		_sight_big_piano_tick(delta)       # new: drives the big sight piano fade-out
 		_midi_chord_buffer_tick()
 		_chord_explorer_tick()
+	# Per-frame enforcement: when ANY panel screen is up, force home overlay
+	# buttons hidden every frame. There are dozens of places that re-show
+	# home buttons (HUD refresh, mode-selected cascades, settings refresh,
+	# layout changes); rather than guard every one, we just override them
+	# at 60fps. Negligible cost; the fight ends in one frame.
+	if _chord_explorer_active or _practice_drills_active or _functional_ear_active:
+		_hide_home_overlay_buttons()
 	if _bird_sprite != null and _bird_sprite.visible:
 		_ensure_bird_visible_in_gameplay()
 		_update_chicken_bubble_position()
@@ -3773,12 +4044,26 @@ func _build_ui() -> void:
 	header_left_slot.add_theme_constant_override("separation", 8)
 	header_top_row.add_child(header_left_slot)
 
+	# Game-header brand mark — the Clefira logo SVG replaces the old Unicode
+	# treble-clef (𝄞) for a consistent product identity across all screens.
+	# _home_logo_clef_label stays declared as Label (other code adjusts its
+	# font_size for responsive scaling); we make it invisible and house the
+	# logo in a sibling TextureRect at the same slot.
 	_home_logo_clef_label = Label.new()
-	_home_logo_clef_label.text = char(0x1D11E)
-	_home_logo_clef_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_home_logo_clef_label.add_theme_font_size_override("font_size", 30)
-	_home_logo_clef_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_home_logo_clef_label.visible = false
 	header_left_slot.add_child(_home_logo_clef_label)
+	var header_brand_logo := TextureRect.new()
+	var brand_tex: Texture2D = _load_texture(_CLEFIRA_LOGO_PATH)
+	if brand_tex == null:
+		brand_tex = _load_texture("res://assets/branding/clefira-splash-mark-transparent-512.png")
+	if brand_tex != null:
+		header_brand_logo.texture = brand_tex
+	header_brand_logo.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+	header_brand_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header_brand_logo.custom_minimum_size = Vector2(38, 38)
+	header_brand_logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header_brand_logo.tooltip_text = "Clefira"
+	header_left_slot.add_child(header_brand_logo)
 
 	_home_wordmark_row = HBoxContainer.new()
 	_home_wordmark_row.alignment = BoxContainer.ALIGNMENT_BEGIN
@@ -4012,57 +4297,12 @@ func _build_ui() -> void:
 	_home_assignments_card.add_child(_home_assignments_vbox)
 	home_overview_stack.add_child(_home_assignments_card)
 
-	# Recommended Next card — visually distinct teal accent so the student
-	# instantly spots their next-step suggestion above the broader mode grid.
-	_home_recommended_card = PanelContainer.new()
-	_home_recommended_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_home_recommended_card.visible = false
-	var _hr_sb := StyleBoxFlat.new()
-	_hr_sb.bg_color = Color(0.08, 0.22, 0.28, 0.92)
-	_hr_sb.border_color = Color(0.475, 0.82, 0.80, 1.0)
-	_hr_sb.border_width_left = 4
-	_hr_sb.border_width_top = 1
-	_hr_sb.border_width_right = 1
-	_hr_sb.border_width_bottom = 1
-	_hr_sb.corner_radius_top_left = 8
-	_hr_sb.corner_radius_top_right = 8
-	_hr_sb.corner_radius_bottom_left = 8
-	_hr_sb.corner_radius_bottom_right = 8
-	_hr_sb.content_margin_left = 14
-	_hr_sb.content_margin_right = 14
-	_hr_sb.content_margin_top = 10
-	_hr_sb.content_margin_bottom = 10
-	_home_recommended_card.add_theme_stylebox_override("panel", _hr_sb)
-	_home_recommended_vbox = VBoxContainer.new()
-	_home_recommended_vbox.add_theme_constant_override("separation", 6)
-	_home_recommended_card.add_child(_home_recommended_vbox)
-	home_overview_stack.add_child(_home_recommended_card)
-
-	# SR7 — Daily Challenge card. Gold-accented; date-deterministic challenge
-	# that resets daily, with persisted best-score-for-today.
-	_home_ear_dashboard_card = PanelContainer.new()
-	_home_ear_dashboard_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_home_ear_dashboard_card.visible = false
-	var _hed_sb := StyleBoxFlat.new()
-	_hed_sb.bg_color = Color(0.09, 0.14, 0.20, 0.92)
-	_hed_sb.border_color = Color(0.62, 0.86, 0.96, 1.0)
-	_hed_sb.border_width_left = 4
-	_hed_sb.border_width_top = 1
-	_hed_sb.border_width_right = 1
-	_hed_sb.border_width_bottom = 1
-	_hed_sb.corner_radius_top_left = 8
-	_hed_sb.corner_radius_top_right = 8
-	_hed_sb.corner_radius_bottom_left = 8
-	_hed_sb.corner_radius_bottom_right = 8
-	_hed_sb.content_margin_left = 14
-	_hed_sb.content_margin_right = 14
-	_hed_sb.content_margin_top = 10
-	_hed_sb.content_margin_bottom = 10
-	_home_ear_dashboard_card.add_theme_stylebox_override("panel", _hed_sb)
-	_home_ear_dashboard_vbox = VBoxContainer.new()
-	_home_ear_dashboard_vbox.add_theme_constant_override("separation", 6)
-	_home_ear_dashboard_card.add_child(_home_ear_dashboard_vbox)
-	home_overview_stack.add_child(_home_ear_dashboard_card)
+	# Recommended Next card + Ear Training dashboard card — REMOVED from
+	# the home overview per user request. The vars stay declared as null;
+	# _refresh_home_recommended_card and _refresh_home_ear_dashboard_card
+	# already null-guard at the top so they become no-ops. To bring either
+	# back, re-instantiate the PanelContainer + VBoxContainer here and
+	# parent to home_overview_stack — refresh functions will populate it.
 
 	_home_daily_challenge_card = PanelContainer.new()
 	_home_daily_challenge_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -4157,6 +4397,11 @@ func _build_ui() -> void:
 		practice_drills_card_btn.set_meta("main_menu_mode_key", "PracticeDrills")
 		_home_material_buttons.append(practice_drills_card_btn)
 		_set_home_selection_state(practice_drills_card_btn, false)
+	var functional_ear_card_btn := _build_home_overview_card(tools_grid, "Functional Ear Training", "Identify chord roles in a key (I, IV, V, vi)", ICON_EAR_PATH, Color(0.74, 0.66, 0.96, 1.0), _on_functional_ear_open)
+	if functional_ear_card_btn != null:
+		functional_ear_card_btn.set_meta("main_menu_mode_key", "FunctionalEar")
+		_home_material_buttons.append(functional_ear_card_btn)
+		_set_home_selection_state(functional_ear_card_btn, false)
 	var chord_explorer_card_btn := _build_home_overview_card(tools_grid, "Chord Explorer", "Play notes and identify chords", ICON_PIANO_PATH, Color(0.62, 0.86, 0.96, 1.0), _on_chord_explorer_open)
 	if chord_explorer_card_btn != null:
 		chord_explorer_card_btn.set_meta("main_menu_mode_key", "ChordExplorer")
@@ -4292,7 +4537,7 @@ func _build_ui() -> void:
 	_ear_questions_label.tooltip_text = "Questions per Ear Training round."
 	_ear_round_length_row.add_child(_ear_questions_label)
 	_question_spin = SpinBox.new()
-	_question_spin.min_value = 1
+	_question_spin.min_value = MIN_STANDARD_ROUND_QUESTIONS
 	_question_spin.max_value = 100
 	_question_spin.step = 1
 	_question_spin.value = _ear_question_count
@@ -4372,24 +4617,6 @@ func _build_ui() -> void:
 	_ear_context_tonic_toggle.toggled.connect(_on_ear_context_tonic_toggled)
 	ear_audio_row.add_child(_ear_context_tonic_toggle)
 
-	_ear_count_in_toggle = CheckButton.new()
-	_ear_count_in_toggle.text = "Count-in"
-	_ear_count_in_toggle.button_pressed = _ear_count_in_enabled
-	_ear_count_in_toggle.toggled.connect(_on_ear_count_in_toggled)
-	ear_audio_row.add_child(_ear_count_in_toggle)
-
-	_ear_metronome_toggle = CheckButton.new()
-	_ear_metronome_toggle.text = "Metronome"
-	_ear_metronome_toggle.button_pressed = _ear_metronome_enabled
-	_ear_metronome_toggle.toggled.connect(_on_ear_metronome_toggled)
-	ear_audio_row.add_child(_ear_metronome_toggle)
-
-	_ear_melodic_context_toggle = CheckButton.new()
-	_ear_melodic_context_toggle.text = "Example"
-	_ear_melodic_context_toggle.button_pressed = _ear_melodic_context_enabled
-	_ear_melodic_context_toggle.toggled.connect(_on_ear_melodic_context_toggled)
-	ear_audio_row.add_child(_ear_melodic_context_toggle)
-
 	var replay_row := HBoxContainer.new()
 	replay_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	replay_row.add_theme_constant_override("separation", 10)
@@ -4444,8 +4671,15 @@ func _build_ui() -> void:
 
 	# Practice mode toggle lives on the home page footer button
 
-	# Music notation font picker — moved here from Chord Explorer +
-	# Practice Drills so it's centralized in one place (home Settings).
+	# Practice Drills section — the music-notation font picker only affects
+	# how notes render in Practice Drills (and the legacy Chord Explorer score
+	# view), so group it under its own header for clarity.
+	var practice_drills_header := Label.new()
+	practice_drills_header.text = "Practice Drills"
+	practice_drills_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	practice_drills_header.set_meta("settings_section_header", true)
+	_ear_settings_more_panel.add_child(practice_drills_header)
+
 	var font_pick_row := HBoxContainer.new()
 	font_pick_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	font_pick_row.add_theme_constant_override("separation", 10)
@@ -4579,13 +4813,15 @@ func _build_ui() -> void:
 	var chord_preset_defs := [
 		["beginner", "Chords I", "Major, Minor"],
 		["standard", "Triads", "Major/Minor + color"],
-		["advanced", "Advanced", "7ths + extensions"],
+		["sevenths", "7th Chords", "Maj7, Dom7, Min7..."],
+		["colors", "Color Chords", "6ths, 9ths, add9"],
+		["advanced", "Advanced", "Upper + altered"],
 	]
 	for chord_preset in chord_preset_defs:
 		var chord_preset_id: String = chord_preset[0]
 		var chord_preset_btn := Button.new()
 		chord_preset_btn.text = "%s\n%s" % [chord_preset[1], chord_preset[2]]
-		chord_preset_btn.custom_minimum_size = Vector2(142, 46)
+		chord_preset_btn.custom_minimum_size = Vector2(150, 46)
 		chord_preset_btn.set_meta("compact_btn", true)
 		chord_preset_btn.pressed.connect(_apply_chord_preset.bind(chord_preset_id))
 		chord_preset_row.add_child(chord_preset_btn)
@@ -4925,8 +5161,8 @@ func _build_ui() -> void:
 	_cadence_preset_btns.clear()
 	var _cpreset_defs := [
 		["beginner", "★ Beginner", "Perfect · Plagal"],
-		["standard", "★★ Standard", "+ Half · Deceptive"],
-		["advanced", "★★★ Advanced", "All 6 cadences"],
+		["standard", "★★ Intermediate", "+ Imperfect / Half"],
+		["advanced", "★★★ Advanced", "+ Interrupted / Deceptive"],
 	]
 	for _cpreset in _cpreset_defs:
 		var _cpreset_id: String = _cpreset[0]
@@ -4942,12 +5178,12 @@ func _build_ui() -> void:
 	cadence_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	cadence_row.add_theme_constant_override("separation", 8)
 	cadence_group.add_child(cadence_row)
-	for cadence_name in ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]:
+	for cadence_name in ["Perfect", "Plagal", "Half", "Deceptive"]:
 		var c_btn := Button.new()
-		c_btn.text = cadence_name
+		c_btn.text = str(CADENCE_BUTTON_NAMES.get(cadence_name, cadence_name))
 		c_btn.toggle_mode = true
 		c_btn.button_pressed = _cadence_selected.has(cadence_name)
-		c_btn.custom_minimum_size = Vector2(132, 36)
+		c_btn.custom_minimum_size = Vector2(168, 36)
 		c_btn.set_meta("compact_btn", true)
 		c_btn.toggled.connect(_on_cadence_toggle.bind(cadence_name))
 		cadence_row.add_child(c_btn)
@@ -5043,6 +5279,25 @@ func _build_ui() -> void:
 	_sight_mode_buttons["Notes"] = sight_notes_btn
 	_home_material_buttons.append(sight_notes_btn)
 
+	var sight_vanishing_btn := Button.new()
+	sight_vanishing_btn.text = "Note Recall"
+	sight_vanishing_btn.custom_minimum_size = Vector2(170, 34)
+	sight_vanishing_btn.visible = _mvp_is_sight_mode_enabled("Vanishing")
+	sight_vanishing_btn.pressed.connect(_on_sight_mode_button_pressed.bind("Vanishing"))
+	sight_mode_row.add_child(sight_vanishing_btn)
+	_sight_mode_buttons["Vanishing"] = sight_vanishing_btn
+	_home_material_buttons.append(sight_vanishing_btn)
+
+	var sight_intervals_btn := Button.new()
+	sight_intervals_btn.text = "Interval Reading"
+	sight_intervals_btn.custom_minimum_size = Vector2(180, 34)
+	sight_intervals_btn.tooltip_text = "Read by shape — step, skip, and named intervals — instead of naming every note."
+	sight_intervals_btn.visible = _mvp_is_sight_mode_enabled("Intervals")
+	sight_intervals_btn.pressed.connect(_on_sight_mode_button_pressed.bind("Intervals"))
+	sight_mode_row.add_child(sight_intervals_btn)
+	_sight_mode_buttons["Intervals"] = sight_intervals_btn
+	_home_material_buttons.append(sight_intervals_btn)
+
 	var sight_chords_btn := Button.new()
 	sight_chords_btn.text = "Chords"
 	sight_chords_btn.custom_minimum_size = Vector2(140, 34)
@@ -5086,8 +5341,12 @@ func _build_ui() -> void:
 	_sight_note_chase_button.text = "Note Chase"
 	_sight_note_chase_button.custom_minimum_size = Vector2(140, 34)
 	_sight_note_chase_button.pressed.connect(_on_mode_button_pressed.bind(MODE_NOTE_CHASE))
-	sight_mode_row.add_child(_sight_note_chase_button)
-	_home_material_buttons.append(_sight_note_chase_button)
+	# Gated by NOTE_CHASE_ENABLED — when off, the tab simply isn't added to
+	# the Sight Reader sub-mode row, so users have no entry into the mode.
+	_sight_note_chase_button.visible = NOTE_CHASE_ENABLED
+	if NOTE_CHASE_ENABLED:
+		sight_mode_row.add_child(_sight_note_chase_button)
+		_home_material_buttons.append(_sight_note_chase_button)
 
 	_sight_round_length_row = HBoxContainer.new()
 	_sight_round_length_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -5101,7 +5360,7 @@ func _build_ui() -> void:
 	_sight_questions_label.tooltip_text = "Questions per Sight Reading round."
 	_sight_round_length_row.add_child(_sight_questions_label)
 	_sight_question_spin = SpinBox.new()
-	_sight_question_spin.min_value = 1
+	_sight_question_spin.min_value = MIN_STANDARD_ROUND_QUESTIONS
 	_sight_question_spin.max_value = 100
 	_sight_question_spin.step = 1
 	_sight_question_spin.value = _sight_question_count
@@ -5115,6 +5374,102 @@ func _build_ui() -> void:
 	sight_questions_suffix.set_meta("settings_small_label", true)
 	sight_questions_suffix.tooltip_text = "Questions per Sight Reading round."
 	_sight_round_length_row.add_child(sight_questions_suffix)
+
+	# Note Recall options: reveal pace (#8) + recall depth (#9). Shown only for Note Recall.
+	_vanishing_options_row = HBoxContainer.new()
+	_vanishing_options_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_vanishing_options_row.add_theme_constant_override("separation", 6)
+	_vanishing_options_row.visible = false
+	sight_controls_column.add_child(_vanishing_options_row)
+	var pace_label := Label.new()
+	pace_label.text = "Pace"
+	pace_label.set_meta("settings_small_label", true)
+	pace_label.tooltip_text = "How long the notes stay before vanishing. It also auto-adapts as you improve."
+	_vanishing_options_row.add_child(pace_label)
+	_vanishing_pace_option = OptionButton.new()
+	for pname in VANISHING_PACE_NAMES:
+		_vanishing_pace_option.add_item(str(pname))
+	_vanishing_pace_option.custom_minimum_size = Vector2(118, 32)
+	_vanishing_pace_option.item_selected.connect(_on_vanishing_pace_selected)
+	_vanishing_options_row.add_child(_vanishing_pace_option)
+	var recall_label := Label.new()
+	recall_label.text = "   Recall"
+	recall_label.set_meta("settings_small_label", true)
+	recall_label.tooltip_text = "Recall just one random note, or the whole sequence in order."
+	_vanishing_options_row.add_child(recall_label)
+	_vanishing_recall_option = OptionButton.new()
+	_vanishing_recall_option.add_item("One note")
+	_vanishing_recall_option.add_item("Full sequence")
+	_vanishing_recall_option.custom_minimum_size = Vector2(150, 32)
+	_vanishing_recall_option.item_selected.connect(_on_vanishing_recall_selected)
+	_vanishing_options_row.add_child(_vanishing_recall_option)
+
+	# Interval Reading variant selector (#1 Phrase, #2 Name). Shown only for Interval Reading.
+	_interval_options_row = HBoxContainer.new()
+	_interval_options_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_interval_options_row.add_theme_constant_override("separation", 6)
+	_interval_options_row.visible = false
+	sight_controls_column.add_child(_interval_options_row)
+	var iv_mode_label := Label.new()
+	iv_mode_label.text = "Mode"
+	iv_mode_label.set_meta("settings_small_label", true)
+	iv_mode_label.tooltip_text = "Pair: one interval. Phrase: read a whole line. Name Note: read the next note from a labelled anchor."
+	_interval_options_row.add_child(iv_mode_label)
+	_interval_variant_option = OptionButton.new()
+	_interval_variant_option.add_item("Pair")          # index 0
+	_interval_variant_option.add_item("Phrase")        # index 1
+	_interval_variant_option.add_item("Name Note")     # index 2
+	_interval_variant_option.custom_minimum_size = Vector2(150, 32)
+	_interval_variant_option.item_selected.connect(_on_interval_variant_selected)
+	_interval_options_row.add_child(_interval_variant_option)
+
+	# Interval picker — choose exactly which interval sizes to practise. When any are
+	# selected the round pool uses only those (named). Deselect all = the auto-ladder.
+	_interval_sizes_row = HBoxContainer.new()
+	_interval_sizes_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_interval_sizes_row.add_theme_constant_override("separation", 5)
+	_interval_sizes_row.visible = false
+	sight_controls_column.add_child(_interval_sizes_row)
+	var iv_pick_label := Label.new()
+	iv_pick_label.text = "Intervals"
+	iv_pick_label.set_meta("settings_small_label", true)
+	iv_pick_label.tooltip_text = "Tap to choose which intervals to practise. Deselect all for the auto-difficulty ladder."
+	_interval_sizes_row.add_child(iv_pick_label)
+	_interval_size_chips.clear()
+	for sz in range(1, 8):  # 1 = 2nd … 7 = Octave
+		var chip := Button.new()
+		chip.toggle_mode = true
+		chip.text = _interval_size_name(sz)
+		chip.custom_minimum_size = Vector2(54, 30)
+		chip.set_pressed_no_signal(_interval_custom_sizes.has(sz))
+		chip.toggled.connect(_on_interval_size_chip_toggled.bind(sz))
+		_interval_sizes_row.add_child(chip)
+		_interval_size_chips.append(chip)
+
+	# My Progress (#7) — opens the strengths/weaknesses heatmap. Shown for Note
+	# Recall + Interval Reading (the modes that feed the heatmap).
+	_skill_progress_button = Button.new()
+	_skill_progress_button.icon = load(ICON_PROGRESS_PATH)
+	_skill_progress_button.add_theme_constant_override("h_separation", 8)
+	_skill_progress_button.text = "My Progress"
+	_skill_progress_button.custom_minimum_size = Vector2(170, 34)
+	_skill_progress_button.tooltip_text = "See a heatmap of which notes and intervals you're strong or weak on."
+	_skill_progress_button.visible = false
+	_skill_progress_button.pressed.connect(_show_skill_heatmap)
+	sight_controls_column.add_child(_skill_progress_button)
+	_home_material_buttons.append(_skill_progress_button)
+
+	# Persistent Beta + microphone notice — Sight Singing is a beta sub-mode that
+	# can't work without a working mic, so set that expectation up front rather
+	# than relying only on transient "no input" toasts during a session.
+	_sight_singing_beta_notice = Label.new()
+	_sight_singing_beta_notice.text = "%s  Beta — Sight Singing needs a working microphone. If you don't see pitch feedback, check your mic permission and device." % char(0x1F3A4)
+	_sight_singing_beta_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sight_singing_beta_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_sight_singing_beta_notice.add_theme_font_size_override("font_size", 13)
+	_sight_singing_beta_notice.add_theme_color_override("font_color", Color(0.96, 0.86, 0.52, 0.96))
+	_sight_singing_beta_notice.visible = false
+	sight_controls_column.add_child(_sight_singing_beta_notice)
 
 	_sight_singing_rhythm_setup_row = HBoxContainer.new()
 	_sight_singing_rhythm_setup_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -5425,6 +5780,24 @@ func _build_ui() -> void:
 	_sight_accidentals_toggle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_sight_accidentals_toggle.toggled.connect(_on_sight_accidentals_toggled)
 	sight_acc_row.add_child(_sight_accidentals_toggle)
+
+	# Adaptive-difficulty toggle (single Treble/Bass clef). On: the reading range
+	# grows/shrinks with the student's accuracy. Off: a teacher can pin a fixed
+	# (full-staff) range for a specific assignment.
+	var sight_adaptive_row := HBoxContainer.new()
+	sight_adaptive_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	sight_adaptive_row.add_theme_constant_override("separation", 10)
+	sight_chord_group.add_child(sight_adaptive_row)
+	_sight_adaptive_row = sight_adaptive_row
+
+	_adaptive_toggle = CheckButton.new()
+	_adaptive_toggle.text = "Adaptive difficulty"
+	_adaptive_toggle.button_pressed = _sight_chord_adaptive_enabled
+	_adaptive_toggle.custom_minimum_size = Vector2(260, 42)
+	_adaptive_toggle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_adaptive_toggle.tooltip_text = "On: the reading range expands as the student improves and eases back on misses. Off: pin a fixed full-staff range (useful for a specific assignment)."
+	_adaptive_toggle.toggled.connect(_on_sight_chord_adaptive_toggled)
+	sight_adaptive_row.add_child(_adaptive_toggle)
 
 	_sight_range_container = VBoxContainer.new()
 	_sight_range_container.add_theme_constant_override("separation", 8)
@@ -5859,6 +6232,17 @@ func _build_ui_game_panel() -> void:
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status_label.add_theme_font_size_override("font_size", 20)
+	# Small centered status icon shown just above the status text (Note Recall +
+	# Interval Reading use it for memorise / vanish / question / correct cues).
+	# Kept as its own row so it never disturbs the shared status label's autowrap.
+	_sight_status_icon = TextureRect.new()
+	_sight_status_icon.custom_minimum_size = Vector2(30, 30)
+	_sight_status_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_sight_status_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	_sight_status_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_sight_status_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sight_status_icon.visible = false
+	_game_panel.add_child(_sight_status_icon)
 	_game_panel.add_child(_status_label)
 
 	_interval_center_top_spacer = Control.new()
@@ -6163,6 +6547,7 @@ func _build_ui_game_panel() -> void:
 	frame_style.border_width_bottom = 2
 	frame_style.border_color = Color(0.95, 0.84, 0.42, 0.82)
 	_note_chase_staff_frame.add_theme_stylebox_override("panel", frame_style)
+	_bordered_frame_template = frame_style
 	_staff_area.add_child(_note_chase_staff_frame)
 
 	_note_chase_overlay = ColorRect.new()
@@ -6486,6 +6871,17 @@ func _build_ui_game_panel() -> void:
 		_staff_area.add_child(extra_note)
 		_staff_chord_notes.append(extra_note)
 
+	for i in 8:
+		var vanish_note := Panel.new()
+		vanish_note.size = _staff_note.size
+		vanish_note.rotation_degrees = _staff_note.rotation_degrees
+		vanish_note.z_index = 158
+		vanish_note.visible = false
+		vanish_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_apply_notehead_material(vanish_note, Color(1.0, 1.0, 1.0, 0.98), Color(0.08, 0.08, 0.10, 0.9))
+		_staff_area.add_child(vanish_note)
+		_vanishing_note_panels.append(vanish_note)
+
 	for _i in 6:
 		var acc_lbl := Label.new()
 		acc_lbl.text = ""
@@ -6599,11 +6995,47 @@ func _build_ui_game_panel() -> void:
 		_sight_key_buttons[acc_note] = acc_btn
 		_style_key_button(acc_btn)
 
+	# Floating 🎤 mic-toggle pill — hides when not in Sight Notes round.
+	# Wires the host's PitchDetector through MicListener so sung/played notes
+	# route into _on_sight_key_chosen via _match_mic_note_to_sight.
+	# Anchored TOP_LEFT and positioned dynamically directly beneath the note-name
+	# keyboard in _position_sight_floating_answer_rows() so it always sits with
+	# the answer keys and stays fully on-screen (it used to be pinned to the
+	# bottom-right corner where it was partially clipped).
+	_sight_notes_mic_button = Button.new()
+	_sight_notes_mic_button.toggle_mode = true
+	_sight_notes_mic_button.text = "%s  Mic" % char(0x1F3A4)
+	_sight_notes_mic_button.tooltip_text = "Listen to your microphone — sing or play the note instead of clicking a key."
+	_sight_notes_mic_button.custom_minimum_size = Vector2(110, 40)
+	_sight_notes_mic_button.add_theme_font_size_override("font_size", 14)
+	_sight_notes_mic_button.visible = false
+	_sight_notes_mic_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_sight_notes_mic_button.toggled.connect(_on_sight_notes_mic_toggled)
+	_sight_answer_overlay.add_child(_sight_notes_mic_button)
+
+	# Floating "🎤 Play it" pill for Sight Chords — captures a take and grades
+	# every note via the native polyphony detector. Anchored TOP_RIGHT so it
+	# sits opposite the Replay Chord button; visibility managed with that button.
+	_sight_chord_mic_button = Button.new()
+	_sight_chord_mic_button.text = "%s  Play it" % char(0x1F3A4)
+	_sight_chord_mic_button.tooltip_text = "Play the chord on your instrument — we'll check every note you played."
+	_sight_chord_mic_button.custom_minimum_size = Vector2(150, 42)
+	_sight_chord_mic_button.add_theme_font_size_override("font_size", 14)
+	_sight_chord_mic_button.visible = false
+	_sight_chord_mic_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_sight_chord_mic_button.offset_left = -170
+	_sight_chord_mic_button.offset_right = -14
+	_sight_chord_mic_button.offset_top = 12
+	_sight_chord_mic_button.offset_bottom = 54
+	_sight_chord_mic_button.pressed.connect(_on_sight_chord_mic_pressed)
+	_sight_answer_overlay.add_child(_sight_chord_mic_button)
+
 	# Small MIDI piano viz is kept ONLY for Sight Chords mode (read-only MIDI
 	# input feedback). Sight Notes uses the big interactive piano instead.
 	# Visibility is gated in _start_midi_listening so it only appears in chord mode.
 	_build_midi_piano_viz()
 	_build_chord_explorer_panel()
+	_build_functional_ear_panel()
 	_build_practice_drills_panel()
 	_build_sight_round_start_card()
 	_build_sight_big_piano()
@@ -7305,6 +7737,23 @@ func _build_ui_game_panel() -> void:
 	_game_home_button.pressed.connect(_on_game_home_pressed)
 	add_child(_game_home_button)
 
+	_sight_mistake_review_next_button = Button.new()
+	_sight_mistake_review_next_button.text = "Next"
+	_sight_mistake_review_next_button.custom_minimum_size = Vector2(150, 46)
+	# Bottom-RIGHT corner so it doesn't cover the centered status/progress text.
+	# (The game nav — End/Restart/Home — lives at the top, so this corner is free.)
+	_sight_mistake_review_next_button.anchor_left = 1.0
+	_sight_mistake_review_next_button.anchor_right = 1.0
+	_sight_mistake_review_next_button.anchor_top = 1.0
+	_sight_mistake_review_next_button.anchor_bottom = 1.0
+	_sight_mistake_review_next_button.offset_left = -174
+	_sight_mistake_review_next_button.offset_right = -24
+	_sight_mistake_review_next_button.offset_top = -70
+	_sight_mistake_review_next_button.offset_bottom = -24
+	_sight_mistake_review_next_button.visible = false
+	_sight_mistake_review_next_button.pressed.connect(_on_sight_mistake_review_next_pressed)
+	add_child(_sight_mistake_review_next_button)
+
 	_apply_pro_style()
 	_style_home_footer_bar()
 	_style_home_footer_buttons()
@@ -7325,6 +7774,9 @@ func _build_ui_game_panel() -> void:
 	_game_home_button.add_theme_font_size_override("font_size", 17)
 	_game_home_button.add_theme_color_override("font_color", Color(0.20, 0.14, 0.06))
 	_style_button(_game_home_button)
+	_sight_mistake_review_next_button.add_theme_font_size_override("font_size", 17)
+	_sight_mistake_review_next_button.add_theme_color_override("font_color", Color(0.20, 0.14, 0.06))
+	_style_button(_sight_mistake_review_next_button)
 	_on_mode_selected()
 	_refresh_degree_buttons()
 	_refresh_chord_group_buttons(false)
@@ -7357,7 +7809,10 @@ func _build_ui_game_panel() -> void:
 	_result_box_panel = PanelContainer.new()
 	_result_box_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_result_box_panel.z_as_relative = false
-	_result_box_panel.z_index = 761
+	# Must sit ABOVE the dim overlay (raised to 2000 at show time). When this was
+	# 761 the 0.42 black overlay painted over the whole summary, making it look
+	# faded / like an inactive window. Panel = 2001, its content = 2002.
+	_result_box_panel.z_index = 2001
 	result_center.add_child(_result_box_panel)
 
 	var result_box := VBoxContainer.new()
@@ -7369,7 +7824,7 @@ func _build_ui_game_panel() -> void:
 	_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_result_title.add_theme_font_size_override("font_size", 64)
 	_result_title.z_as_relative = false
-	_result_title.z_index = 762
+	_result_title.z_index = 2002
 	result_box.add_child(_result_title)
 
 	_result_subtitle = Label.new()
@@ -7377,7 +7832,7 @@ func _build_ui_game_panel() -> void:
 	_result_subtitle.add_theme_font_size_override("font_size", 20)
 	_result_subtitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_result_subtitle.z_as_relative = false
-	_result_subtitle.z_index = 762
+	_result_subtitle.z_index = 2002
 	result_box.add_child(_result_subtitle)
 	# SR6 — celebration content (accuracy badge + focus chip). Filled by
 	# _build_result_celebration_content() each time the result box is shown.
@@ -7385,7 +7840,7 @@ func _build_ui_game_panel() -> void:
 	_result_celebration_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_result_celebration_container.add_theme_constant_override("separation", 12)
 	_result_celebration_container.z_as_relative = false
-	_result_celebration_container.z_index = 762
+	_result_celebration_container.z_index = 2002
 	_result_celebration_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	result_box.add_child(_result_celebration_container)
 	_result_action_row = HBoxContainer.new()
@@ -7393,7 +7848,7 @@ func _build_ui_game_panel() -> void:
 	_result_action_row.add_theme_constant_override("separation", 12)
 	_result_action_row.visible = false
 	_result_action_row.z_as_relative = false
-	_result_action_row.z_index = 762
+	_result_action_row.z_index = 2002
 	_result_action_row.mouse_filter = Control.MOUSE_FILTER_PASS
 	result_box.add_child(_result_action_row)
 	_result_action_primary_button = Button.new()
@@ -7443,26 +7898,55 @@ func _build_ui_game_panel() -> void:
 	_style_result_overlay_theme()
 	_result_box_hide()
 
-	# Streak milestone toast label
+	# Streak/unlock toast. It needs its own high-contrast surface because these
+	# messages appear over staff lines and gameplay art.
+	_streak_toast_panel = PanelContainer.new()
+	_streak_toast_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_streak_toast_panel.offset_left = -340
+	_streak_toast_panel.offset_right = 340
+	_streak_toast_panel.offset_top = 82
+	_streak_toast_panel.offset_bottom = 160
+	_streak_toast_panel.z_as_relative = false
+	_streak_toast_panel.z_index = 1800
+	_streak_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_streak_toast_panel.visible = false
+	_streak_toast_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	var toast_sb := StyleBoxFlat.new()
+	# Slightly transparent so the unlock reads as a floating pop-up, not a solid
+	# block over the screen. Text keeps its black outline + shadow for legibility.
+	toast_sb.bg_color = Color(0.025, 0.035, 0.055, 0.76)
+	toast_sb.border_color = Color(1.0, 0.78, 0.28, 0.88)
+	toast_sb.border_width_left = 2
+	toast_sb.border_width_top = 2
+	toast_sb.border_width_right = 2
+	toast_sb.border_width_bottom = 3
+	toast_sb.corner_radius_top_left = 8
+	toast_sb.corner_radius_top_right = 8
+	toast_sb.corner_radius_bottom_left = 8
+	toast_sb.corner_radius_bottom_right = 8
+	toast_sb.content_margin_left = 24
+	toast_sb.content_margin_right = 24
+	toast_sb.content_margin_top = 12
+	toast_sb.content_margin_bottom = 12
+	_streak_toast_panel.add_theme_stylebox_override("panel", toast_sb)
 	_streak_toast_label = Label.new()
 	_streak_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_streak_toast_label.add_theme_font_size_override("font_size", 32)
-	_streak_toast_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.22, 1.0))
-	_streak_toast_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.55))
+	_streak_toast_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_streak_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_streak_toast_label.add_theme_font_size_override("font_size", 24)
+	_streak_toast_label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.58, 1.0))
+	_streak_toast_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.86))
+	_streak_toast_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_streak_toast_label.add_theme_constant_override("outline_size", 2)
 	_streak_toast_label.add_theme_constant_override("shadow_offset_x", 0)
-	_streak_toast_label.add_theme_constant_override("shadow_offset_y", 3)
-	_streak_toast_label.z_as_relative = false
-	_streak_toast_label.z_index = 580
+	_streak_toast_label.add_theme_constant_override("shadow_offset_y", 2)
 	_streak_toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_streak_toast_label.visible = false
-	_streak_toast_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	_streak_toast_label.set_anchors_preset(PRESET_CENTER_TOP)
-	_streak_toast_label.anchor_top = 0.22
-	_streak_toast_label.anchor_bottom = 0.22
-	_streak_toast_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	if _ui_title_font != null:
+	if _ui_bold_font != null:
+		_streak_toast_label.add_theme_font_override("font", _ui_bold_font)
+	elif _ui_title_font != null:
 		_streak_toast_label.add_theme_font_override("font", _ui_title_font)
-	add_child(_streak_toast_label)
+	_streak_toast_panel.add_child(_streak_toast_label)
+	add_child(_streak_toast_panel)
 
 	# Item 10: First-run ear training intro overlay
 	_ear_intro_overlay = ColorRect.new()
@@ -7576,7 +8060,7 @@ func _build_ui_game_panel() -> void:
 		cad_intro_title.add_theme_font_override("font", _ui_title_font)
 	cad_intro_col.add_child(cad_intro_title)
 	var cad_intro_body := Label.new()
-	cad_intro_body.text = "A cadence is the chord pattern that ends a musical phrase — like punctuation in music.\n\nYou will hear two chords in sequence and identify the cadence type:\n\n  \u2022  Perfect (V\u2013I)   \u2014  the strongest ending; sounds fully resolved\n  \u2022  Plagal (IV\u2013I)   \u2014  the \u201cAmen\u201d cadence; sounds gentle and settled\n  \u2022  Half (I\u2013V)      \u2014  stops on tension; sounds unfinished, expects more\n  \u2022  Deceptive (V\u2013vi)  \u2014  starts like Perfect but surprises you with a minor chord\n  \u2022  Interrupted (V\u2013IV)  \u2014  similar surprise; resolves sideways instead of home\n  \u2022  Imperfect (VII\u2013I)   \u2014  weaker resolution; ends on the leading tone chord\n\nListen for whether the two chords feel \u2018finished\u2019, \u2018interrupted\u2019, or \u2018still moving\u2019."
+	cad_intro_body.text = "A cadence is the chord pattern that ends a musical phrase — like punctuation in music.\n\nYou will hear two chords in sequence and identify the cadence type:\n\n  \u2022  Perfect / Authentic (V\u2013I)   \u2014  the strongest ending; sounds fully resolved\n  \u2022  Plagal (IV\u2013I)   \u2014  the \u201cAmen\u201d cadence; sounds gentle and settled\n  \u2022  Imperfect / Half (I\u2013V)      \u2014  stops on tension; sounds unfinished, expects more\n  \u2022  Interrupted / Deceptive (V\u2013vi)  \u2014  starts like Perfect but surprises you with a minor chord\n\nListen for whether the two chords feel \u2018finished\u2019, \u2018interrupted\u2019, or \u2018still moving\u2019."
 	cad_intro_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cad_intro_body.add_theme_font_size_override("font_size", 14)
 	cad_intro_body.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98, 0.95))
@@ -8181,9 +8665,25 @@ func _apply_pro_style() -> void:
 	else:
 		_ui_title_font = null
 	if _ui_title_font == null:
-		var title_sys_font := SystemFont.new()
-		title_sys_font.font_names = PackedStringArray(["Baloo 2", "Poppins"])
-		_ui_title_font = title_sys_font
+		# Fallback chain: prefer the project's existing Inter cuts so the look
+		# stays consistent if Inter-Thin is stripped from the build. Last resort
+		# is system Inter.
+		if ResourceLoader.exists(UI_FONT_PATH, "Font"):
+			_ui_title_font = ResourceLoader.load(UI_FONT_PATH) as Font
+		if _ui_title_font == null:
+			var title_sys_font := SystemFont.new()
+			title_sys_font.font_names = PackedStringArray(["Inter", "Helvetica Neue", "Segoe UI Light"])
+			_ui_title_font = title_sys_font
+	if not _qa_should_simulate_missing_resource(UI_BOLD_FONT_PATH, "font") and ResourceLoader.exists(UI_BOLD_FONT_PATH, "Font"):
+		_ui_bold_font = ResourceLoader.load(UI_BOLD_FONT_PATH) as Font
+	if _ui_bold_font == null:
+		# Fallback: title font is one step lighter but still acceptable for the
+		# hero mode cards. System Inter as a last resort.
+		_ui_bold_font = _ui_title_font
+		if _ui_bold_font == null:
+			var bold_sys_font := SystemFont.new()
+			bold_sys_font.font_names = PackedStringArray(["Inter", "Helvetica Neue", "Segoe UI"])
+			_ui_bold_font = bold_sys_font
 	_apply_menu_setup_theme_to_home()
 	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {"text_primary": Color(0.98, 0.96, 0.88), "panel_bg": Color(0.10, 0.14, 0.11, 0.74)}
 
@@ -8475,8 +8975,11 @@ func _style_controls_recursive(node: Node) -> void:
 			elif label.has_meta("home_overview_section_header"):
 				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
 				label.add_theme_font_size_override("font_size", 12)
-				label.add_theme_color_override("font_color", Color(0.96, 0.91, 0.73, 0.88))
+				label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.44, 0.98))
 				label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.0))
+				label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.45))
+				label.add_theme_constant_override("shadow_offset_x", 0)
+				label.add_theme_constant_override("shadow_offset_y", 1)
 				label.add_theme_constant_override("outline_size", 0)
 			elif label.has_meta("settings_section_header"):
 				label.add_theme_font_override("font", _ui_title_font if _ui_title_font != null else _ui_font)
@@ -9137,7 +9640,9 @@ func _build_home_overview_section(target_parent: Control, label: String) -> Grid
 	section_label.text = label.to_upper()
 	section_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	section_label.add_theme_font_size_override("font_size", 12)
-	section_label.add_theme_color_override("font_color", Color(0.96, 0.91, 0.73, 0.88))
+	section_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.44, 0.98))
+	section_label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.45))
+	section_label.add_theme_constant_override("shadow_offset_y", 1)
 	section_label.set_meta("home_overview_section_header", true)
 	section.add_child(section_label)
 
@@ -9215,9 +9720,13 @@ func _build_home_overview_card(target_parent: Control, label: String, descriptio
 	var name_lbl := Label.new()
 	name_lbl.text = label
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if _ui_title_font != null:
+	# Hero menu cards use the bold weight so top-level navigation reads with
+	# clear hierarchy against the airy Inter-Thin used everywhere else.
+	if _ui_bold_font != null:
+		name_lbl.add_theme_font_override("font", _ui_bold_font)
+	elif _ui_title_font != null:
 		name_lbl.add_theme_font_override("font", _ui_title_font)
-	name_lbl.add_theme_font_size_override("font_size", 17)
+	name_lbl.add_theme_font_size_override("font_size", 18)
 	name_lbl.add_theme_color_override("font_color", Color(0.16, 0.22, 0.31, 1.0))
 	name_lbl.set_meta("mode_card_title_label", true)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -9454,9 +9963,12 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 		return
 	var gold := MENU_SETUP_HIGHLIGHT
 	var cyan := MENU_CARD_LEARNING_ACCENT
-	var accent: Color = cyan
+	# Selected cards turn golden — accent (icon, bar, shell border) flips from
+	# cyan to gold and the fill gets a warm gold tint so the active mode reads as
+	# a golden button at a glance, not just a blue card with a gold outline.
+	var accent: Color = gold if selected else cyan
 	var normal_bg := Color(0.0588, 0.1529, 0.2510, 0.78)
-	var selected_bg := Color(0.064, 0.166, 0.276, 0.88)
+	var selected_bg := Color(0.2196, 0.1490, 0.0353, 0.93)
 	var normal_border := Color(cyan.r, cyan.g, cyan.b, 0.24)
 	var selected_border := Color(gold.r, gold.g, gold.b, 0.94)
 	var card_size_v: Variant = btn.get_meta("ear_mode_card_size", Vector2(190, 86))
@@ -9464,8 +9976,20 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 	var panel := _ear_mode_card_panel(btn)
 	if panel != null:
 		panel.custom_minimum_size = card_size
-		panel.add_theme_stylebox_override("panel", _ear_mode_card_stylebox(selected_bg if selected else normal_bg, selected_border if selected else normal_border, selected, locked))
+		var card_sb := _ear_mode_card_stylebox(selected_bg if selected else normal_bg, selected_border if selected else normal_border, selected, locked)
+		panel.add_theme_stylebox_override("panel", card_sb)
 		panel.modulate = Color(1, 1, 1, 0.46) if locked else Color(1, 1, 1, 1)
+		# Selection usually changes while the card is hovered (you click it). The
+		# hover system caches the pre-hover stylebox/accent and restores them on
+		# mouse-exit — which would clobber this fresh selected (gold) styling. Re-sync
+		# the hover caches to the new base so the gold fill survives the pointer
+		# leaving. Without this, only the icon (not hover-managed) stays gold.
+		panel.remove_meta("_hover_base_sb")
+		panel.remove_meta("_hover_hover_sb")
+		if panel.has_meta("_pre_hover_sb"):
+			panel.set_meta("_pre_hover_sb", card_sb)
+		panel.remove_meta("_pre_hover_accent_color")
+		panel.remove_meta("_pre_hover_accent_right")
 
 	var transparent := StyleBoxFlat.new()
 	transparent.bg_color = Color(0, 0, 0, 0)
@@ -9490,7 +10014,7 @@ func _style_ear_mode_card_button(btn: Button, selected: bool, locked: bool) -> v
 		title_lbl.add_theme_constant_override("shadow_offset_y", 1)
 	var subtitle_lbl := btn.get_meta("ear_mode_subtitle_label", null) as Label
 	if subtitle_lbl != null and is_instance_valid(subtitle_lbl):
-		subtitle_lbl.add_theme_color_override("font_color", Color(0.78, 0.92, 0.96, 0.96) if selected else Color(0.68, 0.78, 0.88, 0.92))
+		subtitle_lbl.add_theme_color_override("font_color", Color(0.98, 0.91, 0.74, 0.98) if selected else Color(0.68, 0.78, 0.88, 0.92))
 	var icon := btn.get_meta("ear_mode_icon", null) as TextureRect
 	if icon != null and is_instance_valid(icon):
 		icon.modulate = Color(accent.r, accent.g, accent.b, 1.0 if selected else 0.95)
@@ -9689,7 +10213,7 @@ func _style_home_footer_buttons() -> void:
 
 func _is_sight_notes_setup_screen_active() -> bool:
 	var home_visible := _home_card != null and _home_card.visible and _home_panel != null and _home_panel.visible
-	return home_visible and _home_mode_detail_active and not _ear_settings_screen_active and not _sight_settings_screen_active and _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+	return home_visible and _home_mode_detail_active and not _ear_settings_screen_active and not _sight_settings_screen_active and _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 
 
 func _is_main_menu_overview_active() -> bool:
@@ -10044,7 +10568,7 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_range_group.add_theme_constant_override("separation", 12 if active else 4)
 	if _sight_range_container != null:
 		_sight_range_container.add_theme_constant_override("separation", 12 if active else 4)
-	var sight_notes_mode := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+	var sight_notes_mode := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 	var sight_chords_mode := _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
 	if _sight_notes_setup_title_label != null:
 		var show_setup_title := active and not sight_notes_mode and not (_selected_mode == MODE_SIGHT and _sight_mode == "Chords")
@@ -10056,7 +10580,7 @@ func _refresh_sight_notes_setup_menu_style() -> void:
 		_sight_notes_setup_title_label.add_theme_constant_override("outline_size", 0)
 		_sight_notes_setup_title_label.add_theme_font_size_override("font_size", 18)
 	if _sight_key_sig_label != null:
-		var show_key_sig_label := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+		var show_key_sig_label := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 		_sight_key_sig_label.visible = show_key_sig_label
 		_sight_key_sig_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT if active else HORIZONTAL_ALIGNMENT_CENTER
 		_sight_key_sig_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY if active else Color(0.92, 0.90, 0.82, 0.92))
@@ -10395,6 +10919,7 @@ func _style_practice_setup_input_control(ctrl: Control) -> void:
 		opt.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 		opt.add_theme_color_override("font_hover_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 		opt.add_theme_color_override("font_pressed_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+		call_deferred("_style_menu_option_popup", opt)
 	if ctrl is SpinBox:
 		var spin := ctrl as SpinBox
 		var line := spin.get_line_edit()
@@ -10404,6 +10929,51 @@ func _style_practice_setup_input_control(ctrl: Control) -> void:
 			line.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 			line.add_theme_color_override("font_placeholder_color", SIGHT_NOTES_SETUP_TEXT_SECONDARY)
 		spin.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
+
+
+func _style_menu_option_popup(opt_ctrl: Control) -> void:
+	var opt := opt_ctrl as OptionButton
+	if opt == null or not is_instance_valid(opt):
+		return
+	var popup := opt.get_popup()
+	if popup == null:
+		return
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color(0.03, 0.08, 0.15, 0.98)
+	panel.border_color = Color(0.95, 0.75, 0.30, 0.88)
+	panel.border_width_left = 1
+	panel.border_width_top = 1
+	panel.border_width_right = 1
+	panel.border_width_bottom = 1
+	panel.corner_radius_top_left = 8
+	panel.corner_radius_top_right = 8
+	panel.corner_radius_bottom_left = 8
+	panel.corner_radius_bottom_right = 8
+	panel.content_margin_left = 6
+	panel.content_margin_right = 6
+	panel.content_margin_top = 6
+	panel.content_margin_bottom = 6
+	popup.add_theme_stylebox_override("panel", panel)
+	popup.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 0.98))
+	popup.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.80, 1.0))
+	popup.add_theme_color_override("font_selected_color", Color(1.0, 0.96, 0.80, 1.0))
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(0.10, 0.21, 0.36, 0.98)
+	hover.border_color = Color(1.0, 0.84, 0.44, 0.88)
+	hover.border_width_left = 1
+	hover.border_width_top = 1
+	hover.border_width_right = 1
+	hover.border_width_bottom = 1
+	hover.corner_radius_top_left = 4
+	hover.corner_radius_top_right = 4
+	hover.corner_radius_bottom_left = 4
+	hover.corner_radius_bottom_right = 4
+	popup.add_theme_stylebox_override("hover", hover)
+	popup.add_theme_stylebox_override("highlight", hover)
+	var selected: StyleBoxFlat = hover.duplicate()
+	selected.bg_color = Color(0.14, 0.27, 0.42, 0.98)
+	popup.add_theme_stylebox_override("selected", selected)
+	popup.add_theme_stylebox_override("pressed", selected)
 
 
 func _style_practice_setup_primary_cta_button(btn: Button) -> void:
@@ -10624,11 +11194,20 @@ func _refresh_practice_setup_theme() -> void:
 	_style_practice_setup_toggle_button(_sight_accidentals_toggle, _sight_accidentals_toggle != null and _sight_accidentals_toggle.button_pressed, false)
 	_style_practice_setup_toggle_button(_rhythm_flow_metronome_check, _rhythm_flow_runtime.metronome_enabled, false)
 
-	_style_practice_setup_input_control(_pitch_match_key_option)
-	_style_practice_setup_input_control(_pitch_match_scale_option)
-	_style_practice_setup_input_control(_rhythm_flow_exercise_select)
-	_style_practice_setup_input_control(_rhythm_flow_seed_spin)
-	_style_practice_setup_input_control(_rhythm_bpm_spin)
+	for input_ctrl in [
+		_ear_choice_count_select,
+		_pitch_match_key_option,
+		_pitch_match_scale_option,
+		_pitch_match_level_option,
+		_pitch_match_label_mode_option,
+		_progression_key_option,
+		_scale_root_option,
+		_cadence_key_option,
+		_rhythm_flow_exercise_select,
+		_rhythm_flow_seed_spin,
+		_rhythm_bpm_spin,
+	]:
+		_style_practice_setup_input_control(input_ctrl)
 	if _rhythm_flow_bpm_label != null:
 		_rhythm_flow_bpm_label.add_theme_color_override("font_color", SIGHT_NOTES_SETUP_TEXT_PRIMARY)
 	if _rhythm_flow_exercise_label != null:
@@ -11100,15 +11679,15 @@ func _style_hud_box(box: PanelContainer) -> void:
 
 
 func _is_sight_notes_chords_game_mode() -> bool:
-	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords") and _game_panel != null and _game_panel.visible
+	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals") and _game_panel != null and _game_panel.visible
 
 
 func _is_sight_notes_chords_mode() -> bool:
-	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 
 
 func _is_sight_notes_style_mode() -> bool:
-	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow")
+	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Rhythm Flow" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 
 
 func _sight_skin_is_desktop_hybrid_profile() -> bool:
@@ -11339,6 +11918,14 @@ func _apply_top_hud_nav_button_skin() -> void:
 	if _sight_settings_button != null:
 		# Force glyph-based gear so we can guarantee a crisp white settings icon.
 		_style_sight_header_icon_button(_sight_settings_button, char(0x2699), null)
+
+
+# Single-arg adapter used by Practice Drills + Chord Explorer panels so their
+# nav-home buttons match the sight-reader look (SVG house icon in a circular
+# pill). Passed in via setup() to keep the icon loading + style contract
+# centralized here.
+func _apply_clefira_nav_home_button_style(btn: Button) -> void:
+	_style_sight_header_icon_button(btn, char(0x2302), _sight_home_icon)
 
 
 func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: Texture2D = null) -> void:
@@ -11655,7 +12242,7 @@ func _apply_sight_notes_chords_skin() -> void:
 	if _header_accent_line != null:
 		_header_accent_line.visible = false
 	if _title_label != null:
-		_title_label.text = "Sight Reading - %s" % _sight_mode
+		_title_label.text = "Sight Reading - %s" % _sight_mode_display_name(_sight_mode)
 		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_title_label.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
 		_title_label.remove_theme_color_override("font_outline_color")
@@ -11666,7 +12253,12 @@ func _apply_sight_notes_chords_skin() -> void:
 	if _header_mode_label != null:
 		_header_mode_label.visible = false
 	if _header_tagline_label != null:
-		_header_tagline_label.text = "Identify the Correct Note" if _sight_mode == "Notes" else "Identify the Correct Chord"
+		if _sight_mode == "Chords":
+			_header_tagline_label.text = "Identify the Correct Chord"
+		elif _sight_mode == "Vanishing":
+			_header_tagline_label.text = "Read before the notes disappear"
+		else:
+			_header_tagline_label.text = "Identify the Correct Note"
 		_header_tagline_label.add_theme_color_override("font_color", Color(0.78, 0.90, 0.98, 0.90))
 	_apply_top_hud_nav_button_skin()
 	if _home_mode_back_button != null:
@@ -11870,7 +12462,7 @@ func _apply_continuous_sight_skin() -> void:
 	if _header_accent_line != null:
 		_header_accent_line.visible = false
 	if _title_label != null:
-		_title_label.text = "Sight Reading - %s" % _sight_mode
+		_title_label.text = "Sight Reading - %s" % _sight_mode_display_name(_sight_mode)
 		_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_title_label.add_theme_color_override("font_color", Color(0.98, 0.96, 0.88, 1.0))
 		_title_label.remove_theme_color_override("font_outline_color")
@@ -12115,6 +12707,11 @@ func _set_note_chase_bottom_metric(label: RichTextLabel, icon_text: String, valu
 
 
 func _result_box_show(title_text: String, subtitle_text: String) -> void:
+	# Defensive reset: whatever was playing is done by the time the round
+	# closes. If a leaked _is_prompt_playing=true survives into the result
+	# screen, the Restart button used to silently bail; clearing here keeps
+	# the result actions always-responsive.
+	_is_prompt_playing = false
 	if _first_run_assessment_active:
 		_first_run_assessment_active = false
 		_first_run_assessment_steps.clear()
@@ -12136,6 +12733,7 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 		_result_subtitle.move_to_front()
 	if _result_action_row != null:
 		_result_action_row.move_to_front()
+		_result_action_row.mouse_filter = Control.MOUSE_FILTER_STOP
 		var show_standard_actions := title_text == "Complete" or title_text == "Keep Practicing!"
 		_result_action_row.visible = show_standard_actions
 		if show_standard_actions:
@@ -12151,7 +12749,9 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 			if _result_action_focus_button != null:
 				var is_ear_mode := _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_CADENCE]
 				var is_sight_review_mode := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
-				var has_misses := (is_ear_mode or is_sight_review_mode) and not _compute_missed_ids().is_empty()
+				var has_note_review := _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and not _sight_note_mistake_review_items.is_empty()
+				var has_misses := has_note_review or ((is_ear_mode or is_sight_review_mode) and not _compute_missed_ids().is_empty())
+				_result_action_focus_button.text = "Replay Mistakes" if has_note_review else "Focus Misses"
 				_result_action_focus_button.visible = has_misses
 				_result_action_focus_button.disabled = false
 			if _result_action_assignments_button != null:
@@ -12165,16 +12765,24 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 				_result_action_focus_button.visible = false
 			if _result_action_assignments_button != null:
 				_result_action_assignments_button.visible = false
+	if _sight_answer_overlay != null:
+		_sight_answer_overlay.visible = false
+		_sight_answer_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hide_sight_note_name_label()
+	_result_overlay.z_index = 2000
 	_result_overlay.visible = true
 	_result_overlay.move_to_front()
-	# Bounce-in animation for result box
+	# Intro animation for result box. Set the starting state synchronously (so
+	# there's no flicker) then run the settle on the next frame, once layout has
+	# given the panel a real size for a centered pivot. A centered pivot + gentle
+	# non-overshooting settle keeps the Back/Home buttons at their final hit
+	# position from the first frame — animating scale from the default top-left
+	# pivot (with a TRANS_BACK overshoot) moved the buttons around for ~0.3s and
+	# made early clicks miss ("needs multiple clicks").
 	if _result_box_panel != null:
-		_result_box_panel.scale = Vector2(0.72, 0.72)
+		_result_box_panel.scale = Vector2(0.96, 0.96)
 		_result_box_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
-		var rbw := create_tween()
-		rbw.set_parallel(true)
-		rbw.tween_property(_result_box_panel, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		rbw.tween_property(_result_box_panel, "modulate:a", 1.0, 0.20).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		call_deferred("_animate_result_box_bounce")
 	# SR6 — Build celebration content (accuracy badge, mini stats, focus chip).
 	# Confetti only on "Complete" with accuracy >= 75% so it's a reward, not noise.
 	_build_result_celebration_content(title_text)
@@ -12182,18 +12790,46 @@ func _result_box_show(title_text: String, subtitle_text: String) -> void:
 	if title_text == "Complete":
 		# SS5 — Mastery badges check after a successful session completion.
 		_check_and_award_badges(_question_index, _score)
+		_append_session_unlocks_to_result_content()
 	# Result overlay just became visible — re-evaluate the lesson-session
 	# button so it reappears as a chip if a lesson is recording.
 	_refresh_lesson_session_button()
 
 
 func _result_box_hide() -> void:
+	if _result_box_bounce_tween != null and _result_box_bounce_tween.is_valid():
+		_result_box_bounce_tween.kill()
+	if _result_box_panel != null and is_instance_valid(_result_box_panel):
+		# Always leave the panel at its resting transform so a future show can't
+		# inherit a half-finished scale (which would offset the button hit areas).
+		_result_box_panel.scale = Vector2.ONE
+		_result_box_panel.modulate = Color(1, 1, 1, 1)
 	if _result_overlay != null:
 		_result_overlay.visible = false
 		_result_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_result_overlay.z_index = 760
 	if _result_action_row != null:
 		_result_action_row.visible = false
 	_refresh_lesson_session_button()
+
+
+# Settles the result box into place (called deferred from _result_box_show so the
+# panel has a real size for a centered pivot). Kills any in-flight bounce first so
+# overlapping shows can't strand the panel at scale != 1 (which would shift the
+# Back/Home buttons' clickable area off their visible position).
+func _animate_result_box_bounce() -> void:
+	if _result_box_panel == null or not is_instance_valid(_result_box_panel):
+		return
+	if not (_result_overlay != null and _result_overlay.visible):
+		return
+	if _result_box_bounce_tween != null and _result_box_bounce_tween.is_valid():
+		_result_box_bounce_tween.kill()
+	_result_box_panel.pivot_offset = _result_box_panel.size * 0.5
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(_result_box_panel, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(_result_box_panel, "modulate:a", 1.0, 0.14).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_result_box_bounce_tween = tw
 
 
 # SR6 — Build celebration content shown between subtitle and action row.
@@ -12280,36 +12916,89 @@ func _build_result_celebration_content(title_text: String) -> void:
 		_spawn_result_confetti()
 
 
-# Spawns 10 floating emoji labels around the result panel, fading upward. Pure
-# Control-based, no particle system — safe for headless QA + low-end hardware.
-func _spawn_result_confetti() -> void:
-	if _result_box_panel == null or not is_instance_valid(_result_box_panel):
+func _append_session_unlocks_to_result_content() -> void:
+	if _result_celebration_container == null or _session_unlock_messages.is_empty():
 		return
+	_result_celebration_container.visible = true
+	var unlock_panel := PanelContainer.new()
+	unlock_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var unlock_sb := StyleBoxFlat.new()
+	unlock_sb.bg_color = Color(0.08, 0.12, 0.18, 0.88)
+	unlock_sb.border_color = Color(1.0, 0.78, 0.28, 0.82)
+	unlock_sb.border_width_left = 1
+	unlock_sb.border_width_top = 1
+	unlock_sb.border_width_right = 1
+	unlock_sb.border_width_bottom = 2
+	unlock_sb.corner_radius_top_left = 8
+	unlock_sb.corner_radius_top_right = 8
+	unlock_sb.corner_radius_bottom_left = 8
+	unlock_sb.corner_radius_bottom_right = 8
+	unlock_sb.content_margin_left = 16
+	unlock_sb.content_margin_right = 16
+	unlock_sb.content_margin_top = 10
+	unlock_sb.content_margin_bottom = 10
+	unlock_panel.add_theme_stylebox_override("panel", unlock_sb)
+	var unlock_col := VBoxContainer.new()
+	unlock_col.add_theme_constant_override("separation", 4)
+	unlock_panel.add_child(unlock_col)
+	var title := Label.new()
+	title.text = "%s  Unlocked this session" % char(0x2728)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color(1.0, 0.90, 0.48, 1.0))
+	if _ui_bold_font != null:
+		title.add_theme_font_override("font", _ui_bold_font)
+	unlock_col.add_child(title)
+	for msg in _session_unlock_messages:
+		var line := Label.new()
+		line.text = "- %s" % msg
+		line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		line.add_theme_font_size_override("font_size", 14)
+		line.add_theme_color_override("font_color", Color(0.94, 0.97, 1.0, 0.96))
+		if _ui_font != null:
+			line.add_theme_font_override("font", _ui_font)
+		unlock_col.add_child(line)
+	_result_celebration_container.add_child(unlock_panel)
+
+
+# Bursts emoji upward from MULTIPLE points spread across the screen's middle line
+# (full width), so the celebration reads as a curtain rising across the whole
+# screen rather than from a single point. Pure Control-based, no particle system —
+# safe for headless QA + low-end hardware.
+func _spawn_result_confetti() -> void:
 	var confetti_chars := [char(0x2728), char(0x1F389), char(0x2B50), char(0x1F3B5), char(0x1F31F)]
-	var rect: Rect2 = _result_box_panel.get_global_rect()
-	for i in range(10):
+	var vp: Vector2 = get_viewport_rect().size
+	var mid_y: float = vp.y * 0.5
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	# Evenly spaced launch columns across the full width, each jittered so it
+	# doesn't look like a rigid grid.
+	var columns := 22
+	var margin: float = vp.x * 0.04
+	var span: float = vp.x - margin * 2.0
+	for i in range(columns):
 		var emoji := Label.new()
 		emoji.text = str(confetti_chars[i % confetti_chars.size()])
-		emoji.add_theme_font_size_override("font_size", 28)
+		emoji.add_theme_font_size_override("font_size", rng.randi_range(24, 40))
 		emoji.modulate = Color(1.0, 1.0, 1.0, 0.0)
 		emoji.z_as_relative = false
 		emoji.z_index = 605
 		emoji.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# Spread randomly across the top edge of the result panel.
-		var rng := RandomNumberGenerator.new()
-		rng.randomize()
-		var start_x: float = rect.position.x + rng.randf_range(0.0, rect.size.x)
-		var start_y: float = rect.position.y + 8.0
-		emoji.global_position = Vector2(start_x, start_y)
+		var col_x: float = margin + span * (float(i) + 0.5) / float(columns) + rng.randf_range(-span * 0.02, span * 0.02)
+		var start_y: float = mid_y + rng.randf_range(-18.0, 18.0)
+		emoji.global_position = Vector2(col_x, start_y)
 		add_child(emoji)
+		# Rise upward with a gentle sideways fan; staggered start for a wave feel.
+		var lift: float = rng.randf_range(150.0, 320.0)
+		var drift: float = rng.randf_range(-70.0, 70.0)
+		var delay: float = rng.randf_range(0.0, 0.22)
 		var tw := create_tween()
 		tw.set_parallel(true)
-		var lift: float = rng.randf_range(60.0, 140.0)
-		var drift: float = rng.randf_range(-40.0, 40.0)
-		tw.tween_property(emoji, "modulate:a", 1.0, 0.15)
-		tw.tween_property(emoji, "global_position:y", start_y - lift, 1.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tw.tween_property(emoji, "global_position:x", start_x + drift, 1.8).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(emoji, "modulate:a", 0.0, 0.8).set_delay(1.0)
+		tw.tween_property(emoji, "modulate:a", 1.0, 0.14).set_delay(delay)
+		tw.tween_property(emoji, "global_position:y", start_y - lift, 1.5).set_delay(delay).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(emoji, "global_position:x", col_x + drift, 1.5).set_delay(delay).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(emoji, "modulate:a", 0.0, 0.7).set_delay(delay + 0.85)
 		tw.chain().tween_callback(emoji.queue_free)
 
 
@@ -12400,17 +13089,304 @@ func _on_result_action_primary_pressed() -> void:
 
 func _on_result_action_focus_pressed() -> void:
 	_play_ui_click_sfx()
-	_focus_missed_ids = _filter_focus_ids_for_mode(_selected_mode, _compute_missed_ids())
+	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and not _sight_note_mistake_review_items.is_empty():
+		_start_sight_mistake_review()
+		return
+	var missed: Array[String] = _filter_focus_ids_for_mode(_selected_mode, _compute_missed_ids())
+	if missed.is_empty():
+		# Defensive — the button should already have been hidden, but bail
+		# instead of starting an empty focus round.
+		return
+	# Extend the pool with the harmonic inversion of each missed interval so
+	# the drill covers BOTH the miss and its complementary partner. Other
+	# modes don't have a clean "inversion" concept that maps onto the same
+	# ID space (chord inversions are handled by the existing inversion
+	# toggle picking different voicings of the same chord ID).
+	if _selected_mode == MODE_INTERVAL:
+		var extended: Array[String] = []
+		for mid in missed:
+			extended.append(mid)
+		for mid in missed:
+			var inv := _inverted_interval_id(mid)
+			if inv != "" and not extended.has(inv):
+				extended.append(inv)
+		missed = extended
+	_focus_missed_ids = missed
+	# Dynamic round length: roughly one question per pool item, with a min
+	# of 3 (otherwise a single miss → 1-question "round" feels broken) and
+	# a max of 20 to keep focus drills snappy. For chord mode we double the
+	# count so each focus chord gets cycled through multiple inversions via
+	# the existing inversion toggle.
+	var target_count: int
+	if _selected_mode == MODE_CHORD:
+		target_count = clampi(missed.size() * 2, 3, 20)
+	else:
+		target_count = clampi(missed.size(), 3, 20)
 	if _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_CADENCE] and _question_spin != null:
 		_suppress_round_count_save = true
-		_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
+		_question_spin.value = target_count
 		_suppress_round_count_save = false
 	elif _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords") and _sight_question_spin != null:
 		_suppress_round_count_save = true
-		_sight_question_spin.value = FOCUS_MISSES_QUESTION_COUNT
-		_sight_question_count = FOCUS_MISSES_QUESTION_COUNT
+		_sight_question_spin.value = target_count
+		_sight_question_count = target_count
 		_suppress_round_count_save = false
 	_on_restart_quiz_pressed()
+
+
+func _start_sight_mistake_review() -> void:
+	if _sight_note_mistake_review_items.is_empty():
+		return
+	_sight_mistake_review_return_mode = _sight_mode
+	_sight_mistake_review_active = true
+	_sight_mistake_review_index = 0
+	_sight_mistake_review_phase = "watch"
+	_selected_mode = MODE_SIGHT
+	_sight_mode = "Placement"
+	_quiz_active = true
+	_accepting_answer = false
+	_awaiting_round_start = false
+	_question_index = 1
+	_total_questions = _sight_note_mistake_review_items.size()
+	_score = 0
+	_streak = 0
+	_result_box_hide()
+	_show_game()
+	_apply_answer_mode()
+	_show_sight_mistake_review_item(true)
+
+
+func _finish_sight_mistake_review() -> void:
+	_sight_mistake_review_active = false
+	_sight_mistake_review_index = 0
+	_sight_mistake_review_phase = ""
+	_sight_mode = _sight_mistake_review_return_mode
+	_quiz_active = false
+	_accepting_answer = false
+	_is_note_dragging = false
+	if _sight_mistake_review_next_button != null:
+		_sight_mistake_review_next_button.visible = false
+	_set_staff_highlight_none()
+	_hide_preview_ledger()
+	_hide_target_dotted_oval()
+	if _staff_note != null:
+		_staff_note.visible = false
+		_staff_note.modulate = Color(1, 1, 1, 1)
+		_staff_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _staff_clef_label != null:
+		_staff_clef_label.modulate = Color(1, 1, 1, 1)
+		_staff_clef_label.scale = Vector2.ONE
+	_result_box_hide()
+	_show_home()
+
+
+func _current_sight_mistake_review_item() -> Dictionary:
+	if _sight_mistake_review_index < 0 or _sight_mistake_review_index >= _sight_note_mistake_review_items.size():
+		return {}
+	return _sight_note_mistake_review_items[_sight_mistake_review_index]
+
+
+func _show_sight_mistake_review_item(play_demo: bool) -> void:
+	var item := _current_sight_mistake_review_item()
+	if item.is_empty():
+		_finish_sight_mistake_review()
+		return
+	_sight_mistake_review_phase = "watch" if play_demo else "try"
+	_accepting_answer = false
+	_is_note_dragging = false
+	_grand_staff_active = false
+	_question_index = _sight_mistake_review_index + 1
+	_selected_clef = str(item.get("clef", _selected_clef))
+	_sight_key_signature = str(item.get("key_signature", _sight_key_signature))
+	_current_sight_target_step = int(item.get("step", _current_sight_target_step))
+	_current_sight_display_step = _current_sight_target_step
+	_current_sight_note = str(item.get("note", _sight_step_label(_current_sight_target_step)))
+	_prompt_label.text = "Mistake review: %s" % _current_sight_note
+	_score_label.text = "Review %d / %d" % [_question_index, _sight_note_mistake_review_items.size()]
+	_progress_label.text = "Watch, then place the same note."
+	_status_label.visible = true
+	_status_label.text = _sight_note_reason_text(_current_sight_note, _selected_clef)
+	_refresh_meta_ui()
+	_set_answer_buttons_enabled(false)
+	_replay_button.disabled = true
+	_restart_button.disabled = true
+	_clear_staff_ledger_lines()
+	_hide_preview_ledger()
+	_set_staff_highlight_none()
+	_hide_target_dotted_oval()
+	for n in _staff_chord_notes:
+		if n != null:
+			n.visible = false
+	for lbl in _staff_chord_accidental_labels:
+		if lbl != null:
+			lbl.visible = false
+	_reset_placement_note_to_side()
+	if _staff_note != null:
+		_staff_note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _sight_mistake_review_next_button != null:
+		_sight_mistake_review_next_button.text = "Next"
+		_sight_mistake_review_next_button.visible = false
+	if play_demo:
+		_animate_sight_mistake_review_demo()
+	else:
+		_begin_sight_mistake_review_try()
+
+
+func _animate_sight_mistake_review_demo() -> void:
+	var item := _current_sight_mistake_review_item()
+	if item.is_empty() or not _sight_mistake_review_active:
+		return
+	var target_step := int(item.get("step", _current_sight_target_step))
+	var ok_gold := Color(1.0, 0.86, 0.28, 1.0)
+	var ok_green := Color(0.72, 1.0, 0.20, 1.0)
+	_accepting_answer = false
+	_sight_mistake_review_phase = "watch"
+	_set_staff_highlight_for_step(target_step, ok_gold)
+	if _is_staff_ledger_step(target_step):
+		_show_preview_ledger(target_step, ok_gold)
+	if _staff_clef_label != null:
+		_staff_clef_label.modulate = ok_gold
+		var clef_tween := create_tween()
+		clef_tween.set_trans(Tween.TRANS_SINE)
+		clef_tween.set_ease(Tween.EASE_OUT)
+		clef_tween.tween_property(_staff_clef_label, "scale", Vector2(1.06, 1.06), 0.12)
+		clef_tween.tween_property(_staff_clef_label, "scale", Vector2.ONE, 0.16)
+	if _staff_note == null:
+		return
+	var center_y := _staff_center_y_for_step(target_step)
+	var target_pos := Vector2(_sight_note_snap_x(), center_y - (_staff_note.size.y * 0.5) + SIGHT_REPLAY_NOTE_DROP_Y)
+	var demo := create_tween()
+	demo.set_trans(Tween.TRANS_SINE)
+	demo.set_ease(Tween.EASE_IN_OUT)
+	demo.tween_property(_staff_note, "position", target_pos, 0.72)
+	await demo.finished
+	if not _sight_mistake_review_active or _sight_mistake_review_phase != "watch":
+		return
+	_snap_note_to_step(target_step)
+	_staff_note.modulate = ok_green
+	_set_staff_highlight_for_step(target_step, ok_green)
+	if _is_staff_ledger_step(target_step):
+		_show_preview_ledger(target_step, ok_green)
+	if _staff_clef_label != null:
+		_staff_clef_label.modulate = Color(1, 1, 1, 1)
+	await get_tree().create_timer(0.25).timeout
+	if not _sight_mistake_review_active or _sight_mistake_review_phase != "watch":
+		return
+	if _sight_mistake_review_next_button != null:
+		_sight_mistake_review_next_button.text = "Try It"
+		_sight_mistake_review_next_button.visible = true
+
+
+func _begin_sight_mistake_review_try() -> void:
+	var item := _current_sight_mistake_review_item()
+	if item.is_empty():
+		_finish_sight_mistake_review()
+		return
+	_sight_mistake_review_phase = "try"
+	_accepting_answer = true
+	_is_note_dragging = false
+	_reset_placement_note_to_side()
+	_set_staff_highlight_none()
+	_hide_preview_ledger()
+	_hide_target_dotted_oval()
+	if _staff_note != null:
+		_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP
+	_prompt_label.text = "Your turn: place %s" % _current_sight_note
+	_progress_label.text = "Drag the note to the matching line or space."
+	_status_label.visible = true
+	_status_label.text = "Use the clef and staff position to place %s." % _current_sight_note
+	if _sight_mistake_review_next_button != null:
+		_sight_mistake_review_next_button.visible = false
+
+
+func _resolve_sight_mistake_review_drop(step: int) -> void:
+	if not _sight_mistake_review_active or _sight_mistake_review_phase != "try":
+		return
+	_accepting_answer = false
+	var target_step := _current_sight_target_step
+	var is_correct := step == target_step
+	var ok_green := Color(0.72, 1.0, 0.20, 1.0)
+	var bad_red := Color(1.0, 0.26, 0.26, 1.0)
+	if is_correct:
+		_sight_mistake_review_phase = "done"
+		_staff_note.modulate = ok_green
+		_set_staff_highlight_for_step(step, ok_green)
+		if _is_staff_ledger_step(step):
+			_show_preview_ledger(step, ok_green)
+		_status_label.text = "Correct. %s" % _sight_note_reason_text(_current_sight_note, _selected_clef)
+		await _play_success_sfx()
+		if _sight_mistake_review_next_button != null:
+			_sight_mistake_review_next_button.text = "Finish" if _sight_mistake_review_index >= _sight_note_mistake_review_items.size() - 1 else "Next"
+			_sight_mistake_review_next_button.visible = true
+	else:
+		_staff_note.modulate = bad_red
+		_set_staff_highlight_for_step(step, bad_red)
+		if _is_staff_ledger_step(step):
+			_show_preview_ledger(step, bad_red)
+		_status_label.text = "Not there yet. Watch the correct spot, then try again."
+		_play_fail_sfx()
+		await _blink_correct_placement_target(target_step, 3, 1.2)
+		_reset_placement_note_to_side()
+		_set_staff_highlight_none()
+		_hide_preview_ledger()
+		_accepting_answer = true
+
+
+func _on_sight_mistake_review_next_pressed() -> void:
+	_play_ui_click_sfx()
+	if not _sight_mistake_review_active:
+		return
+	if _sight_mistake_review_phase == "watch":
+		_begin_sight_mistake_review_try()
+		return
+	if _sight_mistake_review_phase == "done":
+		_sight_mistake_review_index += 1
+		if _sight_mistake_review_index >= _sight_note_mistake_review_items.size():
+			_finish_sight_mistake_review()
+			return
+		_show_sight_mistake_review_item(true)
+
+
+# Drops focus from the A/B compare buttons after they're pressed. Keeping
+# focus there causes a small ring-tween + amplifies any default press SFX.
+func _clear_compare_button_focus() -> void:
+	if _compare_your_btn != null and _compare_your_btn.has_focus():
+		_compare_your_btn.release_focus()
+	if _compare_correct_play_btn != null and _compare_correct_play_btn.has_focus():
+		_compare_correct_play_btn.release_focus()
+
+
+# Silences the shared _piano_player BEFORE the next compare playback starts.
+# The previous prompt may still have a few ms of audio tail in the buffer
+# (especially when the user clicks "Play yours" right after the wrong-answer
+# replay). Without this, _piano_player.stop() inside _play_note cuts the
+# tail abruptly, producing the audible click the user reported.
+func _settle_piano_for_compare_playback() -> void:
+	if _piano_player == null:
+		return
+	if not _piano_player.playing:
+		return
+	_piano_player.volume_db = -60.0
+	_piano_player.stop()
+
+
+# Returns the harmonic-inversion partner of an interval id (m3↔M6, P4↔P5,
+# P1↔P8, TT↔TT, …). Empty string if the id isn't in INTERVAL_DATA.
+func _inverted_interval_id(id: String) -> String:
+	if not INTERVAL_DATA.has(id):
+		return ""
+	var semis_arr: Array = INTERVAL_DATA[id].get("semitones", [])
+	if semis_arr.is_empty():
+		return ""
+	var semis: int = int(semis_arr[0]) % 12
+	var inv_semis: int = (12 - semis) % 12
+	# P8 (12) inverts to P1 (0); preserve P8 explicitly so we still surface
+	# the octave when the user missed a unison.
+	if int(semis_arr[0]) == 12:
+		return "P1"
+	if id == "P1":
+		return "P8"
+	return _interval_id_for_semitones(inv_semis)
 
 
 # Confusion drill: builds an item pool from the student's top N confused pairs
@@ -12568,6 +13544,50 @@ func _compute_missed_ids() -> Array[String]:
 	return _ensure_progress_store().compute_missed_ids(stats_asked, stats_correct)
 
 
+func _reset_sight_note_mistake_review() -> void:
+	_sight_note_mistake_review_items.clear()
+	_sight_mistake_review_active = false
+	_sight_mistake_review_index = 0
+	_sight_mistake_review_phase = ""
+	if _sight_mistake_review_next_button != null:
+		_sight_mistake_review_next_button.visible = false
+
+
+func _has_sight_note_mistake_review_items() -> bool:
+	return _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and not _sight_note_mistake_review_items.is_empty()
+
+
+func _record_sight_note_mistake(chosen_note: String) -> void:
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
+		return
+	var correct_note := _current_sight_note.strip_edges()
+	if correct_note.is_empty():
+		return
+	var clef_name := _selected_clef
+	var step := _current_sight_display_step
+	var key := "%s:%s:%d" % [clef_name, correct_note, step]
+	for i in range(_sight_note_mistake_review_items.size()):
+		var existing: Dictionary = _sight_note_mistake_review_items[i]
+		if str(existing.get("key", "")) != key:
+			continue
+		existing["count"] = int(existing.get("count", 1)) + 1
+		var chosen_list: Array = existing.get("chosen", [])
+		if not chosen_list.has(chosen_note):
+			chosen_list.append(chosen_note)
+		existing["chosen"] = chosen_list
+		_sight_note_mistake_review_items[i] = existing
+		return
+	_sight_note_mistake_review_items.append({
+		"key": key,
+		"note": correct_note,
+		"clef": clef_name,
+		"step": step,
+		"key_signature": _sight_key_signature,
+		"count": 1,
+		"chosen": [chosen_note],
+	})
+
+
 func _filter_focus_ids_for_mode(mode: int, ids: Array) -> Array[String]:
 	var out: Array[String] = []
 	for id_any in ids:
@@ -12581,7 +13601,15 @@ func _filter_focus_ids_for_mode(mode: int, ids: Array) -> Array[String]:
 			MODE_CHORD:
 				valid = CHORD_INTERVALS.has(id)
 			MODE_CADENCE:
+				# Cadence stats are keyed by the human label ("Perfect (V-I)"),
+				# while CADENCE_DEFS keys are short ("Perfect"). Accept either —
+				# the cadence generator's focus filter matches both too.
 				valid = CADENCE_DEFS.has(id)
+				if not valid:
+					for ck in CADENCE_DEFS:
+						if str(CADENCE_DEFS[ck].get("label", "")) == id:
+							valid = true
+							break
 			MODE_PROGRESSION:
 				valid = PROGRESSION_DEFS.has(id)
 			MODE_SCALE_MODE:
@@ -12727,11 +13755,11 @@ func _cancel_chicken_turn_hint_cycle(hide_bubble: bool) -> void:
 
 
 func _chicken_nudge_disabled_for_current_mode() -> bool:
-	if _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE or _selected_mode == MODE_PITCH_MATCH:
-		return true
-	if _selected_mode == MODE_SIGHT:
-		return _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Sight Singing"
-	return false
+	# Auto-nudge disabled globally (2026-05-30) — the chicken used to pre-empt
+	# the conversation with "click me for a hint" bubbles, which became more
+	# distraction than help. Hints still work; the user just has to tap the
+	# chicken sprite themselves (see _on_bird_gui_input → _request_chicken_hint).
+	return true
 
 
 func _show_chicken_prompt_line() -> void:
@@ -13350,6 +14378,24 @@ func _load_audio_assets_deferred() -> void:
 	elif _note_chase_bgm is AudioStreamMP3:
 		var mp3 := _note_chase_bgm as AudioStreamMP3
 		mp3.loop = true
+	_prewarm_notation_font()
+
+
+# Bravura.otf (the SMuFL music notation font) is large and otherwise loads
+# lazily on the FIRST staff render — which froze the first Sight Reader / Read
+# open for ~2.5s. Load + shape it here during the boot/splash phase so the staff
+# appears instantly the first time the user opens a notation mode. The font is
+# cached statically inside SMuFLFont after this, so later opens reuse it.
+func _prewarm_notation_font() -> void:
+	SMuFLFontScript.set_active_font(_score_font_name)
+	var f: Font = SMuFLFontScript.get_font()
+	if f != null:
+		# Touch a glyph so the font's glyph/shaping cache is warm for the first
+		# draw, not just the resource load.
+		var probe: String = SMuFLFontScript.glyph("gClef")
+		if probe == "":
+			probe = "C"
+		f.get_string_size(probe, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 48)
 
 
 func _setup_audio() -> void:
@@ -13386,15 +14432,12 @@ func _update_first_run_assessment_pending() -> void:
 
 func _load_ear_settings() -> void:
 	_ear_choice_count = 6
-	_ear_question_count = 10
-	_sight_question_count = 10
+	_ear_question_count = MIN_STANDARD_ROUND_QUESTIONS
+	_sight_question_count = MIN_STANDARD_ROUND_QUESTIONS
 	_use_descending_intervals = false
 	_use_harmonic_intervals = false
 	_ear_tempo = 90
 	_ear_context_tonic_enabled = true
-	_ear_melodic_context_enabled = false
-	_ear_count_in_enabled = false
-	_ear_metronome_enabled = false
 	_ear_replay_limit_enabled = false
 	_ear_replay_limit = 3
 	_ear_prompt_volume_db = 0
@@ -13424,9 +14467,9 @@ func _load_ear_settings() -> void:
 	if d.has("choice_count"):
 		_ear_choice_count = clampi(int(d["choice_count"]), 2, 6)
 	if d.has("ear_question_count"):
-		_ear_question_count = clampi(int(d["ear_question_count"]), 1, 100)
+		_ear_question_count = clampi(int(d["ear_question_count"]), MIN_STANDARD_ROUND_QUESTIONS, 100)
 	if d.has("sight_question_count"):
-		_sight_question_count = clampi(int(d["sight_question_count"]), 1, 100)
+		_sight_question_count = clampi(int(d["sight_question_count"]), MIN_STANDARD_ROUND_QUESTIONS, 100)
 	# (Theme picker removed — palette is hard-coded to FIXED_MENU_THEME_ID.)
 	if d.has("use_descending_intervals"):
 		_use_descending_intervals = bool(d["use_descending_intervals"])
@@ -13436,12 +14479,6 @@ func _load_ear_settings() -> void:
 		_ear_tempo = clampi(int(d["ear_tempo"]), 50, 160)
 	if d.has("ear_context_tonic_enabled"):
 		_ear_context_tonic_enabled = bool(d["ear_context_tonic_enabled"])
-	if d.has("ear_melodic_context_enabled"):
-		_ear_melodic_context_enabled = bool(d["ear_melodic_context_enabled"])
-	if d.has("ear_count_in_enabled"):
-		_ear_count_in_enabled = bool(d["ear_count_in_enabled"])
-	if d.has("ear_metronome_enabled"):
-		_ear_metronome_enabled = bool(d["ear_metronome_enabled"])
 	if d.has("max_bpm_records") and typeof(d["max_bpm_records"]) == TYPE_DICTIONARY:
 		_max_bpm_records = (d["max_bpm_records"] as Dictionary).duplicate(true)
 	if d.has("recent_accuracy_window") and typeof(d["recent_accuracy_window"]) == TYPE_DICTIONARY:
@@ -13494,12 +14531,35 @@ func _load_ear_settings() -> void:
 		_sight_per_key_asked = (d["sight_per_key_asked"] as Dictionary).duplicate(true)
 	if d.has("sight_per_key_correct") and typeof(d["sight_per_key_correct"]) == TYPE_DICTIONARY:
 		_sight_per_key_correct = (d["sight_per_key_correct"] as Dictionary).duplicate(true)
+	if d.has("sight_chord_adaptive_enabled"):
+		_sight_chord_adaptive_enabled = bool(d["sight_chord_adaptive_enabled"])
+		if _adaptive_toggle != null:
+			_adaptive_toggle.set_pressed_no_signal(_sight_chord_adaptive_enabled)
 	if d.has("earned_badges") and typeof(d["earned_badges"]) == TYPE_ARRAY:
 		_earned_badges.clear()
 		for b in (d["earned_badges"] as Array):
 			_earned_badges.append(str(b))
 	if d.has("per_student_badge_state") and typeof(d["per_student_badge_state"]) == TYPE_DICTIONARY:
 		_per_student_badge_state = (d["per_student_badge_state"] as Dictionary).duplicate(true)
+	if d.has("skill_stats") and typeof(d["skill_stats"]) == TYPE_DICTIONARY:
+		_skill_stats = (d["skill_stats"] as Dictionary).duplicate(true)
+	if d.has("vanishing_pace_id"):
+		_vanishing_pace_id = clampi(int(d["vanishing_pace_id"]), 0, VANISHING_PACE_MULTS.size() - 1)
+	if d.has("vanishing_full_recall"):
+		_vanishing_full_recall = bool(d["vanishing_full_recall"])
+	if d.has("interval_variant"):
+		var iv := str(d["interval_variant"])
+		_interval_reading_phrase = iv == "phrase"
+		_interval_reading_landmark = iv == "landmark"
+	if d.has("interval_use_harmonic"):
+		_interval_reading_use_harmonic = bool(d["interval_use_harmonic"])
+	if d.has("interval_sizes") and typeof(d["interval_sizes"]) == TYPE_ARRAY:
+		_interval_custom_sizes.clear()
+		for s in (d["interval_sizes"] as Array):
+			var si := int(s)
+			if si >= 1 and si <= 7 and not _interval_custom_sizes.has(si):
+				_interval_custom_sizes.append(si)
+		_interval_custom_sizes.sort()
 	if d.has("item_correct_streaks") and typeof(d["item_correct_streaks"]) == TYPE_DICTIONARY:
 		_item_correct_streaks = (d["item_correct_streaks"] as Dictionary).duplicate(true)
 	if d.has("badge_lifetime_correct_sight"):
@@ -13614,9 +14674,6 @@ func _save_ear_settings() -> void:
 		"use_harmonic_intervals": _use_harmonic_intervals,
 		"ear_tempo": _ear_tempo,
 		"ear_context_tonic_enabled": _ear_context_tonic_enabled,
-		"ear_melodic_context_enabled": _ear_melodic_context_enabled,
-		"ear_count_in_enabled": _ear_count_in_enabled,
-		"ear_metronome_enabled": _ear_metronome_enabled,
 		"max_bpm_records": _max_bpm_records,
 		"recent_accuracy_window": _recent_accuracy_window,
 		"ear_replay_limit_enabled": _ear_replay_limit_enabled,
@@ -13635,12 +14692,19 @@ func _save_ear_settings() -> void:
 		"midi_enabled": _midi_enabled,
 		"midi_any_octave": _midi_any_octave,
 		"score_font_name": _score_font_name,
+		"skill_stats": _skill_stats,
+		"vanishing_pace_id": _vanishing_pace_id,
+		"vanishing_full_recall": _vanishing_full_recall,
+		"interval_variant": ("phrase" if _interval_reading_phrase else ("landmark" if _interval_reading_landmark else "pair")),
+		"interval_use_harmonic": _interval_reading_use_harmonic,
+		"interval_sizes": _interval_custom_sizes,
 		"note_chase_intro_seen": _note_chase_intro_seen,
 		"cadence_intro_seen": _cadence_intro_seen,
 		"rhythm_flow_intro_seen": _rhythm_flow_intro_seen,
 		"daily_challenge_scores": _daily_challenge_scores,
 		"sight_per_key_asked": _sight_per_key_asked,
 		"sight_per_key_correct": _sight_per_key_correct,
+		"sight_chord_adaptive_enabled": _sight_chord_adaptive_enabled,
 		"earned_badges": _earned_badges,
 		"badge_lifetime_correct_sight": _badge_lifetime_correct_sight,
 		"badge_lifetime_correct_chord": _badge_lifetime_correct_chord,
@@ -13697,6 +14761,8 @@ func _load_progress_data() -> void:
 	# All real per-student writes happen AFTER set_active_student is called.
 	var path: String = _resolve_progress_data_path()
 	_lifetime_stats = _ensure_progress_store().load_from_path(path)
+	# Pull this student's persisted Sight-Chords adaptive reading windows.
+	_sync_sight_chord_adaptive_from_stats()
 
 
 func _save_progress_data() -> void:
@@ -14198,7 +15264,7 @@ func _tempo_ramp_suggestion_text() -> String:
 	var next_bpm: int = clampi(_current_session_bpm() + 5, 50, 160)
 	if next_bpm == _current_session_bpm():
 		return ""
-	return "Tempo ramp: 3 sessions ≥85% — try %d BPM next." % next_bpm
+	return "Tempo ramp: 3 sessions >=85%% - try %d BPM next." % next_bpm
 
 
 func _progress_home_line(mode: int) -> String:
@@ -14263,7 +15329,24 @@ func _apply_chord_preset(preset: String) -> void:
 		"beginner":
 			_selected_chord_types = ["Major", "Minor"]
 		"standard":
-			_selected_chord_types = CHORD_TIER_TRIADS.duplicate()
+			_selected_chord_types = []
+			for chord_name in CHORD_TIER_TRIADS:
+				_selected_chord_types.append(str(chord_name))
+		"sevenths":
+			_selected_chord_types = []
+			for chord_name in CHORD_TIER_TRIADS:
+				_selected_chord_types.append(str(chord_name))
+			for chord_name in CHORD_TIER_7THS:
+				if not _selected_chord_types.has(str(chord_name)):
+					_selected_chord_types.append(str(chord_name))
+		"colors":
+			_selected_chord_types = []
+			for chord_name in CHORD_TIER_TRIADS:
+				_selected_chord_types.append(str(chord_name))
+			for tier in [CHORD_TIER_7THS, CHORD_TIER_6THS, CHORD_TIER_EXTENSIONS]:
+				for chord_name in tier:
+					if not _selected_chord_types.has(str(chord_name)):
+						_selected_chord_types.append(str(chord_name))
 		"advanced":
 			_selected_chord_types = []
 			for tier_name in CHORD_TIER_ORDER:
@@ -14285,10 +15368,10 @@ func _apply_cadence_preset(preset: String) -> void:
 	match preset:
 		"beginner":
 			_cadence_selected = ["Perfect", "Plagal"]
-		"standard":
+		"standard":   # Intermediate — adds Imperfect / Half
+			_cadence_selected = ["Perfect", "Plagal", "Half"]
+		"advanced":   # adds Interrupted / Deceptive — all 4
 			_cadence_selected = ["Perfect", "Plagal", "Half", "Deceptive"]
-		"advanced":
-			_cadence_selected = ["Perfect", "Plagal", "Half", "Deceptive", "Interrupted", "ImperfectAuth"]
 	for _cname in _cadence_type_buttons.keys():
 		var _cbtn: Button = _cadence_type_buttons[_cname]
 		if _cbtn != null:
@@ -14335,7 +15418,7 @@ func _refresh_interval_preset_buttons() -> void:
 
 
 func _refresh_chord_preset_buttons() -> void:
-	var preset_names := ["beginner", "standard", "advanced"]
+	var preset_names := ["beginner", "standard", "sevenths", "colors", "advanced"]
 	for i in range(_chord_preset_btns.size()):
 		var btn := _chord_preset_btns[i]
 		if btn == null:
@@ -14396,12 +15479,6 @@ func _refresh_ear_settings_ui() -> void:
 		_ear_tempo_spin.value = _ear_tempo
 	if _ear_context_tonic_toggle != null:
 		_ear_context_tonic_toggle.set_pressed_no_signal(_ear_context_tonic_enabled)
-	if _ear_melodic_context_toggle != null:
-		_ear_melodic_context_toggle.set_pressed_no_signal(_ear_melodic_context_enabled)
-	if _ear_count_in_toggle != null:
-		_ear_count_in_toggle.set_pressed_no_signal(_ear_count_in_enabled)
-	if _ear_metronome_toggle != null:
-		_ear_metronome_toggle.set_pressed_no_signal(_ear_metronome_enabled)
 	if _ear_replay_limit_toggle != null:
 		_ear_replay_limit_toggle.set_pressed_no_signal(_ear_replay_limit_enabled)
 	if _ear_replay_limit_spin != null:
@@ -14579,6 +15656,11 @@ func _on_mode_selected() -> void:
 		# hides the gear icon on mode-setup screens too, which Codex/UX review
 		# flagged as competing with the in-mode controls.
 		_sight_settings_button.visible = show_overview and not _first_run_assessment_pending
+	if _active_student_chip != null:
+		if show_overview:
+			_refresh_active_student_chip()
+		else:
+			_active_student_chip.visible = false
 	if _home_edit_profile_button != null:
 		_home_edit_profile_button.visible = show_overview and not _first_run_assessment_pending and not IS_TEACHER_EDITION
 	_apply_top_hud_nav_button_skin()
@@ -14607,15 +15689,20 @@ func _on_mode_selected() -> void:
 		else:
 			_home_start_button.visible = false
 	if _how_to_play_button != null:
-		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_PITCH_MATCH, MODE_SIGHT, MODE_NOTE_CHASE, MODE_CADENCE]
+		# Only modes with an actual intro overlay in _on_how_to_play_pressed.
+		# (Pitch Match has no overlay, so the button must not show there.)
+		var has_intro := show_detail and _selected_mode in [MODE_INTERVAL, MODE_CHORD, MODE_SIGHT, MODE_NOTE_CHASE, MODE_CADENCE]
 		_how_to_play_button.visible = has_intro
 	_refresh_confusion_drill_button_visibility()
 	# Badge card is home-only — re-evaluate every time menu visibility shifts.
 	_refresh_home_badges_card()
 	if _mic_toggle_button != null:
-		_mic_toggle_button.visible = show_detail and _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		var show_sight_notes_mic_setup := show_detail and _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		_mic_toggle_button.visible = show_sight_notes_mic_setup
+		_mic_toggle_button.set_pressed_no_signal(_mic_mode_enabled)
+		_mic_toggle_button.text = "Mic: On" if _mic_mode_enabled else "Mic: Off"
 	if _home_footer_bar != null:
-		var show_footer_actions := (_home_settings_button != null and _home_settings_button.visible) or (_home_edit_profile_button != null and _home_edit_profile_button.visible) or (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible)
+		var show_footer_actions := (_home_settings_button != null and _home_settings_button.visible) or (_home_edit_profile_button != null and _home_edit_profile_button.visible) or (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible) or (_mic_toggle_button != null and _mic_toggle_button.visible)
 		if _home_footer_row != null:
 			_home_footer_row.visible = show_footer_actions
 		var footer_active := show_home_main and not show_settings and (show_footer_actions or (_home_footer_version_label != null))
@@ -14664,6 +15751,11 @@ func _on_mode_selected() -> void:
 	_refresh_sight_notes_setup_menu_style()
 	_refresh_practice_setup_theme()
 	_update_home_disabled_reason()
+	# Panel screens (Chord Explorer / Practice Drills / Functional Ear) own
+	# the full viewport when active. Override whatever this refresh decided
+	# about home-button visibility so nothing leaks behind them.
+	if _chord_explorer_active or _practice_drills_active or _functional_ear_active:
+		_hide_home_overlay_buttons()
 	call_deferred("_setup_home_focus_navigation")
 
 
@@ -14704,6 +15796,10 @@ func _refresh_home_subtitle() -> void:
 			_home_title_label.text = "Sight Reading - Note Flow"
 		elif _sight_mode == "Rhythm Flow":
 			_home_title_label.text = "Sight Reading - Rhythm Flow"
+		elif _sight_mode == "Vanishing":
+			_home_title_label.text = "Sight Reading - Note Recall"
+		elif _sight_mode == "Intervals":
+			_home_title_label.text = "Sight Reading - Interval Reading"
 		else:
 			_home_title_label.text = "Sight Reading - Notes"
 	elif _selected_mode == MODE_NOTE_CHASE:
@@ -14716,6 +15812,14 @@ func _refresh_home_subtitle() -> void:
 
 func _on_mode_button_pressed(mode: int) -> void:
 	if _startup_boot_blocking_input():
+		return
+	if mode == MODE_NOTE_CHASE and not NOTE_CHASE_ENABLED:
+		_selected_mode = MODE_SIGHT
+		_sight_mode = "Notes"
+		_home_mode_detail_active = true
+		_sight_settings_screen_active = false
+		_sync_home_state_from_runtime()
+		_on_mode_selected()
 		return
 	_clear_gameplay_transient_visuals()
 	_home_mode_detail_active = true
@@ -15601,6 +16705,13 @@ func _on_sight_accidentals_toggled(enabled: bool) -> void:
 	_refresh_practice_setup_theme()
 
 
+func _on_sight_chord_adaptive_toggled(enabled: bool) -> void:
+	_sight_chord_adaptive_enabled = enabled
+	_style_menu_toggle(_adaptive_toggle, enabled, _adaptive_toggle != null and _adaptive_toggle.disabled)
+	_refresh_practice_setup_theme()
+	_save_ear_settings()
+
+
 func _on_note_chase_note_toggled(note_name: String) -> void:
 	if not _note_chase_note_toggles.has(note_name):
 		return
@@ -15688,6 +16799,8 @@ func _on_sight_mode_button_pressed(mode_name: String) -> void:
 			_refresh_continuous_keyboard_range()
 		return
 	_clear_gameplay_transient_visuals()
+	_hide_sight_note_name_label()
+	_hide_sight_chord_note_chip()
 	_sight_mode = next_mode
 	if not _mvp_is_sight_key_signature_enabled(_sight_key_signature, next_mode):
 		_sight_key_signature = "C"
@@ -15923,11 +17036,127 @@ func _on_home_practice_toggle_pressed() -> void:
 
 
 func _on_mic_toggle_pressed() -> void:
-	_mic_mode_enabled = not _mic_mode_enabled
 	if _mic_toggle_button != null:
-		_mic_toggle_button.button_pressed = _mic_mode_enabled
-		_mic_toggle_button.text = "Mic Mode: On" if _mic_mode_enabled else "Mic Mode: Off"
+		_mic_mode_enabled = _mic_toggle_button.button_pressed
+	else:
+		_mic_mode_enabled = not _mic_mode_enabled
+	_refresh_sight_notes_mic_buttons()
+	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and _quiz_active:
+		_on_sight_notes_mic_toggled(_mic_mode_enabled)
+	if _mic_toggle_button != null:
+		_mic_toggle_button.set_pressed_no_signal(_mic_mode_enabled)
 	_save_ear_settings()
+
+
+# --- Sight Notes mic input -------------------------------------------------
+func _refresh_sight_notes_mic_buttons() -> void:
+	if _mic_toggle_button != null:
+		_mic_toggle_button.set_pressed_no_signal(_mic_mode_enabled)
+		_mic_toggle_button.text = "Mic: On" if _mic_mode_enabled else "Mic: Off"
+	if _sight_notes_mic_button != null:
+		_sight_notes_mic_button.set_pressed_no_signal(_mic_mode_enabled and _sight_notes_mic_listener != null and _sight_notes_mic_listener.is_listening())
+		_sight_notes_mic_button.text = ("%s  Mic on" if _sight_notes_mic_button.button_pressed else "%s  Mic") % char(0x1F3A4)
+
+
+func _reset_sight_notes_mic_pending() -> void:
+	_sight_notes_mic_pending_midi = -999
+	_sight_notes_mic_pending_count = 0
+	_sight_notes_mic_pending_first_msec = 0
+
+
+func _sight_notes_mic_detection_confirmed(midi: int) -> bool:
+	var now := Time.get_ticks_msec()
+	if midi != _sight_notes_mic_pending_midi or now - _sight_notes_mic_pending_first_msec > _SIGHT_NOTES_MIC_CONFIRM_WINDOW_MSEC:
+		_sight_notes_mic_pending_midi = midi
+		_sight_notes_mic_pending_count = 1
+		_sight_notes_mic_pending_first_msec = now
+		return _SIGHT_NOTES_MIC_CONFIRMATIONS <= 1
+	_sight_notes_mic_pending_count += 1
+	return _sight_notes_mic_pending_count >= _SIGHT_NOTES_MIC_CONFIRMATIONS and now - _sight_notes_mic_pending_first_msec >= _SIGHT_NOTES_MIC_MIN_CONFIRM_AGE_MSEC
+
+
+func _ensure_sight_notes_mic_listener() -> void:
+	if _sight_notes_mic_listener != null:
+		return
+	_sight_notes_mic_listener = MicListenerScript.new()
+	_sight_notes_mic_listener.setup(
+		Callable(self, "_panel_mic_start"),
+		Callable(self, "_panel_mic_stop"),
+		Callable(self, "_panel_mic_poll"),
+		Callable(self, "_panel_mic_set_target_pc")
+	)
+	if _sight_notes_mic_listener.has_method("set_same_note_repeat_gap"):
+		_sight_notes_mic_listener.call("set_same_note_repeat_gap", 0.08)
+	if _sight_notes_mic_listener.has_method("set_target_pitch_class"):
+		var target_midi := _current_sight_note_prompt_midi()
+		_sight_notes_mic_listener.call("set_target_pitch_class", target_midi % 12 if target_midi >= 0 else -1)
+	_sight_notes_mic_listener.note_detected.connect(_on_sight_notes_mic_note_detected)
+	_sight_notes_mic_listener.status_changed.connect(_on_sight_notes_mic_status_changed)
+
+
+func _on_sight_notes_mic_toggled(pressed: bool) -> void:
+	_ensure_sight_notes_mic_listener()
+	if _sight_notes_mic_listener == null:
+		return
+	if pressed:
+		_mic_mode_enabled = true
+		_reset_sight_notes_mic_pending()
+		var ok: bool = _sight_notes_mic_listener.start()
+		if not ok:
+			_mic_mode_enabled = false
+			if _sight_notes_mic_button != null:
+				_sight_notes_mic_button.set_pressed_no_signal(false)
+			_refresh_sight_notes_mic_buttons()
+			return
+		if _sight_notes_mic_button != null:
+			_sight_notes_mic_button.text = "%s  Mic on" % char(0x1F3A4)
+		if _mic_status_label != null:
+			_mic_status_label.visible = true
+			_mic_status_label.text = "Mic: listening..."
+	else:
+		_mic_mode_enabled = false
+		_reset_sight_notes_mic_pending()
+		_sight_notes_mic_listener.stop()
+		if _sight_notes_mic_button != null:
+			_sight_notes_mic_button.text = "%s  Mic" % char(0x1F3A4)
+		if _mic_status_label != null:
+			_mic_status_label.visible = false
+	_refresh_sight_notes_mic_buttons()
+	_save_ear_settings()
+
+
+func _on_sight_notes_mic_note_detected(midi: int, note_name: String, full_name: String, _cents_off: float) -> void:
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Notes":
+		return
+	if not _accepting_answer or not _quiz_active:
+		return
+	# Reject speaker-bleed: while the prompt note is sounding, the detector
+	# would otherwise pick up the app's own speaker output and submit an
+	# answer with no user input. The cooldown also covers the reverb tail
+	# (~500ms) after the prompt finishes.
+	if _is_prompt_playing:
+		return
+	if Time.get_ticks_msec() < _sight_notes_mic_resume_at_msec:
+		return
+	if note_name.is_empty():
+		return
+	if not _sight_notes_mic_detection_confirmed(midi):
+		if _mic_status_label != null:
+			_mic_status_label.visible = true
+			_mic_status_label.text = "Mic: confirming %s..." % (full_name if not full_name.is_empty() else note_name)
+		return
+	var matched: String = _match_mic_midi_to_sight(midi, note_name)
+	if matched.is_empty() or not _sight_key_buttons.has(matched):
+		return
+	_reset_sight_notes_mic_pending()
+	_on_sight_key_chosen(matched)
+
+
+func _on_sight_notes_mic_status_changed(text: String, listening: bool) -> void:
+	if _mic_status_label == null:
+		return
+	_mic_status_label.text = text
+	_mic_status_label.visible = listening
 
 
 func _on_ear_settings_pressed() -> void:
@@ -16065,7 +17294,7 @@ func _on_ear_choice_count_selected(index: int) -> void:
 func _on_ear_question_count_changed(value: float) -> void:
 	if _suppress_round_count_save or _qa_enabled:
 		return
-	_ear_question_count = clampi(int(round(value)), 1, 100)
+	_ear_question_count = clampi(int(round(value)), MIN_STANDARD_ROUND_QUESTIONS, 100)
 	if _question_spin != null and int(round(_question_spin.value)) != _ear_question_count:
 		_question_spin.value = _ear_question_count
 	_save_ear_settings()
@@ -16080,21 +17309,6 @@ func _on_ear_tempo_changed(value: float) -> void:
 
 func _on_ear_context_tonic_toggled(enabled: bool) -> void:
 	_ear_context_tonic_enabled = enabled
-	_save_ear_settings()
-
-
-func _on_ear_melodic_context_toggled(enabled: bool) -> void:
-	_ear_melodic_context_enabled = enabled
-	_save_ear_settings()
-
-
-func _on_ear_count_in_toggled(enabled: bool) -> void:
-	_ear_count_in_enabled = enabled
-	_save_ear_settings()
-
-
-func _on_ear_metronome_toggled(enabled: bool) -> void:
-	_ear_metronome_enabled = enabled
 	_save_ear_settings()
 
 
@@ -16134,7 +17348,7 @@ func _on_sight_question_count_changed(value: float) -> void:
 			_sight_singing_questions_stepper.value = _sight_singing_runtime.questions_per_round
 			_suppress_round_count_save = false
 	else:
-		_sight_question_count = clampi(int(round(value)), 1, 100)
+		_sight_question_count = clampi(int(round(value)), MIN_STANDARD_ROUND_QUESTIONS, 100)
 		if _sight_question_spin != null and int(round(_sight_question_spin.value)) != _sight_question_count:
 			_sight_question_spin.value = _sight_question_count
 	_save_ear_settings()
@@ -17215,7 +18429,11 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		btn.visible = not locked
 		_set_home_selection_state(btn, not locked and _selected_mode == MODE_SIGHT and mode_name == _sight_mode)
 		_apply_mvp_locked_button_visual(btn, locked)
-	if _sight_note_chase_button != null:
+	# Only style the Note Chase tab when it is actually shown (NOTE_CHASE_ENABLED).
+	# When gated off it is never added to the scene tree, and styling an orphan
+	# control forces a one-time fallback-theme/font resolution that cost ~2.2s on
+	# the FIRST Sight Reader open. Skipping it keeps the mode opening instantly.
+	if NOTE_CHASE_ENABLED and _sight_note_chase_button != null and _sight_note_chase_button.is_inside_tree():
 		_set_home_selection_state(_sight_note_chase_button, _selected_mode == MODE_NOTE_CHASE)
 		_apply_mvp_locked_button_visual(_sight_note_chase_button, false)
 	var sight_active := _selected_mode == MODE_SIGHT
@@ -17226,7 +18444,7 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 	var in_rhythm_menu := rhythm_flow_selected and _home_panel != null and _home_panel.visible
 	if _sight_round_length_row != null:
 		# Show on Notes / Chords / Sight Singing for consistent "Round N questions" UX.
-		_sight_round_length_row.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Sight Singing")
+		_sight_round_length_row.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Sight Singing" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 		# Sync the shared spin value to the mode-specific state var so the
 		# stepper reads/writes the right backing field for the active mode.
 		if _sight_question_spin != null and not _suppress_round_count_save:
@@ -17238,8 +18456,24 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 				_sight_question_spin.max_value = 100
 				_sight_question_spin.value = _sight_question_count
 			_suppress_round_count_save = false
+	if _vanishing_options_row != null:
+		_vanishing_options_row.visible = sight_active and _sight_mode == "Vanishing"
+		if _vanishing_options_row.visible:
+			_refresh_vanishing_option_buttons()
+	if _skill_progress_button != null:
+		_skill_progress_button.visible = sight_active and (_sight_mode == "Vanishing" or _sight_mode == "Intervals")
+	if _interval_options_row != null:
+		_interval_options_row.visible = sight_active and _sight_mode == "Intervals"
+		if _interval_options_row.visible:
+			_refresh_interval_variant_buttons()
+	if _interval_sizes_row != null:
+		_interval_sizes_row.visible = sight_active and _sight_mode == "Intervals"
+		if _interval_sizes_row.visible:
+			_refresh_interval_size_chips()
 	if _sight_singing_rhythm_setup_row != null:
 		_sight_singing_rhythm_setup_row.visible = sight_singing_mode
+	if _sight_singing_beta_notice != null:
+		_sight_singing_beta_notice.visible = sight_singing_mode
 	if sight_singing_mode:
 		_sight_singing_sync_rhythm_level_options()
 	if _sight_notes_setup_title_label != null:
@@ -17248,7 +18482,7 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		# Also show in Sight Singing mode so the embedded Round-length stepper
 		# is reachable; clef-specific children (Treble/Bass/Grand Staff buttons)
 		# are individually hidden for Sight Singing below.
-		_sight_clef_row.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Continuous" or _sight_mode == "Chords" or _sight_mode == "Sight Singing")
+		_sight_clef_row.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Continuous" or _sight_mode == "Chords" or _sight_mode == "Sight Singing" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 		# Hide clef-specific controls when Sight Singing — only the round-length
 		# stepper at the end of the row remains visible.
 		for clef_name in _clef_buttons.keys():
@@ -17269,10 +18503,10 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 	if _rhythm_actions_group_title_label != null:
 		_rhythm_actions_group_title_label.visible = rhythm_flow_selected
 	if _sight_range_container != null:
-		_sight_range_container.visible = sight_active and _sight_mode == "Notes"
+		_sight_range_container.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Vanishing")
 		if _sight_range_container.visible:
 			_apply_sight_note_selector_for_current_clef()
-	var midi_visible := sight_active and _sight_mode == "Notes" and _midi_platform_supported()
+	var midi_visible := sight_active and (_sight_mode == "Notes" or _sight_mode == "Vanishing") and _midi_platform_supported()
 	if _sight_midi_card != null:
 		_sight_midi_card.visible = midi_visible
 	elif _sight_midi_group != null:
@@ -17280,7 +18514,7 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 	if midi_visible:
 		_refresh_midi_settings_ui()
 	if _sight_key_sig_row != null:
-		_sight_key_sig_row.visible = chord_mode or (sight_active and _sight_mode == "Notes")
+		_sight_key_sig_row.visible = chord_mode or (sight_active and (_sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals"))
 	if _sight_accidentals_toggle != null:
 		var show_tier1_accidentals := chord_mode and _sight_tier_allows_accidentals_toggle()
 		_sight_accidentals_toggle.visible = show_tier1_accidentals
@@ -17289,6 +18523,13 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 			sight_acc_row = _sight_accidentals_toggle.get_parent() as Control
 		if sight_acc_row != null:
 			sight_acc_row.visible = show_tier1_accidentals
+	if _adaptive_toggle != null:
+		# Adaptive applies to single Treble/Bass chord reading only (Grand Staff
+		# uses a fixed voicing range).
+		var show_adaptive := chord_mode and (_selected_clef == "Treble" or _selected_clef == "Bass")
+		_adaptive_toggle.visible = show_adaptive
+		if _sight_adaptive_row != null:
+			_sight_adaptive_row.visible = show_adaptive
 	if _rhythm_flow_settings_row != null:
 		_rhythm_flow_settings_row.visible = rhythm_flow_selected
 	if _rhythm_flow_settings_row_2 != null:
@@ -17375,7 +18616,7 @@ func _refresh_sight_key_sig_buttons(final_pass: bool = true) -> void:
 
 
 func _refresh_sight_note_key_buttons() -> void:
-	var use_keysig := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+	var use_keysig := _is_sight_note_input_mode()
 	var sig_map := _key_signature_accidental_map()
 	for key in _sight_key_buttons.keys():
 		var btn: Button = _sight_key_buttons[key]
@@ -17398,6 +18639,14 @@ func _effective_sight_step_bounds() -> Vector2i:
 	var bounds := _get_sight_step_bounds()
 	if _in_tutorial:
 		return bounds
+	# Sight Reading Chords: adaptive vertical window on single Treble/Bass clef.
+	# Grand Staff and focus-misses sessions use the fixed full range.
+	if _sight_mode == "Chords":
+		if (_sight_chord_adaptive_enabled and not _grand_staff_active
+				and _focus_missed_ids.is_empty()
+				and (_selected_clef == "Treble" or _selected_clef == "Bass")):
+			return _sight_chord_window_for_clef(_selected_clef)
+		return bounds
 	if _sight_mode != "Notes":
 		return bounds
 	# SS4 — adaptive ramp: early questions narrow the range to staff-line/space
@@ -17418,6 +18667,110 @@ func _effective_sight_step_bounds() -> Vector2i:
 	if q_ratio < 0.70:
 		return Vector2i(maxi(-3, configured.x), mini(11, configured.y))
 	return configured
+
+
+# --- Sight Reading Chords adaptive difficulty ---
+
+
+# The smallest, easiest reading window per clef — chords start here. Treble: the
+# 2 ledger lines below up to the 2nd space (A3..A4). Bass: the upper staff around
+# middle C (C3..C4). (Smaller step = higher pitch.)
+func _sight_chord_home_window(clef: String) -> Vector2i:
+	if clef == "Bass":
+		return Vector2i(-2, 5)
+	return Vector2i(5, 12)
+
+
+# Absolute reading limits per clef (top ledger to bottom of the step table).
+func _sight_chord_abs_bounds(clef: String) -> Vector2i:
+	return Vector2i(-4, 12)
+
+
+# Current adaptive window for a clef, defaulting to the home window.
+func _sight_chord_window_for_clef(clef: String) -> Vector2i:
+	var w_any: Variant = _sight_chord_window_by_clef.get(clef, null)
+	if w_any is Array and (w_any as Array).size() == 2:
+		var w: Array = w_any
+		return Vector2i(int(w[0]), int(w[1]))
+	return _sight_chord_home_window(clef)
+
+
+# Stores the new window and persists it per student via the progress store.
+func _set_sight_chord_window(clef: String, min_step: int, max_step: int) -> void:
+	_sight_chord_window_by_clef[clef] = [min_step, max_step]
+	var serialized: Dictionary = {}
+	for key in _sight_chord_window_by_clef.keys():
+		serialized[str(key)] = _sight_chord_window_by_clef[key]
+	_lifetime_stats["sight_chord_adaptive"] = serialized
+	_save_progress_data()
+
+
+# Widen the window one step each direction (clamped to the staff). Returns true
+# if anything changed.
+func _sight_chord_expand_window(clef: String) -> bool:
+	var w := _sight_chord_window_for_clef(clef)
+	var ab := _sight_chord_abs_bounds(clef)
+	var new_min := maxi(ab.x, w.x - 1)
+	var new_max := mini(ab.y, w.y + 1)
+	if new_min == w.x and new_max == w.y:
+		return false
+	_set_sight_chord_window(clef, new_min, new_max)
+	return true
+
+
+# Narrow the window one step each direction, but never below the home window.
+func _sight_chord_contract_window(clef: String) -> bool:
+	var w := _sight_chord_window_for_clef(clef)
+	var home := _sight_chord_home_window(clef)
+	var new_min := mini(home.x, w.x + 1)
+	var new_max := maxi(home.y, w.y - 1)
+	if new_min == w.x and new_max == w.y:
+		return false
+	_set_sight_chord_window(clef, new_min, new_max)
+	return true
+
+
+# Reloads the persisted per-student windows (called after the active student's
+# progress data loads).
+func _sync_sight_chord_adaptive_from_stats() -> void:
+	_sight_chord_window_by_clef.clear()
+	var stored_any: Variant = _lifetime_stats.get("sight_chord_adaptive", null)
+	if stored_any is Dictionary:
+		for key in (stored_any as Dictionary).keys():
+			var v_any: Variant = (stored_any as Dictionary)[key]
+			if v_any is Array and (v_any as Array).size() == 2:
+				_sight_chord_window_by_clef[str(key)] = [int(v_any[0]), int(v_any[1])]
+
+
+# Resets the per-session promote/demote streak counters at the start of a round.
+func _sight_chord_adaptive_session_begin() -> void:
+	_sight_chord_adaptive_streak = 0
+	_sight_chord_adaptive_misses = 0
+
+
+# Records one answer and promotes/demotes the reading window. Shows a toast when
+# the range changes so the student understands why higher/lower chords appear.
+func _sight_chord_adaptive_record(correct: bool) -> void:
+	if not _sight_chord_adaptive_enabled or _grand_staff_active or not _focus_missed_ids.is_empty():
+		return
+	if _selected_clef != "Treble" and _selected_clef != "Bass":
+		return
+	if correct:
+		_sight_chord_adaptive_streak += 1
+		_sight_chord_adaptive_misses = 0
+		if _sight_chord_adaptive_streak >= SIGHT_CHORD_PROMOTE_STREAK:
+			_sight_chord_adaptive_streak = 0
+			if _sight_chord_expand_window(_selected_clef):
+				var unlock_msg := "New range unlocked - reading higher and lower now."
+				_record_session_unlock_message(unlock_msg)
+				_show_streak_toast("%s %s" % [char(0x2728), unlock_msg])
+	else:
+		_sight_chord_adaptive_misses += 1
+		_sight_chord_adaptive_streak = 0
+		if _sight_chord_adaptive_misses >= SIGHT_CHORD_DEMOTE_MISSES:
+			_sight_chord_adaptive_misses = 0
+			if _sight_chord_contract_window(_selected_clef):
+				_show_streak_toast("%s Easing the range back — let's lock these in." % char(0x2935))
 
 
 func _sight_step_label_for_clef(step: int, clef_name: String) -> String:
@@ -17876,10 +19229,9 @@ func _on_start_quiz_pressed() -> void:
 	if _first_run_assessment_pending:
 		_begin_first_run_sight_assessment()
 	_ear_replays_used = 0
+	_reset_session_unlock_messages()
 	_lesson_session_record_activity_start()
 	await _ensure_session_controller().start_quiz_from_home(self)
-	if _mic_mode_enabled and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
-		_start_mic_listening()
 	if _midi_enabled and _midi_supported_for_mode() and _midi_platform_supported():
 		_start_midi_listening()
 	# Drone tonic begins with the session (gated by setting; no-op otherwise).
@@ -17890,11 +19242,20 @@ func _on_start_quiz_pressed() -> void:
 
 
 func _on_end_quiz_pressed() -> void:
+	if _sight_mistake_review_active:
+		_finish_sight_mistake_review()
+		return
 	if _first_run_assessment_active:
 		_first_run_assessment_active = false
 		_first_run_assessment_steps.clear()
 	_clear_gameplay_transient_visuals()
 	_invalidate_audio_sequence_schedule()
+	# #7 — weakness-focus is a single-session bias; drop it, and persist the skill
+	# tallies accumulated this session so the heatmap survives across sessions.
+	if not _skill_focus_items.is_empty():
+		_skill_focus_items.clear()
+	_save_ear_settings()
+	_hide_skill_heatmap()
 	_ensure_session_controller().apply_end_state(self)
 	_clear_continuous_sight_notes()
 	_set_continuous_rest_symbol_visible(false)
@@ -17902,6 +19263,12 @@ func _on_end_quiz_pressed() -> void:
 		_continuous_sight_play_line.visible = false
 	_cancel_chicken_turn_hint_cycle(true)
 	_stop_mic_listening()
+	if _sight_notes_mic_listener != null and _sight_notes_mic_listener.is_listening():
+		_sight_notes_mic_listener.stop()
+	if _sight_notes_mic_button != null:
+		_sight_notes_mic_button.set_pressed_no_signal(false)
+		_sight_notes_mic_button.text = "%s  Mic" % char(0x1F3A4)
+		_sight_notes_mic_button.visible = false
 	_stop_midi_listening()
 	_stop_pitch_match_drone()
 	_stop_sight_singing()
@@ -17932,13 +19299,51 @@ func _on_game_home_pressed() -> void:
 
 
 func _on_restart_quiz_pressed() -> void:
-	if _is_prompt_playing:
-		return
+	# Force-clear any stale prompt-playing flag — by the time the user clicks
+	# Restart, the only thing the flag could still be guarding is an aborted
+	# coroutine. The previous "return on _is_prompt_playing" silently dropped
+	# the click and left the result-screen looking unresponsive.
+	_is_prompt_playing = false
+	_invalidate_audio_sequence_schedule()
 	await _ensure_session_controller().restart_quiz(self)
 
 
 func _build_interval_pool_for_settings() -> Array[String]:
 	return EarTrainingCoreScript.build_interval_pool(_get_selected_degrees(), _include_minor_intervals, DEGREE_INTERVALS)
+
+
+func _reset_question_picker_history() -> void:
+	_recent_visible_question_ids.clear()
+
+
+func _recent_visible_ids(history_key: String, current_pool: Array = []) -> Array:
+	var history: Array = _recent_visible_question_ids.get(history_key, [])
+	if history.is_empty() or current_pool.size() <= 1:
+		return []
+	var pool_set: Dictionary = {}
+	for item_any in current_pool:
+		pool_set[str(item_any)] = true
+	var max_avoid := mini(3, maxi(1, pool_set.size() - 1))
+	var out: Array = []
+	for i in range(history.size() - 1, -1, -1):
+		var id := str(history[i])
+		if not pool_set.has(id):
+			continue
+		if not out.has(id):
+			out.append(id)
+		if out.size() >= max_avoid:
+			break
+	return out
+
+
+func _remember_visible_question(history_key: String, visible_id: String) -> void:
+	if visible_id.is_empty():
+		return
+	var history: Array = _recent_visible_question_ids.get(history_key, [])
+	history.append(visible_id)
+	while history.size() > 8:
+		history.pop_front()
+	_recent_visible_question_ids[history_key] = history
 
 
 # Mid-session adaptive difficulty. After each answer, look at the rolling
@@ -18053,27 +19458,51 @@ func _ear_key_root_midi(key_name: String, base_c_midi: int) -> int:
 
 func _build_theory_question_payload() -> Dictionary:
 	if _selected_mode == MODE_PROGRESSION:
-		return TheoryQuestionGeneratorScript.build_progression_payload(
-			_progression_selected, PROGRESSION_DEFS, CHORD_INTERVALS,
-			_review_queue_for_mode(MODE_PROGRESSION), _rng,
-			_ear_key_root_midi(_progression_key, 48)
-		)
+		var progression_pool := _selected_progression_ids()
+		var recent_progressions := _recent_visible_ids("progression", progression_pool)
+		var progression_payload: Dictionary = {}
+		for attempt in range(16):
+			progression_payload = TheoryQuestionGeneratorScript.build_progression_payload(
+				_progression_selected, PROGRESSION_DEFS, CHORD_INTERVALS,
+				_review_queue_for_mode(MODE_PROGRESSION), _rng,
+				_ear_key_root_midi(_progression_key, 48)
+			)
+			var progression_id := str(progression_payload.get("item_id", ""))
+			if not recent_progressions.has(progression_id) or attempt == 15:
+				_remember_visible_question("progression", progression_id)
+				return progression_payload
 	if _selected_mode == MODE_SCALE_MODE:
-		return TheoryQuestionGeneratorScript.build_scale_mode_payload(
-			_scale_selected_modes, SCALE_MODE_DEFS,
-			_review_queue_for_mode(MODE_SCALE_MODE), _rng,
-			_ear_key_root_midi(_scale_root, 60)
-		)
+		var scale_pool := _selected_scale_mode_ids()
+		var recent_scales := _recent_visible_ids("scale_mode", scale_pool)
+		var scale_payload: Dictionary = {}
+		for attempt in range(16):
+			scale_payload = TheoryQuestionGeneratorScript.build_scale_mode_payload(
+				_scale_selected_modes, SCALE_MODE_DEFS,
+				_review_queue_for_mode(MODE_SCALE_MODE), _rng,
+				_ear_key_root_midi(_scale_root, 60)
+			)
+			var scale_id := str(scale_payload.get("item_id", ""))
+			if not recent_scales.has(scale_id) or attempt == 15:
+				_remember_visible_question("scale_mode", scale_id)
+				return scale_payload
 	if _selected_mode == MODE_CADENCE:
 		var cadence_roots: Array[int] = []
 		if _cadence_key == "Rotate":
 			cadence_roots = CADENCE_KEY_ROOTS.duplicate()
 		else:
 			cadence_roots = [_ear_key_root_midi(_cadence_key, 48)]
-		var payload := TheoryQuestionGeneratorScript.build_cadence_payload(
-			_cadence_selected, CADENCE_DEFS, CHORD_INTERVALS, cadence_roots,
-			_focus_missed_ids, _review_queue_for_mode(MODE_CADENCE), _rng
-		)
+		var cadence_pool := _selected_cadence_ids_for_current_round()
+		var recent_cadences := _recent_visible_ids("cadence", cadence_pool)
+		var payload: Dictionary = {}
+		for attempt in range(16):
+			payload = TheoryQuestionGeneratorScript.build_cadence_payload(
+				_cadence_selected, CADENCE_DEFS, CHORD_INTERVALS, cadence_roots,
+				_focus_missed_ids, _review_queue_for_mode(MODE_CADENCE), _rng
+			)
+			var cadence_id := str(payload.get("item_id", ""))
+			if not recent_cadences.has(cadence_id) or attempt == 15:
+				_remember_visible_question("cadence", cadence_id)
+				break
 		# Cadence generator returns the picked key root in `play_root` so callers
 		# can replay the cadence in the same key later in the round.
 		_cadence_play_root = int(payload.get("play_root", _cadence_play_root))
@@ -18152,6 +19581,1422 @@ func _is_sight_chords_grand_staff_mode() -> bool:
 	return _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and _grand_staff_active
 
 
+func _is_sight_vanishing_mode() -> bool:
+	return _selected_mode == MODE_SIGHT and _sight_mode == "Vanishing"
+
+
+func _sight_mode_display_name(mode: String) -> String:
+	# The internal mode key stays "Vanishing" (saved settings + all logic key off it);
+	# only the player-facing label reads "Note Recall".
+	if mode == "Vanishing":
+		return "Note Recall"
+	if mode == "Intervals":
+		return "Interval Reading"
+	return mode
+
+
+func _is_sight_note_input_mode() -> bool:
+	return _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Vanishing")
+
+
+# True when the note-name keyboard is the answer input. Adds the Interval Reading
+# "Name Note" (landmark) variant, which is answered by naming the note.
+func _sight_uses_note_keyboard() -> bool:
+	return _is_sight_note_input_mode() or (_is_interval_reading_mode() and _interval_reading_landmark)
+
+
+func _vanishing_sequence_length() -> int:
+	return int(VANISHING_SEQUENCE_LENGTHS[clampi(_vanishing_level, 0, VANISHING_SEQUENCE_LENGTHS.size() - 1)])
+
+
+func _vanishing_reveal_seconds() -> float:
+	var base := float(VANISHING_REVEAL_SECONDS[clampi(_vanishing_level, 0, VANISHING_REVEAL_SECONDS.size() - 1)])
+	var pace := float(VANISHING_PACE_MULTS[clampi(_vanishing_pace_id, 0, VANISHING_PACE_MULTS.size() - 1)])
+	# Full-sequence recall shows more notes to hold, so grant a little extra read time.
+	var recall_bonus := 1.25 if _vanishing_full_recall else 1.0
+	return clampf(base * pace * _vanishing_adapt_mult * recall_bonus, 0.5, 7.0)
+
+
+func _clear_vanishing_notes() -> void:
+	_vanishing_sequence.clear()
+	_vanishing_input_index = 0
+	_vanishing_target_index = 0
+	for p in _vanishing_note_panels:
+		if p != null:
+			p.visible = false
+			p.modulate = Color(1, 1, 1, 1)
+	_hide_vanishing_slot_marker()
+
+
+func _reset_vanishing_notes_session() -> void:
+	_clear_vanishing_notes()
+	_vanishing_level = 0
+	_vanishing_level_streak = 0
+	_vanishing_adapt_mult = 1.0
+
+
+func _on_vanishing_pace_selected(idx: int) -> void:
+	_vanishing_pace_id = clampi(idx, 0, VANISHING_PACE_MULTS.size() - 1)
+	_save_ear_settings()
+
+
+func _on_vanishing_recall_selected(idx: int) -> void:
+	_vanishing_full_recall = idx == 1
+	_save_ear_settings()
+
+
+func _refresh_vanishing_option_buttons() -> void:
+	if _vanishing_pace_option != null:
+		_vanishing_pace_option.selected = clampi(_vanishing_pace_id, 0, VANISHING_PACE_MULTS.size() - 1)
+	if _vanishing_recall_option != null:
+		_vanishing_recall_option.selected = 1 if _vanishing_full_recall else 0
+
+
+func _vanishing_level_label() -> String:
+	# Honest count — the previous "1 bar"/"2 bars" wording assumed 4/4 metre that
+	# this mode never establishes, so 4 loose notes reading as "1 bar" was misleading.
+	var length := _vanishing_sequence_length()
+	var level_no := clampi(_vanishing_level, 0, VANISHING_SEQUENCE_LENGTHS.size() - 1) + 1
+	return "Level %d · %d notes" % [level_no, length]
+
+
+func _vanishing_pick_step_pool() -> Array[int]:
+	var configured := Vector2i(_sight_range_min_step, _sight_range_max_step)
+	var bounds := Vector2i(maxi(0, configured.x), mini(8, configured.y))
+	if bounds.x > bounds.y:
+		bounds = Vector2i(0, 8)
+	var pool: Array[int] = []
+	for step in range(bounds.x, bounds.y + 1):
+		pool.append(step)
+	if pool.is_empty():
+		for step2 in range(0, 9):
+			pool.append(step2)
+	# #7 — if a weakness-focus drill is active, restrict to steps whose letter is
+	# in the focus set (fall back to the full pool if none match the range).
+	var focus: Array = _skill_focus_items.get("note", [])
+	if not focus.is_empty():
+		var filtered: Array[int] = []
+		for s in pool:
+			if focus.has(_note_letter_only(_staff_step_name_for_clef(s, _selected_clef))):
+				filtered.append(s)
+		if not filtered.is_empty():
+			return filtered
+	return pool
+
+
+# Interval Reading uses the FULL on-staff step range (0..8, an octave-plus span),
+# independent of the note-range selector. The narrow note-range (often a span of
+# ~2) can't hold a 5th/6th/7th/octave, which previously forced the generator to
+# silently fall back to a small interval while the answer buttons still offered
+# the picked sizes — a question/answer mismatch.
+func _interval_step_pool() -> Array[int]:
+	var pool: Array[int] = []
+	for s in range(0, 9):
+		pool.append(s)
+	return pool
+
+
+func _generate_vanishing_round() -> void:
+	_clear_vanishing_notes()
+	for n in _staff_chord_notes:
+		if n != null:
+			n.visible = false
+	for lbl in _staff_chord_accidental_labels:
+		if lbl != null:
+			lbl.visible = false
+	_clear_staff_ledger_lines()
+	_hide_preview_ledger()
+	_set_staff_highlight_none()
+	_stop_sight_note_bounce()
+	_pick_random_sight_frame_border_color()
+	# Roll a fresh notehead colour for this drill — every note in the row shares it,
+	# and the next drill gets a different one, matching the Sight Reader's look.
+	_pick_random_sight_visual_colors()
+	var pool := _vanishing_pick_step_pool()
+	var length := mini(_vanishing_sequence_length(), _vanishing_note_panels.size())
+	var last_step := 999
+	for i in range(length):
+		var step := pool[_rng.randi_range(0, pool.size() - 1)]
+		for attempt in range(8):
+			if step != last_step or pool.size() <= 1:
+				break
+			step = pool[_rng.randi_range(0, pool.size() - 1)]
+		last_step = step
+		var base_note := _staff_step_name_for_clef(step, _selected_clef)
+		var display_name := _sight_note_name_with_key_signature(base_note, false)
+		var accidental := int(_key_signature_accidental_map().get(base_note, 0))
+		var note_midi := _sight_step_to_midi(step, _selected_clef, accidental)
+		_vanishing_sequence.append({
+			"step": step,
+			"base": base_note,
+			"name": display_name,
+			"midi": note_midi,
+		})
+	# Apply the shiny colour material to exactly the panels in play, and pick which
+	# single note this drill will quiz.
+	for i in range(_vanishing_note_panels.size()):
+		if i < _vanishing_sequence.size():
+			_apply_sight_note_color(_vanishing_note_panels[i])
+	_vanishing_target_index = _rng.randi_range(0, maxi(0, _vanishing_sequence.size() - 1))
+	_current_sight_note = _vanishing_level_label()
+	_current_sight_display_step = int(_vanishing_sequence[0].get("step", 4)) if not _vanishing_sequence.is_empty() else 4
+	_position_vanishing_sequence(true)
+	_prompt_label.text = "Read and remember: %s" % _vanishing_level_label()
+	_progress_label.text = "Sequence %d / %d" % [_question_index, _total_questions]
+	_set_status_message("Read the notes — you'll be asked for just one.")
+
+
+func _position_vanishing_sequence(show_notes: bool) -> void:
+	if _staff_area == null:
+		return
+	var g := _sight_visual_staff_geometry()
+	var left := float(g.get("left", STAFF_LEFT_X))
+	var width := float(g.get("width", STAFF_LINE_WIDTH))
+	var count := mini(_vanishing_sequence.size(), _vanishing_note_panels.size())
+	var start_x := left + clampf(width * 0.24, 120.0, 180.0)
+	var usable_w := maxf(120.0, width - (start_x - left) - 48.0)
+	var gap := usable_w / float(maxi(1, count))
+	for i in range(_vanishing_note_panels.size()):
+		var panel := _vanishing_note_panels[i]
+		if panel == null:
+			continue
+		if i >= count:
+			panel.visible = false
+			continue
+		var item: Dictionary = _vanishing_sequence[i]
+		var step := int(item.get("step", 4))
+		# Match the Sight Reader's vertical seating exactly — the single-note mode nudges
+		# every notehead down by SIGHT_NOTE_CENTER_OFFSET_Y so the head sits centred on the
+		# line/space rather than riding high. The vanishing row was missing that offset.
+		var center_y := _staff_center_y_for_step(step) + SIGHT_NOTE_CENTER_OFFSET_Y
+		panel.scale = _note_scale_for_y(center_y)
+		panel.position = Vector2(start_x + (float(i) * gap), center_y - (panel.size.y * 0.5))
+		panel.modulate = Color(1, 1, 1, 1)
+		panel.visible = show_notes
+
+
+func _hide_vanishing_sequence() -> void:
+	for p in _vanishing_note_panels:
+		if p != null:
+			p.visible = false
+	_present_vanishing_question()
+
+
+func _present_vanishing_question() -> void:
+	# After the row vanishes, mark the slot being quizzed and ask for it. Full-recall
+	# walks left-to-right from the first note; single-recall marks one random slot.
+	if _vanishing_full_recall:
+		_vanishing_input_index = 0
+		_show_vanishing_slot_marker(0)
+	else:
+		_show_vanishing_slot_marker(_vanishing_target_index)
+	_vanishing_apply_question_status()
+
+
+func _vanishing_question_prompt() -> String:
+	if _vanishing_sequence.is_empty():
+		return "Pick the note you saw."
+	if _vanishing_full_recall:
+		return "Enter every note in order — note %d of %d." % [
+			_vanishing_input_index + 1, _vanishing_sequence.size()]
+	return "Which note was in the highlighted slot?  (note %d of %d)" % [
+		_vanishing_target_index + 1, _vanishing_sequence.size()]
+
+
+func _ensure_vanishing_slot_marker() -> Panel:
+	if _vanishing_slot_marker != null and is_instance_valid(_vanishing_slot_marker):
+		return _vanishing_slot_marker
+	var m := Panel.new()
+	m.z_index = 156
+	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	m.visible = false
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.86, 0.28, 0.13)
+	sb.border_width_left = 3
+	sb.border_width_right = 3
+	sb.border_width_top = 3
+	sb.border_width_bottom = 3
+	sb.border_color = Color(1.0, 0.82, 0.22, 0.9)
+	sb.corner_radius_top_left = 12
+	sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_left = 12
+	sb.corner_radius_bottom_right = 12
+	m.add_theme_stylebox_override("panel", sb)
+	if _staff_area != null:
+		_staff_area.add_child(m)
+	_vanishing_slot_marker = m
+	return m
+
+
+func _show_vanishing_slot_marker(index: int) -> void:
+	# A vertical highlight over the quizzed note's horizontal slot. It spans the full
+	# staff height (independent of the note's pitch), so it points at "which note in
+	# the row" without leaking the note's vertical position / pitch.
+	if _vanishing_sequence.is_empty():
+		return
+	var idx := clampi(index, 0, _vanishing_note_panels.size() - 1)
+	if idx >= _vanishing_note_panels.size():
+		return
+	var panel := _vanishing_note_panels[idx]
+	if panel == null:
+		return
+	var marker := _ensure_vanishing_slot_marker()
+	var gap := _active_staff_line_gap_y()
+	var staff_top := _active_staff_top_y()
+	var marker_w := maxf(panel.size.x * 1.5, 46.0)
+	var center_x := panel.position.x + (panel.size.x * 0.5)
+	marker.size = Vector2(marker_w, (gap * 4.0) + (gap * 1.4))
+	marker.position = Vector2(center_x - (marker_w * 0.5), staff_top - (gap * 0.7))
+	marker.modulate = Color(1, 1, 1, 1)
+	marker.visible = true
+	if _vanishing_marker_tween != null and _vanishing_marker_tween.is_valid():
+		_vanishing_marker_tween.kill()
+	_vanishing_marker_tween = create_tween()
+	_vanishing_marker_tween.set_loops()
+	_vanishing_marker_tween.tween_property(marker, "modulate:a", 0.5, 0.6).set_trans(Tween.TRANS_SINE)
+	_vanishing_marker_tween.tween_property(marker, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
+
+
+func _hide_vanishing_slot_marker() -> void:
+	if _vanishing_marker_tween != null and _vanishing_marker_tween.is_valid():
+		_vanishing_marker_tween.kill()
+	_vanishing_marker_tween = null
+	if _vanishing_slot_marker != null and is_instance_valid(_vanishing_slot_marker):
+		_vanishing_slot_marker.visible = false
+
+
+func _reveal_vanishing_sequence(color: Color = Color(1, 1, 1, 1)) -> void:
+	_position_vanishing_sequence(true)
+	for p in _vanishing_note_panels:
+		if p != null and p.visible:
+			p.modulate = color
+
+
+func _animate_vanishing_fade(duration: float) -> void:
+	# Tween every visible notehead's alpha to 0 in parallel, then leave them hidden.
+	# _hide_vanishing_sequence() (and the next _position/_reveal) restores alpha to 1.
+	var tween := create_tween()
+	tween.set_parallel(true)
+	var any := false
+	for p in _vanishing_note_panels:
+		if p != null and p.visible:
+			any = true
+			tween.tween_property(p, "modulate:a", 0.0, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	if not any:
+		tween.kill()
+		return
+	await tween.finished
+
+
+func _on_vanishing_note_chosen(note_name: String, chosen_btn_override: Button = null) -> void:
+	if not _quiz_active or not _accepting_answer or _vanishing_sequence.is_empty():
+		return
+	if _vanishing_full_recall:
+		await _vanishing_handle_full_recall_entry(note_name, chosen_btn_override)
+		return
+	# Single-question drill: only the one randomly-chosen slot is graded, then we move on.
+	var target_idx := clampi(_vanishing_target_index, 0, _vanishing_sequence.size() - 1)
+	var expected := str((_vanishing_sequence[target_idx] as Dictionary).get("name", ""))
+	var is_correct := note_name == expected
+	_play_sight_answer_click_sfx()
+	var chosen_btn: Button = chosen_btn_override
+	if chosen_btn == null:
+		chosen_btn = _sight_key_buttons.get(note_name, null) as Button
+	var expected_btn: Button = _sight_key_buttons.get(expected, null) as Button
+	_show_sight_note_keyboard_feedback(note_name, is_correct)
+	await _finish_vanishing_round(is_correct, note_name, expected_btn if expected_btn != null else chosen_btn)
+
+
+func _vanishing_handle_full_recall_entry(note_name: String, chosen_btn_override: Button = null) -> void:
+	# #9 Full-sequence recall: enter each note left-to-right; a miss ends the round.
+	var idx := clampi(_vanishing_input_index, 0, _vanishing_sequence.size() - 1)
+	var expected := str((_vanishing_sequence[idx] as Dictionary).get("name", ""))
+	var is_correct := note_name == expected
+	_play_sight_answer_click_sfx()
+	var expected_btn: Button = _sight_key_buttons.get(expected, null) as Button
+	_show_sight_note_keyboard_feedback(note_name, is_correct)
+	if is_correct:
+		# Keep the note HIDDEN — recall stays a pure memory test. Confirmation comes
+		# from the keyboard turning green + the pitch sounding + the marker advancing,
+		# not from filling the note in on the staff (which would reveal the contour
+		# you've built and act as a crutch for the remaining notes). The whole row is
+		# revealed only at the end, for review.
+		var midi := int((_vanishing_sequence[idx] as Dictionary).get("midi", -1))
+		if midi >= 0:
+			_play_note(midi, 0.26)
+		_vanishing_input_index += 1
+		if _vanishing_input_index < _vanishing_sequence.size():
+			_show_vanishing_slot_marker(_vanishing_input_index)
+			_set_status_message("Good — note %d of %d." % [_vanishing_input_index + 1, _vanishing_sequence.size()], ICON_CORRECT_PATH)
+			if expected_btn != null:
+				_pop_sight_button(expected_btn)
+			return
+		await _finish_vanishing_round(true, note_name, expected_btn)
+	else:
+		# Land the red verdict on the missed slot.
+		_vanishing_target_index = idx
+		var chosen_btn := chosen_btn_override if chosen_btn_override != null else _sight_key_buttons.get(note_name, null) as Button
+		await _finish_vanishing_round(false, note_name, expected_btn if expected_btn != null else chosen_btn)
+
+
+func _finish_vanishing_round(is_correct: bool, chosen_note: String, feedback_btn: Button = null) -> void:
+	var quiz_token := _quiz_run_token
+	_on_player_answer_committed()
+	_accepting_answer = false
+	_set_answer_buttons_enabled(false)
+	_replay_button.disabled = true
+	_restart_button.disabled = true
+	_hide_vanishing_slot_marker()
+	var prev_streak := _streak
+	var prev_xp := _xp
+	var target_idx := clampi(_vanishing_target_index, 0, maxi(0, _vanishing_sequence.size() - 1))
+	var expected := str((_vanishing_sequence[target_idx] as Dictionary).get("name", "")) if not _vanishing_sequence.is_empty() else ""
+	# Bring the whole row back (in its drill colour) so the player can self-check,
+	# then repaint just the quizzed slot green/red as the verdict.
+	_reveal_vanishing_sequence(Color(1, 1, 1, 1))
+	var target_panel: Panel = _vanishing_note_panels[target_idx] if target_idx < _vanishing_note_panels.size() else null
+	# #7 — record which note name was tested, for the weakness heatmap.
+	_record_skill_result("note", _note_letter_only(expected), is_correct)
+	if is_correct:
+		_score += 1
+		_streak += 1
+		_vanishing_level_streak += 1
+		if _vanishing_level_streak >= 2 and _vanishing_level < VANISHING_SEQUENCE_LENGTHS.size() - 1:
+			_vanishing_level += 1
+			_vanishing_level_streak = 0
+		_xp += 12 + mini(_streak, 10)
+		# #8 — succeeded: tighten the reveal window a little next time.
+		_vanishing_adapt_mult = maxf(0.65, _vanishing_adapt_mult - 0.06)
+		_record_question_correct()
+		if target_panel != null:
+			_apply_notehead_material(target_panel, Color(0.45, 0.85, 0.32, 0.98), Color(0.06, 0.12, 0.05, 0.9))
+			target_panel.visible = true
+		if _vanishing_full_recall:
+			_set_status_message("Correct — full sequence!  Next: %s" % _vanishing_level_label(), ICON_CORRECT_PATH)
+		else:
+			_set_status_message("Correct — note %d was %s.  Next: %s" % [target_idx + 1, expected, _vanishing_level_label()], ICON_CORRECT_PATH)
+		_play_success_sfx()
+	else:
+		_streak = 0
+		_vanishing_level_streak = 0
+		if _vanishing_level > 0:
+			_vanishing_level -= 1
+		if not _practice_mode_enabled:
+			_lives = maxi(0, _lives - 1)
+		_xp = maxi(0, _xp - 2)
+		# #8 — missed: loosen the reveal window so the next read is more forgiving.
+		_vanishing_adapt_mult = minf(1.4, _vanishing_adapt_mult + 0.12)
+		if target_panel != null:
+			_apply_notehead_material(target_panel, Color(0.96, 0.46, 0.38, 0.98), Color(0.14, 0.05, 0.05, 0.9))
+			target_panel.visible = true
+		_set_status_message("Note %d was %s, not %s." % [target_idx + 1, expected, chosen_note], ICON_WRONG_PATH)
+		_play_fail_sfx()
+	# Sound the quizzed note so the player links its staff position to its pitch.
+	var target_midi := int((_vanishing_sequence[target_idx] as Dictionary).get("midi", -1)) if not _vanishing_sequence.is_empty() else -1
+	if target_midi >= 0:
+		_play_note(target_midi, 0.3)
+	if feedback_btn != null:
+		if is_correct:
+			await _blink_sight_feedback(null, feedback_btn, 2)
+		else:
+			await _blink_sight_feedback(_sight_key_buttons.get(chosen_note, null) as Button, feedback_btn, 2)
+	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
+	_refresh_meta_ui()
+	_animate_sight_streak_score_feedback(prev_streak, prev_xp, _streak, _xp, _xp - prev_xp, is_correct)
+	await get_tree().create_timer(0.9 if is_correct else 1.5).timeout
+	_clear_vanishing_notes()
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
+
+
+func _is_interval_reading_mode() -> bool:
+	return _selected_mode == MODE_SIGHT and _sight_mode == "Intervals"
+
+
+# Sets the status line text and (optionally) the custom status icon above it.
+# Pass "" to clear the icon. Used by Note Recall + Interval Reading to replace the
+# old inline emoji with the Clefira icon art.
+func _set_status_message(text: String, icon_path: String = "") -> void:
+	if _status_label != null:
+		_status_label.text = text
+		_status_label.visible = true
+	if _sight_status_icon != null:
+		if icon_path != "":
+			_sight_status_icon.texture = load(icon_path)
+			_sight_status_icon.visible = true
+		else:
+			_sight_status_icon.texture = null
+			_sight_status_icon.visible = false
+
+
+func _clear_sight_status_icon() -> void:
+	if _sight_status_icon != null:
+		_sight_status_icon.texture = null
+		_sight_status_icon.visible = false
+
+
+func _vanishing_apply_question_status() -> void:
+	_set_status_message(_vanishing_question_prompt(), ICON_RECALL_PATH)
+
+
+func _interval_apply_question_status() -> void:
+	_set_status_message("What is the interval?", ICON_RECALL_PATH)
+
+
+func _reset_interval_reading_session() -> void:
+	_interval_reading_level = 0
+	_interval_reading_streak = 0
+	_interval_reading_correct = ""
+	_interval_reading_midi1 = -1
+	_interval_reading_midi2 = -1
+
+
+func _interval_reading_level_label() -> String:
+	var names := ["Step & Skip", "Step & Skip + direction", "Named 2nd–5th", "Named to octave"]
+	var idx := clampi(_interval_reading_level, 0, names.size() - 1)
+	return "Level %d · %s" % [idx + 1, names[idx]]
+
+
+func _interval_size_name(size: int) -> String:
+	match size:
+		0: return "Unison"
+		1: return "2nd"
+		2: return "3rd"
+		3: return "4th"
+		4: return "5th"
+		5: return "6th"
+		6: return "7th"
+		7: return "Octave"
+		_: return "%dth" % (size + 1)
+
+
+# Builds the answer key for a (size, direction) pair. Shape levels (0,1) collapse
+# sizes into Same/Step/Skip; named levels use interval numbers. A direction arrow
+# is appended only for melodic display at level ≥ 1 (harmonic has no up/down).
+# Use named interval numbers (2nd/3rd/…) vs the beginner shape words (Step/Skip)?
+# A custom selection is always named; the auto-ladder uses shapes at levels 0–1.
+func _interval_use_named() -> bool:
+	return not _interval_custom_sizes.is_empty() or _interval_reading_level >= 2
+
+
+# Ask for direction (↑/↓)? Only in melodic display, and only once past the very
+# first ladder level (or whenever a custom selection is in play).
+func _interval_use_direction() -> bool:
+	return not _interval_reading_use_harmonic and (not _interval_custom_sizes.is_empty() or _interval_reading_level >= 1)
+
+
+# The interval sizes in play this round: the player's picks, or the level-ladder
+# range when nothing is picked.
+func _interval_allowed_sizes() -> Array[int]:
+	if not _interval_custom_sizes.is_empty():
+		var picks := _interval_custom_sizes.duplicate()
+		picks.sort()
+		return picks
+	var out: Array[int] = []
+	var mx := 2 if _interval_reading_level <= 1 else (4 if _interval_reading_level == 2 else 7)
+	var mn := 0 if _interval_reading_level <= 1 else 1
+	for s in range(mn, mx + 1):
+		out.append(s)
+	return out
+
+
+func _interval_answer_key(size: int, direction: int) -> String:
+	var base := ""
+	if not _interval_use_named():
+		if size <= 0:
+			base = "Same"
+		elif size == 1:
+			base = "Step"
+		else:
+			base = "Skip"
+	else:
+		base = _interval_size_name(size)
+	if _interval_use_direction() and size > 0:
+		base += " %s" % (char(0x2191) if direction > 0 else char(0x2193))
+	return base
+
+
+# The full set of answer buttons for the current selection + display mode.
+func _interval_choice_keys() -> Array[String]:
+	var out: Array[String] = []
+	var add_dir := _interval_use_direction()
+	for sz in _interval_allowed_sizes():
+		if add_dir and sz > 0:
+			out.append(_interval_answer_key(sz, 1))
+			out.append(_interval_answer_key(sz, -1))
+		else:
+			out.append(_interval_answer_key(sz, 1))
+	return out
+
+
+func _generate_interval_reading_round() -> void:
+	if _interval_reading_phrase:
+		_generate_interval_phrase_round()
+		return
+	if _interval_reading_landmark:
+		_generate_interval_landmark_round()
+		return
+	# Reuse the Note Recall notehead panels + cleanup for the staff render.
+	_clear_vanishing_notes()
+	for n in _staff_chord_notes:
+		if n != null:
+			n.visible = false
+	for lbl in _staff_chord_accidental_labels:
+		if lbl != null:
+			lbl.visible = false
+	if _staff_note != null:
+		_staff_note.visible = false
+	_clear_staff_ledger_lines()
+	_hide_preview_ledger()
+	_set_staff_highlight_none()
+	_stop_sight_note_bounce()
+	_pick_random_sight_frame_border_color()
+	_pick_random_sight_visual_colors()
+
+	# Step indices increase DOWNWARD (lower pitch), so "up" = a smaller step index.
+	var pool := _interval_step_pool()
+	var lo_step: int = pool[0]
+	var hi_step: int = pool[pool.size() - 1]
+	# Only consider interval sizes that actually FIT the staff range, so the drawn
+	# interval always has a matching answer button (no clamp surprises).
+	var span: int = hi_step - lo_step
+	var allowed: Array[int] = []
+	for s in _interval_allowed_sizes():
+		if s <= span:
+			allowed.append(s)
+	if allowed.is_empty():
+		allowed = [mini(1, maxi(0, span))]
+	var size: int = allowed[_rng.randi_range(0, allowed.size() - 1)]
+	# #7 — bias toward weak interval shapes when a focus drill is active.
+	var focus_iv: Array = _skill_focus_items.get("interval", [])
+	if not focus_iv.is_empty():
+		var cands: Array[int] = []
+		for s in allowed:
+			if focus_iv.has(_interval_item_only(_interval_answer_key(s, 1))):
+				cands.append(s)
+		if not cands.is_empty():
+			size = cands[_rng.randi_range(0, cands.size() - 1)]
+	var direction := 1 if _rng.randi_range(0, 1) == 0 else -1
+	if _interval_reading_use_harmonic:
+		direction = 1  # stacked: second note sits above the first
+
+	var step1: int = _rng.randi_range(lo_step, hi_step)
+	var step2: int = step1 - (direction * size)
+	for _attempt in range(24):
+		if step2 >= lo_step and step2 <= hi_step:
+			break
+		step1 = _rng.randi_range(lo_step, hi_step)
+		step2 = step1 - (direction * size)
+	step2 = clampi(step2, lo_step, hi_step)
+	# Derive the answer from the steps actually drawn (covers the clamp fallback).
+	var delta: int = step1 - step2
+	var actual_dir: int = 1 if delta > 0 else (-1 if delta < 0 else 0)
+	var actual_size: int = absi(delta)
+	_interval_reading_correct = _interval_answer_key(actual_size, actual_dir)
+
+	var base1 := _staff_step_name_for_clef(step1, _selected_clef)
+	var base2 := _staff_step_name_for_clef(step2, _selected_clef)
+	_interval_reading_midi1 = _sight_step_to_midi(step1, _selected_clef, int(_key_signature_accidental_map().get(base1, 0)))
+	_interval_reading_midi2 = _sight_step_to_midi(step2, _selected_clef, int(_key_signature_accidental_map().get(base2, 0)))
+	_current_sight_display_step = step1
+	_current_sight_note = _interval_reading_level_label()
+
+	_position_interval_reading_notes(step1, step2)
+	_build_interval_reading_answer_buttons()
+
+	_prompt_label.text = "Read the interval (%s)" % ("harmonic" if _interval_reading_use_harmonic else "melodic")
+	_progress_label.text = "Interval %d / %d" % [_question_index, _total_questions]
+	_status_label.visible = true
+	_set_status_message("What is the interval?  (%s)" % _interval_reading_level_label(), ICON_RECALL_PATH)
+
+
+func _place_interval_panel(panel: Panel, center_x: float, center_y: float) -> void:
+	panel.scale = _note_scale_for_y(center_y)
+	panel.position = Vector2(center_x - (panel.size.x * 0.5), center_y - (panel.size.y * 0.5))
+	panel.modulate = Color(1, 1, 1, 1)
+	panel.visible = true
+
+
+func _position_interval_reading_notes(step1: int, step2: int) -> void:
+	if _staff_area == null or _vanishing_note_panels.size() < 2:
+		return
+	var p1: Panel = _vanishing_note_panels[0]
+	var p2: Panel = _vanishing_note_panels[1]
+	if p1 == null or p2 == null:
+		return
+	_apply_sight_note_color(p1)
+	_apply_sight_note_color(p2)
+	var g := _sight_visual_staff_geometry()
+	var left := float(g.get("left", STAFF_LEFT_X))
+	var width := float(g.get("width", STAFF_LINE_WIDTH))
+	var y1 := _staff_center_y_for_step(step1) + SIGHT_NOTE_CENTER_OFFSET_Y
+	var y2 := _staff_center_y_for_step(step2) + SIGHT_NOTE_CENTER_OFFSET_Y
+	var cx := left + clampf(width * 0.42, 200.0, 380.0)
+	if _interval_reading_use_harmonic:
+		var x1 := cx
+		var x2 := cx
+		# Adjacent steps (a 2nd) collide when stacked — offset the upper note right.
+		if absi(step1 - step2) == 1:
+			if step2 < step1:
+				x2 = cx + p2.size.x * 0.9
+			else:
+				x1 = cx + p1.size.x * 0.9
+		_place_interval_panel(p1, x1, y1)
+		_place_interval_panel(p2, x2, y2)
+	else:
+		var gap := clampf(width * 0.22, 130.0, 240.0)
+		_place_interval_panel(p1, cx - gap * 0.5, y1)
+		_place_interval_panel(p2, cx + gap * 0.5, y2)
+
+
+func _ensure_interval_reading_answer_row() -> void:
+	if _interval_reading_answer_row != null and is_instance_valid(_interval_reading_answer_row):
+		return
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 8)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.mouse_filter = Control.MOUSE_FILTER_PASS
+	col.visible = false
+	var toggle := Button.new()
+	toggle.toggle_mode = true
+	toggle.custom_minimum_size = Vector2(168, 34)
+	toggle.tooltip_text = "Melodic shows the notes side-by-side (with up/down). Harmonic stacks them."
+	toggle.set_pressed_no_signal(_interval_reading_use_harmonic)
+	toggle.text = "Harmonic" if _interval_reading_use_harmonic else "Melodic"
+	toggle.toggled.connect(_on_interval_reading_harmonic_toggled)
+	col.add_child(toggle)
+	_interval_reading_harmonic_toggle = toggle
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	col.add_child(grid)
+	_interval_reading_grid = grid
+	if _sight_answer_overlay != null:
+		_sight_answer_overlay.add_child(col)
+	_interval_reading_answer_row = col
+
+
+func _build_interval_reading_answer_buttons() -> void:
+	_ensure_interval_reading_answer_row()
+	if _interval_reading_grid == null:
+		return
+	for c in _interval_reading_grid.get_children():
+		_interval_reading_grid.remove_child(c)
+		c.queue_free()
+	_interval_reading_buttons.clear()
+	var up := char(0x2191)
+	var down := char(0x2193)
+	for key in _interval_choice_keys():
+		var b := Button.new()
+		# Swap the ↑/↓ Unicode arrows for the custom interval-direction icons; keep
+		# the full answer key in meta so grading + button lookup stay direction-aware.
+		if key.ends_with(" %s" % up):
+			b.text = key.trim_suffix(" %s" % up)
+			b.icon = load(ICON_INTERVAL_UP_PATH)
+		elif key.ends_with(" %s" % down):
+			b.text = key.trim_suffix(" %s" % down)
+			b.icon = load(ICON_INTERVAL_DOWN_PATH)
+		else:
+			b.text = key
+		b.set_meta("answer_key", key)
+		b.add_theme_constant_override("h_separation", 4)
+		b.custom_minimum_size = Vector2(98, 46)
+		b.pressed.connect(_on_interval_reading_chosen.bind(key, b))
+		_style_key_button(b)
+		_interval_reading_grid.add_child(b)
+		_interval_reading_buttons.append(b)
+	if _interval_reading_harmonic_toggle != null:
+		_interval_reading_harmonic_toggle.set_pressed_no_signal(_interval_reading_use_harmonic)
+		_interval_reading_harmonic_toggle.text = "Harmonic" if _interval_reading_use_harmonic else "Melodic"
+	_refresh_interval_variant_buttons()
+
+
+func _set_interval_buttons_enabled(enabled: bool) -> void:
+	for b in _interval_reading_buttons:
+		if b != null and is_instance_valid(b):
+			b.disabled = not enabled
+
+
+func _interval_button_for_key(key: String) -> Button:
+	for b in _interval_reading_buttons:
+		if b != null and is_instance_valid(b) and str(b.get_meta("answer_key", b.text)) == key:
+			return b
+	return null
+
+
+func _play_interval_reading_notes_audio() -> void:
+	if _interval_reading_midi1 < 0 or _interval_reading_midi2 < 0:
+		return
+	if _interval_reading_use_harmonic:
+		_play_note(_interval_reading_midi1, 0.5)
+		_play_note(_interval_reading_midi2, 0.5)
+	else:
+		_play_note(_interval_reading_midi1, 0.32)
+		await get_tree().create_timer(0.34).timeout
+		_play_note(_interval_reading_midi2, 0.32)
+
+
+func _on_interval_reading_harmonic_toggled(pressed: bool) -> void:
+	_interval_reading_use_harmonic = pressed
+	if _interval_reading_harmonic_toggle != null:
+		_interval_reading_harmonic_toggle.text = "Harmonic" if pressed else "Melodic"
+	_save_ear_settings()
+	# Re-draw the current interval in the new display so the change is immediate.
+	if _quiz_active and _is_interval_reading_mode() and _accepting_answer:
+		_generate_interval_reading_round()
+
+
+func _on_interval_variant_selected(idx: int) -> void:
+	_interval_reading_phrase = idx == 1
+	_interval_reading_landmark = idx == 2
+	# Phrase + Name are inherently melodic / note-naming — drop the harmonic display.
+	if _interval_reading_phrase or _interval_reading_landmark:
+		_interval_reading_use_harmonic = false
+	_refresh_interval_variant_buttons()
+	_save_ear_settings()
+	if _landmark_anchor_label != null and is_instance_valid(_landmark_anchor_label):
+		_landmark_anchor_label.visible = false
+	if _quiz_active and _is_interval_reading_mode() and _accepting_answer:
+		_generate_interval_reading_round()
+		_apply_answer_mode()
+		_position_sight_floating_answer_rows()
+
+
+func _refresh_interval_variant_buttons() -> void:
+	if _interval_variant_option != null:
+		_interval_variant_option.selected = 1 if _interval_reading_phrase else (2 if _interval_reading_landmark else 0)
+	# Harmonic display only applies to the single-pair variant.
+	if _interval_reading_harmonic_toggle != null:
+		_interval_reading_harmonic_toggle.visible = not _interval_reading_phrase and not _interval_reading_landmark
+
+
+# Force a button's text to one colour across EVERY state (normal/pressed/hover/
+# focus/disabled). Buttons use per-state font colours, so overriding only
+# "font_color" leaves the toggled (pressed) text using the theme default — which
+# can vanish against a custom background. Always set all of them together.
+func _set_button_font_color_all_states(btn: Button, color: Color) -> void:
+	if btn == null:
+		return
+	for slot in ["font_color", "font_pressed_color", "font_hover_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color"]:
+		btn.add_theme_color_override(slot, color)
+
+
+func _refresh_interval_size_chips() -> void:
+	for i in _interval_size_chips.size():
+		var c: Button = _interval_size_chips[i]
+		if c == null:
+			continue
+		var on := _interval_custom_sizes.has(i + 1)
+		c.set_pressed_no_signal(on)
+		# Explicit selected/unselected styling — the default toggle state is too subtle,
+		# so a picked chip glows gold and an unpicked one dims to grey.
+		var sb := StyleBoxFlat.new()
+		sb.corner_radius_top_left = 8
+		sb.corner_radius_top_right = 8
+		sb.corner_radius_bottom_left = 8
+		sb.corner_radius_bottom_right = 8
+		if on:
+			sb.bg_color = Color(0.95, 0.78, 0.30, 0.95)
+			sb.border_color = Color(1.0, 0.90, 0.55, 1.0)
+			_set_button_font_color_all_states(c, Color(0.10, 0.08, 0.03, 1.0))  # dark text on gold
+		else:
+			sb.bg_color = Color(0.18, 0.22, 0.30, 0.85)
+			sb.border_color = Color(0.40, 0.45, 0.54, 0.9)
+			_set_button_font_color_all_states(c, Color(0.88, 0.91, 0.97, 1.0))  # light text on slate
+		sb.border_width_left = 2
+		sb.border_width_top = 2
+		sb.border_width_right = 2
+		sb.border_width_bottom = 2
+		for state in ["normal", "hover", "pressed", "focus", "hover_pressed"]:
+			c.add_theme_stylebox_override(state, sb)
+
+
+func _on_interval_size_chip_toggled(pressed: bool, size: int) -> void:
+	if pressed:
+		if not _interval_custom_sizes.has(size):
+			_interval_custom_sizes.append(size)
+	else:
+		_interval_custom_sizes.erase(size)
+	_interval_custom_sizes.sort()
+	_refresh_interval_size_chips()
+	_save_ear_settings()
+	# Redraw the current round so the new pool + answer buttons take effect at once.
+	if _quiz_active and _is_interval_reading_mode() and _accepting_answer:
+		_generate_interval_reading_round()
+		_apply_answer_mode()
+		_position_sight_floating_answer_rows()
+
+
+func _on_interval_reading_chosen(answer_key: String, btn: Button = null) -> void:
+	if not _quiz_active or not _accepting_answer or not _is_interval_reading_mode():
+		return
+	if _interval_reading_phrase:
+		await _on_interval_phrase_chosen(answer_key, btn)
+		return
+	var is_correct := answer_key == _interval_reading_correct
+	_play_sight_answer_click_sfx()
+	await _finish_interval_reading_round(is_correct, answer_key, btn)
+
+
+func _finish_interval_reading_round(is_correct: bool, chosen_key: String, btn: Button = null) -> void:
+	var quiz_token := _quiz_run_token
+	_on_player_answer_committed()
+	_accepting_answer = false
+	_set_interval_buttons_enabled(false)
+	_replay_button.disabled = true
+	_restart_button.disabled = true
+	var prev_streak := _streak
+	var prev_xp := _xp
+	# #7 — record which interval was tested (up/down aggregated), for the heatmap.
+	_record_skill_result("interval", _interval_item_only(_interval_reading_correct), is_correct)
+	# Sound the two pitches so the shape gets an aural anchor (no advantage — the
+	# student has already committed their answer).
+	_play_interval_reading_notes_audio()
+	if is_correct:
+		_score += 1
+		_streak += 1
+		_interval_reading_streak += 1
+		if _interval_reading_streak >= 2 and _interval_reading_level < INTERVAL_READING_MAX_LEVEL:
+			_interval_reading_level += 1
+			_interval_reading_streak = 0
+		_xp += 12 + mini(_streak, 10)
+		_record_question_correct()
+		_set_status_message("Correct — %s." % _interval_reading_correct, ICON_CORRECT_PATH)
+		_play_success_sfx()
+		if btn != null:
+			await _blink_sight_feedback(null, btn, 2)
+	else:
+		_streak = 0
+		_interval_reading_streak = 0
+		if _interval_reading_level > 0:
+			_interval_reading_level -= 1
+		if not _practice_mode_enabled:
+			_lives = maxi(0, _lives - 1)
+		_xp = maxi(0, _xp - 2)
+		_set_status_message("Not quite — it was %s, not %s." % [_interval_reading_correct, chosen_key], ICON_WRONG_PATH)
+		_play_fail_sfx()
+		if btn != null:
+			await _blink_sight_feedback(btn, _interval_button_for_key(_interval_reading_correct), 2)
+	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
+	_refresh_meta_ui()
+	_animate_sight_streak_score_feedback(prev_streak, prev_xp, _streak, _xp, _xp - prev_xp, is_correct)
+	await get_tree().create_timer(0.9 if is_correct else 1.5).timeout
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
+
+
+func _hide_interval_reading_answer_row() -> void:
+	if _interval_reading_answer_row != null and is_instance_valid(_interval_reading_answer_row):
+		_interval_reading_answer_row.visible = false
+
+
+# --- #1 Melodic Phrase Reading ---------------------------------------------
+func _generate_interval_phrase_round() -> void:
+	_clear_vanishing_notes()
+	for n in _staff_chord_notes:
+		if n != null:
+			n.visible = false
+	if _staff_note != null:
+		_staff_note.visible = false
+	_clear_staff_ledger_lines()
+	_set_staff_highlight_none()
+	_stop_sight_note_bounce()
+	_pick_random_sight_frame_border_color()
+	_pick_random_sight_visual_colors()
+	_phrase_steps.clear()
+	_phrase_midis.clear()
+	_phrase_correct.clear()
+	_phrase_index = 0
+
+	var note_count := clampi(3 + _interval_reading_level, 3, mini(6, _vanishing_note_panels.size()))
+	var pool := _interval_step_pool()
+	var lo_step: int = pool[0]
+	var hi_step: int = pool[pool.size() - 1]
+	# Phrase moves use the selected sizes that FIT the range (unison excluded — a line moves).
+	var phrase_span: int = hi_step - lo_step
+	var phrase_sizes: Array[int] = []
+	for s in _interval_allowed_sizes():
+		if s > 0 and s <= phrase_span:
+			phrase_sizes.append(s)
+	if phrase_sizes.is_empty():
+		phrase_sizes = [1, 2] if phrase_span >= 2 else [maxi(1, phrase_span)]
+	# Build a connected line: each note steps a legal interval from the previous one.
+	var step := _rng.randi_range(lo_step, hi_step)
+	_phrase_steps.append(step)
+	for _i in range(note_count - 1):
+		var size: int = phrase_sizes[_rng.randi_range(0, phrase_sizes.size() - 1)]
+		var dir := 1 if _rng.randi_range(0, 1) == 0 else -1
+		var next_step := step - (dir * size)
+		for _attempt in range(16):
+			if next_step >= lo_step and next_step <= hi_step:
+				break
+			dir = -dir
+			next_step = step - (dir * size)
+			if next_step < lo_step or next_step > hi_step:
+				size = phrase_sizes[_rng.randi_range(0, phrase_sizes.size() - 1)]
+				next_step = step - (dir * size)
+		next_step = clampi(next_step, lo_step, hi_step)
+		_phrase_steps.append(next_step)
+		step = next_step
+	# Precompute the correct interval for each consecutive pair + the midis.
+	for i in _phrase_steps.size():
+		var s: int = _phrase_steps[i]
+		var base := _staff_step_name_for_clef(s, _selected_clef)
+		_phrase_midis.append(_sight_step_to_midi(s, _selected_clef, int(_key_signature_accidental_map().get(base, 0))))
+		if i > 0:
+			var delta: int = _phrase_steps[i - 1] - s
+			var d: int = 1 if delta > 0 else (-1 if delta < 0 else 0)
+			_phrase_correct.append(_interval_answer_key(absi(delta), d))
+	_current_sight_display_step = _phrase_steps[0]
+	_current_sight_note = _interval_reading_level_label()
+	_position_phrase_notes()
+	_highlight_phrase_pair(0)
+	_build_interval_reading_answer_buttons()
+	_prompt_label.text = "Read the line, interval by interval"
+	_progress_label.text = "Phrase %d / %d" % [_question_index, _total_questions]
+	_status_label.visible = true
+	_set_status_message("Move 1 of %d — what interval?" % _phrase_correct.size(), ICON_RECALL_PATH)
+
+
+func _position_phrase_notes() -> void:
+	if _staff_area == null:
+		return
+	var g := _sight_visual_staff_geometry()
+	var left := float(g.get("left", STAFF_LEFT_X))
+	var width := float(g.get("width", STAFF_LINE_WIDTH))
+	var count := mini(_phrase_steps.size(), _vanishing_note_panels.size())
+	var start_x := left + clampf(width * 0.14, 90.0, 150.0)
+	var usable := maxf(160.0, width - (start_x - left) - 60.0)
+	var gap := usable / float(maxi(1, count - 1)) if count > 1 else usable
+	for i in range(_vanishing_note_panels.size()):
+		var panel: Panel = _vanishing_note_panels[i]
+		if panel == null:
+			continue
+		if i >= count:
+			panel.visible = false
+			continue
+		_apply_sight_note_color(panel)
+		var cy := _staff_center_y_for_step(_phrase_steps[i]) + SIGHT_NOTE_CENTER_OFFSET_Y
+		panel.scale = _note_scale_for_y(cy)
+		panel.position = Vector2(start_x + (float(i) * gap) - (panel.size.x * 0.5), cy - (panel.size.y * 0.5))
+		panel.modulate = Color(1, 1, 1, 1)
+		panel.visible = true
+
+
+func _highlight_phrase_pair(idx: int) -> void:
+	# Dim all notes, then mark the two notes of the current move bright; the slot
+	# marker brackets the move so the student knows which interval to read.
+	var count := mini(_phrase_steps.size(), _vanishing_note_panels.size())
+	for i in range(count):
+		var panel: Panel = _vanishing_note_panels[i]
+		if panel == null:
+			continue
+		var active := i == idx or i == idx + 1
+		panel.modulate = Color(1, 1, 1, 1) if active else Color(1, 1, 1, 0.32)
+	# Reuse the vanishing slot marker to bracket the active pair's left note.
+	if idx < _vanishing_note_panels.size():
+		_show_vanishing_slot_marker(idx)
+
+
+func _on_interval_phrase_chosen(answer_key: String, btn: Button = null) -> void:
+	if _phrase_index >= _phrase_correct.size():
+		return
+	var expected := _phrase_correct[_phrase_index]
+	var is_correct := answer_key == expected
+	_play_sight_answer_click_sfx()
+	_record_skill_result("interval", _interval_item_only(expected), is_correct)
+	if not is_correct:
+		# A wrong move ends the line (like full-recall) — reveal the answer.
+		_hide_vanishing_slot_marker()
+		_set_status_message("Move %d was %s, not %s." % [_phrase_index + 1, expected, answer_key], ICON_WRONG_PATH)
+		await _finish_phrase_line(false)
+		return
+	# Correct: sound the two notes of the move, advance.
+	if _phrase_index + 1 < _phrase_midis.size():
+		_play_note(_phrase_midis[_phrase_index], 0.24)
+	_phrase_index += 1
+	if _phrase_index >= _phrase_correct.size():
+		_set_status_message("Whole line correct!", ICON_CORRECT_PATH)
+		await _finish_phrase_line(true)
+		return
+	_highlight_phrase_pair(_phrase_index)
+	_set_status_message("Move %d of %d — what interval?" % [_phrase_index + 1, _phrase_correct.size()], ICON_RECALL_PATH)
+
+
+func _finish_phrase_line(all_correct: bool) -> void:
+	var quiz_token := _quiz_run_token
+	_on_player_answer_committed()
+	_accepting_answer = false
+	_set_interval_buttons_enabled(false)
+	_replay_button.disabled = true
+	_restart_button.disabled = true
+	_hide_vanishing_slot_marker()
+	# Show the whole line at full brightness for review.
+	for i in range(mini(_phrase_steps.size(), _vanishing_note_panels.size())):
+		if _vanishing_note_panels[i] != null:
+			_vanishing_note_panels[i].modulate = Color(1, 1, 1, 1)
+			_vanishing_note_panels[i].visible = true
+	var prev_streak := _streak
+	var prev_xp := _xp
+	if all_correct:
+		_score += 1
+		_streak += 1
+		_interval_reading_streak += 1
+		if _interval_reading_streak >= 2 and _interval_reading_level < INTERVAL_READING_MAX_LEVEL:
+			_interval_reading_level += 1
+			_interval_reading_streak = 0
+		_xp += 14 + mini(_streak, 12)
+		_record_question_correct()
+		_play_success_sfx()
+	else:
+		_streak = 0
+		_interval_reading_streak = 0
+		if _interval_reading_level > 0:
+			_interval_reading_level -= 1
+		if not _practice_mode_enabled:
+			_lives = maxi(0, _lives - 1)
+		_xp = maxi(0, _xp - 2)
+		_play_fail_sfx()
+	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
+	_refresh_meta_ui()
+	_animate_sight_streak_score_feedback(prev_streak, prev_xp, _streak, _xp, _xp - prev_xp, all_correct)
+	await get_tree().create_timer(0.9 if all_correct else 1.5).timeout
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
+
+
+# --- #2 Landmark → Name the Note -------------------------------------------
+func _ensure_landmark_anchor_label() -> Label:
+	if _landmark_anchor_label != null and is_instance_valid(_landmark_anchor_label):
+		return _landmark_anchor_label
+	var lbl := Label.new()
+	lbl.z_index = 170
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_color_override("font_color", Color(0.98, 0.92, 0.5, 1.0))
+	lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.02, 0.9))
+	lbl.add_theme_constant_override("outline_size", 4)
+	lbl.visible = false
+	if _staff_area != null:
+		_staff_area.add_child(lbl)
+	_landmark_anchor_label = lbl
+	return lbl
+
+
+func _generate_interval_landmark_round() -> void:
+	_clear_vanishing_notes()
+	for n in _staff_chord_notes:
+		if n != null:
+			n.visible = false
+	if _staff_note != null:
+		_staff_note.visible = false
+	_clear_staff_ledger_lines()
+	_set_staff_highlight_none()
+	_stop_sight_note_bounce()
+	_pick_random_sight_frame_border_color()
+	_pick_random_sight_visual_colors()
+	var pool := _interval_step_pool()
+	var lo_step: int = pool[0]
+	var hi_step: int = pool[pool.size() - 1]
+	var lm_span: int = hi_step - lo_step
+	var landmark_sizes: Array[int] = []
+	for s in _interval_allowed_sizes():
+		if s > 0 and s <= lm_span:
+			landmark_sizes.append(s)
+	if landmark_sizes.is_empty():
+		landmark_sizes = [1, 2] if lm_span >= 2 else [maxi(1, lm_span)]
+	var size: int = landmark_sizes[_rng.randi_range(0, landmark_sizes.size() - 1)]
+	var direction := 1 if _rng.randi_range(0, 1) == 0 else -1
+	var anchor_step := _rng.randi_range(lo_step, hi_step)
+	var target_step := anchor_step - (direction * size)
+	for _attempt in range(24):
+		if target_step >= lo_step and target_step <= hi_step:
+			break
+		anchor_step = _rng.randi_range(lo_step, hi_step)
+		direction = 1 if _rng.randi_range(0, 1) == 0 else -1
+		target_step = anchor_step - (direction * size)
+	target_step = clampi(target_step, lo_step, hi_step)
+	var anchor_base := _staff_step_name_for_clef(anchor_step, _selected_clef)
+	var target_base := _staff_step_name_for_clef(target_step, _selected_clef)
+	_landmark_answer = _sight_note_name_with_key_signature(target_base, false)
+	_interval_reading_midi1 = _sight_step_to_midi(anchor_step, _selected_clef, int(_key_signature_accidental_map().get(anchor_base, 0)))
+	_interval_reading_midi2 = _sight_step_to_midi(target_step, _selected_clef, int(_key_signature_accidental_map().get(target_base, 0)))
+	_current_sight_display_step = target_step
+	# Draw anchor (note 0, labelled) + target (note 1, unlabelled).
+	_position_interval_reading_notes(anchor_step, target_step)
+	var anchor_label := _ensure_landmark_anchor_label()
+	var anchor_panel: Panel = _vanishing_note_panels[0]
+	if anchor_panel != null:
+		anchor_label.text = _sight_note_name_with_key_signature(anchor_base, false)
+		anchor_label.visible = true
+		anchor_label.reset_size()
+		anchor_label.position = Vector2(anchor_panel.position.x + (anchor_panel.size.x * 0.5) - (anchor_label.size.x * 0.5), anchor_panel.position.y - 30.0)
+	_prompt_label.text = "Name the second note (read it from the labelled one)"
+	_progress_label.text = "Note %d / %d" % [_question_index, _total_questions]
+	_status_label.visible = true
+	_set_status_message("The first note is %s. What is the second?" % _ensure_landmark_anchor_label().text, ICON_RECALL_PATH)
+
+
+func _on_interval_landmark_chosen(note_name: String, chosen_btn_override: Button = null) -> void:
+	if not _quiz_active or not _accepting_answer:
+		return
+	var is_correct := note_name == _landmark_answer
+	_play_sight_answer_click_sfx()
+	var chosen_btn: Button = chosen_btn_override if chosen_btn_override != null else _sight_key_buttons.get(note_name, null) as Button
+	var expected_btn: Button = _sight_key_buttons.get(_landmark_answer, null) as Button
+	_show_sight_note_keyboard_feedback(note_name, is_correct)
+	var quiz_token := _quiz_run_token
+	_on_player_answer_committed()
+	_accepting_answer = false
+	_set_answer_buttons_enabled(false)
+	_replay_button.disabled = true
+	_restart_button.disabled = true
+	_record_skill_result("note", _note_letter_only(_landmark_answer), is_correct)
+	var prev_streak := _streak
+	var prev_xp := _xp
+	if _interval_reading_midi2 >= 0:
+		_play_note(_interval_reading_midi2, 0.3)
+	if is_correct:
+		_score += 1
+		_streak += 1
+		_interval_reading_streak += 1
+		if _interval_reading_streak >= 2 and _interval_reading_level < INTERVAL_READING_MAX_LEVEL:
+			_interval_reading_level += 1
+			_interval_reading_streak = 0
+		_xp += 12 + mini(_streak, 10)
+		_record_question_correct()
+		_set_status_message("Correct — it was %s." % _landmark_answer, ICON_CORRECT_PATH)
+		_play_success_sfx()
+		if expected_btn != null:
+			await _blink_sight_feedback(null, expected_btn, 2)
+	else:
+		_streak = 0
+		_interval_reading_streak = 0
+		if _interval_reading_level > 0:
+			_interval_reading_level -= 1
+		if not _practice_mode_enabled:
+			_lives = maxi(0, _lives - 1)
+		_xp = maxi(0, _xp - 2)
+		_set_status_message("It was %s, not %s." % [_landmark_answer, note_name], ICON_WRONG_PATH)
+		_play_fail_sfx()
+		if expected_btn != null:
+			await _blink_sight_feedback(chosen_btn, expected_btn, 2)
+	_score_label.text = "Correct: %d / %d" % [_score, _question_index]
+	_refresh_meta_ui()
+	_animate_sight_streak_score_feedback(prev_streak, prev_xp, _streak, _xp, _xp - prev_xp, is_correct)
+	await get_tree().create_timer(0.9 if is_correct else 1.5).timeout
+	if _landmark_anchor_label != null and is_instance_valid(_landmark_anchor_label):
+		_landmark_anchor_label.visible = false
+	await _ensure_session_controller().advance_after_answer(self, quiz_token, _question_index)
+
+
+# --- #7 Skill stats + weakness heatmap -------------------------------------
+func _record_skill_result(category: String, item: String, correct: bool) -> void:
+	if category.is_empty() or item.is_empty():
+		return
+	var cat: Dictionary = _skill_stats.get(category, {})
+	var rec: Dictionary = cat.get(item, {"correct": 0, "total": 0})
+	rec["total"] = int(rec.get("total", 0)) + 1
+	if correct:
+		rec["correct"] = int(rec.get("correct", 0)) + 1
+	cat[item] = rec
+	_skill_stats[category] = cat
+
+
+func _skill_accuracy(category: String, item: String) -> float:
+	var cat: Dictionary = _skill_stats.get(category, {})
+	var rec: Dictionary = cat.get(item, {})
+	var total := int(rec.get("total", 0))
+	if total <= 0:
+		return -1.0
+	return float(rec.get("correct", 0)) / float(total)
+
+
+func _note_letter_only(name: String) -> String:
+	# Fold to the natural letter so the heatmap stays a clean 7-letter view and
+	# recording agrees with the staff-step letters: "F#4" -> "F", "Bb3" -> "B".
+	if name.is_empty():
+		return name
+	return name.substr(0, 1)
+
+
+func _interval_item_only(key: String) -> String:
+	# Aggregate up/down into one bucket: "3rd ↑" -> "3rd", "Step ↓" -> "Step".
+	return key.replace(" %s" % char(0x2191), "").replace(" %s" % char(0x2193), "").strip_edges()
+
+
+func _skill_heatmap_color(acc: float) -> Color:
+	if acc < 0.0:
+		return Color(0.38, 0.40, 0.46, 1.0)   # no data — grey
+	if acc >= 0.85:
+		return Color(0.30, 0.74, 0.36, 1.0)   # strong — green
+	if acc >= 0.65:
+		return Color(0.62, 0.78, 0.28, 1.0)   # ok — yellow-green
+	if acc >= 0.45:
+		return Color(0.92, 0.66, 0.24, 1.0)   # shaky — orange
+	return Color(0.90, 0.36, 0.32, 1.0)        # weak — red
+
+
+func _skill_weak_items(category: String, max_acc: float = 0.7) -> Array:
+	var out: Array = []
+	var cat: Dictionary = _skill_stats.get(category, {})
+	for item in cat.keys():
+		var rec: Dictionary = cat[item]
+		var total := int(rec.get("total", 0))
+		if total < 2:
+			continue
+		var acc := float(rec.get("correct", 0)) / float(total)
+		if acc <= max_acc:
+			out.append(str(item))
+	return out
+
+
+func _ensure_skill_heatmap_overlay() -> void:
+	if _skill_heatmap_overlay != null and is_instance_valid(_skill_heatmap_overlay):
+		return
+	var ov := ColorRect.new()
+	ov.color = Color(0.04, 0.06, 0.10, 0.86)
+	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.z_as_relative = false
+	ov.z_index = 4000
+	ov.visible = false
+	ov.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(ov)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.add_child(center)
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(560, 380)
+	center.add_child(card)
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_%s" % side, 22)
+	card.add_child(pad)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 12)
+	pad.add_child(col)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 10)
+	col.add_child(title_row)
+	var title_icon := TextureRect.new()
+	title_icon.texture = load(ICON_PROGRESS_PATH)
+	title_icon.custom_minimum_size = Vector2(32, 32)
+	title_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	title_row.add_child(title_icon)
+	var title := Label.new()
+	title.text = "Your Strengths & Weaknesses"
+	title.add_theme_font_size_override("font_size", 24)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_row.add_child(title)
+	var sub := Label.new()
+	sub.text = "Green = strong · red = needs work · grey = not practised yet."
+	sub.add_theme_font_size_override("font_size", 13)
+	sub.add_theme_color_override("font_color", Color(0.82, 0.86, 0.94, 0.9))
+	col.add_child(sub)
+	_skill_heatmap_body = VBoxContainer.new()
+	_skill_heatmap_body.add_theme_constant_override("separation", 10)
+	col.add_child(_skill_heatmap_body)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	col.add_child(actions)
+	var focus_btn := Button.new()
+	focus_btn.icon = load(ICON_BULLSEYE_PATH)
+	focus_btn.add_theme_constant_override("h_separation", 8)
+	focus_btn.text = "Focus my weak spots"
+	focus_btn.custom_minimum_size = Vector2(240, 44)
+	focus_btn.pressed.connect(_on_skill_focus_pressed)
+	actions.add_child(focus_btn)
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.custom_minimum_size = Vector2(120, 44)
+	close_btn.pressed.connect(_hide_skill_heatmap)
+	actions.add_child(close_btn)
+	_skill_heatmap_overlay = ov
+
+
+func _build_skill_heatmap_section(title_text: String, category: String, items: Array) -> void:
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", 6)
+	var hdr := Label.new()
+	hdr.text = title_text
+	hdr.add_theme_font_size_override("font_size", 17)
+	hdr.add_theme_color_override("font_color", Color(0.98, 0.92, 0.66, 1.0))
+	section.add_child(hdr)
+	var grid := GridContainer.new()
+	grid.columns = 7
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	section.add_child(grid)
+	var any_data := false
+	for item in items:
+		var acc := _skill_accuracy(category, str(item))
+		if acc >= 0.0:
+			any_data = true
+		var cell := Panel.new()
+		cell.custom_minimum_size = Vector2(66, 46)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = _skill_heatmap_color(acc)
+		sb.corner_radius_top_left = 8
+		sb.corner_radius_top_right = 8
+		sb.corner_radius_bottom_left = 8
+		sb.corner_radius_bottom_right = 8
+		cell.add_theme_stylebox_override("panel", sb)
+		var lbl := Label.new()
+		lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.add_theme_color_override("font_color", Color(0.06, 0.08, 0.06, 1.0))
+		lbl.text = "%s\n%s" % [str(item), ("%d%%" % int(round(acc * 100.0)) if acc >= 0.0 else "—")]
+		cell.add_child(lbl)
+		grid.add_child(cell)
+	if not any_data:
+		var none := Label.new()
+		none.text = "No data yet — play a few rounds and check back."
+		none.add_theme_font_size_override("font_size", 13)
+		none.add_theme_color_override("font_color", Color(0.78, 0.82, 0.9, 0.85))
+		section.add_child(none)
+	_skill_heatmap_body.add_child(section)
+
+
+func _populate_skill_heatmap() -> void:
+	if _skill_heatmap_body == null:
+		return
+	for c in _skill_heatmap_body.get_children():
+		_skill_heatmap_body.remove_child(c)
+		c.queue_free()
+	_build_skill_heatmap_section("Note Reading", "note", ["C", "D", "E", "F", "G", "A", "B"])
+	_build_skill_heatmap_section("Interval Reading", "interval", ["Same", "Step", "Skip", "2nd", "3rd", "4th", "5th", "6th", "7th", "Octave"])
+
+
+func _show_skill_heatmap() -> void:
+	_ensure_skill_heatmap_overlay()
+	_populate_skill_heatmap()
+	_skill_heatmap_overlay.visible = true
+	_skill_heatmap_overlay.move_to_front()
+
+
+func _hide_skill_heatmap() -> void:
+	if _skill_heatmap_overlay != null and is_instance_valid(_skill_heatmap_overlay):
+		_skill_heatmap_overlay.visible = false
+
+
+func _on_skill_focus_pressed() -> void:
+	# Build a focus set from the weakest note letters + interval shapes, then start
+	# a session that biases toward them (honoured by the round generators).
+	_skill_focus_items = {
+		"note": _skill_weak_items("note", 0.7),
+		"interval": _skill_weak_items("interval", 0.7),
+	}
+	_hide_skill_heatmap()
+	var msg := "Focusing your weak spots this session."
+	if _status_label != null:
+		_status_label.text = msg
+	# Begin a round in the current sight mode (Note Recall / Interval Reading).
+	if _selected_mode == MODE_SIGHT and (_sight_mode == "Vanishing" or _sight_mode == "Intervals"):
+		_on_start_quiz_pressed()
+
+
 func _current_sight_grand_staff_chord_midis() -> Array[int]:
 	var out: Array[int] = []
 	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
@@ -18216,6 +21061,10 @@ func _current_sight_note_prompt_midi() -> int:
 
 
 func _apply_answer_mode() -> void:
+	# The custom status icon belongs only to Note Recall + Interval Reading; clear it
+	# anywhere else so a "Correct"/"question" icon never leaks into another mode.
+	if not (_is_sight_vanishing_mode() or _is_interval_reading_mode()):
+		_clear_sight_status_icon()
 	var gate_choices_for_round_start := _awaiting_round_start and (_is_ear_training_mode() or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
 	var is_ear_mode := _is_ear_training_mode()
 	var vp := get_viewport_rect().size
@@ -18229,8 +21078,8 @@ func _apply_answer_mode() -> void:
 	var continuous_very_compact_layout := vp.y < 980.0
 	var continuous_ultra_compact_layout := vp.y < 900.0
 	var ear_review_active := _manual_next_pending and (_selected_mode == MODE_INTERVAL or _selected_mode == MODE_CHORD or _selected_mode == MODE_CADENCE)
-	var anchor_sight_bottom_controls := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous")
-	var compact_sight_bottom_controls := _selected_mode == MODE_SIGHT and continuous_compact_layout and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous")
+	var anchor_sight_bottom_controls := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
+	var compact_sight_bottom_controls := _selected_mode == MODE_SIGHT and continuous_compact_layout and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 	var show_grand_staff_chord_replay := _is_sight_chords_grand_staff_mode() and not _awaiting_round_start and _quiz_active
 
 	if _selected_mode == MODE_INTERVAL:
@@ -18254,6 +21103,10 @@ func _apply_answer_mode() -> void:
 			_prompt_label.text = "Choose the chord name:"
 		elif _sight_mode == "Placement":
 			_prompt_label.text = "Drag note to the correct line/space:"
+		elif _sight_mode == "Vanishing":
+			_prompt_label.text = "Read the notes before they vanish:"
+		elif _sight_mode == "Intervals":
+			_prompt_label.text = "Read the interval between the two notes:"
 		elif _sight_mode == "Continuous":
 			_prompt_label.text = "Press the key when note hits the line."
 		elif _sight_mode == "Rhythm Flow":
@@ -18275,6 +21128,21 @@ func _apply_answer_mode() -> void:
 			_replay_button.visible = true
 		else:
 			_replay_button.visible = false
+		if _sight_chord_mic_button != null:
+			# Keep the pill VISIBLE during a chord round even if the detector
+			# didn't load — disable + relabel it so the feature is never silently
+			# missing. Skip while a check is running (the handler owns the label).
+			if not _chord_mic_check_active:
+				_sight_chord_mic_button.visible = show_grand_staff_chord_replay
+				if show_grand_staff_chord_replay:
+					var cd_ok := _chord_detection_available()
+					_sight_chord_mic_button.disabled = not cd_ok
+					if cd_ok:
+						_sight_chord_mic_button.text = "%s  Play it" % char(0x1F3A4)
+						_sight_chord_mic_button.tooltip_text = "Play the chord on your instrument — we'll check every note you played."
+					else:
+						_sight_chord_mic_button.text = "%s  Play it (unavailable)" % char(0x1F3A4)
+						_sight_chord_mic_button.tooltip_text = "Chord listening isn't available in this build (audio detector didn't load)."
 		if _round_start_button != null:
 			# Keep the in-flow button HIDDEN — the floating overlay replaces it in sight mode.
 			_round_start_button.visible = false
@@ -18286,7 +21154,7 @@ func _apply_answer_mode() -> void:
 		_refresh_sight_round_start_overlay()
 		_refresh_sight_big_piano_visibility()
 		_prompt_label.visible = ((_selected_mode == MODE_SIGHT and _sight_mode == "Placement") or _selected_mode == MODE_NOTE_CHASE) and not gate_choices_for_round_start
-		_status_label.visible = (_selected_mode == MODE_SIGHT and (_awaiting_round_start or _is_continuous_flow_sight_mode()))
+		_status_label.visible = (_selected_mode == MODE_SIGHT and (_awaiting_round_start or _is_continuous_flow_sight_mode() or _sight_mode == "Vanishing" or _sight_mode == "Intervals"))
 		_game_panel.add_theme_constant_override("separation", 2)
 		_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP if (_selected_mode == MODE_SIGHT and (_sight_mode == "Placement" or _sight_mode == "Chords")) or _in_tutorial else Control.MOUSE_FILTER_IGNORE
 		if _selected_mode != MODE_SIGHT or _sight_mode != "Chords" or _awaiting_round_start:
@@ -18397,12 +21265,24 @@ func _apply_answer_mode() -> void:
 
 	for note_name in _sight_key_buttons.keys():
 		var k_btn: Button = _sight_key_buttons[note_name]
-		var show_key := _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		var show_key := _sight_uses_note_keyboard()
 		k_btn.visible = show_key
 		k_btn.disabled = not show_key or gate_choices_for_round_start
 		k_btn.modulate = Color(1, 1, 1, 1)
 	if _sight_keyboard_row != null:
-		_sight_keyboard_row.visible = _selected_mode == MODE_SIGHT and _sight_mode == "Notes"
+		_sight_keyboard_row.visible = _sight_uses_note_keyboard()
+	if _sight_notes_mic_button != null:
+		var show_sight_mic := _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and _quiz_active
+		_sight_notes_mic_button.visible = show_sight_mic
+		if show_sight_mic and _mic_mode_enabled and not _qa_enabled:
+			_ensure_sight_notes_mic_listener()
+			if _sight_notes_mic_listener != null and not _sight_notes_mic_listener.is_listening():
+				_on_sight_notes_mic_toggled(true)
+		if not show_sight_mic and _sight_notes_mic_listener != null and _sight_notes_mic_listener.is_listening():
+			_sight_notes_mic_listener.stop()
+			_sight_notes_mic_button.set_pressed_no_signal(false)
+			_sight_notes_mic_button.text = "%s  Mic" % char(0x1F3A4)
+		_refresh_sight_notes_mic_buttons()
 	_refresh_sight_note_key_buttons()
 	if _continuous_keyboard_row != null:
 		_continuous_keyboard_row.visible = _selected_mode == MODE_SIGHT and _sight_mode == "Continuous"
@@ -18517,7 +21397,7 @@ func _apply_answer_mode() -> void:
 		_sight_chord_choice_row.visible = _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
 	_refresh_sight_chord_feedback_keyboard_visibility()
 	if _sight_key_label != null:
-		_sight_key_label.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes")
+		_sight_key_label.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 		_refresh_sight_key_label()
 
 	_sight_container.visible = _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE
@@ -18534,6 +21414,8 @@ func _apply_answer_mode() -> void:
 	if _staff_note != null:
 		var show_staff_note := _selected_mode != MODE_NOTE_CHASE
 		if _selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow"):
+			show_staff_note = false
+		if _selected_mode == MODE_SIGHT and (_sight_mode == "Vanishing" or _sight_mode == "Intervals"):
 			show_staff_note = false
 		if _selected_mode == MODE_SIGHT and _awaiting_round_start and not _in_tutorial:
 			show_staff_note = false
@@ -18700,7 +21582,15 @@ func _apply_answer_mode() -> void:
 	_refresh_gameplay_nav_overlay()
 	_refresh_sight_notes_chords_skin()
 	_position_sight_floating_answer_rows()
-	if _selected_mode == MODE_SIGHT or _selected_mode == MODE_READ:
+	# The idle note-bounce loops a tween on _staff_note.position:y. It must NOT run
+	# while the note is draggable (Placement / mistake-review / tutorial placement)
+	# or it overrides the drag's Y every frame — the note then "only moves in X".
+	var note_is_interactive := (
+		_sight_mode == "Placement"
+		or _sight_mistake_review_active
+		or _is_placement_drag_context_active()
+	)
+	if (_selected_mode == MODE_SIGHT or _selected_mode == MODE_READ) and not note_is_interactive:
 		_start_sight_note_bounce()
 	else:
 		_stop_sight_note_bounce()
@@ -18768,6 +21658,10 @@ func _show_home() -> void:
 	_accepting_answer = false
 	_awaiting_round_start = false
 	_is_prompt_playing = false
+	# Force-hide the floating "Tap Start Round" card so it doesn't linger on
+	# top of the home screen even if a refresh is missed.
+	if _sight_round_start_card != null:
+		_sight_round_start_card.visible = false
 	_clear_manual_next_gate()
 	_score = 0
 	_question_index = 0
@@ -18789,6 +21683,8 @@ func _show_home() -> void:
 	# Reset header card to transparent home style — gameplay may have applied
 	# a dark background (sight chords, note chase, etc.) that persists otherwise.
 	if _header_card != null:
+		# Hidden by _hide_home_overlay_buttons while panels were open; restore.
+		_header_card.visible = true
 		_header_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if _header_gradient_bg != null:
 		_header_gradient_bg.visible = false
@@ -18840,8 +21736,8 @@ func _show_home() -> void:
 		_food_token.visible = false
 	if _cadence_intro_overlay != null and _cadence_intro_overlay.visible:
 		_cadence_intro_overlay.visible = false
-	if _streak_toast_label != null and _streak_toast_label.visible:
-		_streak_toast_label.visible = false
+	if _streak_toast_panel != null and _streak_toast_panel.visible:
+		_streak_toast_panel.visible = false
 	if _rhythm_flow_slot_dialog != null and _rhythm_flow_slot_dialog.visible:
 		_rhythm_flow_slot_dialog.visible = false
 	if _bird_sprite != null:
@@ -18923,7 +21819,7 @@ func _show_game() -> void:
 		_game_panel.visible = true
 	_refresh_background_scene_emphasis()
 	if _sight_answer_overlay != null:
-		var show_sight_overlay := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords")
+		var show_sight_overlay := _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 		if _sight_answer_overlay.visible != show_sight_overlay:
 			_sight_answer_overlay.visible = show_sight_overlay
 	if _home_title_label != null:
@@ -18988,6 +21884,9 @@ func _show_game() -> void:
 		if lbl != null:
 			if lbl.visible:
 				lbl.visible = false
+	for p in _vanishing_note_panels:
+		if p != null:
+			p.visible = false
 	_hide_preview_ledger()
 	_clear_staff_ledger_lines()
 	for pl in _staff_preview_ledgers:
@@ -19176,6 +22075,14 @@ func _unhandled_input(event: InputEvent) -> void:
 func _set_sight_result_background_hidden(hidden: bool) -> void:
 	if _selected_mode != MODE_SIGHT:
 		return
+	if hidden:
+		_hide_sight_note_name_label()
+		_hide_sight_chord_note_chip()
+		_clear_vanishing_notes()
+		_hide_interval_reading_answer_row()
+		if _sight_answer_overlay != null:
+			_sight_answer_overlay.visible = false
+			_sight_answer_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _sight_container != null:
 		_sight_container.visible = not hidden
 	if _staff_area != null:
@@ -19229,8 +22136,11 @@ func _refresh_game_title() -> void:
 				title_text = "Interval Birds"
 				subtitle_text = "Identify the Interval"
 			MODE_CHORD:
-				title_text = "Chord Builder"
+				title_text = "Ear Training - Chords"
 				subtitle_text = "Identify the Chord"
+			MODE_PITCH_MATCH:
+				title_text = "Pitch Match"
+				subtitle_text = "Find the note you heard"
 			MODE_PROGRESSION:
 				title_text = "Progression Path"
 				subtitle_text = "Identify the Progression"
@@ -19241,11 +22151,13 @@ func _refresh_game_title() -> void:
 				title_text = "Cadence"
 				subtitle_text = "Identify the Cadence"
 			MODE_SIGHT:
-				title_text = "Sight Reading - %s" % _sight_mode
+				title_text = "Sight Reading - %s" % _sight_mode_display_name(_sight_mode)
 				if _sight_mode == "Notes":
 					subtitle_text = "Identify the Correct Note"
 				elif _sight_mode == "Chords":
 					subtitle_text = "Identify the Correct Chord"
+				elif _sight_mode == "Vanishing":
+					subtitle_text = "Read before the notes disappear"
 				else:
 					subtitle_text = "Read notes in real time"
 			MODE_NOTE_CHASE:
@@ -19295,10 +22207,10 @@ func _refresh_sight_key_label() -> void:
 	if _sight_key_label == null:
 		return
 	var key_text := _sight_key_signature_display_text()
-	if _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes"):
+	if _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals"):
 		key_text = "%s %s" % [char(0x266B), key_text]
 	_sight_key_label.text = key_text
-	_sight_key_label.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes")
+	_sight_key_label.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
 
 
 func _start_read_module() -> void:
@@ -19626,8 +22538,10 @@ func _show_tutorial_step() -> void:
 			if _tutorial_end_button_col != null:
 				_tutorial_end_button_col.visible = true
 				call_deferred("_position_tutorial_end_buttons")
+			# Module 2 has no content yet — hide the "Go to Module 2" button so the
+			# completion screen never leads to a "Coming soon" dead-end.
 			if _tutorial_end_module2_button != null:
-				_tutorial_end_module2_button.visible = true
+				_tutorial_end_module2_button.visible = false
 			if _tutorial_end_home_button != null:
 				_tutorial_end_home_button.visible = true
 			if _tutorial_end_back_button != null:
@@ -20791,7 +23705,7 @@ func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 			size_factor = 1.78
 			y_factor = 1.62
 		clef_y = top_y - (gap * y_factor)
-	if _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous"):
+	if _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Placement" or _sight_mode == "Vanishing" or _sight_mode == "Intervals"):
 		# Lock sight clef placement to staff geometry so future layout tweaks don't drift it.
 		if _sight_mode == "Chords" and _grand_staff_active:
 			# Grand staff: smaller treble clef to fit the reduced line gap
@@ -20804,6 +23718,11 @@ func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 			clef_y = top_y - (gap * SIGHT_CLEF_ANCHOR_FACTOR_TREBLE) - SIGHT_CLEF_EXTRA_RAISE_TREBLE - (gap * SIGHT_TREBLE_CLEF_RAISE_SPACES)
 		if _sight_mode == "Continuous":
 			clef_y -= gap * SIGHT_NOTE_FLOW_CLEF_EXTRA_RAISE_SPACES
+		# Note Recall + Interval Reading use a slightly different staff top than Notes,
+		# which leaves the clef riding high. Nudge it down (~half a staff space) for
+		# these two modes only — no effect on any other mode.
+		if _sight_mode == "Vanishing" or _sight_mode == "Intervals":
+			clef_y += SIGHT_NOTE_CENTER_OFFSET_Y + (gap * 0.5)
 	elif _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble":
 		clef_y += gap * NOTE_CHASE_TREBLE_CLEF_LOWER_SPACES
 	var font_sz := int(round(clampf(span * size_factor, 60.0, 172.0)))
@@ -20854,15 +23773,51 @@ func _sight_visual_staff_geometry() -> Dictionary:
 func _position_sight_floating_answer_rows() -> void:
 	if _sight_answer_overlay == null:
 		return
-	var show_notes := _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and _game_panel != null and _game_panel.visible
-	var show_chords := _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and _game_panel != null and _game_panel.visible
+	if _result_overlay != null and _result_overlay.visible:
+		_sight_answer_overlay.visible = false
+		_sight_answer_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if _sight_keyboard_row != null:
+			_sight_keyboard_row.visible = false
+		if _sight_chord_choice_row != null:
+			_sight_chord_choice_row.visible = false
+		_hide_interval_reading_answer_row()
+		return
+	var panel_on := _game_panel != null and _game_panel.visible
+	# Landmark variant of Interval Reading answers via the note-name keyboard; Pair
+	# and Phrase variants use the interval choice grid.
+	var landmark_active := _is_interval_reading_mode() and _interval_reading_landmark
+	var show_notes := (_is_sight_note_input_mode() or landmark_active) and panel_on
+	var show_chords := _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and panel_on
+	var show_intervals := _is_interval_reading_mode() and not _interval_reading_landmark and panel_on
 	var show_grand_staff_replay := show_chords and _is_sight_chords_grand_staff_mode() and _replay_button != null and _replay_button.visible and _replay_button.get_parent() == _sight_answer_overlay
-	_sight_answer_overlay.visible = show_notes or show_chords
+	_sight_answer_overlay.visible = show_notes or show_chords or show_intervals
 	if _sight_keyboard_row != null:
 		_sight_keyboard_row.visible = show_notes
 	if _sight_chord_choice_row != null:
 		_sight_chord_choice_row.visible = show_chords
+	if _interval_reading_answer_row != null:
+		_interval_reading_answer_row.visible = show_intervals
 	if not _sight_answer_overlay.visible:
+		return
+	if show_intervals and _interval_reading_answer_row != null:
+		var iv_size := _interval_reading_answer_row.get_combined_minimum_size()
+		if iv_size.x <= 1.0 or iv_size.y <= 1.0:
+			iv_size = _interval_reading_answer_row.size
+		var vp_iv := get_viewport_rect().size
+		var iv_gap := clampf(vp_iv.x * 0.012, 12.0, 26.0)
+		# Anchor to the STAFF LINES (which end well before the screen edge), not the
+		# expand-fill _staff_area (which stretches to the edge and pinned the panel
+		# far right). Sit just past the lines and vertically centre on the staff.
+		var staff_ox: float = _staff_area.global_position.x if _staff_area != null else 0.0
+		var staff_oy: float = _staff_area.global_position.y if _staff_area != null else 0.0
+		var g_iv := _sight_visual_staff_geometry()
+		var staff_lines_right := staff_ox + float(g_iv.get("left", STAFF_LEFT_X)) + float(g_iv.get("width", STAFF_LINE_WIDTH))
+		var staff_lines_top := staff_oy + _active_staff_top_y()
+		var staff_lines_h := _active_staff_line_gap_y() * 4.0
+		var iv_x := clampf(staff_lines_right + iv_gap, 8.0, vp_iv.x - iv_size.x - 8.0)
+		var iv_y := clampf(staff_lines_top + ((staff_lines_h - iv_size.y) * 0.5), 8.0, vp_iv.y - iv_size.y - 8.0)
+		_interval_reading_answer_row.global_position = Vector2(iv_x, iv_y)
+		_sight_answer_overlay.move_to_front()
 		return
 	var anchor_rect := Rect2()
 	if _note_chase_staff_frame != null and _note_chase_staff_frame.visible:
@@ -20889,8 +23844,24 @@ func _position_sight_floating_answer_rows() -> void:
 				hud_bottom = maxf(hud_bottom, hb.global_position.y + hb.size.y)
 		var top_clearance := clampf(vp.y * 0.008, 8.0, 18.0)
 		var notes_y := maxf(hud_bottom + top_clearance, anchor_rect.position.y + clampf(anchor_rect.size.y * 0.02, 8.0, 20.0))
-		notes_y = clampf(notes_y, edge_margin, vp.y - notes_size.y - edge_margin)
+		# Reserve room below the keyboard for the mic pill so neither is clipped.
+		var mic_h := 40.0
+		var mic_gap := 10.0
+		var mic_reserve := (mic_h + mic_gap) if (_sight_notes_mic_button != null and _sight_notes_mic_button.visible) else 0.0
+		notes_y = clampf(notes_y, edge_margin, vp.y - notes_size.y - mic_reserve - edge_margin)
 		_sight_keyboard_row.global_position = Vector2(notes_x, notes_y)
+		# Keep the mic pill below the top HUD/back controls on tablet layouts.
+		if _sight_notes_mic_button != null and _sight_notes_mic_button.visible:
+			var mic_size := _sight_notes_mic_button.get_combined_minimum_size()
+			if mic_size.x <= 1.0:
+				mic_size = _sight_notes_mic_button.size
+			var mic_x := notes_x + (notes_size.x - mic_size.x) * 0.5
+			mic_x = clampf(mic_x, edge_margin, vp.x - mic_size.x - edge_margin)
+			var mic_y := notes_y + notes_size.y + mic_gap
+			var min_mic_y := maxf(hud_bottom + 56.0, vp.y * 0.20)
+			mic_y = maxf(mic_y, min_mic_y)
+			mic_y = clampf(mic_y, edge_margin, vp.y - mic_size.y - edge_margin)
+			_sight_notes_mic_button.global_position = Vector2(mic_x, mic_y)
 	if show_chords and _sight_chord_choice_row != null:
 		var chords_size := _sight_chord_choice_row.get_combined_minimum_size()
 		if chords_size.x <= 1.0 or chords_size.y <= 1.0:
@@ -20925,7 +23896,7 @@ func _note_chase_realign_staff_frame() -> void:
 		var top_staff := _active_staff_top_y()
 		var gap_staff := _active_staff_line_gap_y()
 		var frame_bounds := _get_sight_step_bounds()
-		if _sight_mode == "Notes":
+		if _sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals":
 			frame_bounds = _effective_sight_step_bounds()
 		elif _sight_mode == "Continuous" and _continuous_sight_runtime.active:
 			frame_bounds = _continuous_sight_runtime.level_bounds
@@ -20933,21 +23904,21 @@ func _note_chase_realign_staff_frame() -> void:
 		var bottom_step := maxi(12, frame_bounds.y)
 		var top_pad_s := 30.0
 		var bottom_pad_s := 30.0
-		if _sight_mode == "Notes" or _sight_mode == "Chords":
+		if _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals":
 			bottom_pad_s = 54.0
 		elif _sight_mode == "Continuous":
 			bottom_pad_s = 48.0
 		var top_target := _staff_center_y_for_step(top_step) - top_pad_s
 		var bottom_target := _staff_center_y_for_step(bottom_step) + bottom_pad_s
 		# Ensure the sight frame includes the actual notehead body (offset + scale), not just ledger lines.
-		if _sight_mode == "Notes" or _sight_mode == "Chords":
+		if _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Intervals":
 			var note_h := 28.0
 			if _staff_note != null:
 				note_h = _staff_note.size.y
 			var top_visual_center_y := _staff_center_y_for_step(top_step)
 			var bottom_visual_center_y := _staff_center_y_for_step(bottom_step)
 			var sight_note_center_offset_y := 0.0
-			if _sight_mode == "Notes":
+			if _sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals":
 				sight_note_center_offset_y = SIGHT_NOTE_CENTER_OFFSET_Y
 			elif _sight_mode == "Chords":
 				sight_note_center_offset_y = 0.0 if _grand_staff_active else SIGHT_CHORD_NOTE_CENTER_OFFSET_Y
@@ -20984,7 +23955,7 @@ func _note_chase_realign_staff_frame() -> void:
 			left_x_s = maxf(8.0, sight_left - 18.0)
 			right_x_s = minf(_staff_area.size.x - 8.0, sight_left + sight_width + 18.0)
 		var bottom_frame_margin := 8.0
-		if _sight_mode == "Notes" or _sight_mode == "Chords":
+		if _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing" or _sight_mode == "Intervals":
 			bottom_frame_margin = 4.0
 		elif _sight_mode == "Continuous":
 			bottom_frame_margin = 4.0
@@ -20992,10 +23963,25 @@ func _note_chase_realign_staff_frame() -> void:
 		bottom_y = clampf(bottom_y, top_y + 220.0, _staff_area.size.y - bottom_frame_margin)
 		_note_chase_staff_frame.position = Vector2(left_x_s, top_y)
 		_note_chase_staff_frame.size = Vector2(maxf(360.0, right_x_s - left_x_s), maxf(220.0, bottom_y - top_y))
-		if _cached_staff_frame_sb == null or _cached_staff_frame_border != _sight_staff_frame_border_color:
-			var sb_s := _note_chase_staff_frame.get_theme_stylebox("panel")
-			if sb_s != null and sb_s is StyleBoxFlat:
-				_cached_staff_frame_sb = (sb_s as StyleBoxFlat).duplicate()
+		# Note Recall + Interval Reading: drop the boxed border (its bottom line gets
+		# mistaken for the lowest staff line) and use a soft translucent fill instead.
+		# Other sight modes keep the colored frame border. The frame Panel stays
+		# visible either way, so staff-geometry helpers are unaffected.
+		var frame_borderless := _is_sight_vanishing_mode() or _is_interval_reading_mode()
+		var frame_key := "soft" if frame_borderless else ("box:%s" % _sight_staff_frame_border_color.to_html())
+		if frame_key != _frame_style_key:
+			_frame_style_key = frame_key
+			if frame_borderless:
+				if _borderless_frame_sb == null:
+					_borderless_frame_sb = StyleBoxFlat.new()
+					_borderless_frame_sb.bg_color = Color(0.10, 0.16, 0.24, 0.14)
+					_borderless_frame_sb.corner_radius_top_left = 16
+					_borderless_frame_sb.corner_radius_top_right = 16
+					_borderless_frame_sb.corner_radius_bottom_left = 16
+					_borderless_frame_sb.corner_radius_bottom_right = 16
+				_note_chase_staff_frame.add_theme_stylebox_override("panel", _borderless_frame_sb)
+			elif _bordered_frame_template != null:
+				_cached_staff_frame_sb = _bordered_frame_template.duplicate()
 				_cached_staff_frame_sb.border_color = _sight_staff_frame_border_color
 				_cached_staff_frame_border = _sight_staff_frame_border_color
 				_note_chase_staff_frame.add_theme_stylebox_override("panel", _cached_staff_frame_sb)
@@ -21027,6 +24013,8 @@ func _note_chase_realign_staff_frame() -> void:
 			var base_note := _staff_step_name_for_clef(_current_sight_display_step, _selected_clef)
 			var force_natural := _current_sight_note_explicit_accidental == char(0x266E)
 			_current_sight_note = _sight_note_name_with_key_signature(base_note, force_natural)
+		elif _sight_mode == "Vanishing" and not _vanishing_sequence.is_empty():
+			_position_vanishing_sequence(_vanishing_note_panels[0] != null and _vanishing_note_panels[0].visible)
 		_position_sight_floating_answer_rows()
 		return
 	var left_x := 6.0
@@ -21059,7 +24047,7 @@ func _update_note_chase_staff_scroll(delta: float) -> void:
 
 func _begin_next_question(expected_token: int = -1) -> void:
 	_clear_sight_answer_keyboard_feedback()
-	if _midi_active and _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
+	if _midi_active and _is_sight_note_input_mode():
 		_midi_piano_viz_clear_all()
 	# Surface any pending adaptive-difficulty change so the student sees the
 	# round responding to their accuracy. Consumed on first display.
@@ -21097,6 +24085,7 @@ func _generate_round() -> void:
 				_current_interval_choices = _build_interval_choices(_current_interval_id, _active_intervals)
 				_current_ear_text_answer = _current_interval_id
 				_apply_interval_choice_texts(_current_interval_choices, true)
+				_remember_visible_question("ear_interval", _current_interval_id)
 				return
 		var q_ratio := float(_question_index) / float(maxi(1, _total_questions))
 		if _focus_missed_ids.is_empty():
@@ -21106,7 +24095,7 @@ func _generate_round() -> void:
 		if rq_int != null and not _ask_pool.is_empty():
 			weighted_pick = str(rq_int.pick_next(_ask_pool))
 		var picked := EarTrainingCoreScript.pick_interval_question(
-			_ask_pool, weighted_pick, _last_interval_signature, q_ratio,
+			_ask_pool, weighted_pick, _last_interval_signature, _recent_visible_ids("ear_interval", _ask_pool), q_ratio,
 			INTERVAL_DATA, Callable(self, "_interval_id_for_semitones"), _rng
 		)
 		_current_interval_id = str(picked["interval_id"])
@@ -21116,6 +24105,7 @@ func _generate_round() -> void:
 		_current_interval_choices = _build_interval_choices(_current_interval_id, _active_intervals)
 		_current_ear_text_answer = _current_interval_id
 		_apply_interval_choice_texts(_current_interval_choices, true)
+		_remember_visible_question("ear_interval", _current_interval_id)
 	elif _selected_mode == MODE_CHORD:
 		if _current_available_chord_types.is_empty():
 			_current_available_chord_types = _get_available_chord_types()
@@ -21133,6 +24123,7 @@ func _generate_round() -> void:
 				_current_chord_notes = _build_chord_notes(_current_root_midi, _current_chord_quality, 0)
 				_last_chord_signature = "%s:%d:%d" % [_current_chord_quality, _current_root_midi, _current_chord_inversion]
 				_current_chord_choices = _build_chord_choices(_current_chord_quality, _current_available_chord_types)
+				_remember_visible_question("ear_chord", _current_chord_quality)
 				return
 		var rq_chord = _review_queue_for_mode(MODE_CHORD)
 		var chord_weighted_pick := ""
@@ -21146,7 +24137,7 @@ func _generate_round() -> void:
 				break
 		var inversion_on := _inversion_toggle != null and _inversion_toggle.button_pressed
 		var picked_chord := EarTrainingCoreScript.pick_chord_question(
-			_chord_ask_pool, chord_weighted_pick, _last_chord_signature,
+			_chord_ask_pool, chord_weighted_pick, _last_chord_signature, _recent_visible_ids("ear_chord", _chord_ask_pool),
 			allow_inversions, inversion_on, CHORD_INTERVALS, _rng
 		)
 		_current_chord_quality = str(picked_chord["quality"])
@@ -21155,6 +24146,7 @@ func _generate_round() -> void:
 		_current_chord_notes = picked_chord["notes"]
 		_last_chord_signature = str(picked_chord["signature"])
 		_current_chord_choices = _build_chord_choices(_current_chord_quality, _current_available_chord_types)
+		_remember_visible_question("ear_chord", _current_chord_quality)
 	elif _selected_mode == MODE_PITCH_MATCH:
 		var tonic := _pitch_match_tonic_midi()
 		# Level-aware step pool (Tier-A pitch-match upgrade). Falls back to full
@@ -21180,6 +24172,7 @@ func _generate_round() -> void:
 			if rq_pitch != null and not label_pool.is_empty():
 				weighted_label = str(rq_pitch.pick_next(label_pool))
 			var pitch_sig := ""
+			var recent_pitch_labels := _recent_visible_ids("pitch_match", label_pool)
 			for attempt in range(16):
 				if attempt == 0 and not weighted_label.is_empty():
 					for step in step_pool:
@@ -21188,8 +24181,9 @@ func _generate_round() -> void:
 							break
 				else:
 					picked_step = step_pool[_rng.randi_range(0, step_pool.size() - 1)]
-				pitch_sig = "%s:%s:%s" % [_pitch_match_key, _pitch_match_scale, _pitch_match_note_label(tonic + picked_step)]
-				if pitch_sig != _last_pitch_match_signature or attempt == 15:
+				var pitch_label := _pitch_match_note_label(tonic + picked_step)
+				pitch_sig = "%s:%s:%s" % [_pitch_match_key, _pitch_match_scale, pitch_label]
+				if (pitch_sig != _last_pitch_match_signature and not recent_pitch_labels.has(pitch_label)) or attempt == 15:
 					break
 			_last_pitch_match_signature = pitch_sig
 		_current_pitch_match_midi = tonic + picked_step
@@ -21197,6 +24191,7 @@ func _generate_round() -> void:
 		_current_ear_text_answer = _pitch_match_note_label(_current_pitch_match_midi)
 		_last_pitch_match_signature = "%s:%s:%s" % [_pitch_match_key, _pitch_match_scale, _current_ear_text_answer]
 		_current_ear_text_choices = _selected_pitch_match_labels()
+		_remember_visible_question("pitch_match", _current_ear_text_answer)
 		_pitch_match_refresh_keyboard_scale_tones()
 	elif _selected_mode == MODE_PROGRESSION:
 		if _advanced_session != null:
@@ -21225,18 +24220,27 @@ func _generate_round() -> void:
 	else:
 		if _sight_mode == "Chords":
 			var sight_chord_sig := ""
+			var recent_sight_chords := _recent_visible_ids("sight_chord", _sight_chord_visible_pool())
 			for attempt in range(16):
 				_pick_random_sight_frame_border_color()
 				_generate_sight_chord_round()
 				sight_chord_sig = _current_sight_chord_name
 				if _staff_note != null:
 					sight_chord_sig += ":%d" % int(round(_staff_note.position.y))
-				if sight_chord_sig != _last_sight_signature or attempt == 15:
+				if (sight_chord_sig != _last_sight_signature and not recent_sight_chords.has(_current_sight_chord_name)) or attempt == 15:
 					break
 			_last_sight_signature = sight_chord_sig
+			_remember_visible_question("sight_chord", _current_sight_chord_name)
 		elif _sight_mode == "Placement":
 			_pick_random_sight_frame_border_color()
 			_generate_sight_placement_round()
+			_remember_visible_question("sight_placement", str(_current_sight_target_step))
+		elif _sight_mode == "Vanishing":
+			_generate_vanishing_round()
+			_remember_visible_question("sight_vanishing", "%s:%d" % [_vanishing_level_label(), _question_index])
+		elif _sight_mode == "Intervals":
+			_generate_interval_reading_round()
+			_remember_visible_question("sight_interval", "%s:%d" % [_interval_reading_correct, _question_index])
 		elif _sight_mode == "Sight Singing":
 			# Hide the single-note display — the singing staff overlay takes over.
 			if _staff_note != null:
@@ -21244,6 +24248,8 @@ func _generate_round() -> void:
 			_start_sight_singing_round()
 		else:
 			var sight_note_sig := ""
+			var sight_note_pool := _sight_note_visible_pool()
+			var recent_sight_note_steps := _recent_visible_ids("sight_note", sight_note_pool)
 			for attempt in range(16):
 				_pick_random_sight_frame_border_color()
 				var slot := _pick_sight_note_slot()
@@ -21255,9 +24261,10 @@ func _generate_round() -> void:
 				_current_sight_display_step = int(slot.get("step", 8))
 				_position_sight_note(note_base, center_y)
 				sight_note_sig = "%s:%d" % [_current_sight_note, int(round(center_y))]
-				if sight_note_sig != _last_sight_signature or attempt == 15:
+				if (sight_note_sig != _last_sight_signature and not recent_sight_note_steps.has(str(_current_sight_display_step))) or attempt == 15:
 					break
 			_last_sight_signature = sight_note_sig
+			_remember_visible_question("sight_note", str(_current_sight_display_step))
 
 
 func _play_current_prompt() -> void:
@@ -21322,7 +24329,11 @@ func _play_current_prompt() -> void:
 		if _sight_mode == "Chords":
 			var chord_notes := _current_sight_grand_staff_chord_midis()
 			if not chord_notes.is_empty():
-				await _play_chord_block_with_fade(chord_notes, SIGHT_GRAND_STAFF_REPLAY_DURATION, SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS)
+				# Sight Reading is about HEARING the printed chord clearly, so undo the
+				# "rolled/soft" -6 dB baseline + voice-normalization (which left a
+				# 4-note chord at ~-12 dB) and then push it well forward. +14 dB makes
+				# the chord loud and present rather than a faint background ping.
+				await _play_chord_block_with_fade(chord_notes, SIGHT_GRAND_STAFF_REPLAY_DURATION, SIGHT_GRAND_STAFF_REPLAY_FADE_SECONDS, 14.0)
 				return
 		elif _sight_mode == "Notes":
 			var sight_note_midi := _current_sight_note_prompt_midi()
@@ -21331,6 +24342,27 @@ func _play_current_prompt() -> void:
 				await _play_note(sight_note_midi, sight_note_len)
 				await _push_silence(0.05)
 				return
+		elif _sight_mode == "Vanishing":
+			_reveal_vanishing_sequence(Color(1, 1, 1, 1))
+			_set_status_message("Memorise the notes…", ICON_MEMORIZE_PATH)
+			# Hold the notes fully visible for most of the window, then fade them out
+			# over the final stretch so they literally "vanish" rather than blinking
+			# off. The fade doubles as the player's visual countdown.
+			var reveal_total := _vanishing_reveal_seconds()
+			var fade_secs := clampf(reveal_total * 0.35, 0.45, 0.8)
+			var hold_secs := maxf(0.2, reveal_total - fade_secs)
+			await get_tree().create_timer(hold_secs).timeout
+			if _quiz_active and _is_sight_vanishing_mode():
+				_set_status_message("Fading away…", ICON_VANISH_PATH)
+				await _animate_vanishing_fade(fade_secs)
+			_hide_vanishing_sequence()
+			await get_tree().create_timer(0.05).timeout
+			return
+		elif _sight_mode == "Intervals":
+			# Pure visual reading — no audio cue (that would make it ear training).
+			# The two notes are already drawn; just arm the answer buttons.
+			await get_tree().create_timer(0.05).timeout
+			return
 		elif _sight_mode == "Sight Singing":
 			# First-note reference only. After this returns, mic poll records the
 			# sung phrase and evaluates the full take.
@@ -21346,20 +24378,6 @@ func _play_ear_count_in_and_context() -> bool:
 	if _qa_enabled:
 		return false
 	var played_tonal_context := false
-	# Audible 4-beat metronome at the current ear tempo. Drives the student's
-	# internal pulse before the prompt; also the foundation of tempo training.
-	if _ear_metronome_enabled:
-		var beat_sec := 60.0 / float(clampi(_ear_tempo, 50, 160))
-		# Click sound: short high-pitch note. Accent the downbeat with a slightly
-		# louder pitch so the student feels the "1" of the bar.
-		for i in range(4):
-			var click_pitch := 88 if i == 0 else 84
-			await _play_note(click_pitch, 0.035)
-			await _push_silence(maxf(0.02, beat_sec - 0.035))
-	if _ear_count_in_enabled:
-		for i in range(2):
-			await _play_note(84, 0.045)
-			await _push_silence(0.12)
 	if _ear_context_tonic_enabled:
 		if _selected_mode == MODE_INTERVAL:
 			await _play_note(_current_root_midi, 0.38)
@@ -21375,18 +24393,6 @@ func _play_ear_count_in_and_context() -> bool:
 		elif _selected_mode == MODE_SCALE_MODE:
 			await _play_note(_ear_key_root_midi(_scale_root, 60), 0.22)
 			await _push_silence(0.08)
-	if _ear_melodic_context_enabled and _selected_mode != MODE_CADENCE:
-		var root := _current_root_midi
-		if _selected_mode == MODE_PROGRESSION:
-			root = _ear_key_root_midi(_progression_key, 60)
-		elif _selected_mode == MODE_SCALE_MODE:
-			root = _ear_key_root_midi(_scale_root, 60)
-		elif _selected_mode == MODE_CADENCE:
-			root = _cadence_play_root + 12
-		for step in [0, 2, 4]:
-			await _play_note(root + int(step), 0.11)
-			await _push_silence(0.025)
-		await _push_silence(0.08)
 	return played_tonal_context
 
 
@@ -21439,7 +24445,12 @@ func _on_replay_pressed() -> void:
 	await _play_current_prompt()
 	_is_prompt_playing = false
 	if _quiz_active and _question_index == replay_question_index and _accepting_answer:
-		_status_label.text = "Sing the highlighted melody." if _is_sight_singing_mode() else "Pick the correct nest."
+		if _is_sight_singing_mode():
+			_status_label.text = "Sing the highlighted melody."
+		elif _is_sight_vanishing_mode():
+			_status_label.text = _vanishing_question_prompt()
+		else:
+			_status_label.text = "Pick the correct nest."
 		if not keep_answers_live:
 			_set_answer_buttons_enabled(true)
 		_replay_button.disabled = false
@@ -21472,20 +24483,35 @@ func _maybe_play_powerup_on_streak() -> void:
 
 
 func _show_streak_toast(msg: String) -> void:
-	if _streak_toast_label == null:
+	if _streak_toast_panel == null or _streak_toast_label == null:
 		return
 	if _streak_toast_tween != null and is_instance_valid(_streak_toast_tween):
 		_streak_toast_tween.kill()
 	_streak_toast_label.text = msg
-	_streak_toast_label.visible = true
-	_streak_toast_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	_streak_toast_label.scale = Vector2(0.7, 0.7)
+	_streak_toast_panel.visible = true
+	_streak_toast_panel.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	_streak_toast_panel.scale = Vector2(0.94, 0.94)
 	_streak_toast_tween = create_tween()
 	_streak_toast_tween.set_parallel(true)
-	_streak_toast_tween.tween_property(_streak_toast_label, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_streak_toast_tween.tween_property(_streak_toast_label, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_streak_toast_tween.chain().tween_interval(1.4)
-	_streak_toast_tween.chain().tween_property(_streak_toast_label, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_streak_toast_tween.tween_property(_streak_toast_panel, "modulate:a", 1.0, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_streak_toast_tween.tween_property(_streak_toast_panel, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_streak_toast_tween.chain().tween_interval(2.8)
+	_streak_toast_tween.chain().tween_property(_streak_toast_panel, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_streak_toast_tween.chain().tween_callback(func() -> void:
+		if _streak_toast_panel != null:
+			_streak_toast_panel.visible = false
+	)
+
+
+func _reset_session_unlock_messages() -> void:
+	_session_unlock_messages.clear()
+
+
+func _record_session_unlock_message(message: String) -> void:
+	var clean := message.strip_edges()
+	if clean.is_empty() or _session_unlock_messages.has(clean):
+		return
+	_session_unlock_messages.append(clean)
 
 
 func _on_chicken_combo_correct() -> bool:
@@ -21585,6 +24611,8 @@ func _play_chord_for_explorer(notes: Array[int], duration: float) -> void:
 func _play_chord_block(notes: Array[int], duration: float) -> void:
 	if notes.is_empty():
 		return
+	for chord_midi in notes:
+		_qa_audio_probe_push(int(chord_midi), duration)
 	var sample_map := _sample_map_for_current_mode()
 	if sample_map.is_empty() or _chord_players.size() < notes.size():
 		if _chord_players.size() < notes.size() and not _logged_chord_player_shortage:
@@ -22237,6 +25265,12 @@ func _on_pitch_match_key_pressed(pitch: int) -> void:
 func _on_compare_your_pressed() -> void:
 	if _is_prompt_playing:
 		return
+	# No UI click SFX on this button — the user is here to listen to musical
+	# audio, and a synthetic click on press just smears the start of the
+	# prompt. Also clear focus so the button doesn't grab keyboard focus
+	# afterward (which could fire Godot's default focus tween/cue).
+	_clear_compare_button_focus()
+	_settle_piano_for_compare_playback()
 	_is_prompt_playing = true
 	if _compare_chosen_mode == MODE_INTERVAL:
 		var d := _current_note_duration()
@@ -22258,6 +25292,9 @@ func _on_compare_your_pressed() -> void:
 func _on_compare_correct_pressed() -> void:
 	if _is_prompt_playing:
 		return
+	# See _on_compare_your_pressed — no click SFX, settle audio first.
+	_clear_compare_button_focus()
+	_settle_piano_for_compare_playback()
 	_is_prompt_playing = true
 	if _compare_chosen_mode == MODE_INTERVAL:
 		await _play_interval_prompt_async(_current_root_midi, _current_second_midi)
@@ -22398,6 +25435,17 @@ func _start_mic_listening() -> void:
 		return
 	if _pitch_detector.has_method("set_soft_pitch_mode"):
 		_pitch_detector.call("set_soft_pitch_mode", sight_singing_input_required)
+	# Reject chords for instrument-note input, but never for Sight Singing —
+	# the voice is monophonic and must not be gated by the polyphony check.
+	if _pitch_detector.has_method("set_reject_polyphony"):
+		_pitch_detector.call("set_reject_polyphony", not sight_singing_input_required)
+	# Voice tuning for singing; low-instrument tuning otherwise (so bass-clef
+	# instrument input reaches ~C2 instead of bottoming out at the 90 Hz voice floor).
+	if sight_singing_input_required:
+		if _pitch_detector.has_method("configure_for_voice"):
+			_pitch_detector.call("configure_for_voice")
+	elif _pitch_detector.has_method("configure_for_instrument"):
+		_pitch_detector.call("configure_for_instrument")
 	_pitch_detector.start_listening()
 	_mic_listening = _pitch_detector.is_listening()
 	if _mic_status_label != null:
@@ -22565,7 +25613,7 @@ func _midi_supported_for_mode() -> bool:
 	if _learning_lesson_player != null and is_instance_valid(_learning_lesson_player) and _learning_lesson_player.visible:
 		return true
 	if _selected_mode == MODE_SIGHT:
-		return _sight_mode == "Notes" or _sight_mode == "Chords"
+		return _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Vanishing"
 	if _selected_mode == MODE_NOTE_CHASE:
 		return true
 	# Ear training: teacher plays the prompt back on MIDI for validation
@@ -22950,6 +25998,9 @@ func _build_active_student_chip() -> void:
 func _refresh_active_student_chip() -> void:
 	if _active_student_chip == null or _active_student_chip_label == null:
 		return
+	if _home_mode_detail_active or _ear_settings_screen_active or _sight_settings_screen_active:
+		_active_student_chip.visible = false
+		return
 	if not IS_TEACHER_EDITION:
 		_active_student_chip.visible = false
 		return
@@ -23187,7 +26238,7 @@ func _ear_assignment_mode_to_id(mode_name: String) -> int:
 
 
 func _apply_ear_assignment_settings(assignment: Dictionary, mode: int) -> void:
-	var q_count := clampi(int(assignment.get("question_count", _ear_question_count)), 1, 100)
+	var q_count := clampi(int(assignment.get("question_count", _ear_question_count)), MIN_STANDARD_ROUND_QUESTIONS, 100)
 	_ear_question_count = q_count
 	if _question_spin != null:
 		_question_spin.value = q_count
@@ -23249,7 +26300,7 @@ func _apply_sight_assignment_settings(assignment: Dictionary) -> void:
 		_sight_key_signature = key_name
 	else:
 		_sight_key_signature = "C"
-	var q_count := clampi(int(assignment.get("question_count", _sight_question_count)), 1, 100)
+	var q_count := clampi(int(assignment.get("question_count", _sight_question_count)), MIN_STANDARD_ROUND_QUESTIONS, 100)
 	_sight_question_count = q_count
 	if _sight_question_spin != null:
 		_sight_question_spin.value = q_count
@@ -23748,11 +26799,20 @@ func _refresh_home_recommended_card() -> void:
 	for child in _home_recommended_vbox.get_children():
 		child.queue_free()
 
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 7)
+	_home_recommended_vbox.add_child(header_row)
+	var header_icon := TextureRect.new()
+	header_icon.texture = load(ICON_BULLSEYE_PATH)
+	header_icon.custom_minimum_size = Vector2(22, 22)
+	header_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	header_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header_row.add_child(header_icon)
 	var header := Label.new()
-	header.text = "%s  Recommended Next — %s" % [char(0x1F3AF), str(rec.get("mode_label", ""))]
+	header.text = "Recommended Next — %s" % str(rec.get("mode_label", ""))
 	header.add_theme_font_size_override("font_size", 17)
 	header.add_theme_color_override("font_color", Color(0.62, 0.95, 0.88, 1.0))
-	_home_recommended_vbox.add_child(header)
+	header_row.add_child(header)
 
 	var reason := Label.new()
 	reason.text = str(rec.get("reason", ""))
@@ -23769,7 +26829,11 @@ func _refresh_home_recommended_card() -> void:
 	# SS6 — Quick Focus Drill: 5-question targeted session, biggest celebration
 	# on completion. Sits as the primary CTA when there are weak items.
 	var focus_btn := Button.new()
-	focus_btn.text = "%s  Quick Focus (%d Qs)" % [char(0x1F3AF), FOCUS_MISSES_QUESTION_COUNT]
+	focus_btn.text = "  Quick Focus (%d Qs)" % FOCUS_MISSES_QUESTION_COUNT
+	var focus_bullseye: Texture2D = load(ICON_BULLSEYE_PATH)
+	if focus_bullseye != null:
+		focus_btn.icon = focus_bullseye
+		focus_btn.add_theme_constant_override("icon_max_width", 18)
 	focus_btn.custom_minimum_size = Vector2(190, 36)
 	_style_eol_primary_button(focus_btn)
 	focus_btn.pressed.connect(func():
@@ -23896,7 +26960,7 @@ func _on_home_daily_challenge_start_pressed(cfg: Dictionary) -> void:
 	# + question count, then navigate to mode setup. User taps Let's Play to
 	# actually start (so they see the setup once before the run).
 	_sight_mode = str(cfg.get("mode", "Notes"))
-	_sight_question_count = int(cfg.get("questions", 10))
+	_sight_question_count = clampi(int(cfg.get("questions", MIN_STANDARD_ROUND_QUESTIONS)), MIN_STANDARD_ROUND_QUESTIONS, 100)
 	if _sight_question_spin != null:
 		_suppress_round_count_save = true
 		_sight_question_spin.value = _sight_question_count
@@ -23970,6 +27034,7 @@ func _show_badge_earned_toast(badge_id: String) -> void:
 	if def.is_empty():
 		return
 	var text := "%s  Badge unlocked: %s" % [char(int(def.get("icon", 0x2B50))), str(def.get("name", badge_id))]
+	_record_session_unlock_message("Badge unlocked: %s" % str(def.get("name", badge_id)))
 	if _streak_toast_label != null:
 		_show_streak_toast(text)
 
@@ -24236,8 +27301,16 @@ func _build_settings_diagnostics_section(parent: VBoxContainer) -> void:
 	_settings_diag_midi_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.90, 0.88))
 	v.add_child(_settings_diag_midi_label)
 
+	# Mic detection breakdown — populated after a sight-reading mic session so a
+	# tester can see WHY the mic did/didn't detect (too quiet, no pitch, chord, …).
+	_settings_diag_mic_label = Label.new()
+	_settings_diag_mic_label.add_theme_font_size_override("font_size", 12)
+	_settings_diag_mic_label.add_theme_color_override("font_color", Color(0.72, 0.82, 0.90, 0.88))
+	_settings_diag_mic_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_settings_diag_mic_label)
+
 	_settings_diag_support_label = Label.new()
-	_settings_diag_support_label.text = "Support: file an issue at github.com/anthropics/claude-code/issues"
+	_settings_diag_support_label.text = "Support: support@clefira.app"
 	_settings_diag_support_label.add_theme_font_size_override("font_size", 12)
 	_settings_diag_support_label.add_theme_color_override("font_color", Color(0.62, 0.78, 0.92, 0.78))
 	_settings_diag_support_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -24319,6 +27392,13 @@ func _refresh_settings_diagnostics() -> void:
 				_settings_diag_midi_label.text = "MIDI: no device detected"
 			else:
 				_settings_diag_midi_label.text = "MIDI: connected — %s" % summary
+	if _settings_diag_mic_label != null:
+		if _pitch_detector != null and _pitch_detector.has_method("get_diag_summary"):
+			var summ := str(_pitch_detector.call("get_diag_summary"))
+			_settings_diag_mic_label.text = "Mic: %s" % summ
+			_settings_diag_mic_label.visible = true
+		else:
+			_settings_diag_mic_label.visible = false
 
 
 # Updates the Start/End Lesson button visibility + label based on whether a
@@ -24991,7 +28071,7 @@ func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
 	_style_eol_secondary_button(skip_btn)
 	actions.add_child(skip_btn)
 	var save_btn := Button.new()
-	save_btn.text = "Save" if edit_mode else "Save & Start"
+	save_btn.text = "Save" if edit_mode else "Save & Continue"
 	save_btn.custom_minimum_size = Vector2(180, 42)
 	_style_eol_primary_button(save_btn)
 	actions.add_child(save_btn)
@@ -25117,7 +28197,11 @@ func _build_sight_round_start_card() -> void:
 func _refresh_sight_round_start_overlay() -> void:
 	if _sight_round_start_card == null:
 		return
-	var show: bool = _selected_mode == MODE_SIGHT and _awaiting_round_start
+	# Only show the floating "Tap Start Round" prompt when the game panel is
+	# actually on-screen. Without the visibility gate the card lingers when
+	# the user navigates back to home or into another tool panel.
+	var game_visible: bool = _game_panel != null and _game_panel.visible
+	var show: bool = game_visible and _selected_mode == MODE_SIGHT and _awaiting_round_start
 	_sight_round_start_card.visible = show
 
 
@@ -25227,7 +28311,9 @@ func _build_sight_big_piano() -> void:
 		btn.add_theme_color_override("font_pressed_color", label_color)
 		btn.add_theme_color_override("font_focus_color", label_color)
 		btn.add_theme_color_override("font_outline_color", Color(1.0, 0.96, 0.78, 1.0))
-		btn.add_theme_constant_override("outline_size", 4)
+		# Thin outline so the navy letter stays the dominant color (a 4px light
+		# outline on 14px text washed the key names out toward white).
+		btn.add_theme_constant_override("outline_size", 1)
 		# Push text down to the bottom of the key (like real piano labels):
 		# clone the StyleBox and bias content_margin_top so the rendered
 		# text sits low on the key surface.
@@ -25360,7 +28446,7 @@ func _on_sight_big_piano_key_pressed(pitch: int) -> void:
 	var note_name: String = _midi_pitch_to_note_name(pitch)
 	if note_name.is_empty():
 		return
-	var routed: String = _match_mic_note_to_sight(note_name)
+	var routed: String = _match_mic_midi_to_sight(pitch, note_name)
 	if routed.is_empty():
 		return
 	_on_sight_key_chosen(routed)
@@ -25684,10 +28770,195 @@ func _show_sight_chord_keyboard_feedback() -> void:
 	_refresh_sight_chord_feedback_keyboard_visibility()
 
 
+# --- Sight Chords "Play it" polyphonic mic check ---------------------------
+# Lazily probe for the native PolyphonyDetector; cache the facade if present.
+func _chord_detection_available() -> bool:
+	if not _chord_detection_checked:
+		_chord_detection_checked = true
+		if not _qa_enabled:
+			var cd: RefCounted = ChordDetectionScript.new()
+			if cd.call("is_available"):
+				_chord_detection = cd
+	return _chord_detection != null
+
+
+func _on_sight_chord_mic_pressed() -> void:
+	if _chord_mic_check_active or _qa_enabled:
+		return
+	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
+		return
+	if not _chord_detection_available():
+		return
+	var expected := _current_sight_chord_feedback_midis()
+	if expected.is_empty():
+		return
+
+	_chord_mic_check_active = true
+	var restore_text := _sight_chord_mic_button.text
+	_sight_chord_mic_button.disabled = true
+	_sight_chord_mic_button.text = "%s  Listening…" % char(0x1F3A4)
+
+	_request_microphone_permission_if_needed()
+	if _pitch_detector == null:
+		_pitch_detector = PitchDetectorScript.new()
+		if not _pitch_detector.setup(self):
+			_pitch_detector = null
+	if _pitch_detector == null:
+		_status_label.visible = true
+		_status_label.text = "Mic unavailable."
+		_finish_chord_mic_check(restore_text)
+		return
+
+	var was_listening: bool = _pitch_detector.is_listening()
+	if not was_listening:
+		_pitch_detector.start_listening()
+	if not _pitch_detector.is_listening():
+		_status_label.visible = true
+		_status_label.text = "Mic unavailable — check permission."
+		_finish_chord_mic_check(restore_text)
+		return
+
+	if _pitch_detector.has_method("reset_capture_buffer"):
+		_pitch_detector.call("reset_capture_buffer")
+	_pitch_detector.call("start_take_recording")
+	_status_label.visible = true
+	_status_label.text = "%s  Play the chord now…" % char(0x1F3A4)
+
+	await get_tree().create_timer(_CHORD_MIC_CAPTURE_SEC).timeout
+
+	_pitch_detector.call("stop_take_recording")
+	var samples: PackedFloat32Array = _pitch_detector.call("get_take_recording_samples")
+	var rate: int = int(_pitch_detector.call("get_sample_rate"))
+	if not was_listening:
+		_pitch_detector.stop_listening()
+	if _pitch_detector.has_method("clear_take_recording"):
+		_pitch_detector.call("clear_take_recording")
+
+	if samples.is_empty():
+		_status_label.text = "No audio captured — try again."
+		_finish_chord_mic_check(restore_text)
+		return
+
+	var r: Dictionary = _chord_detection.call("grade", samples, rate, expected)
+	if not bool(r.get("available", false)) or r.has("error"):
+		_status_label.text = "Couldn't analyze the audio — try again."
+		_finish_chord_mic_check(restore_text)
+		return
+	_status_label.text = _chord_mic_feedback_text(r)
+	_finish_chord_mic_check(restore_text)
+
+
+func _finish_chord_mic_check(restore_text: String) -> void:
+	_chord_mic_check_active = false
+	if _sight_chord_mic_button != null:
+		_sight_chord_mic_button.disabled = false
+		_sight_chord_mic_button.text = restore_text
+
+
+func _chord_mic_feedback_text(r: Dictionary) -> String:
+	if bool(r.get("correct", false)):
+		return "%s  Yes! You played every note of the chord." % char(0x2705)
+	var parts := PackedStringArray()
+	var missing: Array = r.get("missing_pcs", [])
+	var extra: Array = r.get("extra_pcs", [])
+	if not missing.is_empty():
+		var mn := PackedStringArray()
+		for pc in missing:
+			mn.append(ChordDetectionScript.pc_name(int(pc)))
+		parts.append("missing " + ", ".join(mn))
+	if not extra.is_empty():
+		var en := PackedStringArray()
+		for pc in extra:
+			en.append(ChordDetectionScript.pc_name(int(pc)))
+		parts.append("extra " + ", ".join(en))
+	if parts.is_empty():
+		return "Hmm — couldn't match that. Try again."
+	return "Close — " + "; ".join(parts) + "."
+
+
 # ============================================================================
 # Chord Explorer
 # ============================================================================
 
+
+
+func _build_functional_ear_panel() -> void:
+	_functional_ear_panel = FunctionalEarPanelScript.new()
+	add_child(_functional_ear_panel)
+	_functional_ear_panel.setup(
+		_ui_font,
+		_ui_title_font,
+		Callable(self, "_play_chord_for_explorer"),
+		Callable(self, "_apply_clefira_nav_home_button_style"),
+		Callable(self, "_play_success_sfx"),
+		Callable(self, "_play_fail_sfx")
+	)
+	_functional_ear_panel.closed.connect(_on_functional_ear_closed)
+
+
+func _on_functional_ear_open() -> void:
+	if _functional_ear_panel == null:
+		return
+	_functional_ear_active = true
+	if _home_panel != null:
+		_home_panel.visible = false
+	_hide_home_overlay_buttons()
+	_functional_ear_panel.present()
+
+
+# Shared helper — hides every home-screen button + footer that would
+# otherwise bleed through behind a fullscreen panel (Chord Explorer,
+# Practice Drills, Functional Ear). Called from each panel's open handler;
+# the matching restore happens on close via _show_home() / _on_*_closed().
+func _hide_home_overlay_buttons() -> void:
+	# Nuclear option: hide the WHOLE home/header card hierarchy. Every
+	# button, chip, label, gradient, shadow that lives on the home shell
+	# is a child of these — hiding the containers takes them all out in
+	# one shot, no matter what intermediate refresh fires after this call.
+	if _home_card != null:
+		_home_card.visible = false
+	if _header_card != null:
+		_header_card.visible = false
+	# Individual buttons too — some are NOT children of the cards above
+	# (e.g. _home_settings_button lives in _home_footer_bar, which is a
+	# sibling). Belt-and-braces explicit hides:
+	if _home_footer_row != null:
+		_home_footer_row.visible = false
+	if _home_footer_bar != null:
+		_home_footer_bar.visible = false
+	if _home_settings_button != null:
+		_home_settings_button.visible = false
+	if _home_edit_profile_button != null:
+		_home_edit_profile_button.visible = false
+	if _home_start_button != null:
+		_home_start_button.visible = false
+	if _rhythm_flow_demo_home_button != null:
+		_rhythm_flow_demo_home_button.visible = false
+	if _quick_practice_button != null:
+		_quick_practice_button.visible = false
+	if _how_to_play_button != null:
+		_how_to_play_button.visible = false
+	if _home_mode_back_button != null:
+		_home_mode_back_button.visible = false
+	if _home_mode_home_button != null:
+		_home_mode_home_button.visible = false
+	if _active_student_chip != null:
+		_active_student_chip.visible = false
+	if _home_streak_panel != null:
+		_home_streak_panel.visible = false
+	if _home_info_label != null:
+		_home_info_label.visible = false
+	if _sight_round_start_card != null:
+		_sight_round_start_card.visible = false
+	if _game_home_button != null:
+		_game_home_button.visible = false
+
+
+func _on_functional_ear_closed() -> void:
+	_functional_ear_active = false
+	if _home_panel != null:
+		_home_panel.visible = true
+	_show_home()
 
 
 func _build_chord_explorer_panel() -> void:
@@ -25700,12 +28971,20 @@ func _build_chord_explorer_panel() -> void:
 		Callable(self, "_sample_map_for_current_mode"),
 		Callable(self, "_nearest_sample_midi_from_map"),
 		Callable(self, "_build_score_font_picker"),
-		Callable(self, "_play_chord_for_explorer")
+		Callable(self, "_play_chord_for_explorer"),
+		Callable(self, "_apply_clefira_nav_home_button_style")
 	)
 	_chord_explorer_panel.closed.connect(_on_chord_explorer_panel_closed)
 	_chord_explorer_panel.chord_cleared.connect(_on_chord_explorer_panel_chord_cleared)
 	_chord_explorer_panel.note_pressed_via_keyboard.connect(_on_chord_explorer_panel_keyboard_note)
 	_chord_explorer_panel.build_quiz_requested.connect(_on_open_build_chord_quiz)
+	if _chord_explorer_panel.has_method("setup_mic"):
+		_chord_explorer_panel.call(
+			"setup_mic",
+			Callable(self, "_panel_mic_start"),
+			Callable(self, "_panel_mic_stop"),
+			Callable(self, "_panel_mic_poll")
+		)
 
 
 # Build Chord Quiz panel — a separate screen with three exercise modes
@@ -25802,6 +29081,7 @@ func _on_chord_explorer_open() -> void:
 	_chord_explorer_active = true
 	if _home_panel != null:
 		_home_panel.visible = false
+	_hide_home_overlay_buttons()
 	_chord_explorer_panel.present()
 	if _midi_enabled and _midi_platform_supported():
 		_open_midi_inputs_for_detection()
@@ -26644,52 +29924,55 @@ func _sight_singing_show_phrase_summary(result: Dictionary) -> void:
 	# detector mis-heard or DTW alignment slid by one note.
 	var per_note: Array = result.get("per_note", [])
 	var segments: Array = result.get("segments", [])
-	print("[SightSinging] expected→detected:")
-	for i in range(per_note.size()):
-		var row: Dictionary = per_note[i]
-		var t_midi: int = int(row.get("target_midi", -1))
-		var d_midi: int = int(row.get("detected_midi", -1))
-		var cents: float = float(row.get("cents_off", 0.0))
-		var band_lbl: String = SingingEvaluatorScript.band_label(int(row.get("band", SingingEvaluatorScript.BAND_WRONG)))
-		var missing: bool = bool(row.get("missing", false))
-		var t_name: String = PitchDetectorScript.midi_to_full_name(t_midi) if t_midi >= 0 else "?"
-		var d_name: String = PitchDetectorScript.midi_to_full_name(d_midi) if d_midi >= 0 else "(missing)"
-		print("  note %d: expected %s (midi %d)  →  heard %s (midi %d)  cents=%+d  [%s]%s" % [
-			i, t_name, t_midi, d_name, d_midi, int(round(cents)), band_lbl,
-			"  MISSING-SEGMENT" if missing else ""
+	# Verbose per-note / per-window diagnostics — debug builds only so release
+	# builds don't spam the console/log on every sung phrase.
+	if OS.is_debug_build():
+		print("[SightSinging] expected→detected:")
+		for i in range(per_note.size()):
+			var row: Dictionary = per_note[i]
+			var t_midi: int = int(row.get("target_midi", -1))
+			var d_midi: int = int(row.get("detected_midi", -1))
+			var cents: float = float(row.get("cents_off", 0.0))
+			var band_lbl: String = SingingEvaluatorScript.band_label(int(row.get("band", SingingEvaluatorScript.BAND_WRONG)))
+			var missing: bool = bool(row.get("missing", false))
+			var t_name: String = PitchDetectorScript.midi_to_full_name(t_midi) if t_midi >= 0 else "?"
+			var d_name: String = PitchDetectorScript.midi_to_full_name(d_midi) if d_midi >= 0 else "(missing)"
+			print("  note %d: expected %s (midi %d)  →  heard %s (midi %d)  cents=%+d  [%s]%s" % [
+				i, t_name, t_midi, d_name, d_midi, int(round(cents)), band_lbl,
+				"  MISSING-SEGMENT" if missing else ""
+			])
+		print("[SightSinging] %d segments built from %d stable detections; %d pitch candidates captured" % [
+			segments.size(), _sight_singing_runtime.phrase_detections.size(), int(result.get("candidate_count", _sight_singing_runtime.pitch_candidates.size()))
 		])
-	print("[SightSinging] %d segments built from %d stable detections; %d pitch candidates captured" % [
-		segments.size(), _sight_singing_runtime.phrase_detections.size(), int(result.get("candidate_count", _sight_singing_runtime.pitch_candidates.size()))
-	])
-	print("[SightSinging] candidate_source=%s live_coverage_ok=%s timing_offset=%+.3fs vocal_region=%.2f-%.2fs" % [
-		str(result.get("candidate_source", "?")),
-		str(result.get("live_candidate_coverage_ok", true)),
-		float(result.get("timing_offset_sec", 0.0)),
-		float(result.get("vocal_start", 0.0)),
-		float(result.get("vocal_end", 0.0)),
-	])
-	var debug_windows: Array = result.get("debug_windows", [])
-	for window_any in debug_windows:
-		var window: Dictionary = window_any
-		var idx := int(window.get("note_index", -1))
-		var selected_midi := int(window.get("selected_midi", -1))
-		var selected_name := PitchDetectorScript.midi_to_full_name(selected_midi) if selected_midi >= 0 else "(missing)"
-		var band_label := SingingEvaluatorScript.band_label(int(window.get("band", SingingEvaluatorScript.BAND_WRONG)))
-		print("  window %d: %.2f-%.2fs candidates=%d core=%d vote=%d selected=%s selected_count=%d source=%s conf=%.2f rms=%.4f [%s]%s" % [
-			idx,
-			float(window.get("start_time", 0.0)),
-			float(window.get("end_time", 0.0)),
-			int(window.get("candidate_count", 0)),
-			int(window.get("core_candidate_count", 0)),
-			int(window.get("vote_candidate_count", window.get("candidate_count", 0))),
-			selected_name,
-			int(window.get("selected_count", 0)),
-			str(window.get("source", "?")),
-			float(window.get("confidence_avg", 0.0)),
-			float(window.get("rms_avg", 0.0)),
-			band_label,
-			"  UNCERTAIN" if bool(window.get("uncertain", false)) else ("  MISSING-WINDOW" if bool(window.get("missing", false)) else ""),
+		print("[SightSinging] candidate_source=%s live_coverage_ok=%s timing_offset=%+.3fs vocal_region=%.2f-%.2fs" % [
+			str(result.get("candidate_source", "?")),
+			str(result.get("live_candidate_coverage_ok", true)),
+			float(result.get("timing_offset_sec", 0.0)),
+			float(result.get("vocal_start", 0.0)),
+			float(result.get("vocal_end", 0.0)),
 		])
+		var debug_windows: Array = result.get("debug_windows", [])
+		for window_any in debug_windows:
+			var window: Dictionary = window_any
+			var idx := int(window.get("note_index", -1))
+			var selected_midi := int(window.get("selected_midi", -1))
+			var selected_name := PitchDetectorScript.midi_to_full_name(selected_midi) if selected_midi >= 0 else "(missing)"
+			var band_label := SingingEvaluatorScript.band_label(int(window.get("band", SingingEvaluatorScript.BAND_WRONG)))
+			print("  window %d: %.2f-%.2fs candidates=%d core=%d vote=%d selected=%s selected_count=%d source=%s conf=%.2f rms=%.4f [%s]%s" % [
+				idx,
+				float(window.get("start_time", 0.0)),
+				float(window.get("end_time", 0.0)),
+				int(window.get("candidate_count", 0)),
+				int(window.get("core_candidate_count", 0)),
+				int(window.get("vote_candidate_count", window.get("candidate_count", 0))),
+				selected_name,
+				int(window.get("selected_count", 0)),
+				str(window.get("source", "?")),
+				float(window.get("confidence_avg", 0.0)),
+				float(window.get("rms_avg", 0.0)),
+				band_label,
+				"  UNCERTAIN" if bool(window.get("uncertain", false)) else ("  MISSING-WINDOW" if bool(window.get("missing", false)) else ""),
+			])
 	if _sight_singing_progress_label != null:
 		_sight_singing_progress_label.text = "Pitch %d%%   Rhythm %d%%   Overall %d%%" % [pitch_pct, rhythm_pct, overall_pct]
 	if _status_label != null:
@@ -27063,9 +30346,33 @@ func _build_practice_drills_panel() -> void:
 		Callable(self, "_midi_to_freq"),
 		Callable(self, "_build_score_font_picker"),
 		Callable(self, "_apply_clefira_dialog_style"),
-		Callable(self, "_practice_get_weakest_skill_family")
+		Callable(self, "_practice_get_weakest_skill_family"),
+		Callable(self, "_apply_clefira_nav_home_button_style"),
+		Callable(self, "_qa_audio_probe_push"),
+		Callable(self, "_practice_drills_lookup_open_assignment")
 	)
 	_practice_drills_panel.closed.connect(_on_practice_drills_panel_closed)
+	if _practice_drills_panel.has_method("setup_mic"):
+		_practice_drills_panel.call(
+			"setup_mic",
+			Callable(self, "_panel_mic_start"),
+			Callable(self, "_panel_mic_stop"),
+			Callable(self, "_panel_mic_poll")
+		)
+
+
+# Feat 4 — Teacher-assignment lookup for Practice Drills' "★ Assigned"
+# chip. Returns the first open practice-drill assignment for the active
+# student whose exercise_id matches, or {} if there's no teacher data
+# loaded (Student Edition) or no match. Defensive — the panel handles
+# either case gracefully via _refresh_assignment_chip.
+func _practice_drills_lookup_open_assignment(exercise_id: String) -> Dictionary:
+	if _teacher_store == null:
+		return {}
+	var sid: String = _teacher_store.get_active_student_id("")
+	if sid.is_empty():
+		return {}
+	return _teacher_store.get_open_practice_drill_assignment_for(sid, exercise_id)
 
 
 func _practice_get_weakest_skill_family() -> String:
@@ -27080,7 +30387,12 @@ func _on_practice_drills_open() -> void:
 	_practice_drills_active = true
 	if _home_panel != null:
 		_home_panel.visible = false
+	_hide_home_overlay_buttons()
 	_practice_drills_panel.present()
+	# Open MIDI inputs so Play Along grading can receive note-ons.
+	if _midi_enabled and _midi_platform_supported():
+		_open_midi_inputs_for_detection()
+		_midi_active = true
 	_refresh_active_student_chip()
 
 
@@ -27092,6 +30404,10 @@ func _on_practice_drills_close() -> void:
 
 func _on_practice_drills_panel_closed() -> void:
 	_practice_drills_active = false
+	if _home_footer_bar != null:
+		_home_footer_bar.visible = true
+	if _home_footer_row != null:
+		_home_footer_row.visible = true
 	_refresh_active_student_chip()
 	_show_home()
 
@@ -27110,6 +30426,13 @@ func _handle_midi_note_on(pitch: int) -> void:
 	if _chord_explorer_active:
 		_handle_midi_note_on_for_chord_explorer(pitch)
 		return
+	# Practice Drills Play Along: when its panel is visible, forward MIDI so
+	# the grader can match against expected notes. Practice Drills is a tool
+	# panel (not a quiz mode) so the quiz-active gating below doesn't apply.
+	if _practice_drills_active and _practice_drills_panel != null and is_instance_valid(_practice_drills_panel):
+		if _practice_drills_panel.has_method("handle_midi_note_on"):
+			_practice_drills_panel.call("handle_midi_note_on", pitch)
+			return
 	if _is_prompt_playing or _awaiting_round_start:
 		return
 	if _learning_lesson_player != null and _learning_lesson_player.visible:
@@ -27118,7 +30441,7 @@ func _handle_midi_note_on(pitch: int) -> void:
 		return
 	if not _quiz_active or not _accepting_answer:
 		return
-	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
+	if _selected_mode == MODE_SIGHT and (_sight_mode == "Notes" or _sight_mode == "Vanishing"):
 		_handle_midi_note_on_for_sight_notes(pitch)
 	elif _selected_mode == MODE_SIGHT and _sight_mode == "Chords":
 		_handle_midi_note_on_for_sight_chords(pitch)
@@ -27136,7 +30459,7 @@ func _handle_midi_note_on_for_sight_notes(pitch: int) -> void:
 	var note_name := _midi_pitch_to_note_name(pitch)
 	if note_name.is_empty():
 		return
-	var routed := _match_mic_note_to_sight(note_name)
+	var routed := _match_mic_midi_to_sight(pitch, note_name)
 	if routed.is_empty():
 		return
 	var matched_btn: Button = _sight_key_buttons.get(routed, null) as Button
@@ -27483,6 +30806,52 @@ func _stop_mic_listening() -> void:
 		_mic_status_label.visible = false
 
 
+# --- Panel mic helpers ----------------------------------------------------
+# Used by Chord Explorer + Practice Drills panels via MicListener. Bypasses
+# the sight-singing-mode guards on _start_mic_listening so panels can drive
+# the shared pitch detector directly. Returns true if the mic is actively
+# listening after the call.
+func _panel_mic_start() -> bool:
+	_request_microphone_permission_if_needed()
+	if _pitch_detector == null and not _qa_enabled:
+		_pitch_detector = PitchDetectorScript.new()
+		if not _pitch_detector.setup(self):
+			_pitch_detector = null
+	if _pitch_detector == null:
+		return false
+	if _pitch_detector.has_method("set_soft_pitch_mode"):
+		_pitch_detector.call("set_soft_pitch_mode", false)
+	# Sight Notes is single-note instrument input — reject chords so a struck
+	# chord can't read as a "correct" answer the player never isolated.
+	if _pitch_detector.has_method("set_reject_polyphony"):
+		_pitch_detector.call("set_reject_polyphony", true)
+	# Instrument range — reach down to piano bass clef (~C2) so low notes register
+	# without the player having to play hard. Without this the detector's voice
+	# tuning (90 Hz floor / 85 Hz HPF) silently drops most bass-clef fundamentals.
+	if _pitch_detector.has_method("configure_for_instrument"):
+		_pitch_detector.call("configure_for_instrument")
+	if _pitch_detector.has_method("reset_voice_state"):
+		_pitch_detector.call("reset_voice_state")
+	_pitch_detector.start_listening()
+	return _pitch_detector.is_listening()
+
+
+func _panel_mic_stop() -> void:
+	if _pitch_detector != null and _pitch_detector.is_listening():
+		_pitch_detector.stop_listening()
+
+
+func _panel_mic_poll() -> Dictionary:
+	if _pitch_detector == null or not _pitch_detector.is_listening():
+		return {}
+	return _pitch_detector.poll()
+
+
+func _panel_mic_set_target_pc(pc: int) -> void:
+	if _pitch_detector != null and _pitch_detector.has_method("set_target_pitch_class"):
+		_pitch_detector.call("set_target_pitch_class", pc)
+
+
 func _poll_mic_pitch() -> void:
 	if _pitch_detector == null or not _mic_listening:
 		return
@@ -27538,7 +30907,7 @@ func _poll_mic_pitch() -> void:
 			return
 		_sight_singing_phrase_feed_detection(result)
 	elif _selected_mode == MODE_SIGHT and _sight_mode == "Notes":
-		var matched := _match_mic_note_to_sight(detected_name)
+		var matched := _match_mic_midi_to_sight(int(result.get("midi", -1)), detected_name)
 		if matched.is_empty():
 			return
 		_on_sight_key_chosen(matched)
@@ -27557,6 +30926,29 @@ func _match_mic_note_to_sight(detected: String) -> String:
 	if not alt.is_empty() and _sight_key_buttons.has(alt):
 		return alt
 	return detected
+
+
+func _match_mic_midi_to_sight(midi: int, detected: String) -> String:
+	if midi < 0:
+		return _match_mic_note_to_sight(detected)
+	var detected_name := _midi_pitch_to_note_name(midi)
+	if detected_name.is_empty():
+		detected_name = detected
+	var routed := _match_mic_note_to_sight(detected_name)
+	var target_midi := _current_sight_note_prompt_midi()
+	if target_midi < 0:
+		return routed
+	if not _midi_any_octave and midi != target_midi:
+		var octave_message := "Wrong octave - try %s." % _pitch_match_note_label(target_midi)
+		if _mic_status_label != null and _mic_status_label.is_inside_tree():
+			_mic_status_label.visible = true
+			_mic_status_label.text = octave_message
+		if _midi_status_label != null and _midi_status_label.is_inside_tree():
+			_midi_status_label.text = octave_message
+		return ""
+	if midi % 12 == target_midi % 12:
+		return _current_sight_note
+	return routed
 
 
 func _show_sight_note_name_label(is_correct: bool) -> void:
@@ -27618,6 +31010,12 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 	if _sight_mode == "Continuous":
 		_on_continuous_sight_key_pressed(note_name)
 		return
+	if _sight_mode == "Vanishing":
+		await _on_vanishing_note_chosen(note_name, chosen_btn_override)
+		return
+	if _sight_mode == "Intervals" and _interval_reading_landmark:
+		await _on_interval_landmark_chosen(note_name, chosen_btn_override)
+		return
 	if not _quiz_active or not _accepting_answer:
 		return
 	var quiz_token := _quiz_run_token
@@ -27635,6 +31033,8 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 	var prev_streak := _streak
 	var prev_xp := _xp
 	var is_correct := note_name == _current_sight_note
+	if not is_correct:
+		_record_sight_note_mistake(note_name)
 	# SR8 — per-key accuracy tracking for sight notes.
 	var _pk: String = str(_sight_key_signature)
 	_sight_per_key_asked[_pk] = int(_sight_per_key_asked.get(_pk, 0)) + 1
@@ -30690,6 +34090,8 @@ func _on_sight_chord_choice_index(choice_idx: int) -> void:
 	var prev_streak := _streak
 	var prev_xp := _xp
 	var is_correct := chosen_name == _current_sight_chord_name
+	# Adaptive difficulty: promote/demote the reading window from this result.
+	_sight_chord_adaptive_record(is_correct)
 	var chosen_btn: Button = _sight_chord_choice_buttons[choice_idx]
 	var correct_idx := _current_sight_chord_choices.find(_current_sight_chord_name)
 	var correct_btn: Button = null
@@ -30806,8 +34208,8 @@ func _place_note_from_local_point(local: Vector2, resolve_drop: bool) -> void:
 	var cx := clampf(local.x, 6.0, _staff_area.size.x - 6.0)
 	var cy := local.y
 	var bounds := _effective_sight_step_bounds()
-	var min_y := STAFF_TOP_LINE_Y + float(bounds.x) * STAFF_STEP_Y
-	var max_y := STAFF_TOP_LINE_Y + float(bounds.y) * STAFF_STEP_Y
+	var min_y := _active_staff_top_y() + float(bounds.x) * _active_staff_step_y()
+	var max_y := _active_staff_top_y() + float(bounds.y) * _active_staff_step_y()
 	cy = clampf(cy, min_y, max_y)
 	_staff_note.scale = _note_scale_for_y(cy)
 	_staff_note.position = Vector2(cx - (_staff_note.size.x * 0.5), cy - (_staff_note.size.y * 0.5))
@@ -30900,6 +34302,8 @@ func _on_staff_area_gui_input(event: InputEvent) -> void:
 
 
 func _is_placement_drag_context_active() -> bool:
+	if _sight_mistake_review_active:
+		return _quiz_active and _accepting_answer and _sight_mistake_review_phase == "try"
 	if not ((_selected_mode == MODE_SIGHT and _sight_mode == "Placement") or _in_tutorial):
 		return false
 	if not _in_tutorial and (not _quiz_active or not _accepting_answer):
@@ -30910,16 +34314,20 @@ func _is_placement_drag_context_active() -> bool:
 func _update_note_drag_from_mouse() -> void:
 	if _staff_area == null or _staff_note == null:
 		return
+	# Defensive: ensure the looping idle bounce isn't fighting the drag's Y.
+	if _sight_note_bounce_tween != null:
+		_stop_sight_note_bounce()
 	var local_mouse := _staff_area.get_local_mouse_position()
 	var center_x := local_mouse.x - _note_drag_offset_x
 	var center_y := local_mouse.y - _note_drag_offset_y
 	var bounds := _effective_sight_step_bounds()
-	var min_y := STAFF_TOP_LINE_Y + float(bounds.x) * STAFF_STEP_Y
-	var max_y := STAFF_TOP_LINE_Y + float(bounds.y) * STAFF_STEP_Y
+	var min_y := _active_staff_top_y() + float(bounds.x) * _active_staff_step_y()
+	var max_y := _active_staff_top_y() + float(bounds.y) * _active_staff_step_y()
 	center_y = clampf(center_y, min_y, max_y)
 	center_x = clampf(center_x, 6.0, _staff_area.size.x - 6.0)
 	_staff_note.scale = _note_scale_for_y(center_y)
-	_staff_note.position = Vector2(center_x - (_staff_note.size.x * 0.5), center_y - (_staff_note.size.y * 0.5))
+	var review_drop_y: float = SIGHT_REPLAY_NOTE_DROP_Y if _sight_mistake_review_active else 0.0
+	_staff_note.position = Vector2(center_x - (_staff_note.size.x * 0.5), center_y - (_staff_note.size.y * 0.5) + review_drop_y)
 	if _is_in_staff_drop_zone(center_x):
 		var hover_step := _nearest_staff_step_from_center_y(center_y)
 		_current_sight_hover_step = hover_step
@@ -30942,8 +34350,8 @@ func _finish_note_drag_drop(drop_local_pos: Vector2 = Vector2(-1, -1)) -> void:
 		center_x = drop_local_pos.x
 		center_y = drop_local_pos.y
 		var bounds := _effective_sight_step_bounds()
-		var min_y := STAFF_TOP_LINE_Y + float(bounds.x) * STAFF_STEP_Y
-		var max_y := STAFF_TOP_LINE_Y + float(bounds.y) * STAFF_STEP_Y
+		var min_y := _active_staff_top_y() + float(bounds.x) * _active_staff_step_y()
+		var max_y := _active_staff_top_y() + float(bounds.y) * _active_staff_step_y()
 		center_y = clampf(center_y, min_y, max_y)
 		center_x = clampf(center_x, 6.0, _staff_area.size.x - 6.0)
 		_staff_note.scale = _note_scale_for_y(center_y)
@@ -31201,7 +34609,7 @@ func _active_staff_top_y() -> float:
 			var total_h := gap * 12.0
 			var top := maxf(12.0, (sight_h - total_h) * 0.5)
 			return top
-		var ledger_heavy_sight := _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous"
+		var ledger_heavy_sight := _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Placement"
 		if ledger_heavy_sight:
 			var gap := _active_staff_line_gap_y()
 			# Center the five staff lines vertically so headroom above/below stays balanced.
@@ -31230,7 +34638,7 @@ func _active_staff_line_gap_y() -> float:
 			return grand_gap
 		var min_gap := 40.0
 		var max_gap := 52.0
-		var ledger_heavy_sight := _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous"
+		var ledger_heavy_sight := _sight_mode == "Notes" or _sight_mode == "Chords" or _sight_mode == "Continuous" or _sight_mode == "Placement"
 		if ledger_heavy_sight:
 			if sight_h < 360.0:
 				min_gap = 30.0
@@ -31346,12 +34754,16 @@ func _reset_placement_note_to_side() -> void:
 	_staff_note.scale = _note_scale_for_y(home_center_y)
 	_staff_note.modulate = Color(1, 1, 1, 1)
 	_staff_note.visible = true
-	_staff_note.position = Vector2(_placement_note_home_pos.x, home_center_y - (_staff_note.size.y * 0.5))
+	var review_drop_y: float = SIGHT_REPLAY_NOTE_DROP_Y if _sight_mistake_review_active else 0.0
+	_staff_note.position = Vector2(_placement_note_home_pos.x, home_center_y - (_staff_note.size.y * 0.5) + review_drop_y)
 	_hide_target_dotted_oval()
 
 
 func _preview_placement_step(step: int) -> void:
-	_set_staff_highlight_for_step(step, Color(0.95, 0.80, 0.35, 0.95))
+	# No staff-line recolor during the drag: highlighting the line(s) at the hover
+	# step (two amber lines when over a space) read as a confusing "surrounding"
+	# yellow box. The moving note is the indicator; correctness is shown on drop.
+	_set_staff_highlight_none()
 	if _is_staff_ledger_step(step):
 		_show_preview_ledger(step, Color(0.95, 0.80, 0.35, 0.95))
 	else:
@@ -31361,6 +34773,9 @@ func _preview_placement_step(step: int) -> void:
 func _resolve_sight_placement_drop(step: int) -> void:
 	if _in_tutorial:
 		await _resolve_tutorial_placement_drop(step)
+		return
+	if _sight_mistake_review_active:
+		await _resolve_sight_mistake_review_drop(step)
 		return
 	if not _quiz_active:
 		return
@@ -31809,6 +35224,9 @@ func _sight_chord_candidates(include_accidental_variants: bool = false) -> Array
 	)
 
 func _generate_sight_chord_round() -> void:
+	# Reset the per-session adaptive streak at the first question of a round.
+	if _question_index <= 1:
+		_sight_chord_adaptive_session_begin()
 	var chord_candidate: Dictionary = {}
 	var centers: Array[float] = []
 	var found := false
@@ -32146,10 +35564,14 @@ func _generate_sight_placement_round() -> void:
 
 	var bounds := _effective_sight_step_bounds()
 	var target_step := _rng.randi_range(bounds.x, bounds.y)
+	var placement_pool: Array = []
+	for step in range(bounds.x, bounds.y + 1):
+		placement_pool.append(str(step))
+	var recent_placement_steps := _recent_visible_ids("sight_placement", placement_pool)
 	for attempt in range(12):
 		target_step = _rng.randi_range(bounds.x, bounds.y)
 		var sig := "P:%d:%s" % [target_step, _selected_clef]
-		if sig != _last_sight_signature or attempt == 11:
+		if (sig != _last_sight_signature and not recent_placement_steps.has(str(target_step))) or attempt == 11:
 			_last_sight_signature = sig
 			break
 	_current_sight_target_step = target_step
@@ -32215,6 +35637,20 @@ func _has_sight_chord_available_in_range() -> bool:
 
 func _position_sight_chord(note_centers: Array[float], chord_def: Dictionary = {}) -> void:
 	_ensure_sight_renderer().position_sight_chord(self, note_centers, chord_def, _sight_renderer_config())
+
+
+func _sight_chord_visible_pool() -> Array:
+	var pool: Array = []
+	var candidates := _sight_chord_candidates(_sight_include_accidental_variants())
+	for candidate in candidates:
+		var name := str((candidate as Dictionary).get("name", ""))
+		if name.is_empty():
+			continue
+		if not _focus_missed_ids.is_empty() and not _focus_missed_ids.has(name):
+			continue
+		if not pool.has(name):
+			pool.append(name)
+	return pool
 
 
 func _ledger_visual_note_center_y_for_step(step: int) -> float:
@@ -32329,6 +35765,23 @@ func _pick_sight_note_slot() -> Dictionary:
 		"explicit_accidental_symbol": natural_sym if use_explicit_natural else "",
 		"explicit_natural": use_explicit_natural
 	}
+
+
+func _sight_note_visible_pool() -> Array:
+	var pool: Array = []
+	var allowed := _sight_note_set_for_clef(_selected_clef)
+	for note_name in allowed:
+		var step := _sight_step_for_label_in_clef(str(note_name), _selected_clef)
+		if step == 999:
+			continue
+		var base_name := _staff_step_name_for_clef(step, _selected_clef)
+		var display_name := _sight_note_name_with_key_signature(base_name, false)
+		if not _focus_missed_ids.is_empty() and not (_focus_missed_ids.has(base_name) or _focus_missed_ids.has(display_name)):
+			continue
+		var step_id := str(step)
+		if not pool.has(step_id):
+			pool.append(step_id)
+	return pool
 
 
 func _pick_random_sight_visual_colors() -> void:
@@ -32540,7 +35993,11 @@ func _show_sight_note_accidental_for_current_note() -> void:
 func _position_sight_note(note_name: String, center_y_override: float = NAN) -> void:
 	# Any new note placement is a new question — drop the previous answer label.
 	_hide_sight_note_name_label()
+	_reset_sight_notes_mic_pending()
 	_ensure_sight_renderer().position_sight_note(self, note_name, center_y_override, _sight_renderer_config())
+	if _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and _sight_notes_mic_listener != null and _sight_notes_mic_listener.has_method("set_target_pitch_class"):
+		var target_midi := _current_sight_note_prompt_midi()
+		_sight_notes_mic_listener.call("set_target_pitch_class", target_midi % 12 if target_midi >= 0 else -1)
 
 
 func _closest_step_for_note_name_in_bounds(note_name: String, clef_name: String, bounds: Vector2i) -> int:
@@ -33427,6 +36884,7 @@ func _load_piano_samples() -> void:
 		_piano_interval_anchor_samples = {}
 
 func _play_note(midi_note: int, duration: float) -> void:
+	_qa_audio_probe_push(midi_note, duration)
 	var sample_map: Dictionary = _sample_map_for_current_mode()
 
 	if sample_map.is_empty():
@@ -33569,6 +37027,13 @@ func _play_powerup_sfx() -> void:
 
 
 func _play_shield_activate_sfx() -> void:
+	# Suppress the tic-tac shield cue while a mic is live — the click bleeds into
+	# the next note's pitch detection and causes false / dropped reads. The
+	# "Shield ready" status text still informs the player.
+	if _mic_listening:
+		return
+	if _sight_notes_mic_listener != null and _sight_notes_mic_listener.is_listening():
+		return
 	if _shield_activate_sfx != null and _shield_sfx_player != null:
 		_shield_sfx_player.stop()
 		_shield_sfx_player.stream = _shield_activate_sfx

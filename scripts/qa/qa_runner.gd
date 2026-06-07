@@ -108,6 +108,10 @@ func _run() -> void:
 
 
 func _cleanup_before_quit() -> void:
+	if _app != null and is_instance_valid(_app) and _app.has_method("_qa_prepare_for_quit"):
+		_app.call("_qa_prepare_for_quit")
+	for _i in range(10):
+		await get_tree().process_frame
 	if _bot != null and is_instance_valid(_bot):
 		_bot.queue_free()
 	_bot = null
@@ -122,7 +126,7 @@ func _cleanup_before_quit() -> void:
 	_overlay_title = null
 	_overlay_step = null
 	_overlay_mode = null
-	for _i in range(4):
+	for _i in range(16):
 		await get_tree().process_frame
 
 

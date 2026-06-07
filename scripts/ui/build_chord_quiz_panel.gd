@@ -37,16 +37,16 @@ extends PanelContainer
 # --- Signals ---
 signal closed
 signal presented
-signal chord_quiz_completed(score: int, total: int)
+signal chord_quiz_completed(score: int, total: int, report: Dictionary)
 
 
 # --- Constants ---
 const KEYBOARD_LOW := 48   # C3
 const KEYBOARD_HIGH := 84  # C6
-const WHITE_W := 38.0
-const WHITE_H := 164.0
-const BLACK_W := 24.0
-const BLACK_H := 104.0
+const WHITE_W := 34.0
+const WHITE_H := 150.0
+const BLACK_W := 22.0
+const BLACK_H := 94.0
 const QUESTIONS_PER_ROUND := 10
 const CHOICES_COUNT := 4
 
@@ -195,6 +195,11 @@ var _summary_shown: bool = false
 var _session_attribution_pending: bool = false
 var _play_token: int = 0
 var _hint_stage: int = 0  # 0-4, advances on each Hint click
+var _round_events: Array[Dictionary] = []
+var _question_started_msec: int = 0
+var _current_attempts: int = 0
+var _current_wrong_attempts: int = 0
+var _current_hints_used: int = 0
 
 # Current question target
 var _target_root_pc: int = 0
@@ -250,6 +255,8 @@ var _play_button: Button = null
 # Playback busy
 var _playback_busy_until: float = 0.0
 var _playback_lock_token: int = 0
+var _playback_unlock_timer: Timer = null
+var _playback_unlock_timer_token: int = 0
 var _playback_buttons: Array[Button] = []
 
 
@@ -301,6 +308,7 @@ func dismiss() -> void:
 	_play_token += 1
 	_playback_lock_token += 1
 	_playback_busy_until = 0.0
+	_stop_playback_unlock_timer()
 	_set_playback_buttons_disabled(false)
 
 
@@ -321,13 +329,13 @@ func handle_midi_note_on(pitch: int) -> void:
 
 func _build_ui() -> void:
 	var root_margin := MarginContainer.new()
-	root_margin.add_theme_constant_override("margin_left", 24)
-	root_margin.add_theme_constant_override("margin_right", 24)
-	root_margin.add_theme_constant_override("margin_top", 14)
-	root_margin.add_theme_constant_override("margin_bottom", 14)
+	root_margin.add_theme_constant_override("margin_left", 20)
+	root_margin.add_theme_constant_override("margin_right", 20)
+	root_margin.add_theme_constant_override("margin_top", 12)
+	root_margin.add_theme_constant_override("margin_bottom", 12)
 	add_child(root_margin)
 	var root_vbox := VBoxContainer.new()
-	root_vbox.add_theme_constant_override("separation", 8)
+	root_vbox.add_theme_constant_override("separation", 7)
 	root_margin.add_child(root_vbox)
 
 	# Top bar: home + title + difficulty
@@ -342,11 +350,35 @@ func _build_ui() -> void:
 	_apply_nav_icon_style(_back_button)
 	_back_button.pressed.connect(_on_back_pressed)
 	top_bar.add_child(_back_button)
+	# Clefira brand mark — same logo+wordmark box used by Chord Explorer, Practice
+	# Drills and Functional Ear so every panel header reads as one product.
+	var brand_box := HBoxContainer.new()
+	brand_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	brand_box.add_theme_constant_override("separation", 8)
+	top_bar.add_child(brand_box)
+	var brand_logo := TextureRect.new()
+	var brand_tex: Texture2D = load("res://assets/logos/clefira-logo.svg") as Texture2D
+	if brand_tex == null:
+		brand_tex = load("res://assets/branding/clefira-splash-mark-transparent-512.png") as Texture2D
+	if brand_tex != null:
+		brand_logo.texture = brand_tex
+	brand_logo.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+	brand_logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	brand_logo.custom_minimum_size = Vector2(28, 28)
+	brand_logo.tooltip_text = "Clefira"
+	brand_box.add_child(brand_logo)
+	var brand_text := Label.new()
+	brand_text.text = "Clefira"
+	if _ui_title_font != null:
+		brand_text.add_theme_font_override("font", _ui_title_font)
+	brand_text.add_theme_font_size_override("font_size", 18)
+	brand_text.add_theme_color_override("font_color", MENU_PRIMARY_ACCENT)
+	brand_box.add_child(brand_text)
 	var title := Label.new()
 	title.text = "%s  Guided Practice" % char(0x1F3AF)  # bullseye
 	if _ui_title_font != null:
 		title.add_theme_font_override("font", _ui_title_font)
-	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -372,11 +404,11 @@ func _build_ui() -> void:
 	mode_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	mode_row.add_theme_constant_override("separation", 6)
 	root_vbox.add_child(mode_row)
-	_make_mode_button(mode_row, Mode.BUILD,       "%s Build a Chord" % char(0x1F3B9))
-	_make_mode_button(mode_row, Mode.IDENTIFY,    "%s Identify Quality" % char(0x1F442))  # ear
-	_make_mode_button(mode_row, Mode.COMPARE,     "%s Compare Sounds" % char(0x2696))     # scales
-	_make_mode_button(mode_row, Mode.FUNCTION,    "%s Chord Function" % char(0x1F4DC))    # scroll
-	_make_mode_button(mode_row, Mode.PROGRESSION, "%s Progression" % char(0x1F3BC))       # music notes
+	_make_mode_button(mode_row, Mode.BUILD,       "Build")
+	_make_mode_button(mode_row, Mode.IDENTIFY,    "Identify")
+	_make_mode_button(mode_row, Mode.COMPARE,     "Compare")
+	_make_mode_button(mode_row, Mode.FUNCTION,    "Function")
+	_make_mode_button(mode_row, Mode.PROGRESSION, "Progression")
 
 	# Score line
 	_score_label = Label.new()
@@ -391,7 +423,7 @@ func _build_ui() -> void:
 	_prompt_label.text = ""
 	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_prompt_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_prompt_label.add_theme_font_size_override("font_size", 22)
+	_prompt_label.add_theme_font_size_override("font_size", 20)
 	_prompt_label.add_theme_color_override("font_color", MENU_TITLE_TEXT)
 	root_vbox.add_child(_prompt_label)
 	_subprompt_label = Label.new()
@@ -442,7 +474,7 @@ func _build_ui() -> void:
 	_next_button.pressed.connect(_on_advance_pressed)
 	actions.add_child(_next_button)
 	_close_button = Button.new()
-	_close_button.text = "Close"
+	_close_button.text = "Back"
 	_close_button.custom_minimum_size = Vector2(120, 38)
 	_close_button.add_theme_font_size_override("font_size", 14)
 	_close_button.pressed.connect(_on_back_pressed)
@@ -453,7 +485,7 @@ func _build_ui() -> void:
 
 func _build_build_mode_ui() -> Control:
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 6)
+	col.add_theme_constant_override("separation", 5)
 	_build_selected_label = Label.new()
 	_build_selected_label.text = "Currently selected: (none)"
 	_build_selected_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -491,20 +523,20 @@ func _build_build_mode_ui() -> Control:
 	col.add_child(btn_row)
 	_build_submit_button = Button.new()
 	_build_submit_button.text = "Check"
-	_build_submit_button.custom_minimum_size = Vector2(140, 38)
+	_build_submit_button.custom_minimum_size = Vector2(132, 36)
 	_build_submit_button.add_theme_font_size_override("font_size", 14)
 	_build_submit_button.pressed.connect(_on_build_submit)
 	btn_row.add_child(_build_submit_button)
 	_playback_buttons.append(_build_submit_button)
 	_build_clear_button = Button.new()
 	_build_clear_button.text = "Clear"
-	_build_clear_button.custom_minimum_size = Vector2(120, 38)
+	_build_clear_button.custom_minimum_size = Vector2(112, 36)
 	_build_clear_button.add_theme_font_size_override("font_size", 14)
 	_build_clear_button.pressed.connect(_on_build_clear)
 	btn_row.add_child(_build_clear_button)
 	_build_hint_button = Button.new()
 	_build_hint_button.text = "Hint %s" % char(0x1F4A1)
-	_build_hint_button.custom_minimum_size = Vector2(120, 38)
+	_build_hint_button.custom_minimum_size = Vector2(112, 36)
 	_build_hint_button.add_theme_font_size_override("font_size", 14)
 	_build_hint_button.tooltip_text = "Each click reveals one more clue (4 stages: count → start note → intervals → exact notes)."
 	_build_hint_button.pressed.connect(_on_build_hint)
@@ -639,11 +671,28 @@ func _is_black(pitch: int) -> bool:
 func _make_mode_button(parent: Control, mode: int, label: String) -> void:
 	var btn := Button.new()
 	btn.text = label
-	btn.custom_minimum_size = Vector2(168, 34)
-	btn.add_theme_font_size_override("font_size", 12)
+	btn.custom_minimum_size = Vector2(124, 34)
+	btn.add_theme_font_size_override("font_size", 13)
+	btn.tooltip_text = _mode_tooltip(mode)
 	btn.pressed.connect(func(): _select_mode(mode))
 	parent.add_child(btn)
 	_mode_buttons[mode] = btn
+
+
+func _mode_tooltip(mode: int) -> String:
+	match mode:
+		Mode.BUILD:
+			return "Build the named chord on the keyboard."
+		Mode.IDENTIFY:
+			return "Listen to a chord and identify its quality."
+		Mode.COMPARE:
+			return "Hear A then B and name what chord B became."
+		Mode.FUNCTION:
+			return "Build a Roman-numeral chord inside a key."
+		Mode.PROGRESSION:
+			return "Build each chord in a progression sequence."
+		_:
+			return ""
 
 
 func _select_mode(mode: int) -> void:
@@ -692,6 +741,7 @@ func _start_round() -> void:
 	_score = 0
 	_summary_shown = false
 	_session_attribution_pending = true
+	_round_events.clear()
 	_play_token += 1
 	_playback_lock_token += 1
 	_playback_busy_until = 0.0
@@ -719,6 +769,10 @@ func _next_question() -> void:
 	_question_index += 1
 	_answered = false
 	_hint_stage = 0
+	_current_attempts = 0
+	_current_wrong_attempts = 0
+	_current_hints_used = 0
+	_question_started_msec = Time.get_ticks_msec()
 	_show_wrong_feedback = false
 	_feedback_label.text = ""
 	_next_button.disabled = true
@@ -954,6 +1008,7 @@ func _toggle_build_note(pitch: int) -> void:
 	var uses_keyboard: bool = (_mode == Mode.BUILD or _mode == Mode.FUNCTION or _mode == Mode.PROGRESSION)
 	if not uses_keyboard:
 		return
+	_show_wrong_feedback = false
 	if _selected_notes.has(pitch):
 		_selected_notes.erase(pitch)
 	else:
@@ -1023,6 +1078,7 @@ func _on_build_submit() -> void:
 		_feedback_label.text = "Pick at least 2 notes before checking."
 		_feedback_label.add_theme_color_override("font_color", Color(0.96, 0.86, 0.42, 1.0))
 		return
+	_current_attempts += 1
 	# Compute PC sets.
 	var selected_pcs: Dictionary = {}
 	for pitch in _selected_notes.keys():
@@ -1050,6 +1106,7 @@ func _on_build_submit() -> void:
 			# Progression complete — count as one correct question.
 			_answered = true
 			_score += 1
+			_record_question_result(true, "progression_complete", missing, extra)
 			var prog_done: String = "%s  Progression complete!" % char(0x2713)
 			_feedback_label.text = prog_done
 			_feedback_label.add_theme_color_override("font_color", Color(0.45, 0.92, 0.62, 1.0))
@@ -1071,34 +1128,29 @@ func _on_build_submit() -> void:
 			]
 			_feedback_label.add_theme_color_override("font_color", Color(0.78, 0.92, 1.0, 0.92))
 		return
+	if _mode == Mode.PROGRESSION and not correct:
+		_current_wrong_attempts += 1
+		_show_wrong_feedback = true
+		_refresh_build_keyboard_highlight()
+		_feedback_label.text = "%s  %s Try this step again." % [char(0x2717), _build_missing_extra_message(selected_pcs, missing, extra)]
+		_feedback_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45, 1.0))
+		return
 	# BUILD / FUNCTION (or PROGRESSION incorrect) — render feedback.
-	_answered = true
 	if correct:
+		_answered = true
 		_score += 1
-		_feedback_label.text = "%s  Yes. %s%s = %s." % [
+		_record_question_result(true, _format_selected_notes(), missing, extra)
+		_feedback_label.text = "%s  Yes. %s = %s." % [
 			char(0x2713),
-			_target_key_label,
-			_quality_suffix(_target_quality),
+			_target_chord_label(),
 			_format_target_notes(),
 		]
 		_feedback_label.add_theme_color_override("font_color", Color(0.45, 0.92, 0.62, 1.0))
 		if _play_chord_callable.is_valid():
 			_play_chord_callable.call(_target_notes, 1.4)
 	else:
-		var msg_parts: Array[String] = []
-		if not missing.is_empty():
-			var got_pcs: Array[String] = []
-			for pc in selected_pcs.keys():
-				got_pcs.append(_pc_to_name(int(pc)))
-			msg_parts.append("You have %s. Add %s." % [", ".join(got_pcs), ", ".join(missing)])
-		if not extra.is_empty():
-			msg_parts.append("%s %s in %s%s." % [
-				", ".join(extra),
-				"does not belong" if extra.size() == 1 else "do not belong",
-				_target_key_label,
-				_quality_suffix(_target_quality),
-			])
-		_feedback_label.text = "%s  %s" % [char(0x2717), "  ".join(msg_parts)]
+		_current_wrong_attempts += 1
+		_feedback_label.text = "%s  %s Try again." % [char(0x2717), _build_missing_extra_message(selected_pcs, missing, extra)]
 		_feedback_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45, 1.0))
 		# Paint the keyboard: target notes green, the user's wrong picks
 		# red. Visual feedback complements the text message so the student
@@ -1107,6 +1159,7 @@ func _on_build_submit() -> void:
 		_refresh_build_keyboard_highlight()
 		if _play_chord_callable.is_valid():
 			_play_chord_callable.call(_target_notes, 1.4)
+		return
 	_update_score_label()
 	_next_button.disabled = false
 	if _question_index >= QUESTIONS_PER_ROUND:
@@ -1127,6 +1180,7 @@ func _on_build_hint() -> void:
 	if _answered:
 		return
 	_hint_stage = mini(_hint_stage + 1, 4)
+	_current_hints_used = maxi(_current_hints_used, _hint_stage)
 	var hint_text: String = ""
 	match _hint_stage:
 		1:
@@ -1141,6 +1195,141 @@ func _on_build_hint() -> void:
 			hint_text = "The notes are %s." % _format_target_notes()
 	_feedback_label.text = "%s  Hint %d/4: %s" % [char(0x1F4A1), _hint_stage, hint_text]
 	_feedback_label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.95, 0.92))
+
+
+func _build_missing_extra_message(selected_pcs: Dictionary, missing: Array[String], extra: Array[String]) -> String:
+	var msg_parts: Array[String] = []
+	if not missing.is_empty():
+		var got_pcs: Array[String] = []
+		for pc in selected_pcs.keys():
+			got_pcs.append(_pc_to_name(int(pc)))
+		if got_pcs.is_empty():
+			msg_parts.append("Add %s." % ", ".join(missing))
+		else:
+			msg_parts.append("You have %s. Add %s." % [", ".join(got_pcs), ", ".join(missing)])
+	if not extra.is_empty():
+		msg_parts.append("%s %s in %s%s." % [
+			", ".join(extra),
+			"does not belong" if extra.size() == 1 else "do not belong",
+			_target_chord_label(),
+			"",
+		])
+	if msg_parts.is_empty():
+		return "That is not the target chord."
+	return "  ".join(msg_parts)
+
+
+func _format_selected_notes() -> String:
+	if _selected_notes.is_empty():
+		return ""
+	var sorted_pitches: Array[int] = []
+	for pitch in _selected_notes.keys():
+		sorted_pitches.append(int(pitch))
+	sorted_pitches.sort()
+	var parts: Array[String] = []
+	for p in sorted_pitches:
+		parts.append(_midi_to_name(p))
+	return ", ".join(parts)
+
+
+func _target_chord_label() -> String:
+	return "%s%s" % [_spell_root(_target_root_pc, _target_key_label.contains("b")), _quality_suffix(_target_quality)]
+
+
+func _record_question_result(correct: bool, chosen: String, missing: Array[String], extra: Array[String]) -> void:
+	var mode_name := _mode_name(_mode)
+	var difficulty_label := str(DIFFICULTIES[_difficulty].get("label", ""))
+	var response_ms := maxi(0, Time.get_ticks_msec() - _question_started_msec)
+	var event: Dictionary = {
+		"question": _question_index,
+		"mode": mode_name,
+		"difficulty": difficulty_label,
+		"correct": correct,
+		"assisted": _current_hints_used > 0 or _current_wrong_attempts > 0,
+		"attempts": _current_attempts,
+		"wrong_attempts": _current_wrong_attempts,
+		"hints_used": _current_hints_used,
+		"response_ms": response_ms,
+		"key": _target_key_label,
+		"key_is_minor": _target_key_is_minor,
+		"root_pc": _target_root_pc,
+		"root": _spell_root(_target_root_pc, _target_key_label.contains("b")),
+		"quality": _target_quality,
+		"roman": _target_roman,
+		"target_notes": _format_target_notes(),
+		"chosen": chosen,
+		"missing": missing.duplicate(),
+		"extra": extra.duplicate(),
+	}
+	if _mode == Mode.PROGRESSION:
+		var steps: Array[Dictionary] = []
+		for step_v in _progression_steps:
+			if typeof(step_v) == TYPE_DICTIONARY:
+				var step: Dictionary = step_v
+				steps.append({
+					"roman": str(step.get("roman", "")),
+					"root_pc": int(step.get("root_pc", 0)),
+					"quality": str(step.get("quality", "")),
+				})
+		event["progression_steps"] = steps
+	_round_events.append(event)
+
+
+func _round_report() -> Dictionary:
+	var mode_counts: Dictionary = {}
+	var weak_qualities: Dictionary = {}
+	var weak_functions: Dictionary = {}
+	var weak_keys: Dictionary = {}
+	var hints_total := 0
+	var assisted_correct := 0
+	var unassisted_correct := 0
+	for event in _round_events:
+		var mode_name := str(event.get("mode", ""))
+		mode_counts[mode_name] = int(mode_counts.get(mode_name, 0)) + 1
+		hints_total += int(event.get("hints_used", 0))
+		if bool(event.get("correct", false)):
+			if bool(event.get("assisted", false)):
+				assisted_correct += 1
+			else:
+				unassisted_correct += 1
+			continue
+		var quality := str(event.get("quality", ""))
+		if not quality.is_empty():
+			weak_qualities[quality] = int(weak_qualities.get(quality, 0)) + 1
+		var roman := str(event.get("roman", ""))
+		if not roman.is_empty():
+			weak_functions[roman] = int(weak_functions.get(roman, 0)) + 1
+		var key_label := str(event.get("key", ""))
+		if not key_label.is_empty():
+			weak_keys[key_label] = int(weak_keys.get(key_label, 0)) + 1
+	return {
+		"mode": _mode_name(_mode),
+		"difficulty": str(DIFFICULTIES[_difficulty].get("label", "")),
+		"events": _round_events.duplicate(true),
+		"mode_counts": mode_counts,
+		"weak_qualities": weak_qualities,
+		"weak_functions": weak_functions,
+		"weak_keys": weak_keys,
+		"hints_total": hints_total,
+		"assisted_correct": assisted_correct,
+		"unassisted_correct": unassisted_correct,
+	}
+
+
+func _mode_name(mode: int) -> String:
+	match mode:
+		Mode.BUILD:
+			return "Build a Chord"
+		Mode.IDENTIFY:
+			return "Identify Quality"
+		Mode.COMPARE:
+			return "Compare Sounds"
+		Mode.FUNCTION:
+			return "Chord Function"
+		Mode.PROGRESSION:
+			return "Progression"
+		_:
+			return "Unknown"
 
 
 func _interval_summary(quality: String) -> String:
@@ -1186,11 +1375,23 @@ func _play_compare_sequence() -> void:
 	_lock_playback(3.1)
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(_compare_a_notes, 1.3)
-	await get_tree().create_timer(1.55).timeout
+	if not await _wait_play_sequence_seconds(1.55, my_token):
+		return
 	if my_token != _play_token or not is_inside_tree() or not visible:
 		return
 	if _play_chord_callable.is_valid():
 		_play_chord_callable.call(_compare_b_notes, 1.3)
+
+
+func _wait_play_sequence_seconds(seconds: float, play_token: int) -> bool:
+	var deadline := (float(Time.get_ticks_msec()) / 1000.0) + maxf(0.0, seconds)
+	while (float(Time.get_ticks_msec()) / 1000.0) < deadline:
+		if not is_inside_tree() or not visible:
+			return false
+		if play_token != _play_token:
+			return false
+		await get_tree().process_frame
+	return true
 
 
 # --- Multiple-choice handling ---
@@ -1211,7 +1412,7 @@ func _render_choice_buttons(choices: Array) -> void:
 	for choice in choices:
 		var btn := Button.new()
 		btn.text = str(choice)
-		btn.custom_minimum_size = Vector2(118, 46)
+		btn.custom_minimum_size = Vector2(126, 42)
 		btn.add_theme_font_size_override("font_size", 14)
 		var captured := str(choice)
 		btn.pressed.connect(func(): _submit_choice(captured))
@@ -1228,6 +1429,7 @@ func _clear_choice_buttons() -> void:
 func _submit_choice(chosen: String) -> void:
 	if _answered:
 		return
+	_current_attempts += 1
 	_answered = true
 	var correct: bool = chosen == _target_quality
 	if correct:
@@ -1237,6 +1439,8 @@ func _submit_choice(chosen: String) -> void:
 	else:
 		_feedback_label.text = "%s  Not quite — that was %s." % [char(0x2717), _target_quality]
 		_feedback_label.add_theme_color_override("font_color", Color(0.95, 0.55, 0.45, 1.0))
+		_current_wrong_attempts += 1
+	_record_question_result(correct, chosen, [], [])
 	for child in _choices_row.get_children():
 		if child is Button:
 			(child as Button).disabled = true
@@ -1281,7 +1485,7 @@ func _show_round_summary() -> void:
 	_summary_shown = true
 	if _session_attribution_pending:
 		_session_attribution_pending = false
-		chord_quiz_completed.emit(_score, QUESTIONS_PER_ROUND)
+		chord_quiz_completed.emit(_score, QUESTIONS_PER_ROUND, _round_report())
 
 
 # --- Playback busy lock ---
@@ -1298,8 +1502,28 @@ func _lock_playback(duration: float) -> void:
 	var my_token: int = _playback_lock_token
 	_set_playback_buttons_disabled(true)
 	if is_inside_tree():
-		var t := get_tree().create_timer(duration)
-		t.timeout.connect(func(): _auto_unlock_playback(my_token))
+		_ensure_playback_unlock_timer()
+		_playback_unlock_timer_token = my_token
+		_playback_unlock_timer.start(maxf(0.01, duration))
+
+
+func _ensure_playback_unlock_timer() -> void:
+	if _playback_unlock_timer != null and is_instance_valid(_playback_unlock_timer):
+		return
+	_playback_unlock_timer = Timer.new()
+	_playback_unlock_timer.one_shot = true
+	_playback_unlock_timer.process_callback = Timer.TIMER_PROCESS_IDLE
+	_playback_unlock_timer.timeout.connect(_on_playback_unlock_timer_timeout)
+	add_child(_playback_unlock_timer)
+
+
+func _stop_playback_unlock_timer() -> void:
+	if _playback_unlock_timer != null and is_instance_valid(_playback_unlock_timer):
+		_playback_unlock_timer.stop()
+
+
+func _on_playback_unlock_timer_timeout() -> void:
+	_auto_unlock_playback(_playback_unlock_timer_token)
 
 
 func _auto_unlock_playback(token: int) -> void:

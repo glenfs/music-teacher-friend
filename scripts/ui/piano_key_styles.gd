@@ -18,7 +18,7 @@ static func is_black_key(pitch: int) -> bool:
 
 static func apply_white_style(btn: Button, tint: Color) -> void:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.985, 0.985, 0.975, 1.0).blend(Color(tint.r, tint.g, tint.b, 0.55) if tint != Color.WHITE else Color(0, 0, 0, 0))
+	sb.bg_color = Color(0.985, 0.985, 0.975, 1.0).blend(Color(tint.r, tint.g, tint.b, 0.34) if tint != Color.WHITE else Color(0, 0, 0, 0))
 	if tint == Color.WHITE:
 		sb.bg_color = Color(0.985, 0.985, 0.975, 1.0)
 	sb.border_color = Color(0.62, 0.60, 0.58, 1.0)
@@ -44,7 +44,7 @@ static func apply_black_style(btn: Button, tint: Color) -> void:
 	if tint == Color.WHITE:
 		sb.bg_color = Color(0.08, 0.09, 0.11, 1.0)
 	else:
-		sb.bg_color = Color(tint.r * 0.55, tint.g * 0.55, tint.b * 0.55, 1.0)
+		sb.bg_color = Color(0.08, 0.09, 0.11, 1.0).blend(Color(tint.r, tint.g, tint.b, 0.42))
 	sb.border_color = Color(0.02, 0.02, 0.04, 1.0)
 	sb.border_width_left = 1
 	sb.border_width_right = 1

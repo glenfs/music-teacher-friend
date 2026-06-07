@@ -90,6 +90,25 @@ const HARMONIC_RATIO_MIN := 0.10
 # Voice range adaptation: after observing this many accepted detections we
 # lock in a preferred octave center, which the octave-error corrector uses.
 const VOICE_RANGE_WARMUP := 3
+# Polyphony rejection (instrument sight-reading). YIN is monophonic: fed a
+# chord it locks onto ONE fundamental (usually the bass) and reports it as a
+# clean single note — so a struck chord can read as a "correct" single answer
+# the player never actually isolated. When _reject_polyphony is on, an
+# otherwise-accepted detection is dropped if a SECOND strong fundamental that
+# is NOT a harmonic of the detected pitch is present (i.e. a chord was played).
+# A real single note has energy only on its integer-harmonic grid; a chord tone
+# (e.g. the third at ~1.26·F or the fifth at ~1.5·F) sits OFF that grid, so it
+# is a reliable discriminator. POLYPHONY_ENERGY_RATIO is deliberately high so
+# spectral leakage from a single note never trips it.
+const POLYPHONY_ENERGY_RATIO := 0.45
+# A real chord adds ≥2 notes; a phone mic's noise/reverb adds at most one
+# spurious peak. Require this many distinct competitors, sustained for this many
+# consecutive YIN frames, before rejecting — robust against transient artifacts.
+const POLYPHONY_MIN_COMPETITORS := 2
+const POLYPHONY_REQUIRED_FRAMES := 2
+# A competing-fundamental probe within this fraction of an integer harmonic
+# (or sub-octave) of F is treated as belonging to F, not a separate note.
+const POLYPHONY_HARMONIC_TOL := 0.03
 
 var _sample_rate: float = SAMPLE_RATE_FALLBACK
 var _capture: AudioEffectCapture = null
@@ -122,6 +141,46 @@ var _voice_octave_center: float = 60.0  # ema of accepted MIDI values
 
 # Caller-supplied prior — pitch class (0–11) we expect right now, or -1 if none.
 var _target_pitch_class: int = -1
+
+# When true, poll() rejects detections taken from polyphonic (chord) input.
+# Off by default — only instrument sight-reading wants it; singing is already
+# monophonic and must never be gated by it. See POLYPHONY_* consts.
+var _reject_polyphony := false
+var _poly_frames := 0   # consecutive frames judged polyphonic
+var _test_feeding := false  # validation: samples injected, skip mic capture read
+# Volume gate, tunable at runtime so a quiet / low-gain mic (common on tablets)
+# can be accommodated without a recompile. Lower = quieter input gets through.
+# Defaults relaxed from the old consts (0.0025 / 4.0 ≈ 12 dB) to 0.0010 / 2.5
+# (≈ 8 dB over the noise floor): headless validation on 37 piano notes recovered
+# quiet/low-gain detection (81%→86%, the rest now fail at YIN not the gate) with
+# ZERO false detections on 400 frames of quiet- and loud-room noise. The adaptive
+# ×mult still raises the gate in genuinely noisy rooms. set_gate_sensitivity()
+# overrides per-session.
+var _rms_threshold: float = 0.0010
+var _noise_gate_mult: float = 2.5
+
+# Pitch-search range, HPF cutoff, and YIN window are tunable so the SAME detector
+# serves both singing voice (defaults below match the historical consts) and low
+# instrument input. The voice defaults (90 Hz floor / 85 Hz HPF / 1280 window)
+# physically cannot read piano bass-clef fundamentals — C2≈65 Hz and E2≈82 Hz sit
+# below the 90 Hz YIN floor and get cut by the 85 Hz high-pass, so the player had
+# to hammer the key to push enough harmonic energy through. configure_for_instrument()
+# drops the floor to ~58 Hz, the HPF to ~48 Hz, and widens the window to 2048 so two
+# full cycles of a 65 Hz note fit (YIN needs that to lock a period). See
+# configure_pitch_range().
+var _min_freq: float = MIN_FREQ
+var _max_freq: float = MAX_FREQ
+var _hpf_cutoff_hz: float = HPF_CUTOFF_HZ
+var _window_size: int = WINDOW_SIZE
+
+# Detection diagnostics — tally why poll() does/doesn't detect, so failures on a
+# real device can be inspected without a debugger. Reset each start_listening().
+var _diag_counts := {}        # reason (or "detected") -> count this session
+var _diag_total := 0
+var _diag_last_reason := ""
+var _diag_last_rms := 0.0
+var _diag_last_gate := 0.0
+var _diag_last_conf := 0.0
 
 # Last raw RMS (made available in returned dicts for UI metering / debugging).
 var _last_rms: float = 0.0
@@ -171,7 +230,7 @@ func setup(owner: Node) -> bool:
 	owner.add_child(_mic_player)
 	# Pre-compute the HPF coefficient once. α = exp(-2π·fc/fs). Cached so the
 	# inner loop avoids a transcendental call per sample.
-	_hpf_alpha_cached = exp(-2.0 * PI * HPF_CUTOFF_HZ / _sample_rate)
+	_hpf_alpha_cached = exp(-2.0 * PI * _hpf_cutoff_hz / _sample_rate)
 	_setup_done = true
 	return true
 
@@ -190,6 +249,8 @@ func start_listening() -> void:
 	_ring.clear()
 	_samples_since_yin = 0
 	_samples_seen = 0
+	_poly_frames = 0
+	_diag_reset()
 	# Pre-warm the HPF: run HPF_WARMUP_SAMPLES samples of silence through the
 	# filter so its state is settled before the first real mic frame arrives.
 	# Without this, the first frame after start can be transient-distorted
@@ -305,6 +366,50 @@ func set_soft_pitch_mode(enabled: bool) -> void:
 	_soft_pitch_mode = enabled
 
 
+# Enable/disable chord (polyphony) rejection. Turn ON for instrument input
+# where the player should isolate a single note; leave OFF for singing.
+func set_reject_polyphony(enabled: bool) -> void:
+	_reject_polyphony = enabled
+
+
+func is_reject_polyphony() -> bool:
+	return _reject_polyphony
+
+
+# Tune the volume gate. rms_threshold = absolute floor; noise_gate_mult = how far
+# (×) above the adaptive noise floor a signal must sit to register. Lower both to
+# accept quieter input from low-gain mics. Defaults: 0.0025 / 4.0 (≈12 dB).
+func set_gate_sensitivity(rms_threshold: float, noise_gate_mult: float) -> void:
+	_rms_threshold = maxf(0.0002, rms_threshold)
+	_noise_gate_mult = maxf(1.2, noise_gate_mult)
+
+
+# Set the pitch-search range, HPF cutoff, and YIN window in one call. The HPF
+# alpha is recomputed immediately so the change takes effect on the next frame.
+# Window must hold at least two cycles of min_freq, so it is floored accordingly.
+func configure_pitch_range(min_freq: float, max_freq: float, hpf_cutoff_hz: float, window_size: int) -> void:
+	_min_freq = clampf(min_freq, 30.0, 500.0)
+	_max_freq = clampf(max_freq, 800.0, 4000.0)
+	_hpf_cutoff_hz = clampf(hpf_cutoff_hz, 20.0, 200.0)
+	# Need ≥2 cycles of the lowest fundamental in the window for YIN to lock it.
+	var two_cycles: int = int(ceil(2.0 * _sample_rate / maxf(_min_freq, 1.0)))
+	_window_size = clampi(maxi(window_size, two_cycles), MIN_BUFFER, 4096)
+	if _sample_rate > 0.0:
+		_hpf_alpha_cached = exp(-2.0 * PI * _hpf_cutoff_hz / _sample_rate)
+
+
+# Preset for low monophonic INSTRUMENT input (e.g. piano bass clef). Reaches down
+# to ~C2 (65 Hz) without forcing the player to play hard.
+func configure_for_instrument() -> void:
+	configure_pitch_range(58.0, MAX_FREQ, 48.0, 2048)
+
+
+# Preset for singing VOICE — restores the historical tuning (rumble-rejecting HPF,
+# voice-range floor, compact window).
+func configure_for_voice() -> void:
+	configure_pitch_range(MIN_FREQ, MAX_FREQ, HPF_CUTOFF_HZ, WINDOW_SIZE)
+
+
 func start_take_recording() -> void:
 	_take_recording_samples.clear()
 	_take_recording_enabled = true
@@ -354,40 +459,137 @@ func get_take_recording_stream() -> AudioStreamWAV:
 	return stream
 
 
+# Thin wrapper that tallies the outcome for on-device diagnostics, then returns
+# the real poll result unchanged.
 func poll() -> Dictionary:
-	if not _is_listening or _capture == null:
-		return {"detected": false, "reason": "not_listening"}
+	var r := _poll_impl()
+	_diag_total += 1
+	var reason: String = "detected" if r.get("detected", false) else str(r.get("reason", "?"))
+	_diag_counts[reason] = int(_diag_counts.get(reason, 0)) + 1
+	_diag_last_reason = reason
+	if r.has("rms"):
+		_diag_last_rms = float(r["rms"])
+	if r.has("gate"):
+		_diag_last_gate = float(r["gate"])
+	if r.has("confidence"):
+		_diag_last_conf = float(r["confidence"])
+	return r
 
-	# Drain whatever fresh frames the capture has into the ring buffer, HPF'd
-	# inline. The ring keeps the last WINDOW_SIZE samples so YIN always sees a
-	# full window even when individual polls only deliver a small chunk.
+
+func _diag_reset() -> void:
+	_diag_counts = {}
+	_diag_total = 0
+	_diag_last_reason = ""
+	_diag_last_rms = 0.0
+	_diag_last_gate = 0.0
+	_diag_last_conf = 0.0
+
+
+# One-line, human-readable breakdown of recent mic outcomes for an on-screen or
+# logged diagnostic, e.g. "240 polls · detected 14% · too_quiet 51% · no_pitch 28%".
+func get_diag_summary() -> String:
+	if _diag_total == 0:
+		return "mic: no input polled yet"
+	var keys: Array = _diag_counts.keys()
+	keys.sort_custom(func(a, b): return int(_diag_counts[a]) > int(_diag_counts[b]))
+	var parts := PackedStringArray()
+	for k in keys:
+		parts.append("%s %d%%" % [k, int(round(100.0 * float(_diag_counts[k]) / float(_diag_total)))])
+	return "%d polls · %s · lvl %.3f/gate %.3f" % [
+		_diag_total, ", ".join(parts), _diag_last_rms, _diag_last_gate]
+
+
+func get_diag() -> Dictionary:
+	return {
+		"total": _diag_total,
+		"counts": _diag_counts.duplicate(),
+		"last_reason": _diag_last_reason,
+		"last_rms": _diag_last_rms,
+		"last_gate": _diag_last_gate,
+		"last_confidence": _diag_last_conf,
+	}
+
+
+# HPF a chunk of mono samples (state persists across calls) and append to the
+# sliding ring + take recording, updating sample counters. Shared by the live
+# capture path and the validation feed so both exercise identical DSP.
+func _hpf_and_append(raw: PackedFloat32Array) -> void:
+	var added := raw.size()
+	if added <= 0:
+		return
+	var hpf_alpha: float = _hpf_alpha_cached
+	var prev_in := _hpf_prev_in
+	var prev_out := _hpf_prev_out
+	var new_chunk := PackedFloat32Array()
+	new_chunk.resize(added)
+	for i in added:
+		var s: float = raw[i]
+		var filtered: float = hpf_alpha * (prev_out + s - prev_in)
+		prev_in = s
+		prev_out = filtered
+		new_chunk[i] = filtered
+	_hpf_prev_in = prev_in
+	_hpf_prev_out = prev_out
+	_append_to_ring(new_chunk)
+	_append_take_recording_samples(new_chunk)
+	_samples_since_yin += added
+	_samples_seen += added
+
+
+func _ingest_capture() -> void:
 	var frames_avail := _capture.get_frames_available()
-	if frames_avail > 0:
-		var read_count := mini(frames_avail, 4096)
-		var buffer: PackedVector2Array = _capture.get_buffer(read_count)
-		var added := buffer.size()
-		if added > 0:
-			# HPF state persists across polls — no per-call discontinuity.
-			# Cutoff is HPF_CUTOFF_HZ (85 Hz). Cached alpha avoids the per-poll
-			# transcendental call.
-			var hpf_alpha: float = _hpf_alpha_cached
-			var prev_in := _hpf_prev_in
-			var prev_out := _hpf_prev_out
-			var new_chunk := PackedFloat32Array()
-			new_chunk.resize(added)
-			for i in added:
-				var raw := (buffer[i].x + buffer[i].y) * 0.5
-				var filtered: float = hpf_alpha * (prev_out + raw - prev_in)
-				prev_in = raw
-				prev_out = filtered
-				new_chunk[i] = filtered
-			_hpf_prev_in = prev_in
-			_hpf_prev_out = prev_out
-			# Append to ring; drop the oldest to keep size ≤ WINDOW_SIZE.
-			_append_to_ring(new_chunk)
-			_append_take_recording_samples(new_chunk)
-			_samples_since_yin += added
-			_samples_seen += added
+	if frames_avail <= 0:
+		return
+	var read_count := mini(frames_avail, 4096)
+	var buffer: PackedVector2Array = _capture.get_buffer(read_count)
+	if buffer.size() <= 0:
+		return
+	var mono := PackedFloat32Array()
+	mono.resize(buffer.size())
+	for i in buffer.size():
+		mono[i] = (buffer[i].x + buffer[i].y) * 0.5
+	_hpf_and_append(mono)
+
+
+# --- Validation hooks (Windows headless) ----------------------------------
+# Drive the FULL live pipeline (HPF → gate → YIN → polyphony → stability) with
+# injected audio so detection can be exercised without a microphone. Call
+# begin_test_mode(), then feed_test_samples() in chunks and poll() between them.
+func begin_test_mode(rate: float) -> void:
+	_sample_rate = rate
+	_hpf_alpha_cached = exp(-2.0 * PI * _hpf_cutoff_hz / _sample_rate)
+	_setup_done = true
+	_is_listening = true
+	_test_feeding = true
+	# Reset detection state (mirrors start_listening minus the mic player).
+	_stable_midi = -1
+	_stable_count = 0
+	_last_detected_midi = -1
+	_freq_history.clear()
+	_no_frame_polls = 0
+	_onset_baseline = 0.0
+	_last_onset_frame = -1000
+	_frame_counter = 0
+	_ring.clear()
+	_samples_since_yin = 0
+	_samples_seen = 0
+	_poly_frames = 0
+	_hpf_prev_in = 0.0
+	_hpf_prev_out = 0.0
+	reset_adaptation()
+	_diag_reset()
+
+
+func feed_test_samples(samples: PackedFloat32Array) -> void:
+	_hpf_and_append(samples)
+
+
+func _poll_impl() -> Dictionary:
+	# In test mode the ring is filled by feed_test_samples(); skip the mic read.
+	if not _test_feeding:
+		if not _is_listening or _capture == null:
+			return {"detected": false, "reason": "not_listening"}
+		_ingest_capture()
 
 	# Need a full window before YIN can run at all.
 	if _ring.size() < MIN_BUFFER:
@@ -406,7 +608,7 @@ func poll() -> Dictionary:
 
 	# Pull the last WINDOW_SIZE samples (or whatever we have if less, which
 	# only happens during the first second or so after start_listening).
-	var window_n: int = mini(_ring.size(), WINDOW_SIZE)
+	var window_n: int = mini(_ring.size(), _window_size)
 	var mono := PackedFloat32Array()
 	mono.resize(window_n)
 	var start_idx: int = _ring.size() - window_n
@@ -424,8 +626,8 @@ func poll() -> Dictionary:
 
 	# Adaptive volume gate — the noise floor self-calibrates during silence,
 	# so a quieter room gets a quieter gate (and louder room gets stricter).
-	var base_gate := SOFT_RMS_THRESHOLD if _soft_pitch_mode else RMS_THRESHOLD
-	var gate_mult := SOFT_NOISE_GATE_MULT if _soft_pitch_mode else NOISE_GATE_MULT
+	var base_gate := SOFT_RMS_THRESHOLD if _soft_pitch_mode else _rms_threshold
+	var gate_mult := SOFT_NOISE_GATE_MULT if _soft_pitch_mode else _noise_gate_mult
 	var gate: float = maxf(base_gate, _noise_floor * gate_mult)
 	if rms < gate:
 		_noise_floor = lerpf(rms, _noise_floor, NOISE_FLOOR_DECAY)
@@ -466,7 +668,7 @@ func poll() -> Dictionary:
 	var goertzel_input: PackedFloat32Array = _apply_hann_window(analysis_mono)
 	var harmonic_ratio: float = _goertzel_ratio(goertzel_input, freq * 2.0, freq)
 	var harmonic_ratio_3f: float = _goertzel_ratio(goertzel_input, freq * 3.0, freq)
-	var half_ratio: float = _goertzel_ratio(goertzel_input, freq * 0.5, freq) if freq * 0.5 >= MIN_FREQ else 0.0
+	var half_ratio: float = _goertzel_ratio(goertzel_input, freq * 0.5, freq) if freq * 0.5 >= _min_freq else 0.0
 	# Weak harmonic content at BOTH 2F and 3F → likely octave error (or noise).
 	# Demote a little but don't reject — the median + stability filter will
 	# absorb a single weak frame, and we still want it in the candidate stream.
@@ -541,6 +743,21 @@ func poll() -> Dictionary:
 	var required_stability: int = 1 if confidence >= HIGH_CONFIDENCE_FAST_TRACK else STABILITY_REQUIRED
 	if _stable_count < required_stability:
 		return {"detected": false, "reason": "stabilizing", "rms": rms, "midi": midi, "candidate": candidate, "candidates": [candidate]}
+
+	# Polyphony guard — drop a detection drawn from a CHORD so the player can't
+	# "answer" by mashing several keys. Hardened for real mics: needs ≥2 distinct
+	# competing notes (a triad has 2+) sustained for ≥2 consecutive frames. A lone
+	# spurious peak from phone-mic noise/reverb/AGC no longer drops a clean note.
+	if _reject_polyphony:
+		if _polyphony_competitor_count(analysis_mono, smoothed_freq) >= POLYPHONY_MIN_COMPETITORS:
+			_poly_frames += 1
+		else:
+			_poly_frames = 0
+		if _poly_frames >= POLYPHONY_REQUIRED_FRAMES:
+			_stable_count = 0
+			return {"detected": false, "reason": "polyphonic", "rms": rms, "midi": midi}
+	else:
+		_poly_frames = 0
 
 	_last_detected_midi = midi
 	_record_voice_sample(midi)
@@ -656,7 +873,7 @@ func analyze_take_samples(mono_samples: PackedFloat32Array, analysis_hop: int = 
 # Returns the candidate dict on a usable detection, {} otherwise. Mirrors the
 # meaningful parts of poll()'s analysis section without the capture-buffer plumbing.
 func _run_yin_step_for_analysis() -> Dictionary:
-	var window_n: int = mini(_ring.size(), WINDOW_SIZE)
+	var window_n: int = mini(_ring.size(), _window_size)
 	if window_n < MIN_BUFFER:
 		return {}
 	var mono := PackedFloat32Array()
@@ -686,7 +903,7 @@ func _run_yin_step_for_analysis() -> Dictionary:
 	var goertzel_input: PackedFloat32Array = _apply_hann_window(analysis_mono)
 	var harmonic_ratio: float = _goertzel_ratio(goertzel_input, freq * 2.0, freq)
 	var harmonic_ratio_3f: float = _goertzel_ratio(goertzel_input, freq * 3.0, freq)
-	var half_ratio: float = _goertzel_ratio(goertzel_input, freq * 0.5, freq) if freq * 0.5 >= MIN_FREQ else 0.0
+	var half_ratio: float = _goertzel_ratio(goertzel_input, freq * 0.5, freq) if freq * 0.5 >= _min_freq else 0.0
 	if harmonic_ratio < HARMONIC_RATIO_MIN and harmonic_ratio_3f < HARMONIC_RATIO_MIN:
 		confidence *= 0.78
 	elif harmonic_ratio < HARMONIC_RATIO_MIN:
@@ -803,8 +1020,8 @@ func _record_voice_sample(midi: int) -> void:
 		# period (period is inversely proportional to frequency).
 		var hi_freq: float = 440.0 * pow(2.0, (float(hi_midi + 7) - 69.0) / 12.0)
 		var lo_freq: float = 440.0 * pow(2.0, (float(lo_midi - 7) - 69.0) / 12.0)
-		hi_freq = clampf(hi_freq, VOICE_FLOOR_HZ, VOICE_CEIL_HZ)
-		lo_freq = clampf(lo_freq, VOICE_FLOOR_HZ, VOICE_CEIL_HZ)
+		hi_freq = clampf(hi_freq, _min_freq, VOICE_CEIL_HZ)
+		lo_freq = clampf(lo_freq, _min_freq, VOICE_CEIL_HZ)
 		_voice_period_min = int(_sample_rate / hi_freq)  # smallest tau for highest freq
 		_voice_period_max = int(_sample_rate / lo_freq)  # largest tau for lowest freq
 
@@ -818,12 +1035,12 @@ func _append_to_ring(chunk: PackedFloat32Array) -> void:
 	if chunk.is_empty():
 		return
 	_ring.append_array(chunk)
-	if _ring.size() > WINDOW_SIZE:
-		var drop: int = _ring.size() - WINDOW_SIZE
+	if _ring.size() > _window_size:
+		var drop: int = _ring.size() - _window_size
 		# PackedFloat32Array has no slice-assign or pop_front_many; rebuild.
 		var kept := PackedFloat32Array()
-		kept.resize(WINDOW_SIZE)
-		for i in WINDOW_SIZE:
+		kept.resize(_window_size)
+		for i in _window_size:
 			kept[i] = _ring[drop + i]
 		_ring = kept
 
@@ -890,6 +1107,66 @@ func _goertzel_ratio(mono: PackedFloat32Array, probe_freq: float, ref_freq: floa
 	return probe_e / ref_e
 
 
+# Counts DISTINCT competing fundamentals (other played notes) in the window.
+# A real chord has ≥2 extra notes; a single note picked up on a noisy mic (AGC,
+# room reverb, broadband hiss) produces at most ONE spurious off-harmonic peak.
+# So the caller requires count ≥ 2 before declaring polyphony — this is what
+# keeps a clean single note on a phone mic from being falsely rejected.
+#
+# Sweeps a semitone grid around f0 with Goertzel; skips probes inside f0's main
+# lobe (its own leakage) and on f0's harmonic/sub-octave grid. Competing peaks
+# within 2 semitones of each other are merged (one wide peak ≠ two notes).
+func _polyphony_competitor_count(mono: PackedFloat32Array, f0: float) -> int:
+	if f0 <= 0.0 or mono.size() < MIN_BUFFER:
+		return 0
+	var windowed: PackedFloat32Array = _apply_hann_window(mono)
+	var n_max: int = mini(windowed.size(), 1024)
+	var e_f0: float = _goertzel_energy(windowed, f0, n_max)
+	if e_f0 < 0.000001:
+		return 0
+	var min_sep_hz: float = 2.0 * _sample_rate / float(windowed.size())
+	var cands: Array = []  # [{s, r}] ratio of probe energy to f0 energy
+	for s in range(-12, 25):
+		if s == 0:
+			continue
+		var f: float = f0 * pow(2.0, float(s) / 12.0)
+		if f < _min_freq or f > _max_freq:
+			continue
+		if absf(f - f0) < min_sep_hz:
+			continue
+		if _is_harmonic_of(f, f0):
+			continue
+		var ratio: float = _goertzel_energy(windowed, f, n_max) / e_f0
+		if ratio >= POLYPHONY_ENERGY_RATIO:
+			cands.append({"s": s, "r": ratio})
+	# Greedily pick the loudest peaks, merging any within 2 semitones of a peak
+	# already chosen (the skirt of one strong note must not count as two).
+	cands.sort_custom(func(a, b): return float(a["r"]) > float(b["r"]))
+	var picked: Array[int] = []
+	for c in cands:
+		var s_i: int = int(c["s"])
+		var adjacent := false
+		for p in picked:
+			if absi(p - s_i) <= 2:
+				adjacent = true
+				break
+		if not adjacent:
+			picked.append(s_i)
+	return picked.size()
+
+
+# True when probe freq f sits on f0's integer-harmonic grid (2F..8F) or one of
+# its low sub-octaves (F/2..F/4) — energy there belongs to f0, not a new note.
+func _is_harmonic_of(f: float, f0: float) -> bool:
+	for k in range(2, 9):
+		if absf(f / (f0 * float(k)) - 1.0) < POLYPHONY_HARMONIC_TOL:
+			return true
+	for k in range(2, 5):
+		if absf(f / (f0 / float(k)) - 1.0) < POLYPHONY_HARMONIC_TOL:
+			return true
+	return false
+
+
 func _goertzel_energy(mono: PackedFloat32Array, freq: float, n: int) -> float:
 	if n < 4:
 		return 0.0
@@ -915,8 +1192,8 @@ func _yin_detect_ranged(mono: PackedFloat32Array, period_min: int, period_max: i
 	# diff/cmnd arrays at low τ because the cumulative-mean normalisation needs
 	# the early terms to be correct, but we restrict the threshold search.
 	var n := mono.size()
-	var hard_max: int = int(_sample_rate / MIN_FREQ)
-	var hard_min: int = int(_sample_rate / MAX_FREQ)
+	var hard_max: int = int(_sample_rate / _min_freq)
+	var hard_min: int = int(_sample_rate / _max_freq)
 	# Use the smaller of hard_max and (adaptive max + 30% margin); biggest gain
 	# is when the singer is solidly mid-range so we skip computing diff[] for
 	# τ values near the bass floor that contribute only noise.
@@ -980,8 +1257,8 @@ func _yin_detect_ranged(mono: PackedFloat32Array, period_min: int, period_max: i
 # YIN autocorrelation pitch detection
 func _yin_detect(mono: PackedFloat32Array) -> Dictionary:
 	var n := mono.size()
-	var max_period := int(_sample_rate / MIN_FREQ)  # ~678 samples for 65Hz @ 44.1kHz
-	var min_period := int(_sample_rate / MAX_FREQ)  # ~31 samples for 1400Hz @ 44.1kHz
+	var max_period := int(_sample_rate / _min_freq)  # tau for the lowest searched freq
+	var min_period := int(_sample_rate / _max_freq)  # tau for the highest searched freq
 	max_period = mini(max_period, n / 2)
 	if max_period <= min_period:
 		return {"detected": false}

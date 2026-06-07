@@ -15,6 +15,10 @@ const ExerciseValidatorScript = preload("res://scripts/exercises/exercise_valida
 const DifficultyEstimatorScript = preload("res://scripts/exercises/difficulty_estimator.gd")
 const PatternPrimitivesScript = preload("res://scripts/exercises/patterns/pattern_primitives.gd")
 const SequenceTransformsScript = preload("res://scripts/exercises/patterns/sequence_transforms.gd")
+const FingeringRulesScript = preload("res://scripts/exercises/fingering_rules.gd")
+const NotationRulesScript = preload("res://scripts/exercises/notation_rules.gd")
+const StaffRendererScript = preload("res://scripts/score_engine/staff_renderer.gd")
+const ScoreModelScript = preload("res://scripts/score_engine/score_model.gd")
 
 # Phase 4 sampler sweep — drives PatternPrimitives.walk_degrees through a set
 # of style profiles and asserts (a) every sample respects its constraints and
@@ -130,6 +134,21 @@ static func run() -> Dictionary:
 	failed += int(sampler.get("failed", 0))
 	for f in sampler.get("failures", []):
 		failures.append("[sampler] " + str(f))
+	# Fingering regression sweep â€” scale/arpeggio/five-finger assignments should
+	# follow the shared fingering tables exactly, and all fingered drills should
+	# keep fingering metadata present on every pitched note.
+	var fingering: Dictionary = run_fingering_sweep()
+	passed += int(fingering.get("passed", 0))
+	failed += int(fingering.get("failed", 0))
+	for f in fingering.get("failures", []):
+		failures.append("[fingering] " + str(f))
+	# Notation regression sweep â€” terminal resolution and 8va spans must
+	# follow the score-writing rules, not produce isolated one-note ottava runs.
+	var notation: Dictionary = run_notation_sweep()
+	passed += int(notation.get("passed", 0))
+	failed += int(notation.get("failed", 0))
+	for f in notation.get("failures", []):
+		failures.append("[notation] " + str(f))
 	# Phase 5: SequenceTransforms invariants. Each transform must satisfy its
 	# documented invariant; apply_stack must be safe with empty / unknown names.
 	var transforms: Dictionary = run_transform_sweep()
@@ -328,6 +347,343 @@ static func run_sampler_sweep() -> Dictionary:
 		"failures": failures,
 		"per_style": per_style,
 	}
+
+
+static func run_fingering_sweep() -> Dictionary:
+	var passed: int = 0
+	var failed: int = 0
+	var failures: Array[String] = []
+
+	var scale_cases: Array = [
+		{"label": "C major RH", "key_pc": 0, "minor": false, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "G major RH", "key_pc": 7, "minor": false, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "D major RH", "key_pc": 2, "minor": false, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "A major RH", "key_pc": 9, "minor": false, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "E major RH", "key_pc": 4, "minor": false, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "B major RH", "key_pc": 11, "minor": false, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "F major RH", "key_pc": 5, "minor": false, "hand": "right", "expected": [1, 2, 3, 4, 1, 2, 3, 4]},
+		{"label": "Bb major RH", "key_pc": 10, "minor": false, "hand": "right", "expected": [2, 1, 2, 3, 1, 2, 3, 4]},
+		{"label": "Eb major RH", "key_pc": 3, "minor": false, "hand": "right", "expected": [3, 1, 2, 3, 4, 1, 2, 3]},
+		{"label": "Ab major RH", "key_pc": 8, "minor": false, "hand": "right", "expected": [3, 4, 1, 2, 3, 1, 2, 3]},
+		{"label": "Db major RH", "key_pc": 1, "minor": false, "hand": "right", "expected": [2, 3, 1, 2, 3, 4, 1, 2]},
+		{"label": "Gb major RH", "key_pc": 6, "minor": false, "hand": "right", "expected": [2, 3, 4, 1, 2, 3, 1, 2]},
+		{"label": "C major LH", "key_pc": 0, "minor": false, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "G major LH", "key_pc": 7, "minor": false, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "D major LH", "key_pc": 2, "minor": false, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "A major LH", "key_pc": 9, "minor": false, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "E major LH", "key_pc": 4, "minor": false, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "B major LH", "key_pc": 11, "minor": false, "hand": "left", "expected": [4, 3, 2, 1, 4, 3, 2, 1]},
+		{"label": "F major LH", "key_pc": 5, "minor": false, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "Bb major LH", "key_pc": 10, "minor": false, "hand": "left", "expected": [3, 2, 1, 4, 3, 2, 1, 3]},
+		{"label": "Eb major LH", "key_pc": 3, "minor": false, "hand": "left", "expected": [3, 2, 1, 4, 3, 2, 1, 3]},
+		{"label": "Ab major LH", "key_pc": 8, "minor": false, "hand": "left", "expected": [3, 2, 1, 4, 3, 2, 1, 3]},
+		{"label": "Db major LH", "key_pc": 1, "minor": false, "hand": "left", "expected": [3, 2, 1, 4, 3, 2, 1, 3]},
+		{"label": "Gb major LH", "key_pc": 6, "minor": false, "hand": "left", "expected": [4, 3, 2, 1, 3, 2, 1, 4]},
+		{"label": "A minor RH", "key_pc": 9, "minor": true, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "E minor RH", "key_pc": 4, "minor": true, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "B minor RH", "key_pc": 11, "minor": true, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "F# minor RH", "key_pc": 6, "minor": true, "hand": "right", "expected": [2, 3, 1, 2, 3, 1, 2, 3]},
+		{"label": "C# minor RH", "key_pc": 1, "minor": true, "hand": "right", "expected": [3, 4, 1, 2, 3, 1, 2, 3]},
+		{"label": "G# minor RH", "key_pc": 8, "minor": true, "hand": "right", "expected": [3, 4, 1, 2, 3, 1, 2, 3]},
+		{"label": "D# minor RH", "key_pc": 3, "minor": true, "hand": "right", "expected": [3, 1, 2, 3, 4, 1, 2, 3]},
+		{"label": "D minor RH", "key_pc": 2, "minor": true, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "G minor RH", "key_pc": 7, "minor": true, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "C minor RH", "key_pc": 0, "minor": true, "hand": "right", "expected": [1, 2, 3, 1, 2, 3, 4, 5]},
+		{"label": "F minor RH", "key_pc": 5, "minor": true, "hand": "right", "expected": [1, 2, 3, 4, 1, 2, 3, 4]},
+		{"label": "Bb minor RH", "key_pc": 10, "minor": true, "hand": "right", "expected": [2, 1, 2, 3, 1, 2, 3, 4]},
+		{"label": "Eb minor RH", "key_pc": 3, "minor": true, "hand": "right", "expected": [3, 1, 2, 3, 4, 1, 2, 3]},
+		{"label": "A minor LH", "key_pc": 9, "minor": true, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "E minor LH", "key_pc": 4, "minor": true, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "B minor LH", "key_pc": 11, "minor": true, "hand": "left", "expected": [4, 3, 2, 1, 4, 3, 2, 1]},
+		{"label": "F# minor LH", "key_pc": 6, "minor": true, "hand": "left", "expected": [4, 3, 2, 1, 3, 2, 1, 4]},
+		{"label": "C# minor LH", "key_pc": 1, "minor": true, "hand": "left", "expected": [3, 2, 1, 4, 3, 2, 1, 3]},
+		{"label": "G# minor LH", "key_pc": 8, "minor": true, "hand": "left", "expected": [3, 2, 1, 3, 2, 1, 4, 3]},
+		{"label": "D# minor LH", "key_pc": 3, "minor": true, "hand": "left", "expected": [2, 1, 4, 3, 2, 1, 3, 2]},
+		{"label": "D minor LH", "key_pc": 2, "minor": true, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "G minor LH", "key_pc": 7, "minor": true, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "C minor LH", "key_pc": 0, "minor": true, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "F minor LH", "key_pc": 5, "minor": true, "hand": "left", "expected": [5, 4, 3, 2, 1, 3, 2, 1]},
+		{"label": "Bb minor LH", "key_pc": 10, "minor": true, "hand": "left", "expected": [2, 1, 3, 2, 1, 4, 3, 2]},
+		{"label": "Eb minor LH", "key_pc": 3, "minor": true, "hand": "left", "expected": [2, 1, 4, 3, 2, 1, 3, 2]},
+	]
+	for case_any in scale_cases:
+		var case: Dictionary = case_any
+		var ex: Dictionary = TechnicalExerciseGeneratorScript.generate("scale", int(case.get("key_pc", 0)), bool(case.get("minor", false)), 3, str(case.get("hand", "right")), 2)
+		var expected: Array = case.get("expected", [])
+		var got: Array = _first_pitched_fingerings(ex.get("notes", []), expected.size())
+		if got != expected:
+			failures.append("%s fingering mismatch: got %s expected %s" % [str(case.get("label", "")), str(got), str(expected)])
+			failed += 1
+		else:
+			passed += 1
+		if _count_missing_fingerings(ex.get("notes", [])) > 0:
+			failures.append("%s still has pitched notes without fingering metadata" % str(case.get("label", "")))
+			failed += 1
+		else:
+			passed += 1
+
+	# Arpeggio / five-finger smoke checks: all pitched notes should carry
+	# metadata and the canonical hand patterns should still hold.
+	var arp_r: Dictionary = TechnicalExerciseGeneratorScript.generate("arpeggio", 0, false, 3, "right", 2)
+	var arp_l: Dictionary = TechnicalExerciseGeneratorScript.generate("arpeggio", 0, false, 3, "left", 2)
+	if _first_pitched_fingerings(arp_r.get("notes", []), 7) != [1, 2, 3, 1, 2, 3, 1]:
+		failures.append("arpeggio RH fingering no longer matches canonical thumb-under pattern")
+		failed += 1
+	else:
+		passed += 1
+	if _first_pitched_fingerings(arp_l.get("notes", []), 7) != [5, 3, 2, 1, 3, 2, 1]:
+		failures.append("arpeggio LH fingering no longer matches canonical mirror pattern")
+		failed += 1
+	else:
+		passed += 1
+	if _count_missing_fingerings(arp_r.get("notes", [])) > 0 or _count_missing_fingerings(arp_l.get("notes", [])) > 0:
+		failures.append("arpeggio exercises still have pitched notes without fingering metadata")
+		failed += 1
+	else:
+		passed += 1
+	var ff_r: Dictionary = TechnicalExerciseGeneratorScript.generate("five_finger", 0, false, 1, "right", 1)
+	var ff_l: Dictionary = TechnicalExerciseGeneratorScript.generate("five_finger", 0, false, 1, "left", 1)
+	if _first_pitched_fingerings(ff_r.get("notes", []), 9) != [1, 2, 3, 4, 5, 4, 3, 2, 1]:
+		failures.append("five_finger RH fingering mismatch")
+		failed += 1
+	else:
+		passed += 1
+	if _first_pitched_fingerings(ff_l.get("notes", []), 9) != [5, 4, 3, 2, 1, 2, 3, 4, 5]:
+		failures.append("five_finger LH fingering mismatch")
+		failed += 1
+	else:
+		passed += 1
+	if _count_missing_fingerings(ff_r.get("notes", [])) > 0 or _count_missing_fingerings(ff_l.get("notes", [])) > 0:
+		failures.append("five_finger exercises still have pitched notes without fingering metadata")
+		failed += 1
+	else:
+		passed += 1
+
+	# All Hanon variants should carry explicit fingering metadata on every pitched note.
+	for id_v in ExerciseLibraryScript.DEFAULT_ORDER:
+		var id: String = str(id_v)
+		if not id.begins_with("hanon_"):
+			continue
+		var ex_h: Dictionary = TechnicalExerciseGeneratorScript.generate(id, 0, false, 4, "right", 1, -1, 20260528)
+		var missing := 0
+		for n_any in ex_h.get("notes", []):
+			var n: Dictionary = n_any
+			if int(n.get("midi", -1)) >= 0 and not bool(n.get("rest", false)) and int(n.get("fingering", 0)) <= 0:
+				missing += 1
+		if missing > 0:
+			failures.append("%s has %d pitched notes without fingering metadata" % [id, missing])
+			failed += 1
+		else:
+			passed += 1
+
+	return {
+		"passed": passed,
+		"failed": failed,
+		"failures": failures,
+	}
+
+
+static func run_notation_sweep() -> Dictionary:
+	var passed: int = 0
+	var failed: int = 0
+	var failures: Array[String] = []
+
+	# Triad-tone endings should elongate to fill the final bar rather than
+	# sprout a gratuitous extra note or rest.
+	var triad_case: Array = [
+		{"midi": 64, "duration_beats": 1.0, "beat_offset": 1.0, "rest": false}, # E in C major
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(triad_case, 0, false, 4.0, 1, 1)
+	if triad_case.size() != 2 or not bool((triad_case[0] as Dictionary).get("rest", false)) or absf(float((triad_case[1] as Dictionary).get("duration_beats", 0.0)) - 3.0) > 0.001:
+		failures.append("triad-ending resolution did not extend the final note to fill its 4/4 bar")
+		failed += 1
+	else:
+		passed += 1
+
+	var three_four_case: Array = [
+		{"midi": 60, "duration_beats": 0.5, "beat_offset": 1.0, "rest": false},
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(three_four_case, 0, false, 3.0, 1, 1)
+	if three_four_case.size() != 2 or not bool((three_four_case[0] as Dictionary).get("rest", false)) or absf(float((three_four_case[1] as Dictionary).get("duration_beats", 0.0)) - 2.0) > 0.001:
+		failures.append("3/4 final note did not fill the last bar after adding the leading rest")
+		failed += 1
+	else:
+		passed += 1
+
+	var long_sustain_case: Array = [
+		{"midi": 60, "duration_beats": 4.0, "beat_offset": 1.0, "rest": false},
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(long_sustain_case, 0, false, 4.0, 1, 1)
+	var long_sustain_last: Dictionary = long_sustain_case[long_sustain_case.size() - 1]
+	if absf(float(long_sustain_last.get("beat_offset", 0.0)) + float(long_sustain_last.get("duration_beats", 0.0)) - 8.0) > 0.001:
+		failures.append("bar completion shortened or failed to complete a cross-bar final sustain")
+		failed += 1
+	else:
+		passed += 1
+
+	var internal_gap_case: Array = [
+		{"midi": 60, "duration_beats": 1.0, "beat_offset": 0.0, "rest": false},
+		{"midi": 64, "duration_beats": 1.0, "beat_offset": 2.0, "rest": false},
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(internal_gap_case, 0, false, 4.0, 1, 1)
+	if internal_gap_case.size() != 3 or not bool((internal_gap_case[1] as Dictionary).get("rest", false)) or absf(float((internal_gap_case[1] as Dictionary).get("duration_beats", 0.0)) - 1.0) > 0.001 or absf(float((internal_gap_case[2] as Dictionary).get("duration_beats", 0.0)) - 2.0) > 0.001:
+		failures.append("bar completion did not fill an internal gap with a rest and sustain the last note")
+		failed += 1
+	else:
+		passed += 1
+
+	var padded_terminal_case: Array = [
+		{"midi": 60, "duration_beats": 1.0, "beat_offset": 2.0, "rest": false},
+		{"midi": -1, "duration_beats": 0.5, "beat_offset": 3.0, "rest": true},
+		{"midi": -1, "duration_beats": 0.5, "beat_offset": 3.5, "rest": true},
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(padded_terminal_case, 0, false, 4.0, 1, 1)
+	if padded_terminal_case.size() != 2 or not bool((padded_terminal_case[0] as Dictionary).get("rest", false)) or bool((padded_terminal_case[1] as Dictionary).get("rest", false)) or absf(float((padded_terminal_case[1] as Dictionary).get("duration_beats", 0.0)) - 2.0) > 0.001:
+		failures.append("terminal resolution left stale trailing rests after extending the final tonic")
+		failed += 1
+	else:
+		passed += 1
+
+	# Non-triad endings should either fill the remaining bar space or add a
+	# tonic in the next bar when the bar is already complete.
+	var fill_case: Array = [
+		{"midi": 62, "duration_beats": 1.0, "beat_offset": 1.0, "rest": false}, # D in C major
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(fill_case, 0, false, 4.0, 1, 1)
+	if fill_case.size() != 3 or not bool((fill_case[0] as Dictionary).get("rest", false)) or int((fill_case[2] as Dictionary).get("midi", -1)) % 12 != 0 or absf(float((fill_case[2] as Dictionary).get("beat_offset", -1.0)) + float((fill_case[2] as Dictionary).get("duration_beats", 0.0)) - 4.0) > 0.001:
+		failures.append("non-triad ending did not append tonic to fill the remaining bar")
+		failed += 1
+	else:
+		passed += 1
+
+	var barline_case: Array = [
+		{"midi": 62, "duration_beats": 1.0, "beat_offset": 3.0, "rest": false}, # D on beat 4
+	]
+	NotationRulesScript.apply_tonic_resolution_inplace(barline_case, 0, false, 4.0, 1, 1)
+	var barline_last: Dictionary = barline_case[barline_case.size() - 1]
+	if absf(float(barline_last.get("beat_offset", -1.0)) - 4.0) > 0.001 or absf(float(barline_last.get("duration_beats", 0.0)) - 4.0) > 0.001:
+		failures.append("barline-ending non-triad did not append a full-bar tonic in the next bar")
+		failed += 1
+	else:
+		passed += 1
+
+	# 8va spans should only appear on a musically meaningful run.
+	var renderer := StaffRendererScript.new()
+	var isolated_events: Array = [
+		{"notes": [{"midi": 85, "duration_beats": 0.5, "beat_offset": 0.0, "rest": false}]},
+	]
+	var isolated_warnings: Array[String] = renderer.validate_ottava_runs(isolated_events, "treble")
+	if isolated_warnings.is_empty():
+		failures.append("isolated 8va candidate was not flagged by validator")
+		failed += 1
+	else:
+		passed += 1
+	var span_events: Array = [
+		{"notes": [{"midi": 85, "duration_beats": 0.5, "beat_offset": 0.0, "rest": false}]},
+		{"notes": [{"midi": 86, "duration_beats": 0.5, "beat_offset": 0.5, "rest": false}]},
+		{"notes": [{"midi": 87, "duration_beats": 0.5, "beat_offset": 1.0, "rest": false}]},
+	]
+	var span_warnings: Array[String] = renderer.validate_ottava_runs(span_events, "treble")
+	if not span_warnings.is_empty():
+		failures.append("valid 8va span was incorrectly rejected: %s" % str(span_warnings))
+		failed += 1
+	else:
+		passed += 1
+	var arpeggio_peak_events: Array = [
+		{"beat_offset": 0.0, "duration_beats": 0.5, "notes": [{"midi": 80, "rest": false}], "rest": false},
+		{"beat_offset": 0.5, "duration_beats": 0.5, "notes": [{"midi": 83, "rest": false}], "rest": false},
+		{"beat_offset": 1.0, "duration_beats": 0.5, "notes": [{"midi": 88, "rest": false}], "rest": false},
+		{"beat_offset": 1.5, "duration_beats": 0.5, "notes": [{"midi": 83, "rest": false}], "rest": false},
+		{"beat_offset": 2.0, "duration_beats": 0.5, "notes": [{"midi": 80, "rest": false}], "rest": false},
+	]
+	renderer._prepare_event_display(arpeggio_peak_events, "treble", {"clef": "treble", "ottava": 0})
+	if int((arpeggio_peak_events[0] as Dictionary).get("ottava_shift", 0)) != 12 or int((arpeggio_peak_events[4] as Dictionary).get("ottava_shift", 0)) != 12:
+		failures.append("treble 8va did not cover the readable high arpeggio phrase around a C6+ peak")
+		failed += 1
+	else:
+		passed += 1
+	var bass_f2_events: Array = [
+		{"beat_offset": 0.0, "duration_beats": 0.5, "notes": [{"midi": 41, "rest": false}], "rest": false},
+	]
+	renderer._prepare_event_display(bass_f2_events, "bass", {"clef": "bass", "ottava": 0})
+	if int((bass_f2_events[0] as Dictionary).get("ottava_shift", 0)) != -12:
+		failures.append("bass 8vb did not apply at F2")
+		failed += 1
+	else:
+		passed += 1
+	var eighth_transition_events: Array = [
+		{"beat_offset": 0.0, "duration_beats": 0.5, "notes": [{"midi": 52, "rest": false}], "rest": false, "display_clef": "bass", "ottava_shift": 0},
+		{"beat_offset": 0.5, "duration_beats": 0.5, "notes": [{"midi": 72, "rest": false}], "rest": false, "display_clef": "treble", "ottava_shift": 12},
+		{"beat_offset": 1.0, "duration_beats": 0.5, "notes": [{"midi": 74, "rest": false}], "rest": false, "display_clef": "treble", "ottava_shift": 12},
+		{"beat_offset": 1.5, "duration_beats": 0.5, "notes": [{"midi": 76, "rest": false}], "rest": false, "display_clef": "treble", "ottava_shift": 12},
+	]
+	renderer._harmonize_display_for_rhythm_groups(eighth_transition_events, "bass", 0, {"clef": "treble", "ottava": 12})
+	if str((eighth_transition_events[1] as Dictionary).get("display_clef", "")) != "bass" or int((eighth_transition_events[1] as Dictionary).get("ottava_shift", -1)) != 0 or not bool((eighth_transition_events[2] as Dictionary).get("draw_clef_change", false)):
+		failures.append("display transition split an eighth-note pair instead of waiting for the next pair")
+		failed += 1
+	else:
+		passed += 1
+	var triplet_transition_events: Array = [
+		{"beat_offset": 0.0, "duration_beats": 1.0 / 3.0, "triplet": true, "notes": [{"midi": 52, "rest": false}], "rest": false, "display_clef": "bass", "ottava_shift": 0},
+		{"beat_offset": 1.0 / 3.0, "duration_beats": 1.0 / 3.0, "triplet": true, "notes": [{"midi": 72, "rest": false}], "rest": false, "display_clef": "treble", "ottava_shift": 12},
+		{"beat_offset": 2.0 / 3.0, "duration_beats": 1.0 / 3.0, "triplet": true, "notes": [{"midi": 74, "rest": false}], "rest": false, "display_clef": "treble", "ottava_shift": 12},
+		{"beat_offset": 1.0, "duration_beats": 1.0 / 3.0, "triplet": true, "notes": [{"midi": 76, "rest": false}], "rest": false, "display_clef": "treble", "ottava_shift": 12},
+	]
+	renderer._harmonize_display_for_rhythm_groups(triplet_transition_events, "bass", 0, {"clef": "treble", "ottava": 12})
+	if str((triplet_transition_events[2] as Dictionary).get("display_clef", "")) != "bass" or int((triplet_transition_events[2] as Dictionary).get("ottava_shift", -1)) != 0 or not bool((triplet_transition_events[3] as Dictionary).get("draw_clef_change", false)):
+		failures.append("display transition split a triplet instead of waiting for all three notes")
+		failed += 1
+	else:
+		passed += 1
+	var triplet_score := ScoreModelScript.from_flat_notes(
+		SequenceTransformsScript.pitches_to_triplet_notes([60, 62, 64]),
+		"treble"
+	)
+	var stored_triplet_notes: Array = triplet_score["staves"][0]["measures"][0]["notes"]
+	if stored_triplet_notes.is_empty() or not bool((stored_triplet_notes[0] as Dictionary).get("triplet", false)):
+		failures.append("score model discarded triplet metadata before rendering")
+		failed += 1
+	else:
+		passed += 1
+	renderer.free()
+
+	var rest_pad_case: Array = [
+		{"midi": 60, "duration_beats": 1.0, "beat_offset": 0.0, "rest": false},
+		{"midi": 62, "duration_beats": 1.0, "beat_offset": 1.0, "rest": false},
+	]
+	SequenceTransformsScript.pad_to_bar_boundary(rest_pad_case, 4.0, 0.5)
+	if rest_pad_case.size() != 3 or not bool((rest_pad_case[2] as Dictionary).get("rest", false)) or absf(float((rest_pad_case[2] as Dictionary).get("duration_beats", 0.0)) - 2.0) > 0.001:
+		failures.append("bar padding did not use the largest available rest duration")
+		failed += 1
+	else:
+		passed += 1
+
+	return {
+		"passed": passed,
+		"failed": failed,
+		"failures": failures,
+	}
+
+
+static func _first_pitched_fingerings(notes: Array, count: int = -1) -> Array:
+	var out: Array = []
+	for note_any in notes:
+		var note: Dictionary = note_any
+		if int(note.get("midi", -1)) < 0 or bool(note.get("rest", false)):
+			continue
+		out.append(int(note.get("fingering", 0)))
+		if count > 0 and out.size() >= count:
+			break
+	return out
+
+
+static func _count_missing_fingerings(notes: Array) -> int:
+	var missing := 0
+	for note_any in notes:
+		var note: Dictionary = note_any
+		if int(note.get("midi", -1)) >= 0 and not bool(note.get("rest", false)) and int(note.get("fingering", 0)) <= 0:
+			missing += 1
+	return missing
 
 
 # Asserts the Phase-5 transform invariants. Each transform has one or two
@@ -566,6 +922,13 @@ static func _test_one(exercise_id: String, hand: String, failures: Array[String]
 	var xml: String = MusicXMLEncoderScript.encode(ex)
 	if xml.is_empty() or not xml.contains("score-partwise"):
 		failures.append("[%s/%s] MusicXML encoding produced invalid output" % [exercise_id, hand])
+		return false
+	# Fingering sanity (LH-mirror contract). Catches the recurring bug
+	# class where a composer ships RH thumb-to-pinky patterns on the LH.
+	var fingering_warnings: Array[String] = ExerciseValidatorScript.validate_left_hand_fingering(ex)
+	if not fingering_warnings.is_empty():
+		for w in fingering_warnings:
+			failures.append("[%s/%s] %s" % [exercise_id, hand, w])
 		return false
 	return true
 

@@ -1,0 +1,234 @@
+name: QA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "QA scope (smoke, settings, ear.intervals, ..., or all)"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+# QA runs through qa_run.ps1, which drives Godot headless with --qa.
+# Reports land in the Godot userdata dir (custom_user_dir_name=Clefira),
+# which on a Windows runner resolves to %APPDATA%\Godot\app_userdata\Clefira\.
+# We upload that whole directory as a build artifact so failures are
+# inspectable without re-running locally.
+jobs:
+  qa:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      GODOT_VERSION: "4.6-stable"
+      # qa_run.ps1 reads this and skips the hard-coded developer path.
+      # The release zip distributes the regular .exe (not _console.exe);
+      # PowerShell pipes stdout from it fine, so headless mode works.
+      GODOT_BIN: ${{ github.workspace }}\godot\Godot_v4.6-stable_win64.exe
+      QA_USERDATA_DIR: ${{ github.workspace }}\qa_userdata
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot binary
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: godot
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}
+
+      - name: Download Godot 4.6-stable (Windows)
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path godot | Out-Null
+          $zipUrl = "https://github.com/godotengine/godot-builds/releases/download/${env:GODOT_VERSION}/Godot_v${env:GODOT_VERSION}_win64.exe.zip"
+          $zipPath = Join-Path $env:RUNNER_TEMP "godot.zip"
+          Write-Host "Downloading $zipUrl"
+          Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath godot -Force
+          Get-ChildItem godot | ForEach-Object { Write-Host "  $($_.Name)" }
+
+      - name: Verify Godot binary
+        shell: pwsh
+        run: |
+          if (-not (Test-Path $env:GODOT_BIN)) {
+            Write-Error "GODOT_BIN missing after download: $env:GODOT_BIN"
+            Get-ChildItem godot -Recurse | Select-Object FullName
+            exit 1
+          }
+          # Print version so CI logs show exactly what shipped.
+          & $env:GODOT_BIN --version
+
+      - name: Import project assets (first-run pass)
+        shell: pwsh
+        # Godot needs an import pass before headless runs so .import sidecars
+        # exist. --editor --quit imports and exits.
+        run: |
+          & $env:GODOT_BIN --headless --editor --quit --path "$env:GITHUB_WORKSPACE"
+
+      - name: Run QA suite
+        id: qa
+        shell: pwsh
+        run: |
+          $scope = "${{ github.event.inputs.scope }}"
+          if (-not $scope) { $scope = "all" }
+          Write-Host "Running QA with scope: $scope"
+          & "$env:GITHUB_WORKSPACE\qa_run.ps1" -Scope $scope
+          $exit = $LASTEXITCODE
+          Write-Host "qa_run.ps1 exit: $exit"
+          exit $exit
+
+      - name: Locate QA userdata
+        if: always()
+        shell: pwsh
+        # The Clefira project pins config/custom_user_dir_name = "Clefira"
+        # (see project.godot). On Windows that's:
+        #   %APPDATA%\Godot\app_userdata\Clefira\
+        run: |
+          $userdata = Join-Path $env:APPDATA "Godot\app_userdata\Clefira"
+          if (Test-Path $userdata) {
+            Write-Host "QA userdata: $userdata"
+            Get-ChildItem $userdata -Recurse | Select-Object FullName, Length | Format-Table
+            New-Item -ItemType Directory -Force -Path $env:QA_USERDATA_DIR | Out-Null
+            Copy-Item -Path "$userdata\*" -Destination $env:QA_USERDATA_DIR -Recurse -Force
+          } else {
+            Write-Host "::warning::QA userdata not found at $userdata (suite may not have started)"
+          }
+
+      - name: Upload QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-reports-${{ github.run_id }}
+          path: |
+            ${{ env.QA_USERDATA_DIR }}/qa_report.md
+            ${{ env.QA_USERDATA_DIR }}/qa_issues.md
+            ${{ env.QA_USERDATA_DIR }}/qa_suggestions.md
+            ${{ env.QA_USERDATA_DIR }}/qa_run_log.json
+            ${{ env.QA_USERDATA_DIR }}/qa_screenshots/**
+            ${{ env.QA_USERDATA_DIR }}/qa_goldens/_failures/**
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Surface QA report in summary
+        if: always()
+        shell: pwsh
+        # GitHub Actions job summary supports Markdown — pasting the QA
+        # report in keeps the headline result one click away from the run.
+        run: |
+          $report = Join-Path $env:QA_USERDATA_DIR "qa_report.md"
+          if (Test-Path $report) {
+            "## QA Report" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Get-Content $report | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          } else {
+            "## QA Report`n`n_No report file produced. See run logs for parser/startup errors._" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+
+  # AI-orchestrated QA pipeline (see docs/prompts/ai-orchetrated-qa-
+  # pipeline-for-exe.txt + qa/orchestrator/). Runs AFTER the in-engine
+  # harness so we know basic compile/script health is green before we
+  # spend CI time on the longer external-driver run.
+  qa_orchestrator:
+    needs: qa
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      GODOT_VERSION: "4.6-stable"
+      GODOT_BIN: ${{ github.workspace }}\godot\Godot_v4.6-stable_win64.exe
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot binary
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: godot
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: qa/orchestrator/requirements.txt
+
+      - name: Install orchestrator deps
+        run: |
+          python -m pip install --upgrade pip
+          # python-rtmidi needs a C compiler on Windows; pip wheels exist
+          # for cp311 so this should be a binary install. If it ever fails
+          # to build, the orchestrator falls back to the debug-API MIDI path.
+          python -m pip install -r qa/orchestrator/requirements.txt
+
+      - name: Launch Clefira (headless, debug-server on)
+        # Background-launch the editor with --debug-server so the
+        # orchestrator can drive it. Logs to a file we upload on failure.
+        shell: pwsh
+        run: |
+          if (-not (Test-Path $env:GODOT_BIN)) {
+            Write-Error "GODOT_BIN missing — qa job's cache step should have provided it"
+            exit 1
+          }
+          $logFile = Join-Path $env:RUNNER_TEMP "clefira_orchestrator.log"
+          Write-Host "Launching Clefira → log: $logFile"
+          $proc = Start-Process -FilePath $env:GODOT_BIN `
+            -ArgumentList @('--headless', '--path', "$env:GITHUB_WORKSPACE", '--', '--debug-server', '8765') `
+            -RedirectStandardOutput $logFile -RedirectStandardError "$logFile.err" `
+            -PassThru
+          $proc.Id | Out-File -FilePath $env:RUNNER_TEMP\clefira_pid.txt -Encoding ascii
+          # Give the editor a beat to spin up before the orchestrator polls.
+          Start-Sleep -Seconds 3
+
+      - name: Run orchestrator (smoke + drills + library)
+        shell: pwsh
+        run: |
+          python qa\orchestrator\qa_orchestrator.py --no-launch --port 8765 --verbose
+
+      - name: Quit Clefira
+        if: always()
+        shell: pwsh
+        run: |
+          $pidFile = "$env:RUNNER_TEMP\clefira_pid.txt"
+          if (Test-Path $pidFile) {
+            $procId = Get-Content $pidFile
+            try { Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue } catch {}
+          }
+
+      - name: Upload orchestrator artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-orchestrator-${{ github.run_id }}
+          path: |
+            qa/orchestrator/results/**
+            ${{ runner.temp }}/clefira_orchestrator.log
+            ${{ runner.temp }}/clefira_orchestrator.log.err
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Surface orchestrator summary
+        if: always()
+        shell: pwsh
+        run: |
+          $results = "qa\orchestrator\results\qa_results.json"
+          if (Test-Path $results) {
+            $payload = Get-Content $results -Raw | ConvertFrom-Json
+            $s = $payload.summary
+            "## Orchestrator Run" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            "- Total: $($s.total)  ·  Passed: $($s.passed)  ·  Failed: $($s.failed)  ·  Duration: $($s.duration_sec)s" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            if ($s.failed -gt 0) {
+              "### Failed cases" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              $payload.cases | Where-Object { -not $_.ok } | ForEach-Object {
+                "- **$($_.name)** — $($_.failure_reason)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              }
+            }
+          } else {
+            "## Orchestrator Run`n_No results file produced — see run logs._" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }

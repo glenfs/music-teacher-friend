@@ -3,8 +3,9 @@ extends Control
 const MAIN_MENU_SCENE: String = "res://scenes/IntervalBirds.tscn"
 const MAIN_MENU_PACKED: PackedScene = preload("res://scenes/IntervalBirds.tscn")
 const AudioEngineScript = preload("res://scripts/product/audio_engine.gd")
-const LOGO_FONT_PATH: String = "res://assets/fonts/Baloo2-SemiBold.ttf"
-const TAGLINE_FONT_PATH: String = "res://assets/fonts/Nunito-Regular.ttf"
+# Unified with Inter family (2026-05-30) — Baloo2/Nunito retired across the app.
+const LOGO_FONT_PATH: String = "res://assets/fonts/Inter-Thin.ttf"
+const TAGLINE_FONT_PATH: String = "res://assets/fonts/Inter-Light.ttf"
 const ONE_SEMITONE_UP: float = 1.059463
 const CHORD_STREAM_PATHS := [
 	"res://assets/audio/piano/piano/52.mp3",

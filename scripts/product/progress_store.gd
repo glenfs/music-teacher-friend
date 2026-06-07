@@ -40,6 +40,8 @@ func merge_session(
 	mode_interval: int,
 	mode_chord: int,
 	mode_pitch_match: int,
+	mode_progression: int,
+	mode_scale_mode: int,
 	mode_cadence: int,
 	interval_stats_asked: Dictionary,
 	interval_stats_correct: Dictionary,
@@ -50,6 +52,9 @@ func merge_session(
 	var interval_bucket: Dictionary = _ensure_bucket(next_stats, "interval")
 	var chord_bucket: Dictionary = _ensure_bucket(next_stats, "chord")
 	var pitch_match_bucket: Dictionary = _ensure_bucket(next_stats, "pitch_match")
+	var progression_bucket: Dictionary = _ensure_bucket(next_stats, "progression")
+	var scale_mode_bucket: Dictionary = _ensure_bucket(next_stats, "scale_mode")
+	var cadence_bucket: Dictionary = _ensure_bucket(next_stats, "cadence")
 	match selected_mode:
 		mode_interval:
 			next_stats["sessions_interval"] = int(next_stats.get("sessions_interval", 0)) + 1
@@ -60,8 +65,15 @@ func merge_session(
 		mode_pitch_match:
 			next_stats["sessions_pitch_match"] = int(next_stats.get("sessions_pitch_match", 0)) + 1
 			next_stats["pitch_match"] = _merge_mode_stats(pitch_match_bucket, chord_stats_asked, chord_stats_correct)
+		mode_progression:
+			next_stats["sessions_progression"] = int(next_stats.get("sessions_progression", 0)) + 1
+			next_stats["progression"] = _merge_mode_stats(progression_bucket, chord_stats_asked, chord_stats_correct)
+		mode_scale_mode:
+			next_stats["sessions_scale_mode"] = int(next_stats.get("sessions_scale_mode", 0)) + 1
+			next_stats["scale_mode"] = _merge_mode_stats(scale_mode_bucket, chord_stats_asked, chord_stats_correct)
 		mode_cadence:
 			next_stats["sessions_cadence"] = int(next_stats.get("sessions_cadence", 0)) + 1
+			next_stats["cadence"] = _merge_mode_stats(cadence_bucket, chord_stats_asked, chord_stats_correct)
 	stats = next_stats
 	return get_stats()
 

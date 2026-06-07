@@ -45,6 +45,8 @@ func validate_start(
 
 
 func apply_continuous_start_state(host) -> void:
+	if host.has_method("_reset_session_unlock_messages"):
+		host._reset_session_unlock_messages()
 	host._score = 0
 	host._question_index = 0
 	host._total_questions = 0
@@ -57,11 +59,14 @@ func apply_continuous_start_state(host) -> void:
 
 
 func apply_standard_start_state(host, mode_sight: int, mode_note_chase: int) -> void:
+	const MIN_STANDARD_ROUND_QUESTIONS := 5
+	if host.has_method("_reset_session_unlock_messages"):
+		host._reset_session_unlock_messages()
 	host._grand_staff_active = host._selected_mode == mode_sight and host._sight_mode == "Chords" and host._selected_clef == "Grand Staff"
 	if host._selected_mode == mode_sight and host._sight_question_spin != null:
-		host._total_questions = int(host._sight_question_spin.value)
+		host._total_questions = maxi(MIN_STANDARD_ROUND_QUESTIONS, int(host._sight_question_spin.value))
 	else:
-		host._total_questions = int(host._question_spin.value)
+		host._total_questions = maxi(MIN_STANDARD_ROUND_QUESTIONS, int(host._question_spin.value))
 	host._score = 0
 	host._question_index = 0
 	host._lives = 5 if (host._selected_mode == mode_note_chase or host._is_continuous_flow_sight_mode()) else 3
@@ -73,6 +78,8 @@ func apply_standard_start_state(host, mode_sight: int, mode_note_chase: int) -> 
 	host._last_chord_signature = ""
 	host._last_pitch_match_signature = ""
 	host._last_sight_signature = ""
+	if host.has_method("_reset_question_picker_history"):
+		host._reset_question_picker_history()
 	host._quiz_start_time = Time.get_ticks_msec() / 1000.0
 	host._quiz_active = true
 	host._accepting_answer = false
@@ -80,6 +87,12 @@ func apply_standard_start_state(host, mode_sight: int, mode_note_chase: int) -> 
 	host._interval_recent_results.clear()
 	host._chord_recent_results.clear()
 	host._adaptive_difficulty_note = ""
+	if host.has_method("_reset_sight_note_mistake_review"):
+		host._reset_sight_note_mistake_review()
+	if host.has_method("_reset_vanishing_notes_session"):
+		host._reset_vanishing_notes_session()
+	if host.has_method("_reset_interval_reading_session"):
+		host._reset_interval_reading_session()
 
 
 func apply_end_state(host) -> void:
@@ -99,6 +112,8 @@ func apply_end_state(host) -> void:
 
 
 func apply_restart_state(host, mode_note_chase: int) -> void:
+	if host.has_method("_reset_session_unlock_messages"):
+		host._reset_session_unlock_messages()
 	host._quiz_active = false
 	host._accepting_answer = false
 	host._awaiting_round_start = false
@@ -117,6 +132,14 @@ func apply_restart_state(host, mode_note_chase: int) -> void:
 	host._last_chord_signature = ""
 	host._last_pitch_match_signature = ""
 	host._last_sight_signature = ""
+	if host.has_method("_reset_question_picker_history"):
+		host._reset_question_picker_history()
+	if host.has_method("_reset_sight_note_mistake_review"):
+		host._reset_sight_note_mistake_review()
+	if host.has_method("_reset_vanishing_notes_session"):
+		host._reset_vanishing_notes_session()
+	if host.has_method("_reset_interval_reading_session"):
+		host._reset_interval_reading_session()
 	host._quiz_active = true
 
 
@@ -249,6 +272,12 @@ func restart_quiz(host) -> void:
 		await host._start_read_module()
 		return
 	apply_restart_state(host, host.MODE_NOTE_CHASE)
+	# Theory modes (Progression/Scale-Mode/Cadence) run questions through
+	# _advanced_session; a finished session has asked == total, so without
+	# re-starting it next_question() early-returns and Restart would replay the
+	# last question with a stale score. Mirror start_quiz_from_home here.
+	if host._is_new_theory_mode() and host._advanced_session != null:
+		host._advanced_session.start(host._total_questions)
 	host._cancel_chicken_turn_hint_cycle(true)
 	host._stop_note_chase_music()
 	host._set_note_chase_overlay("", false)
@@ -364,7 +393,20 @@ func begin_next_question(host, expected_token: int = -1) -> void:
 	var prompt_question_index: int = int(host._question_index)
 	var allow_answer_during_prompt: bool = host._selected_mode == host.MODE_SCALE_MODE or host._selected_mode == host.MODE_INTERVAL
 	if allow_answer_during_prompt:
-		host._status_label.text = "Sing the highlighted melody." if host.has_method("_is_sight_singing_mode") and host._is_sight_singing_mode() else "Pick the correct nest."
+		if host.has_method("_is_sight_singing_mode") and host._is_sight_singing_mode():
+			host._status_label.text = "Sing the highlighted melody."
+		elif host.has_method("_is_sight_vanishing_mode") and host._is_sight_vanishing_mode():
+			if host.has_method("_vanishing_apply_question_status"):
+				host._vanishing_apply_question_status()
+			else:
+				host._status_label.text = "Pick the note you saw."
+		elif host.has_method("_is_interval_reading_mode") and host._is_interval_reading_mode():
+			if host.has_method("_interval_apply_question_status"):
+				host._interval_apply_question_status()
+			else:
+				host._status_label.text = "What is the interval?"
+		else:
+			host._status_label.text = "Pick the correct nest."
 		host._set_answer_buttons_enabled(true)
 		host._accepting_answer = true
 		host._start_chicken_turn_hint_cycle()
@@ -380,11 +422,29 @@ func begin_next_question(host, expected_token: int = -1) -> void:
 	if not host._quiz_active:
 		return
 	if not allow_answer_during_prompt:
-		host._status_label.text = "Sing the highlighted melody." if host.has_method("_is_sight_singing_mode") and host._is_sight_singing_mode() else "Pick the correct nest."
+		if host.has_method("_is_sight_singing_mode") and host._is_sight_singing_mode():
+			host._status_label.text = "Sing the highlighted melody."
+		elif host.has_method("_is_sight_vanishing_mode") and host._is_sight_vanishing_mode():
+			if host.has_method("_vanishing_apply_question_status"):
+				host._vanishing_apply_question_status()
+			else:
+				host._status_label.text = "Pick the note you saw."
+		elif host.has_method("_is_interval_reading_mode") and host._is_interval_reading_mode():
+			if host.has_method("_interval_apply_question_status"):
+				host._interval_apply_question_status()
+			else:
+				host._status_label.text = "What is the interval?"
+		else:
+			host._status_label.text = "Pick the correct nest."
 		host._set_answer_buttons_enabled(true)
 		host._accepting_answer = true
 		host._start_chicken_turn_hint_cycle()
-	host._replay_button.disabled = false
+	# Vanishing Notes is a memory exercise — Replay would re-reveal the hidden
+	# sequence, defeating the point. Interval Reading has no audio prompt to replay.
+	# Keep Replay disabled for both.
+	var vanishing: bool = host.has_method("_is_sight_vanishing_mode") and host._is_sight_vanishing_mode()
+	var intervals: bool = host.has_method("_is_interval_reading_mode") and host._is_interval_reading_mode()
+	host._replay_button.disabled = vanishing or intervals
 	host._restart_button.disabled = false
 
 
@@ -450,7 +510,7 @@ func handle_game_over(
 	host._replay_button.disabled = true
 	host._restart_button.disabled = false
 	host._status_label.text = ""
-	host._progress_label.text = final_quiz_result_text(
+	var result_text := final_quiz_result_text(
 		host,
 		host._score,
 		asked_count,
@@ -465,6 +525,7 @@ func handle_game_over(
 		host.MODE_NOTE_CHASE,
 		Callable(host, "_interval_display_name")
 	)
+	host._progress_label.text = ""
 	if host._sight_progress_track != null:
 		host._sight_progress_track.visible = false
 		host._set_sight_progress_ratio(0.0, false)
@@ -476,7 +537,10 @@ func handle_game_over(
 	host._merge_session_into_lifetime()
 	host._save_progress_data()
 	host._complete_active_ear_assignment_if_target_met(host._score, asked_count)
-	host._result_box_show(result_title, result_message)
+	var dialog_message := result_message.strip_edges()
+	if not result_text.strip_edges().is_empty():
+		dialog_message = "%s\n\n%s" % [dialog_message, result_text] if not dialog_message.is_empty() else result_text
+	host._result_box_show(result_title, dialog_message)
 
 
 func finish_continuous_sight_reading(host, result_title: String = "Complete") -> void:

@@ -276,7 +276,10 @@ func _build_keyboard() -> void:
 			# the very dark setup tint.
 			lbl.add_theme_color_override("font_color", Color(0.015, 0.045, 0.11, 1.0))
 			lbl.add_theme_color_override("font_outline_color", Color(1.0, 0.96, 0.78, 1.0))
-			lbl.add_theme_constant_override("outline_size", 3)
+			# Thin outline: a 3px light outline on 12px text swallowed the dark glyph
+			# and made the key names read as pale/white. 1px keeps a touch of contrast
+			# without washing out the navy letter.
+			lbl.add_theme_constant_override("outline_size", 1)
 			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 			lbl.position = Vector2(white_x, WHITE_H - 18.0)

@@ -1,0 +1,4 @@
+# Built native libraries (rebuild via native/polyphony/CMakeLists.txt). Large
+# binaries are kept out of git; CI / a local build repopulates bin/.
+bin/
+# Keep: polyphony.gdextension, nmp.onnx

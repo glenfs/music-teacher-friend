@@ -1,0 +1,39 @@
+{
+  "name": "G7_dom7",
+  "wav": "D:\\My Projects\\godot projects\\musiced\\poc\\basic_pitch_poc\\chords\\G7_dom7.wav",
+  "n_windows": 2,
+  "original_length": 35280,
+  "n_times": 137,
+  "n_freq": 88,
+  "frames_per_window": 172,
+  "n_overlap": 30,
+  "min_note_len": 10,
+  "onset_thresh": 0.5,
+  "frame_thresh": 0.45,
+  "note_events": [
+    [
+      2,
+      128,
+      65,
+      0.6131729483604431
+    ],
+    [
+      2,
+      130,
+      59,
+      0.6415541172027588
+    ],
+    [
+      1,
+      131,
+      62,
+      0.6712459325790405
+    ],
+    [
+      57,
+      129,
+      55,
+      0.5003325343132019
+    ]
+  ]
+}

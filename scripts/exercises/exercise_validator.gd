@@ -28,7 +28,10 @@ static func is_valid(exercise: Dictionary, opts: Dictionary = {}) -> Dictionary:
 	if notes.is_empty():
 		return {"ok": false, "reasons": ["zero notes"], "features": {}}
 
-	var max_jump: int = int(opts.get("max_jump", MAX_JUMP_SEMITONES_DEFAULT))
+	# max_jump precedence: explicit opts override > exercise-declared tolerance >
+	# default. Stride/leaping-bass idioms legitimately exceed the melodic default,
+	# so those composers declare their own "max_jump" on the exercise dict.
+	var max_jump: int = int(opts.get("max_jump", int(exercise.get("max_jump", MAX_JUMP_SEMITONES_DEFAULT))))
 	var max_span: int = int(opts.get("max_span", MAX_HAND_SPAN_DEFAULT))
 	var min_dur: float = float(opts.get("min_duration_beats", MIN_DURATION_BEATS_DEFAULT))
 	var max_dur: float = float(opts.get("max_duration_beats", MAX_DURATION_BEATS_DEFAULT))
@@ -39,7 +42,7 @@ static func is_valid(exercise: Dictionary, opts: Dictionary = {}) -> Dictionary:
 	# Per-staff pitch tracking. Staves: 1=treble/RH, 2=bass/LH. Notes without a
 	# staff field bucket into staff 0 (single-hand exercises).
 	var staff_pitches: Dictionary = {}
-	var staff_last_midi: Dictionary = {}
+	var staff_offsets: Dictionary = {}
 	var staff_max_jump: Dictionary = {}
 	var observed_jump: int = 0
 
@@ -71,17 +74,52 @@ static func is_valid(exercise: Dictionary, opts: Dictionary = {}) -> Dictionary:
 		var staff: int = int(note.get("staff", 0))
 		if not staff_pitches.has(staff):
 			staff_pitches[staff] = []
+			staff_offsets[staff] = []
 		(staff_pitches[staff] as Array).append(midi)
-		if staff_last_midi.has(staff):
-			var jump: int = absi(midi - int(staff_last_midi[staff]))
-			observed_jump = maxi(observed_jump, jump)
-			staff_max_jump[staff] = maxi(int(staff_max_jump.get(staff, 0)), jump)
-			if jump > max_jump:
-				reasons.append("staff %d: jump of %d semitones at beat %.3f (max %d)" % [staff, jump, off, max_jump])
-		staff_last_midi[staff] = midi
+		(staff_offsets[staff] as Array).append(off)
 
 	if pitched_count == 0:
 		reasons.append("no pitched notes (all rests)")
+
+	# Per-staff melodic jump check — CHORD-AWARE. Notes that share a beat_offset
+	# form a block chord; collapse each chord to its bass voice (lowest note) and
+	# measure motion between consecutive beat-groups. This stops a block-chord
+	# shape change (top of one chord → bottom of the next) from being mis-counted
+	# as a melodic leap. For single-note lines every group has one note, so this
+	# is identical to a plain note-to-note check.
+	for staff_v in staff_pitches.keys():
+		var staff_j: int = int(staff_v)
+		var midis: Array = staff_pitches[staff_j]
+		var offs: Array = staff_offsets.get(staff_j, [])
+		var group_low: int = 1 << 30
+		var group_off: float = 0.0
+		var prev_group_low: int = -1
+		var have_group: bool = false
+		for i in range(midis.size()):
+			var m: int = int(midis[i])
+			var o: float = float(offs[i]) if i < offs.size() else 0.0
+			if not have_group:
+				group_off = o
+				group_low = m
+				have_group = true
+			elif absf(o - group_off) <= 1e-6:
+				group_low = mini(group_low, m)
+			else:
+				if prev_group_low >= 0:
+					var jmp: int = absi(group_low - prev_group_low)
+					observed_jump = maxi(observed_jump, jmp)
+					staff_max_jump[staff_j] = maxi(int(staff_max_jump.get(staff_j, 0)), jmp)
+					if jmp > max_jump:
+						reasons.append("staff %d: jump of %d semitones at beat %.3f (max %d)" % [staff_j, jmp, group_off, max_jump])
+				prev_group_low = group_low
+				group_off = o
+				group_low = m
+		if have_group and prev_group_low >= 0:
+			var jmp2: int = absi(group_low - prev_group_low)
+			observed_jump = maxi(observed_jump, jmp2)
+			staff_max_jump[staff_j] = maxi(int(staff_max_jump.get(staff_j, 0)), jmp2)
+			if jmp2 > max_jump:
+				reasons.append("staff %d: jump of %d semitones at beat %.3f (max %d)" % [staff_j, jmp2, group_off, max_jump])
 
 	# Per-staff span check.
 	var observed_span: int = 0
@@ -124,6 +162,67 @@ static func is_valid(exercise: Dictionary, opts: Dictionary = {}) -> Dictionary:
 # Convenience for callers that only want the boolean answer.
 static func ok(exercise: Dictionary, opts: Dictionary = {}) -> bool:
 	return bool(is_valid(exercise, opts).get("ok", false))
+
+
+# Left-hand fingering sanity check (CONTRACT).
+#
+# Catches the recurring class of bug where a composer ships a left-hand
+# exercise with right-hand fingering patterns (1 on the lowest note,
+# climbing to 5 on the highest). The piano LH is geometrically mirrored —
+# pinky (5) belongs on the lowest note, thumb (1) on the highest. Any
+# LH exercise where the LOWEST fingered note is fingered 1 is almost
+# certainly wrong (the only legit case is a passage that starts mid-run
+# with the thumb coming off a cross-under, which is rare and should be
+# explicitly opted in via the `lh_fingering_starts_with_thumb` exercise
+# flag).
+#
+# Returns: Array of human-readable warnings (empty == clean). Composers
+# can call this in their self-tests; QA harness picks it up via
+# exercise_self_test.gd.
+static func validate_left_hand_fingering(exercise: Dictionary) -> Array[String]:
+	var warnings: Array[String] = []
+	if typeof(exercise) != TYPE_DICTIONARY:
+		return warnings
+	var hand_v: Variant = exercise.get("hand", "")
+	if str(hand_v) != "left":
+		# Grand-staff exercises split into per-hand caches — check the
+		# left_hand_notes array if present.
+		var lh_notes_v: Variant = exercise.get("left_hand_notes", null)
+		if not (lh_notes_v is Array):
+			return warnings
+		return _validate_lh_notes(lh_notes_v as Array, exercise)
+	return _validate_lh_notes(exercise.get("notes", []) as Array, exercise)
+
+
+static func _validate_lh_notes(notes: Array, exercise: Dictionary) -> Array[String]:
+	var warnings: Array[String] = []
+	if bool(exercise.get("lh_fingering_starts_with_thumb", false)):
+		return warnings
+	# Find the lowest fingered note.
+	var lowest_midi: int = 999
+	var lowest_finger: int = -1
+	var any_fingering: bool = false
+	for note_any in notes:
+		var note: Dictionary = note_any
+		var midi: int = int(note.get("midi", -1))
+		if midi < 0 or bool(note.get("rest", false)):
+			continue
+		var f: int = int(note.get("fingering", 0))
+		if f <= 0:
+			continue
+		any_fingering = true
+		if midi < lowest_midi:
+			lowest_midi = midi
+			lowest_finger = f
+	if not any_fingering:
+		return warnings  # No fingerings emitted — nothing to validate.
+	if lowest_finger == 1:
+		warnings.append(
+			"Suspicious LH fingering: lowest note (MIDI %d) is fingered with thumb (1). " %
+			lowest_midi + "Left hand normally puts the pinky (5) on the lowest note. " +
+			"Did you route the pattern through FingeringRules.apply_fingering_pattern with hand=\"left\"?"
+		)
+	return warnings
 
 
 # Internal: derives total beats from the highest beat_offset + duration_beats.

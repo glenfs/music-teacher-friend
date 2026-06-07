@@ -9,19 +9,24 @@ extends RefCounted
 const _LETTER_PER_PC := {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 3, 6: 3, 7: 4, 8: 4, 9: 5, 10: 5, 11: 6}
 
 const _MAJOR_SHARP_FIFTHS := {0: 0, 7: 1, 2: 2, 9: 3, 4: 4, 11: 5, 6: 6}
-const _MAJOR_FLAT_FIFTHS := {5: -1, 10: -2, 3: -3, 8: -4, 1: -5}
+const _MAJOR_FLAT_FIFTHS := {5: -1, 10: -2, 3: -3, 8: -4, 1: -5, 6: -6}
 const _MINOR_FIFTHS := {9: 0, 4: 1, 11: 2, 6: 3, 1: 4, 8: 5, 3: 6, 2: -1, 7: -2, 0: -3, 5: -4, 10: -5}
+const _MINOR_FLAT_FIFTHS := {2: -1, 7: -2, 0: -3, 5: -4, 10: -5, 3: -6, 8: -7}
 
 const _SHARP_LETTERS := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 
 # Number of sharps (positive) / flats (negative) in the given key sig.
 # pc is the tonic's pitch class (0=C..11=B); is_minor selects the parallel-minor table.
-static func key_pc_to_fifths(pc: int, is_minor: bool) -> int:
+static func key_pc_to_fifths(pc: int, is_minor: bool, force_flats: bool = false) -> int:
 	if is_minor:
+		if force_flats and _MINOR_FLAT_FIFTHS.has(pc):
+			return int(_MINOR_FLAT_FIFTHS[pc])
 		if _MINOR_FIFTHS.has(pc):
 			return int(_MINOR_FIFTHS[pc])
 		return 0
+	if force_flats and _MAJOR_FLAT_FIFTHS.has(pc):
+		return int(_MAJOR_FLAT_FIFTHS[pc])
 	if _MAJOR_SHARP_FIFTHS.has(pc):
 		return int(_MAJOR_SHARP_FIFTHS[pc])
 	if _MAJOR_FLAT_FIFTHS.has(pc):

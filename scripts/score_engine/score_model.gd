@@ -114,6 +114,7 @@ static func from_flat_notes(
 			"rest": bool(n.get("rest", false)) or int(n.get("midi", -1)) < 0,
 			"voice": int(n.get("voice", 1)),
 			"fingering": int(n.get("fingering", 0)),
+			"triplet": bool(n.get("triplet", false)),
 		}
 		(measures[bar_idx]["notes"] as Array).append(note_dict)
 	if measures.is_empty():
@@ -243,6 +244,7 @@ static func _build_staff_from_notes(notes: Array, clef: String, beats_per_bar: f
 			"voice": int(n.get("voice", 1)),
 			"staff": int(n.get("staff", 1 if clef == "treble" else 2)),
 			"fingering": int(n.get("fingering", 0)),
+			"triplet": bool(n.get("triplet", false)),
 		})
 	if measures.is_empty():
 		measures.append(new_measure())

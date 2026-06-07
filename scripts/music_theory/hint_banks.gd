@@ -350,14 +350,16 @@ static func scale_mode_bank(mode_name: String) -> Array:
 # prefix or padding; the caller handles those).
 static func cadence_bank(cadence_label_lower: String) -> Array:
 	var n := cadence_label_lower
-	if n.find("perfect") >= 0:
-		return ["Strong 'home' ending.", "Feels complete and settled.", "Classic V to I resolution sound.", "The ending lands firmly.", "Often the strongest cadence in tonal music."]
-	if n.find("plagal") >= 0:
-		return ["Church-like 'Amen' feeling.", "Softer home arrival than perfect cadence.", "IV moves to I.", "Still resolves, but gentler.", "Common hymn-style ending color."]
-	if n.find("half") >= 0:
+	# Order matters: check "half"/"imperfect" and "deceptive"/"interrupted" BEFORE
+	# "perfect", because "imperfect" contains the substring "perfect".
+	if n.find("half") >= 0 or n.find("imperfect") >= 0:
 		return ["Sounds unfinished or paused.", "Ends with a question-mark feeling.", "It stops on V, not home.", "You expect another chord after it.", "Suspended ending, not final."]
-	if n.find("deceptive") >= 0:
+	if n.find("deceptive") >= 0 or n.find("interrupted") >= 0:
 		return ["Starts like a strong ending, but surprises you.", "Feels like a trick turn.", "V does not go to I here.", "The ending avoids full resolution.", "A 'not yet home' surprise landing."]
+	if n.find("plagal") >= 0 or n.find("amen") >= 0:
+		return ["Church-like 'Amen' feeling.", "Softer home arrival than perfect cadence.", "IV moves to I.", "Still resolves, but gentler.", "Common hymn-style ending color."]
+	if n.find("perfect") >= 0 or n.find("authentic") >= 0:
+		return ["Strong 'home' ending.", "Feels complete and settled.", "Classic V to I resolution sound.", "The ending lands firmly.", "Often the strongest cadence in tonal music."]
 	return ["Listen to how the last chord feels.", "Does it sound final or open?", "Compare strong vs soft resolution.", "Replay and focus on the last chord.", "Cadence = ending pattern."]
 
 

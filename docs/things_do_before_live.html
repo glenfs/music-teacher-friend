@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clefira — Things To Do Before Going Live (Paid)</title>
+<style>
+  :root {
+    --fg: #1b1f24;
+    --fg-mute: #4a5160;
+    --bg: #fbfaf6;
+    --accent: #b88a2b;
+    --accent-soft: #f3e6c2;
+    --code-bg: #14202c;
+    --code-fg: #d9e2ec;
+    --hr: #d8d2c0;
+    --good: #1f7a3d;
+    --warn: #a44508;
+    --block: #8e1c1c;
+  }
+  html { font-size: 16px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 2rem 4rem;
+  }
+  main { max-width: 940px; margin: 0 auto; }
+  header {
+    border-bottom: 1px solid var(--hr);
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.6rem;
+  }
+  h1 {
+    font-size: 1.85rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+  }
+  .subtitle { color: var(--fg-mute); font-size: 1.02rem; margin: 0; }
+  h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 2.4rem 0 0.85rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--hr);
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.4rem 0 0.5rem;
+    color: var(--fg);
+  }
+  p { margin: 0.6rem 0; }
+  ul, ol { padding-left: 1.4rem; margin: 0.5rem 0 0.9rem; }
+  li { margin: 0.35rem 0; }
+  code {
+    font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+    font-size: 0.9em;
+    background: var(--accent-soft);
+    color: #4a350c;
+    padding: 0.08em 0.34em;
+    border-radius: 3px;
+  }
+  .tldr {
+    border-left: 4px solid var(--accent);
+    background: #fff7e3;
+    padding: 0.9rem 1.1rem;
+    margin: 0 0 1.6rem;
+    border-radius: 0 6px 6px 0;
+  }
+  .tldr p:first-child { margin-top: 0; }
+  .tldr p:last-child { margin-bottom: 0; }
+  .punchline {
+    border-left: 4px solid var(--good);
+    background: #eef7ef;
+    padding: 0.9rem 1.1rem;
+    margin: 1.6rem 0 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .blocker {
+    border-left: 4px solid var(--block);
+    background: #fbeeee;
+    padding: 0.6rem 0.95rem;
+    margin: 0.6rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .gap {
+    border-left: 3px solid var(--warn);
+    background: #fff3e8;
+    padding: 0.5rem 0.9rem 0.55rem;
+    margin: 0.5rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .gap strong:first-child { color: var(--warn); }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.85rem 0 1.1rem;
+    font-size: 0.94rem;
+  }
+  th, td {
+    border-bottom: 1px solid var(--hr);
+    padding: 0.45rem 0.7rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--accent-soft);
+    color: #594016;
+    font-weight: 600;
+  }
+  .good { color: var(--good); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .block { color: var(--block); font-weight: 600; }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--hr);
+    color: var(--fg-mute);
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>Things To Do Before Going Live <span style="color: var(--accent);">— Clefira (Paid)</span></h1>
+  <p class="subtitle">Honest pre-launch assessment of what's ready, what isn't, and a 15-working-day path to commercial readiness.</p>
+</header>
+
+<div class="tldr">
+  <p><strong>TL;DR</strong></p>
+  <p>The <strong>feature breadth</strong> is already past most paid competitors. The <strong>commercial readiness</strong> isn't there yet. If you shipped today at $5 / month you'd get refunds; if you ship at $15 / month with another 4–6 weeks of polish you'd hold your own against EarMaster / Tomplay / Yousician in the teacher-plus-student niche where none of those three actually fits.</p>
+  <p>Recommendation: position as <strong>Pro tier with a 14-day free trial</strong>, <em>not</em> a cheap student app. The depth justifies it; cheap pricing trains users to undervalue.</p>
+</div>
+
+<h2>What's strong (ship-worthy today)</h2>
+<ul>
+  <li><strong>Smart Drill Library</strong> — 16ths, triplets, jazz ii-V-I, stride bass, walking bass, chord exercises, Hanon, Czerny, scales in 3rds/6ths/chromatic/contrary. This catalog is competitive with EarMaster ($60+) and broader than Hanon Online (subscription).</li>
+  <li><strong>MIDI grading pipeline</strong> — capture + score + replay-your-take + accuracy gate + weak-spot drill + per-note keyboard feedback. This is the kind of feature that justifies "pro" pricing on its own.</li>
+  <li><strong>Procedural generation with seed reproducibility</strong> — teachers can give a student a seed and get the exact same drill. Genuine differentiator.</li>
+  <li><strong>Daily Drill + streak + analytics + lesson summary export</strong> — the engagement loop is real, not gamification theater.</li>
+  <li><strong>Teacher edition concept</strong> — addressable to a paying segment (piano teachers) who currently cobble together 3–4 apps to do what you're proposing.</li>
+  <li><strong>Practice Drills visual polish</strong> — hero dock, chips, post-play summary, contextual styling — reads as a paid product, not a free one.</li>
+  <li><strong>QA pipeline</strong> — orchestrator drives the shipped <code>.exe</code> end-to-end. Genuinely rare for a small app.</li>
+</ul>
+
+<h2>Real gaps that would hurt at launch</h2>
+
+<div class="gap"><strong>Cross-module polish unevenness.</strong> Practice Drills got 30+ refinement rounds this month. Sight Reading, Ear Training, Note Chase — unclear if they got the same love. Customers will compare modules side-by-side and notice. <code>UI 20</code> (cross-module style unification) is the obvious follow-on but it's multi-day work.</div>
+
+<div class="gap"><strong>Customer can't tell what's beta.</strong> Sight Singing is gated behind a flag because it's not ready — correct, but if a paying user discovers a half-working feature with no "beta" label, refund. Audit every entry point.</div>
+
+<div class="gap"><strong>MIDI-keyboard dependency is poorly explained.</strong> Most of the pro features (grading, accuracy, weak-spot, replay-your-take) silently degrade or hide when there's no MIDI device. A first-run check that explicitly says <em>"For best results, plug in a MIDI keyboard — these features will activate: ..."</em> would prevent confusion.</div>
+
+<div class="gap"><strong>Onboarding for a brand-new user.</strong> No clear tutorial for "you've opened Clefira, what now?" — Yousician's first 30 seconds explain piano-app behavior with zero text; Clefira drops you into a home menu with 8 modes. A 4-screen first-run flow would massively reduce bounce.</div>
+
+<div class="gap"><strong>Audio quality.</strong> A2–C6 piano samples are fine for ear training; for a paid music app, students expect concert-piano warmth. Either license a high-quality sample set ($100–500) or document the choice as a deliberate "drill" sound.</div>
+
+<div class="gap"><strong>No telemetry.</strong> If you ship paid and someone has a bug, you'll never see it. Even basic crash logging + "what feature is used most" would tell you where to invest the next 6 months of dev. The QA pipeline catches regressions; telemetry catches user reality.</div>
+
+<div class="gap"><strong>Saved files location is opaque.</strong> Already had a "where did my PDF save?" question from internal testing. For paying customers that's a –1 star review. Add "Open exports folder" button. (One-day task.)</div>
+
+<div class="gap"><strong>Teacher dashboard UX.</strong> The teacher-assignment data model exists; the UI for <em>creating</em> assignments doesn't. A teacher buying Pro expects to assign drills to students within 60 seconds of opening the app. Right now they'd have to edit JSON.</div>
+
+<div class="gap"><strong>No social proof.</strong> Zero reviews, zero install base. New paid app from unknown developer = high friction. Mitigation: free tier or generous trial to get people through the door.</div>
+
+<h3>Hard blockers (cannot ship paid without these)</h3>
+
+<div class="blocker"><strong>No payment integration shipped.</strong> Google Play Billing plugin is installed per memory but the actual upgrade flow isn't wired. Needs purchase UI, restore-purchases flow, license validation, refund handling.</div>
+
+<div class="blocker"><strong>License + EULA still placeholder.</strong> Per memory: hard blocker for paid distribution.</div>
+
+<div class="blocker"><strong>No code signing certificate.</strong> Hard blocker — Windows SmartScreen will warn on every install, which kills conversion. Cost: ~$200–400/year.</div>
+
+<div class="blocker"><strong>Cloud sync not validated cross-device.</strong> Backups exist but multi-device sync hasn't been tested end-to-end. Multi-device is table-stakes for paid.</div>
+
+<h2>What to ship now vs wait on</h2>
+
+<table>
+  <thead>
+    <tr><th>Timing</th><th>What</th><th>Pricing</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Ship as paid <em>now</em></strong></td>
+      <td>Practice Drills module standalone, as a separate paid SKU. It's the most polished, most differentiated piece. Position as "Smart Practice for Pianists."</td>
+      <td>$9.99 one-time<br>or $4.99/month</td>
+    </tr>
+    <tr>
+      <td><strong>Ship in 4–6 weeks</strong></td>
+      <td>Full app, after the gap list above is closed.</td>
+      <td>$9.99–14.99/month</td>
+    </tr>
+    <tr>
+      <td><strong>Don't ship until</strong></td>
+      <td>Cloud sync validated across two devices · ≥ 1 outside teacher has piloted for 2 weeks and didn't refund · Crash rate from telemetry &lt; 1% sessions.</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Competitive positioning honestly</h2>
+
+<table>
+  <thead>
+    <tr><th>Competitor</th><th>Price</th><th>Clefira vs them</th><th>Recommended pricing</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Yousician</td>
+      <td>$20/mo</td>
+      <td>More feature-rich for serious students; less polished onboarding.</td>
+      <td>30–40% under Yousician → <strong>$11.99–13.99/mo</strong></td>
+    </tr>
+    <tr>
+      <td>EarMaster</td>
+      <td>$60+ perpetual</td>
+      <td>Similar depth; much better procedural drill generation; weaker pro-tier reputation.</td>
+      <td><strong>$9.99/mo</strong> or <strong>$59 perpetual</strong></td>
+    </tr>
+    <tr>
+      <td>Tomplay</td>
+      <td>$13/mo</td>
+      <td>Different product (Tomplay = sheet music library). Not direct competition.</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>musictheory.net / Teoria</td>
+      <td>Free</td>
+      <td>Clefira's superpower vs these is <em>integration</em> — they're siloed; Clefira is end-to-end. Paid customers will pay for "one app instead of five tabs."</td>
+      <td>Clefira > free as integrated workflow.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>What to build next — priority by ROI</h2>
+
+<p>In order of value-per-day-of-work:</p>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>Task</th><th>Effort</th><th>Why first</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>First-run onboarding flow (4 screens)</td><td>~3 days</td><td>Biggest single conversion lever.</td></tr>
+    <tr><td>2</td><td>Telemetry + crash logging</td><td>~2 days</td><td>You can't improve what you can't measure.</td></tr>
+    <tr><td>3</td><td>"Beta" badges + feature audit</td><td>~1 day</td><td>Prevents reputation damage from half-finished modules.</td></tr>
+    <tr><td>4</td><td>Free trial gate with feature limits + clear upgrade path</td><td>~2 days</td><td>Lowers acquisition friction; enables paid conversion.</td></tr>
+    <tr><td>5</td><td>Teacher assignment creation UI in dashboard</td><td>~4 days</td><td>Unlocks the teacher market segment.</td></tr>
+    <tr><td>6</td><td>Cross-module UI unification pass</td><td>~3 days</td><td>Removes the "this module looks neglected" effect.</td></tr>
+    <tr><td>7</td><td>High-quality piano sample swap (budget permitting)</td><td>1 day + license cost</td><td>Audio quality is felt immediately by anyone with headphones.</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Total: ~15 working days of focused work.</strong> With that done, ship at $9.99–14.99/month and expect it to hold up to scrutiny.</p>
+
+<div class="punchline">
+  <p><strong>The honest punchline</strong></p>
+  <p>The product is good enough to charge for. The <em>business</em> around it isn't quite ready. Don't conflate "the code works" with "ready to ship paid" — they're different problems. The code is the easy part; payment, support, marketing, refunds, reviews are where most small apps die.</p>
+  <p>If you want to validate demand before doing all the business plumbing, the lowest-friction move is: <strong>post Practice Drills as a free standalone, get 100 users, see what they ask for</strong>. That'll tell you in 2 weeks what 2 months of internal speculation can't.</p>
+</div>
+
+<footer>
+  Companion docs: <code>docs/release_smoke_test.md</code> · <code>docs/release_process.md</code> · <code>docs/ai_orchestrated_qa_pipeline.html</code><br>
+  Pre-launch deferred items index in user-memory: <code>pre_launch_deferred.md</code>.
+</footer>
+
+</main>
+</body>
+</html>

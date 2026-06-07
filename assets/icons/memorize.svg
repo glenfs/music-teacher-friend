@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Clefira "Memorise" — watching eye with a teal iris. Original artwork. -->
+  <circle cx="32" cy="32" r="29" fill="#0E2237" stroke="#F0C24B" stroke-width="2.5"/>
+  <path d="M13 32 Q32 16 51 32 Q32 48 13 32 Z" fill="#FFF6E0" stroke="#F0C24B" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="8.5" fill="#2FB7A8" stroke="#0E2237" stroke-width="2"/>
+  <circle cx="32" cy="32" r="3.6" fill="#0E2237"/>
+  <circle cx="29.3" cy="29.3" r="1.7" fill="#FFFFFF" opacity="0.85"/>
+</svg>

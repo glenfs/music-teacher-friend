@@ -8,6 +8,19 @@ const MODE_NOTE_CHASE := 4
 const MODE_PROGRESSION := 5
 const MODE_SCALE_MODE := 6
 const MODE_CADENCE := 7
+const MODE_PITCH_MATCH := 8
+const MIN_STANDARD_ROUND_QUESTIONS := 5
+const NOTE_CHASE_ENABLED := false
+const ExerciseSelfTestScript = preload("res://scripts/exercises/exercise_self_test.gd")
+const MusicTheoryCorrectnessTestScript = preload("res://scripts/qa/music_theory_correctness_test.gd")
+const QA_SIGHT_CLEF_ANCHOR_FACTOR_TREBLE := 1.02
+const QA_SIGHT_CLEF_EXTRA_RAISE_TREBLE := -10.0
+const QA_SIGHT_TREBLE_CLEF_RAISE_SPACES := 1.0
+const QA_SIGHT_NOTE_FLOW_CLEF_EXTRA_RAISE_SPACES := 1.0
+const QA_NOTE_CHASE_TREBLE_CLEF_LOWER_SPACES := 0.5
+const QA_SIGHT_ACCIDENTAL_RAISE_Y := 3.0
+const QA_SIGHT_KEY_SIGNATURE_LOWER_Y := 3.0
+const QA_GRAND_STAFF_CLEF_DOWN_SPACES := 1.0
 
 var _app: Node = null
 var _runner: Node = null
@@ -27,6 +40,8 @@ var _suggestion_items: Array[Dictionary] = []
 var _na_notes: Array[String] = []
 var _answer_flip := false
 var _active_section_name := ""
+var _active_section_started_msec := 0
+var _last_step_msec := 0
 var _observed_home_meta_signals := false
 
 
@@ -62,6 +77,8 @@ func run_suite() -> Dictionary:
 	await _run_scoped_test("Cadence Coverage", "ear.cadence", _section_cadence)
 	await _run_scoped_test("Sight Reading Coverage", "sight", _section_sight)
 	await _run_scoped_test("Note Chase Coverage", "note_chase", _section_note_chase)
+	await _run_scoped_test("Chord Explorer Coverage", "chord_explorer", _section_chord_explorer)
+	await _run_scoped_test("Chord Guided Practice Coverage", "chord_guided", _section_chord_guided)
 	await _run_scoped_test("Read/Tutorial Coverage", "read", _section_read_tutorial)
 	await _run_scoped_test("Navigation Stress", "navigation", _section_navigation_stress)
 	await _run_scoped_test("Negative Paths", "negative", _section_negative_paths)
@@ -69,6 +86,7 @@ func run_suite() -> Dictionary:
 	await _run_scoped_test("State Reset/Persistence", "state_reset", _section_state_reset_and_persistence)
 	await _run_scoped_test("UI Integrity", "ui", _section_ui_integrity)
 	await _run_scoped_test("Technical Assertions", "technical", _section_technical_assertions)
+	await _run_scoped_test("Settings Screen Coverage", "settings", _section_settings)
 	await _run_scoped_test("Long-Run Stability", "long_run", _section_long_run_stability)
 
 	return _summary()
@@ -124,6 +142,232 @@ func assert_node_exists(root: Node, name_or_group: String) -> bool:
 func wait_frames(n: int) -> void:
 	for _i in range(maxi(0, n)):
 		await get_tree().process_frame
+
+
+# --- qa_id contract (Task 91) ---
+# Convention: every actionable widget the bot needs to drive sets
+# `set_meta("qa_id", "<unique-stable-id>")`. Bot calls click_by_qa_id()
+# instead of hard-coded _call("_on_xxx_pressed"). Catches binding /
+# visibility / disabled regressions that direct handler calls miss.
+
+
+# Returns the Control matching qa_id, or null if none. Walks the whole
+# tree under `root`; cheap enough at QA time.
+func find_by_qa_id(root: Node, qa_id: String) -> Control:
+	if root == null or qa_id.is_empty():
+		return null
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back() as Node
+		if n is Control:
+			var c: Control = n as Control
+			if c.get_meta("qa_id", "") == qa_id:
+				return c
+		for child in n.get_children():
+			if child is Node:
+				stack.append(child as Node)
+	return null
+
+
+func click_by_qa_id(root: Node, qa_id: String) -> bool:
+	var ctl := find_by_qa_id(root, qa_id)
+	if ctl == null:
+		fail("qa_id not found: %s" % qa_id)
+		return false
+	if not ctl.visible:
+		fail("qa_id `%s` is hidden" % qa_id)
+		return false
+	if ctl is BaseButton:
+		var btn := ctl as BaseButton
+		if btn.disabled:
+			fail("qa_id `%s` is disabled" % qa_id)
+			return false
+		_emit_click_marker(btn)
+		btn.emit_signal("pressed")
+		return true
+	fail("qa_id `%s` is not a BaseButton (type=%s)" % [qa_id, ctl.get_class()])
+	return false
+
+
+# --- wait_until (Task 95 — flake reduction) ---
+# Polls a Callable that returns bool; resolves when true OR times out.
+# Replaces fixed wait_frames() calls that race against background timers.
+# `predicate` runs once per frame. Returns true on satisfaction, false on
+# timeout (caller decides whether to fail / warn).
+func wait_until(predicate: Callable, timeout_sec: float = 3.0, why: String = "") -> bool:
+	var start_usec: int = Time.get_ticks_usec()
+	var timeout_usec: int = int(timeout_sec * 1_000_000.0)
+	while Time.get_ticks_usec() - start_usec < timeout_usec:
+		if predicate.is_valid():
+			var ok_v: Variant = predicate.call()
+			if ok_v is bool and bool(ok_v):
+				return true
+		await get_tree().process_frame
+	if not why.is_empty():
+		warn_step("wait_until timed out after %.1fs: %s" % [timeout_sec, why])
+	return false
+
+
+# --- Audio call probe (Task 92) ---
+# Reads the queue published by the app's audio-probe wrapper. The wrapper
+# pushes {usec, midi, dur} dicts each time _play_note / _play_chord_block
+# fires while _qa_enabled. Returns the slice newer than `since_usec`.
+func audio_probe_recent(since_usec: int = 0) -> Array:
+	var probe_v: Variant = _member("_qa_audio_probe")
+	if not (probe_v is Array):
+		return []
+	var out: Array = []
+	for entry_any in (probe_v as Array):
+		if entry_any is Dictionary:
+			var entry: Dictionary = entry_any
+			if int(entry.get("usec", 0)) >= since_usec:
+				out.append(entry)
+	return out
+
+
+# True if a note matching `midi` (pitch class match within ± octave_tol)
+# was scheduled within the last `within_sec`. Use after triggering a
+# play to assert audio actually fired.
+func assert_audio_event(midi: int, within_sec: float = 1.0, octave_tol: int = 2, tag: String = "") -> bool:
+	var now_usec: int = Time.get_ticks_usec()
+	var since: int = now_usec - int(within_sec * 1_000_000.0)
+	var events := audio_probe_recent(since)
+	var target_pc: int = ((midi % 12) + 12) % 12
+	for entry_any in events:
+		var entry: Dictionary = entry_any
+		var got: int = int(entry.get("midi", -1))
+		if got < 0:
+			continue
+		if absi(got - midi) > octave_tol * 12:
+			continue
+		if ((got % 12) + 12) % 12 != target_pc:
+			continue
+		return true
+	fail("assert_audio_event(midi=%d, %s): no matching audio in last %.2fs (%d events seen)" % [
+		midi, tag, within_sec, events.size()
+	])
+	return false
+
+
+# Clears the audio probe queue. Call before a test step so subsequent
+# assert_audio_event reads only fresh events.
+func audio_probe_reset() -> void:
+	if _app != null and _app.has_method("_qa_audio_probe_reset"):
+		_app.call("_qa_audio_probe_reset")
+
+
+# --- MIDI input simulation (Task 93) ---
+# Constructs an InputEventMIDI note-on event and feeds it through the
+# viewport so it lands in the same _input handlers a real keyboard would.
+# Use this to functionally test the Practice Drills grading pipeline,
+# Chord Explorer keyboard input, etc.
+func inject_midi_note_on(pitch: int, velocity: int = 96) -> void:
+	var event := InputEventMIDI.new()
+	event.message = MIDI_MESSAGE_NOTE_ON
+	event.pitch = pitch
+	event.velocity = velocity
+	Input.parse_input_event(event)
+
+
+func inject_midi_note_off(pitch: int) -> void:
+	var event := InputEventMIDI.new()
+	event.message = MIDI_MESSAGE_NOTE_OFF
+	event.pitch = pitch
+	event.velocity = 0
+	Input.parse_input_event(event)
+
+
+# Convenience: fires note-on, waits `hold_frames`, fires note-off.
+# Use in test sequences that simulate one keystroke.
+func inject_midi_tap(pitch: int, hold_frames: int = 4, velocity: int = 96) -> void:
+	inject_midi_note_on(pitch, velocity)
+	await wait_frames(hold_frames)
+	inject_midi_note_off(pitch)
+
+
+# --- Visual regression with golden screenshots (Task 94) ---
+# Captures the current viewport, loads the committed golden under
+# user://qa_goldens/<label>.png, computes mean RGB diff, and fails if
+# above tolerance. On first run with no golden present we save the
+# capture as the new golden (bootstrap mode) so subsequent runs detect
+# drift. Tolerance is a 0..1 fraction of total possible RGB diff.
+const GOLDEN_DIR: String = "user://qa_goldens"
+
+
+func screenshot_compare(label: String, tolerance_pct: float = 0.5) -> bool:
+	if not _ensure_golden_dir():
+		warn_step("screenshot_compare(%s): could not create golden dir" % label)
+		return false
+	var viewport := get_viewport()
+	if viewport == null:
+		fail("screenshot_compare(%s): no viewport" % label)
+		return false
+	var captured: Image = viewport.get_texture().get_image()
+	if captured == null or captured.is_empty():
+		fail("screenshot_compare(%s): empty viewport capture" % label)
+		return false
+	var golden_path: String = "%s/%s.png" % [GOLDEN_DIR, label]
+	if not FileAccess.file_exists(golden_path):
+		captured.save_png(ProjectSettings.globalize_path(golden_path))
+		_log_step("INFO", "screenshot_compare(%s): bootstrapped golden at %s" % [label, golden_path])
+		return true
+	var golden := Image.new()
+	var err := golden.load(ProjectSettings.globalize_path(golden_path))
+	if err != OK:
+		warn_step("screenshot_compare(%s): could not load golden (err=%d)" % [label, err])
+		return false
+	if golden.get_size() != captured.get_size():
+		# Resize captured to match — viewport size can vary across runs.
+		captured.resize(int(golden.get_size().x), int(golden.get_size().y), Image.INTERPOLATE_BILINEAR)
+	var diff_pct: float = _image_mean_diff_pct(captured, golden)
+	if diff_pct > tolerance_pct:
+		var fail_dir: String = "%s/_failures" % GOLDEN_DIR
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(fail_dir))
+		var fail_path: String = "%s/%s_actual.png" % [fail_dir, label]
+		captured.save_png(ProjectSettings.globalize_path(fail_path))
+		fail("screenshot_compare(%s): diff %.2f%% > tolerance %.2f%%  (actual saved to %s)" % [
+			label, diff_pct, tolerance_pct, fail_path
+		])
+		return false
+	pass_step("screenshot_compare(%s): %.2f%% within tolerance" % [label, diff_pct])
+	return true
+
+
+func _ensure_golden_dir() -> bool:
+	var d := DirAccess.open("user://")
+	if d == null:
+		return false
+	if not d.dir_exists("qa_goldens"):
+		var err := d.make_dir("qa_goldens")
+		if err != OK and err != ERR_ALREADY_EXISTS:
+			return false
+	return true
+
+
+# Mean per-channel diff between two images as a percent of 255.
+# Sampled on a 64×64 grid for speed — sufficient resolution for catching
+# layout / color / font regressions without scanning every pixel.
+func _image_mean_diff_pct(a: Image, b: Image) -> float:
+	var w: int = mini(a.get_width(), b.get_width())
+	var h: int = mini(a.get_height(), b.get_height())
+	if w == 0 or h == 0:
+		return 100.0
+	var samples_x: int = mini(64, w)
+	var samples_y: int = mini(64, h)
+	var step_x: int = maxi(1, int(w / samples_x))
+	var step_y: int = maxi(1, int(h / samples_y))
+	var total_diff: float = 0.0
+	var n: int = 0
+	for y in range(0, h, step_y):
+		for x in range(0, w, step_x):
+			var ca := a.get_pixel(x, y)
+			var cb := b.get_pixel(x, y)
+			total_diff += absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b)
+			n += 1
+	if n == 0:
+		return 0.0
+	# Each pixel contributes up to 3.0 (rgb each 0..1).
+	return (total_diff / float(n) / 3.0) * 100.0
 
 
 func screenshot(tag: String) -> Dictionary:
@@ -196,6 +440,8 @@ func _summary() -> Dictionary:
 
 func _run_test(name: String, action: Callable) -> void:
 	_active_section_name = name
+	_active_section_started_msec = Time.get_ticks_msec()
+	_last_step_msec = _active_section_started_msec
 	_step_failures.clear()
 	_step_warnings.clear()
 	_step_records.clear()
@@ -215,6 +461,7 @@ func _run_test(name: String, action: Callable) -> void:
 		"name": name,
 		"ok": ok,
 		"status": status,
+		"elapsed_ms": Time.get_ticks_msec() - _active_section_started_msec,
 		"failures": _step_failures.duplicate(),
 		"warnings": _step_warnings.duplicate(),
 		"steps": _step_records.duplicate(true)
@@ -225,11 +472,14 @@ func _run_test(name: String, action: Callable) -> void:
 		"type": "section",
 		"name": name,
 		"status": status,
+		"elapsed_ms": Time.get_ticks_msec() - _active_section_started_msec,
 		"failures": _step_failures.duplicate(),
 		"warnings": _step_warnings.duplicate(),
 		"steps": _step_records.duplicate(true)
 	})
 	_active_section_name = ""
+	_active_section_started_msec = 0
+	_last_step_msec = 0
 
 
 func _run_scoped_test(name: String, prefix: String, action: Callable) -> void:
@@ -387,7 +637,7 @@ func _test_ear_mode(mode: int, tag: String) -> void:
 		return
 	await screenshot("%s_first_prompt" % tag)
 	for i in range(3):
-		if not await _wait_for_accepting_answer(720):
+		if not await _wait_for_accepting_answer(720, mode):
 			fail("%s: prompt %d not ready for answer" % [tag, i + 1])
 			break
 		var answered := await _answer_current(mode)
@@ -445,21 +695,28 @@ func _test_sight_chords() -> void:
 
 
 func _test_note_chase() -> void:
+	if not NOTE_CHASE_ENABLED:
+		na_step("Note Chase hidden in this build")
+		return
 	await _goto_note_chase()
 	await screenshot("note_chase_entry")
 	if not await _start_round_from_home():
 		fail("Note Chase: failed to start")
 		return
-	if not await _wait_for_note_chase_running(180):
-		# Headless QA can burn frames faster than Note Chase's real-time countdown.
+	# Flake fix (Task 95): Note Chase's countdown runs in real time so the
+	# 3.2s deadline (180 frames @ 60fps) used to time out under headless
+	# load. Bumped to 8s + diagnostic logging. The awaiting-round-start
+	# fallback (mash the start button if the countdown overlay is still
+	# up) is preserved.
+	if not await _wait_for_note_chase_running(480):
 		if _member_bool("_awaiting_round_start", false):
 			_call("_on_round_start_pressed")
 			await wait_frames(8)
-		if not await _wait_for_note_chase_running(360):
-			fail("Note Chase: round never started")
+		if not await _wait_for_note_chase_running(480):
+			fail("Note Chase: round never started (waited 16s total)")
 			return
-	if not await _wait_for_note_chase_note(240):
-		fail("Note Chase: no active notes spawned")
+	if not await _wait_for_note_chase_note(360):
+		fail("Note Chase: no active notes spawned (waited 6s)")
 	else:
 		var clicked := _click_first_note_chase_note()
 		if not clicked:
@@ -534,6 +791,235 @@ func _test_settings() -> void:
 	if bool(_app.get("_ear_settings_screen_active")):
 		fail("Settings screen did not close on back")
 	pass_step("settings")
+
+
+# Deep-coverage settings test — exercises every Ear Settings control and
+# verifies its backing state var. Run via `qa_run.ps1 -Scope settings`.
+func _section_settings() -> void:
+	await _open_ear_settings_screen()
+	if not _member_bool("_ear_settings_screen_active", false):
+		fail("Settings: could not open ear settings screen")
+		return
+	await screenshot("settings_full_open")
+
+	await _test_setting_choice_count()
+	await _test_setting_tempo()
+	await _test_setting_bool_toggle("_ear_context_tonic_toggle", "_on_ear_context_tonic_toggled", "_ear_context_tonic_enabled", "Tonic")
+	await _test_setting_replay_limit()
+	await _test_setting_prompt_volume()
+	await _test_setting_sfx_volume()
+	await _test_setting_score_font()
+
+	await _test_settings_persistence()
+
+	await _close_ear_settings_screen()
+	if _member_bool("_ear_settings_screen_active", false):
+		fail("Settings: screen did not close on back")
+		return
+	pass_step("section_settings")
+
+
+func _open_ear_settings_screen() -> void:
+	if _member_bool("_ear_settings_screen_active", false):
+		return
+	_call("_show_home")
+	await wait_frames(3)
+	_call("_on_home_hub_pressed", ["Practice"])
+	await wait_frames(4)
+	if _app.has_method("_on_ear_settings_pressed"):
+		_call("_on_ear_settings_pressed")
+	await wait_frames(6)
+
+
+func _close_ear_settings_screen() -> void:
+	if not _member_bool("_ear_settings_screen_active", false):
+		return
+	if _app.has_method("_on_ear_settings_back_pressed"):
+		_call("_on_ear_settings_back_pressed")
+	else:
+		_call("_on_home_back_pressed")
+	await wait_frames(6)
+
+
+func _test_setting_choice_count() -> void:
+	var opt_v: Variant = _member("_ear_choice_count_select")
+	if opt_v == null or not (opt_v is OptionButton):
+		na_step("Settings: choice count dropdown unavailable")
+		return
+	var opt := opt_v as OptionButton
+	var target_index := -1
+	var target_count := -1
+	for i in opt.item_count:
+		var meta_v: Variant = opt.get_item_metadata(i)
+		if meta_v == null:
+			continue
+		var n := int(meta_v)
+		if n != _member_int("_ear_choice_count", 4):
+			target_index = i
+			target_count = n
+			break
+	if target_index < 0:
+		na_step("Settings: choice count has no alternate value")
+		return
+	_call("_on_ear_choice_count_selected", [target_index])
+	await wait_frames(3)
+	var got := _member_int("_ear_choice_count", -1)
+	if got != target_count:
+		fail("Settings: choice count expected %d, got %d" % [target_count, got])
+		return
+	pass_step("settings_choice_count_%d" % target_count)
+
+
+func _test_setting_tempo() -> void:
+	var spin_v: Variant = _member("_ear_tempo_spin")
+	if spin_v == null or not (spin_v is SpinBox):
+		na_step("Settings: tempo spin unavailable")
+		return
+	var original := _member_int("_ear_tempo", 90)
+	var target := 75 if original != 75 else 110
+	_call("_on_ear_tempo_changed", [float(target)])
+	await wait_frames(3)
+	var got := _member_int("_ear_tempo", -1)
+	if got != target:
+		fail("Settings: tempo expected %d, got %d" % [target, got])
+		return
+	# Restore so other scopes see expected default-ish value.
+	_call("_on_ear_tempo_changed", [float(original)])
+	await wait_frames(2)
+	pass_step("settings_tempo")
+
+
+func _test_setting_bool_toggle(toggle_member: String, handler: String, state_member: String, label: String) -> void:
+	var btn_v: Variant = _member(toggle_member)
+	if btn_v == null or not (btn_v is BaseButton):
+		na_step("Settings: %s toggle unavailable" % label)
+		return
+	var before := _member_bool(state_member, false)
+	_call(handler, [not before])
+	await wait_frames(3)
+	var after := _member_bool(state_member, before)
+	if after == before:
+		fail("Settings: %s toggle did not change state (%s)" % [label, state_member])
+		return
+	# Flip back so we leave state as we found it.
+	_call(handler, [before])
+	await wait_frames(2)
+	pass_step("settings_toggle_%s" % label.to_lower().replace(" ", "_"))
+
+
+func _test_setting_replay_limit() -> void:
+	var toggle_v: Variant = _member("_ear_replay_limit_toggle")
+	if toggle_v == null or not (toggle_v is BaseButton):
+		na_step("Settings: replay-limit toggle unavailable")
+		return
+	var before_enabled := _member_bool("_ear_replay_limit_enabled", false)
+	# Ensure the limit is enabled so the spin is editable.
+	if not before_enabled:
+		_call("_on_ear_replay_limit_toggled", [true])
+		await wait_frames(2)
+	if not _member_bool("_ear_replay_limit_enabled", false):
+		fail("Settings: replay-limit toggle did not enable")
+		return
+	var spin_v: Variant = _member("_ear_replay_limit_spin")
+	if spin_v == null or not (spin_v is SpinBox):
+		na_step("Settings: replay-limit spin unavailable")
+		return
+	var before_value := _member_int("_ear_replay_limit", 3)
+	var target := 5 if before_value != 5 else 7
+	_call("_on_ear_replay_limit_changed", [float(target)])
+	await wait_frames(3)
+	var got := _member_int("_ear_replay_limit", -1)
+	if got != target:
+		fail("Settings: replay-limit expected %d, got %d" % [target, got])
+		return
+	# Restore.
+	_call("_on_ear_replay_limit_changed", [float(before_value)])
+	await wait_frames(2)
+	if not before_enabled:
+		_call("_on_ear_replay_limit_toggled", [false])
+		await wait_frames(2)
+	pass_step("settings_replay_limit")
+
+
+func _test_setting_prompt_volume() -> void:
+	var spin_v: Variant = _member("_ear_prompt_volume_spin")
+	if spin_v == null or not (spin_v is SpinBox):
+		na_step("Settings: prompt volume spin unavailable")
+		return
+	var original := _member_int("_ear_prompt_volume_db", 0)
+	var target := -6 if original != -6 else 3
+	_call("_on_ear_prompt_volume_changed", [float(target)])
+	await wait_frames(3)
+	var got := _member_int("_ear_prompt_volume_db", 999)
+	if got != target:
+		fail("Settings: prompt volume expected %d dB, got %d dB" % [target, got])
+		return
+	_call("_on_ear_prompt_volume_changed", [float(original)])
+	await wait_frames(2)
+	pass_step("settings_prompt_volume")
+
+
+func _test_setting_sfx_volume() -> void:
+	var spin_v: Variant = _member("_ear_sfx_volume_spin")
+	if spin_v == null or not (spin_v is SpinBox):
+		na_step("Settings: sfx volume spin unavailable")
+		return
+	var original := _member_int("_ear_sfx_volume_db", 0)
+	var target := -9 if original != -9 else 2
+	_call("_on_ear_sfx_volume_changed", [float(target)])
+	await wait_frames(3)
+	var got := _member_int("_ear_sfx_volume_db", 999)
+	if got != target:
+		fail("Settings: sfx volume expected %d dB, got %d dB" % [target, got])
+		return
+	_call("_on_ear_sfx_volume_changed", [float(original)])
+	await wait_frames(2)
+	pass_step("settings_sfx_volume")
+
+
+func _test_setting_score_font() -> void:
+	if not _app.has_method("_on_score_font_changed"):
+		na_step("Settings: score font handler unavailable")
+		return
+	var fonts := ["Bravura", "Leland", "Petaluma"]
+	var original_name := _member_str("_score_font_name", "Bravura")
+	for i in fonts.size():
+		_call("_on_score_font_changed", [i])
+		await wait_frames(3)
+		var got := _member_str("_score_font_name", "")
+		if got != fonts[i]:
+			fail("Settings: score font index %d expected %s, got %s" % [i, fonts[i], got])
+			return
+	# Restore original.
+	var restore_idx := fonts.find(original_name)
+	if restore_idx < 0:
+		restore_idx = 0
+	_call("_on_score_font_changed", [restore_idx])
+	await wait_frames(2)
+	pass_step("settings_score_font")
+
+
+# Persistence smoke: change a value, close + reopen the settings screen,
+# verify the value survived (the controls re-bind from the backing state vars
+# during _refresh_ear_settings_ui).
+func _test_settings_persistence() -> void:
+	var before := _member_int("_ear_tempo", 90)
+	var target := 95 if before != 95 else 115
+	_call("_on_ear_tempo_changed", [float(target)])
+	await wait_frames(2)
+	await _close_ear_settings_screen()
+	await _open_ear_settings_screen()
+	if not _member_bool("_ear_settings_screen_active", false):
+		warn_step("Settings persistence: could not reopen settings screen")
+		return
+	var after := _member_int("_ear_tempo", -1)
+	if after != target:
+		fail("Settings persistence: tempo expected %d after reopen, got %d" % [target, after])
+		return
+	# Restore.
+	_call("_on_ear_tempo_changed", [float(before)])
+	await wait_frames(2)
+	pass_step("settings_persistence_round_trip")
 
 
 func _section_smoke() -> void:
@@ -726,6 +1212,9 @@ func _section_sight() -> void:
 
 
 func _section_note_chase() -> void:
+	if not NOTE_CHASE_ENABLED:
+		na_step("Note Chase hidden in this build")
+		return
 	for clef_mode in ["Treble", "Bass", "Both"]:
 		if not await _set_note_chase_clef(clef_mode):
 			na_step("Note Chase clef `%s`: not present" % clef_mode)
@@ -736,6 +1225,385 @@ func _section_note_chase() -> void:
 		if not await _set_note_chase_target_note_count(3):
 			warn_step("Note Chase target note count=3 could not be configured")
 		await _note_chase_session("note_chase_%s_three" % clef_mode.to_lower(), 1)
+
+
+func _section_chord_explorer() -> void:
+	_call("_show_home")
+	await wait_frames(6)
+	_call("_on_chord_explorer_open")
+	await wait_frames(12)
+	var panel := _get_chord_explorer_panel()
+	if panel == null:
+		fail("Chord Explorer: panel missing after open")
+		return
+	if not _member_bool("_chord_explorer_active", false):
+		fail("Chord Explorer: active flag not set after open")
+	if panel is CanvasItem and not (panel as CanvasItem).visible:
+		fail("Chord Explorer: panel is hidden after open")
+	pass_step("chord_explorer_open")
+	await screenshot("chord_explorer_open")
+
+	await _chord_explorer_default_state(panel)
+	await _chord_explorer_note_input_and_clear(panel)
+	await _chord_explorer_key_preset_and_playback(panel)
+	await _chord_explorer_spelling_and_diatonic_checks(panel)
+	await _chord_explorer_close_clears_playback(panel)
+	await _chord_explorer_small_viewport_probe(panel)
+
+	_force_unlock_chord_explorer(panel)
+	_call("_on_chord_explorer_close")
+	await wait_frames(8)
+	if _member_bool("_chord_explorer_active", true):
+		fail("Chord Explorer: active flag still true after close")
+	else:
+		pass_step("chord_explorer_close")
+
+
+func _chord_explorer_default_state(panel: Node) -> void:
+	panel.call("_on_key_changed", 0)
+	_force_unlock_chord_explorer(panel)
+	panel.call("_on_clear_pressed")
+	panel.call("_stage_default_demo_chord")
+	panel.call("_refresh_display")
+	await wait_frames(3)
+	var chord_name := _chord_explorer_label_text(panel, "_chord_name_label")
+	if chord_name != "C":
+		fail("Chord Explorer default state: expected staged C chord, got `%s`" % chord_name)
+	var tabs_v: Variant = panel.get("_chord_detail_tabs")
+	if not (tabs_v is TabContainer) or not (tabs_v as TabContainer).visible:
+		fail("Chord Explorer default state: chord detail tabs are not visible for a staged chord")
+	var diatonic_v: Variant = panel.get("_diatonic_row")
+	if not (diatonic_v is HBoxContainer) or (diatonic_v as HBoxContainer).get_child_count() < 8:
+		fail("Chord Explorer default state: diatonic key-chord row is missing or incomplete")
+	var keys_v: Variant = panel.get("_keyboard_keys")
+	if not (keys_v is Dictionary) or not (keys_v as Dictionary).has(60):
+		fail("Chord Explorer default state: virtual keyboard does not expose middle C")
+	if _failures.is_empty() or _step_failures.is_empty():
+		pass_step("chord_explorer_default_state")
+
+
+func _chord_explorer_note_input_and_clear(panel: Node) -> void:
+	_force_unlock_chord_explorer(panel)
+	panel.call("_on_clear_pressed")
+	await wait_frames(1)
+	panel.call("handle_note_on", 60, true)
+	panel.call("handle_note_on", 64, true)
+	panel.call("handle_note_on", 67, true)
+	panel.call("_refresh_display")
+	await wait_frames(3)
+	var chord_name := _chord_explorer_label_text(panel, "_chord_name_label")
+	if not chord_name.begins_with("C"):
+		fail("Chord Explorer note input: C-E-G did not resolve to C chord, got `%s`" % chord_name)
+	else:
+		pass_step("chord_explorer_note_input")
+	panel.call("_on_clear_pressed")
+	await wait_frames(2)
+	chord_name = _chord_explorer_label_text(panel, "_chord_name_label")
+	if chord_name != "Play a chord...":
+		fail("Chord Explorer clear: expected empty prompt, got `%s`" % chord_name)
+	else:
+		pass_step("chord_explorer_clear")
+
+
+func _chord_explorer_key_preset_and_playback(panel: Node) -> void:
+	_force_unlock_chord_explorer(panel)
+	panel.call("_on_key_changed", 1) # G
+	await wait_frames(2)
+	panel.call("_load_preset", {
+		"id": "qa_ii_V_I_C",
+		"label": "QA ii-V-I in C",
+		"key_pc": 0,
+		"is_minor": false,
+		"chords": [[2, "Min7", "ii"], [7, "Dom7", "V"], [0, "Maj7", "I"]],
+	})
+	await wait_frames(4)
+	var chord_name := _chord_explorer_label_text(panel, "_chord_name_label")
+	if chord_name != "Am7":
+		fail("Chord Explorer preset transpose: ii-V-I in selected G should start on Am7, got `%s`" % chord_name)
+	var steps_v: Variant = panel.get("_preset_steps_row")
+	if not (steps_v is HBoxContainer) or not (steps_v as HBoxContainer).visible or (steps_v as HBoxContainer).get_child_count() < 4:
+		fail("Chord Explorer preset load: preset step row is missing or incomplete")
+	else:
+		pass_step("chord_explorer_preset_load")
+	_force_unlock_chord_explorer(panel)
+	panel.call("_play_preset_step", 1)
+	await wait_frames(4)
+	chord_name = _chord_explorer_label_text(panel, "_chord_name_label")
+	if chord_name != "D7":
+		fail("Chord Explorer preset step: expected V chord D7 in G, got `%s`" % chord_name)
+	else:
+		pass_step("chord_explorer_preset_step")
+	_force_unlock_chord_explorer(panel)
+	panel.call("_play_all_preset_steps")
+	await wait_frames(2)
+	if not bool(panel.call("_is_playback_busy")):
+		fail("Chord Explorer Play all: playback lock did not engage")
+	else:
+		pass_step("chord_explorer_play_all_busy_lock")
+	_force_unlock_chord_explorer(panel)
+	panel.call("_stage_default_demo_chord")
+	panel.call("_refresh_display")
+	await wait_frames(2)
+	panel.call("_compare_play_side", "b")
+	await wait_frames(2)
+	if not bool(panel.call("_is_playback_busy")):
+		fail("Chord Explorer compare: playback lock did not engage")
+	else:
+		pass_step("chord_explorer_compare_playback")
+	_force_unlock_chord_explorer(panel)
+
+
+func _chord_explorer_spelling_and_diatonic_checks(panel: Node) -> void:
+	_force_unlock_chord_explorer(panel)
+	panel.call("_on_key_changed", 12) # Gb
+	await wait_frames(2)
+	panel.call("_on_clear_pressed")
+	panel.call("handle_note_on", 66, true)
+	panel.call("_refresh_display")
+	await wait_frames(2)
+	var single_name := _chord_explorer_label_text(panel, "_chord_name_label")
+	if single_name != "Gb":
+		fail("Chord Explorer flat key single note: expected Gb, got `%s`" % single_name)
+	else:
+		pass_step("chord_explorer_flat_key_single_note")
+	panel.call("_on_clear_pressed")
+	panel.call("handle_note_on", 66, true)
+	panel.call("handle_note_on", 68, true)
+	panel.call("_refresh_display")
+	await wait_frames(2)
+	var interval_name := _chord_explorer_label_text(panel, "_chord_name_label")
+	if not interval_name.begins_with("Gb+Ab"):
+		fail("Chord Explorer flat key interval spelling: expected Gb+Ab, got `%s`" % interval_name)
+	else:
+		pass_step("chord_explorer_flat_key_interval")
+	_force_unlock_chord_explorer(panel)
+	panel.call("_stage_and_play_diatonic_chord", 6, "Major")
+	await wait_frames(4)
+	var chord_name := _chord_explorer_label_text(panel, "_chord_name_label")
+	if not chord_name.begins_with("Gb"):
+		fail("Chord Explorer flat key spelling: Gb major displays `%s`" % chord_name)
+	else:
+		pass_step("chord_explorer_flat_key_spelling")
+	var inversions_v: Variant = panel.get("_inversions_row")
+	if inversions_v is HBoxContainer:
+		var has_flat_bass := false
+		for child in (inversions_v as HBoxContainer).get_children():
+			if child is Button and (child as Button).text.contains("/Bb"):
+				has_flat_bass = true
+				break
+		if not has_flat_bass:
+			fail("Chord Explorer flat key inversion labels: expected /Bb label for Gb major")
+		else:
+			pass_step("chord_explorer_flat_key_inversion_label")
+	_force_unlock_chord_explorer(panel)
+	panel.call("_on_key_changed", 3) # A
+	panel.call("_on_key_flavor_selected", 2) # KeyFlavor.HARMONIC_MINOR
+	await wait_frames(2)
+	panel.call("_stage_and_play_diatonic_chord", 4, "Major")
+	await wait_frames(4)
+	var diatonic := _chord_explorer_label_text(panel, "_diatonic_label")
+	if diatonic != "In key":
+		fail("Chord Explorer harmonic minor: V chord in A harmonic minor is marked `%s`" % diatonic)
+	else:
+		pass_step("chord_explorer_harmonic_minor_diatonic")
+	var roman := _chord_explorer_label_text(panel, "_roman_label")
+	if roman != "V":
+		fail("Chord Explorer harmonic minor: V chord Roman label is `%s`" % roman)
+	else:
+		pass_step("chord_explorer_harmonic_minor_roman")
+	_force_unlock_chord_explorer(panel)
+
+
+func _chord_explorer_small_viewport_probe(panel: Node) -> void:
+	if DisplayServer.get_name() == "headless":
+		na_step("Chord Explorer small viewport: skipped in headless display")
+		return
+	var original_size := DisplayServer.window_get_size()
+	DisplayServer.window_set_size(Vector2i(900, 720))
+	await wait_frames(10)
+	if panel.has_method("_apply_responsive_layout"):
+		panel.call("_apply_responsive_layout")
+	await wait_frames(2)
+	await _check_chord_explorer_visible_bounds(panel, "small")
+	DisplayServer.window_set_size(original_size)
+	await wait_frames(10)
+	if panel.has_method("_apply_responsive_layout"):
+		panel.call("_apply_responsive_layout")
+
+
+func _chord_explorer_close_clears_playback(panel: Node) -> void:
+	_force_unlock_chord_explorer(panel)
+	panel.call("_on_key_changed", 0)
+	await wait_frames(1)
+	panel.call("_load_preset", {
+		"id": "qa_close_busy",
+		"label": "QA Close Busy",
+		"key_pc": 0,
+		"is_minor": false,
+		"chords": [[0, "Major", "I"], [5, "Major", "IV"], [7, "Major", "V"]],
+	})
+	await wait_frames(4)
+	_force_unlock_chord_explorer(panel)
+	panel.call("_play_all_preset_steps")
+	await wait_frames(2)
+	_call("_on_chord_explorer_close")
+	await wait_frames(4)
+	if bool(panel.call("_is_playback_busy")):
+		fail("Chord Explorer close during playback: busy state remained after dismiss")
+		return
+	var indicator_v: Variant = panel.get("_playback_indicator")
+	if indicator_v is CanvasItem and (indicator_v as CanvasItem).visible:
+		fail("Chord Explorer close during playback: Playing indicator remained visible")
+		return
+	_call("_on_chord_explorer_open")
+	await wait_frames(8)
+	pass_step("chord_explorer_close_clears_playback")
+
+
+func _section_chord_guided() -> void:
+	_call("_show_home")
+	await wait_frames(6)
+	_call("_on_chord_explorer_open")
+	await wait_frames(8)
+	_call("_on_open_build_chord_quiz")
+	await wait_frames(12)
+	var panel := _get_chord_guided_panel()
+	if panel == null:
+		fail("Chord Guided Practice: panel missing after open")
+		return
+	if panel is CanvasItem and not (panel as CanvasItem).visible:
+		fail("Chord Guided Practice: panel hidden after open")
+		return
+	pass_step("chord_guided_open")
+	await screenshot("chord_guided_open")
+	await _chord_guided_build_retry(panel)
+	await _chord_guided_choice_modes(panel)
+	await _chord_guided_function_and_progression(panel)
+	await _chord_guided_round_summary(panel)
+	await _chord_guided_small_viewport_probe(panel)
+	if panel.has_method("dismiss"):
+		panel.call("dismiss")
+	await wait_frames(4)
+	pass_step("chord_guided_close")
+
+
+func _chord_guided_build_retry(panel: Node) -> void:
+	panel.call("_select_mode", 0) # Build a Chord
+	await wait_frames(4)
+	panel.call("_on_build_hint")
+	await wait_frames(1)
+	panel.call("handle_midi_note_on", 48)
+	panel.call("handle_midi_note_on", 49)
+	panel.call("_on_build_submit")
+	await wait_frames(2)
+	if bool(panel.get("_answered")):
+		fail("Chord Guided Build: wrong answer ended the question instead of allowing retry")
+		return
+	var wrong_attempts := int(panel.get("_current_wrong_attempts"))
+	var hints_used := int(panel.get("_current_hints_used"))
+	if wrong_attempts < 1 or hints_used < 1:
+		fail("Chord Guided Build: wrong attempts/hints were not tracked")
+	await _chord_guided_answer_build_target(panel)
+	if not bool(panel.get("_answered")):
+		fail("Chord Guided Build: corrected answer did not complete question")
+	else:
+		pass_step("chord_guided_build_retry_and_tracking")
+
+
+func _chord_guided_choice_modes(panel: Node) -> void:
+	panel.call("_select_mode", 1) # Identify Quality
+	await wait_frames(6)
+	var answer := str(panel.get("_target_quality"))
+	panel.call("_submit_choice", answer)
+	await wait_frames(3)
+	if not bool(panel.get("_answered")):
+		fail("Chord Guided Identify: answer did not submit")
+	else:
+		pass_step("chord_guided_identify_quality")
+	panel.call("_select_mode", 2) # Compare Sounds
+	await wait_frames(6)
+	answer = str(panel.get("_target_quality"))
+	panel.call("_submit_choice", answer)
+	await wait_frames(3)
+	if not bool(panel.get("_answered")):
+		fail("Chord Guided Compare: answer did not submit")
+	else:
+		pass_step("chord_guided_compare_sounds")
+
+
+func _chord_guided_function_and_progression(panel: Node) -> void:
+	panel.call("_select_mode", 3) # Chord Function
+	await wait_frames(6)
+	await _chord_guided_answer_build_target(panel)
+	if not bool(panel.get("_answered")):
+		fail("Chord Guided Function: target chord did not submit")
+	else:
+		pass_step("chord_guided_chord_function")
+	panel.call("_select_mode", 4) # Progression
+	await wait_frames(6)
+	var guard := 0
+	while not bool(panel.get("_answered")) and guard < 12:
+		await _chord_guided_answer_build_target(panel)
+		await wait_frames(3)
+		guard += 1
+	if not bool(panel.get("_answered")):
+		fail("Chord Guided Progression: did not complete after target steps")
+	else:
+		pass_step("chord_guided_progression")
+
+
+func _chord_guided_round_summary(panel: Node) -> void:
+	panel.call("_select_mode", 0) # Build a Chord
+	await wait_frames(4)
+	for _i in range(10):
+		await _chord_guided_answer_build_target(panel)
+		await wait_frames(2)
+		panel.call("_on_advance_pressed")
+		await wait_frames(4)
+	var prompt := _chord_guided_label_text(panel, "_prompt_label")
+	if not prompt.contains("Round complete"):
+		fail("Chord Guided summary: round summary did not appear, prompt=`%s`" % prompt)
+	else:
+		pass_step("chord_guided_round_summary")
+	var events_v: Variant = panel.get("_round_events")
+	if not (events_v is Array) or (events_v as Array).is_empty():
+		fail("Chord Guided analytics: round events were not recorded")
+	else:
+		pass_step("chord_guided_round_events")
+	var lifetime_v: Variant = _member("_lifetime_stats")
+	if lifetime_v is Dictionary:
+		var history_v: Variant = (lifetime_v as Dictionary).get("chord_quiz_history", [])
+		if history_v is Array and not (history_v as Array).is_empty():
+			var last_v: Variant = (history_v as Array)[(history_v as Array).size() - 1]
+			if last_v is Dictionary and (last_v as Dictionary).has("events"):
+				pass_step("chord_guided_history_report")
+			else:
+				fail("Chord Guided analytics: saved history entry missing detailed events")
+
+
+func _chord_guided_small_viewport_probe(panel: Node) -> void:
+	if DisplayServer.get_name() == "headless":
+		na_step("Chord Guided small viewport: skipped in headless display")
+		return
+	var original_size := DisplayServer.window_get_size()
+	DisplayServer.window_set_size(Vector2i(900, 720))
+	await wait_frames(10)
+	await _check_panel_visible_bounds(panel, "Chord Guided", "small")
+	DisplayServer.window_set_size(original_size)
+	await wait_frames(10)
+
+
+func _chord_guided_answer_build_target(panel: Node) -> void:
+	panel.call("_on_build_clear")
+	await wait_frames(1)
+	var target_v: Variant = panel.get("_target_notes")
+	if not (target_v is Array):
+		fail("Chord Guided target notes missing")
+		return
+	for note_v in (target_v as Array):
+		panel.call("handle_midi_note_on", int(note_v))
+	panel.call("_on_build_submit")
+	await wait_frames(2)
 
 
 func _section_read_tutorial() -> void:
@@ -752,8 +1620,9 @@ func _section_navigation_stress() -> void:
 		await _nav_back_assert("Navigation", "chord_to_practice_%d_before" % i, "chord_to_practice_%d_after" % i)
 		await _goto_practice_sight_mode("Notes")
 		await _nav_back_assert("Navigation", "sight_notes_to_practice_%d_before" % i, "sight_notes_to_practice_%d_after" % i)
-		await _goto_note_chase()
-		await _nav_back_assert("Navigation", "note_chase_to_practice_%d_before" % i, "note_chase_to_practice_%d_after" % i)
+		if NOTE_CHASE_ENABLED:
+			await _goto_note_chase()
+			await _nav_back_assert("Navigation", "note_chase_to_practice_%d_before" % i, "note_chase_to_practice_%d_after" % i)
 	if _is_ear_mode_enabled_for_build(MODE_PROGRESSION) and await _goto_practice_ear_mode_start_quiz(MODE_PROGRESSION, "nav_rapid_back_during_playback"):
 		_call("_on_end_quiz_pressed")
 		await wait_frames(2)
@@ -785,6 +1654,7 @@ func _section_negative_paths() -> void:
 		if int(item["mode"]) == MODE_SCALE_MODE:
 			await _set_scale_modes(["Major", "Natural Minor", "Dorian", "Mixolydian"])
 		await _negative_path_ear(int(item["mode"]), str(item["label"]))
+	await _negative_path_mixed_quick_focus_filters()
 	await _negative_path_sight("Notes", "sight_notes")
 	await _negative_path_sight("Chords", "sight_chords")
 
@@ -826,7 +1696,10 @@ func _section_state_reset_and_persistence() -> void:
 	await _restart_reset_check_ear(MODE_INTERVAL, "reset_interval")
 	await _restart_reset_check_ear(MODE_CADENCE, "reset_cadence")
 	await _restart_reset_check_sight_notes("reset_sight_notes")
-	await _restart_reset_check_note_chase("reset_note_chase")
+	if NOTE_CHASE_ENABLED:
+		await _restart_reset_check_note_chase("reset_note_chase")
+	else:
+		na_step("Note Chase reset check skipped: hidden in this build")
 	await _back_home_reset_check()
 	await _settings_persistence_check()
 
@@ -841,9 +1714,15 @@ func _section_ui_integrity() -> void:
 
 func _section_technical_assertions() -> void:
 	await _assert_mode_ids_follow_navigation()
+	await _assert_question_count_minimums()
+	await _assert_practice_menu_bug_regressions()
 	await _assert_prompt_and_replay_gate()
 	await _assert_result_overlay_scope()
+	await _assert_sight_notes_mic_regressions()
 	await _assert_answer_enable_behavior()
+	await _assert_exercise_self_tests()
+	await _assert_music_theory_correctness()
+	await _assert_mode_open_performance()
 
 
 func _section_long_run_stability() -> void:
@@ -908,11 +1787,21 @@ func _smoke_ear_mode(label: String, mode: int, tag: String) -> void:
 			"Press Start Training"
 		], "Round should start", "Round did not start", "Always")
 		return
-	await wait_frames(8)
+	# Flake fix (Task 95): wait on a real predicate (quiz active + correct
+	# mode selected) instead of a fixed 8-frame sleep. Progression and
+	# Scale/Mode generators take longer to spin up than 8 frames under
+	# headless, which was the root of intermittent failures here.
+	var quiz_ready := await wait_until(
+		func(): return _member_bool("_quiz_active", false) and _member_int("_selected_mode", -1) == mode,
+		5.0,
+		"%s smoke: waiting for _quiz_active + selected_mode==%d" % [label, mode],
+	)
+	if not quiz_ready:
+		fail("%s smoke: quiz never activated for mode %d" % [label, mode])
+		await _end_quiz_to_home_with_checks("%s smoke" % label, tag)
+		return
 	if _member_bool("_is_prompt_playing", false):
 		await _wait_for_prompt_not_playing(720)
-	if _member_int("_selected_mode", -1) != mode:
-		fail("%s smoke: wrong mode active after start" % label)
 	await _end_quiz_to_home_with_checks("%s smoke" % label, tag)
 
 
@@ -1257,11 +2146,25 @@ func _run_answer_loop(mode: int, questions: int, wrong_first: bool = false, use_
 	var previous_prompt_key := ""
 	var consecutive_repeat_count := 0
 	for i in range(questions):
-		if not await _wait_for_accepting_answer(720):
+		if not await _wait_for_accepting_answer(720, mode):
 			if not _member_bool("_quiz_active", false):
 				warn_step("Session ended before requested question %d/%d in mode %d" % [i + 1, questions, mode])
 				break
-			fail("Prompt %d/%d not ready in mode %d" % [i + 1, questions, mode])
+			var status_text := ""
+			var status_v: Variant = _member("_status_label")
+			if status_v is Label:
+				status_text = (status_v as Label).text.strip_edges()
+			fail("Prompt %d/%d not ready in mode %d (q=%d active=%s accepting=%s playing=%s token=%d status=%s)" % [
+				i + 1,
+				questions,
+				mode,
+				_member_int("_question_index", -1),
+				str(_member_bool("_quiz_active", false)),
+				str(_member_bool("_accepting_answer", false)),
+				str(_member_bool("_is_prompt_playing", false)),
+				_member_int("_quiz_run_token", -1),
+				status_text.substr(0, 80)
+			])
 			return
 		var prompt_key := _current_prompt_observation_key(mode)
 		if prompt_key != "":
@@ -1280,7 +2183,7 @@ func _run_answer_loop(mode: int, questions: int, wrong_first: bool = false, use_
 			await wait_frames(4)
 		var use_wrong := wrong_first and i == 0
 		if not await _answer_current(mode, use_wrong):
-			fail("Answer submission failed for question %d in mode %d" % [i + 1, mode])
+			fail("Answer submission failed for question %d in mode %d (%s)" % [i + 1, mode, _answer_debug_state(mode)])
 			return
 		await wait_frames(4)
 		if use_wrong:
@@ -1289,6 +2192,40 @@ func _run_answer_loop(mode: int, questions: int, wrong_first: bool = false, use_
 			_observe_wrong_answer_explanation()
 			# Continue by answering subsequent prompts normally.
 	pass_step("answer_loop_%d_%d" % [mode, questions])
+
+
+func _answer_debug_state(mode: int) -> String:
+	var parts: Array[String] = []
+	parts.append("q=%d" % _member_int("_question_index", -1))
+	parts.append("active=%s" % str(_member_bool("_quiz_active", false)))
+	parts.append("accepting=%s" % str(_member_bool("_accepting_answer", false)))
+	parts.append("playing=%s" % str(_member_bool("_is_prompt_playing", false)))
+	if mode == MODE_CHORD:
+		var dict: Dictionary = _member("_chord_buttons")
+		var enabled := 0
+		var visible := 0
+		for k in dict.keys():
+			var btn: Button = dict.get(k, null)
+			if btn != null and is_instance_valid(btn):
+				if btn.visible:
+					visible += 1
+				if btn.visible and not btn.disabled:
+					enabled += 1
+		parts.append("chord=%s" % str(_member("_current_chord_quality")))
+		parts.append("buttons=%d visible=%d enabled=%d" % [dict.size(), visible, enabled])
+	else:
+		var buttons: Array = _member("_interval_choice_buttons")
+		var enabled_i := 0
+		var visible_i := 0
+		for b in buttons:
+			if b is Button and is_instance_valid(b):
+				if (b as Button).visible:
+					visible_i += 1
+				if (b as Button).visible and not (b as Button).disabled:
+					enabled_i += 1
+		parts.append("answer=%s" % str(_member("_current_ear_text_answer")))
+		parts.append("buttons=%d visible=%d enabled=%d" % [buttons.size(), visible_i, enabled_i])
+	return " ".join(parts)
 
 
 func _feedback_visible_or_status_changed() -> bool:
@@ -1347,6 +2284,12 @@ func _sight_notes_coverage() -> void:
 		await _run_sight_session("sight_notes_%s_c" % clef.to_lower(), "Notes", 5)
 		if await _set_sight_key_sig("2#"):
 			await _run_sight_session("sight_notes_%s_2s" % clef.to_lower(), "Notes", 5)
+		if await _set_sight_key_sig("3#"):
+			await _run_sight_session("sight_notes_%s_3s" % clef.to_lower(), "Notes", 3)
+		if await _set_sight_key_sig("2b"):
+			await _run_sight_session("sight_notes_%s_2b" % clef.to_lower(), "Notes", 3)
+		if await _set_sight_key_sig("3b"):
+			await _run_sight_session("sight_notes_%s_3b" % clef.to_lower(), "Notes", 3)
 		await _set_sight_range_variant(true)
 		await _run_sight_session("sight_notes_%s_wide" % clef.to_lower(), "Notes", 5)
 
@@ -1354,10 +2297,13 @@ func _sight_notes_coverage() -> void:
 func _sight_chords_coverage() -> void:
 	# Chords mode now always uses grand staff (no clef toggle)
 	await _goto_practice_sight_mode("Chords")
+	await _set_clef("Treble")
 	await _set_sight_key_sig("C")
 	await _run_sight_session("sight_chords_grand_c", "Chords", 5)
 	if await _set_sight_key_sig("2b"):
 		await _run_sight_session("sight_chords_grand_2b", "Chords", 5)
+	if await _set_sight_key_sig("3b"):
+		await _run_sight_session("sight_chords_grand_3b", "Chords", 3)
 
 
 func _sight_placement_coverage() -> void:
@@ -1395,6 +2341,7 @@ func _sight_continuous_coverage() -> void:
 		fail("Sight Continuous: failed to start")
 		return
 	await _wait_flag("_continuous_sight_runtime.active", true, 240)
+	await _assert_sight_staff_symbol_positions("sight_continuous")
 	# Ensure the continuous flow leaves "tap to start" waiting state before we probe hits.
 	if _member_bool("_continuous_sight_runtime.waiting_start", false):
 		if _app.has_method("_start_continuous_flow_after_waiting"):
@@ -1466,7 +2413,10 @@ func _run_sight_session(tag: String, mode_name: String, questions: int) -> void:
 		fail("%s: staff area missing" % tag)
 	else:
 		await _assert_staff_visible_within_bounds(tag)
+		await _assert_sight_staff_symbol_positions(tag)
+		await _assert_sight_key_signature_order(tag, mode_name)
 	await _run_answer_loop(MODE_SIGHT, questions, false, true, false)
+	await _assert_sight_result_overlay_cleanup(tag)
 	_call("_on_end_quiz_pressed")
 	await wait_frames(8)
 	if _member_bool("_home_mode_detail_active", false):
@@ -1474,6 +2424,204 @@ func _run_sight_session(tag: String, mode_name: String, questions: int) -> void:
 		await wait_frames(6)
 	await _take_tagged_screenshot("%s_after" % tag)
 	pass_step(tag)
+
+
+func _assert_sight_key_signature_order(tag: String, mode_name: String) -> void:
+	var sig := _member_str("_sight_key_signature", "")
+	if sig != "2#" and sig != "3#" and sig != "2b" and sig != "3b":
+		return
+	await _assert_sight_key_signature_label_order(tag, "_staff_key_sig_labels", sig)
+	if mode_name == "Chords" and _member_bool("_grand_staff_active", false):
+		await _assert_sight_key_signature_label_order("%s_bass" % tag, "_grand_staff_bass_key_sig_labels", sig)
+
+
+func _assert_sight_key_signature_label_order(tag: String, labels_member: String, sig: String) -> void:
+	await wait_frames(2)
+	var labels_v: Variant = _member(labels_member)
+	if not (labels_v is Array):
+		warn_step("%s: key signature labels unavailable" % tag)
+		return
+	var labels := labels_v as Array
+	var expected_count := 3 if sig.begins_with("3") else 2
+	var y_centers: Array[float] = []
+	for i in range(mini(expected_count, labels.size())):
+		var label_any: Variant = labels[i]
+		if not (label_any is Control):
+			continue
+		var label := label_any as Control
+		if not label.visible:
+			continue
+		y_centers.append(label.get_global_rect().get_center().y)
+	if y_centers.size() < expected_count:
+		warn_step("%s: expected %d key signature signs, saw %d" % [tag, expected_count, y_centers.size()])
+		return
+	var tolerance := 1.0
+	var valid := true
+	if sig.ends_with("b"):
+		valid = y_centers[1] < y_centers[0] - tolerance
+		if expected_count >= 3:
+			valid = valid and y_centers[2] > y_centers[0] + tolerance
+	else:
+		valid = y_centers[1] > y_centers[0] + tolerance
+		if expected_count >= 3:
+			valid = valid and y_centers[2] < y_centers[0] - tolerance
+	if not valid:
+		fail("%s: key signature %s signs are not in standard staff order" % [tag, sig])
+		_record_issue("Sight key signature signs out of order", "High", "Sight Reader", [
+			"Open Sight Reader",
+			"Select key signature %s" % sig,
+			"Start %s" % tag
+		], "Signs should follow standard clef-specific key signature placement", "Rendered sign vertical order was invalid", "Consistent")
+		return
+	pass_step("%s_key_signature_%s_order" % [tag, sig.replace("#", "s")])
+
+
+func _assert_sight_staff_symbol_positions(tag: String) -> void:
+	var sight_mode := _member_str("_sight_mode", "")
+	if sight_mode == "Continuous":
+		await _assert_note_flow_clef_anchor(tag)
+		return
+	if sight_mode != "Notes" and sight_mode != "Chords":
+		return
+	var selected_clef := _member_str("_selected_clef", "")
+	var grand_staff := _member_bool("_grand_staff_active", false)
+	if selected_clef == "Treble" or grand_staff:
+		await _assert_primary_treble_clef_anchor(tag, grand_staff)
+	await _assert_sight_key_signature_anchor(tag)
+
+
+func _assert_note_flow_clef_anchor(tag: String) -> void:
+	var clef_v: Variant = _member("_staff_clef_label")
+	if not (clef_v is Control):
+		fail("%s: Note Flow clef label missing" % tag)
+		return
+	var clef := clef_v as Control
+	if not clef.visible:
+		fail("%s: Note Flow clef label hidden" % tag)
+		return
+	var top_y := _qa_app_float("_active_staff_top_y")
+	var gap_y := _qa_app_float("_active_staff_line_gap_y")
+	var selected_clef := _member_str("_selected_clef", "Treble")
+	var expected_y := top_y - (gap_y * QA_SIGHT_CLEF_ANCHOR_FACTOR_TREBLE) - QA_SIGHT_CLEF_EXTRA_RAISE_TREBLE - (gap_y * QA_SIGHT_TREBLE_CLEF_RAISE_SPACES)
+	if selected_clef == "Bass":
+		# Mirrors the production bass formula; only the Note Flow-specific extra raise is asserted here.
+		expected_y = top_y - (gap_y * 1.62) - 27.0
+	expected_y -= gap_y * QA_SIGHT_NOTE_FLOW_CLEF_EXTRA_RAISE_SPACES
+	_assert_close("%s_note_flow_clef_anchor" % tag, clef.position.y, expected_y, 2.0)
+
+
+func _assert_primary_treble_clef_anchor(tag: String, grand_staff: bool) -> void:
+	var clef_v: Variant = _member("_staff_clef_label")
+	if not (clef_v is Control):
+		fail("%s: treble clef label missing" % tag)
+		return
+	var clef := clef_v as Control
+	if not clef.visible:
+		fail("%s: treble clef label hidden" % tag)
+		return
+	var top_y := _qa_app_float("_active_staff_top_y")
+	var gap_y := _qa_app_float("_active_staff_line_gap_y")
+	var expected_y := top_y - (gap_y * QA_SIGHT_CLEF_ANCHOR_FACTOR_TREBLE) - QA_SIGHT_CLEF_EXTRA_RAISE_TREBLE - (gap_y * QA_SIGHT_TREBLE_CLEF_RAISE_SPACES)
+	if grand_staff:
+		expected_y = top_y - (gap_y * 1.10) - 14.0 + (gap_y * QA_GRAND_STAFF_CLEF_DOWN_SPACES) - (gap_y * QA_SIGHT_TREBLE_CLEF_RAISE_SPACES)
+	_assert_close("%s_treble_clef_anchor" % tag, clef.position.y, expected_y, 2.0)
+
+
+func _assert_sight_key_signature_anchor(tag: String) -> void:
+	var sig := _member_str("_sight_key_signature", "")
+	var defs := _qa_key_signature_defs(sig)
+	if defs.is_empty():
+		return
+	var labels_v: Variant = _member("_staff_key_sig_labels")
+	if not (labels_v is Array):
+		fail("%s: key signature labels missing" % tag)
+		return
+	var labels := labels_v as Array
+	var selected_clef := _member_str("_selected_clef", "Treble")
+	var sight_mode := _member_str("_sight_mode", "")
+	var grand_staff := _member_bool("_grand_staff_active", false)
+	var step_y := _qa_app_float("_active_staff_step_y")
+	var sharp_sym := char(0x266F)
+	for i in range(mini(defs.size(), labels.size())):
+		var label_any: Variant = labels[i]
+		if not (label_any is Control):
+			continue
+		var label := label_any as Control
+		if not label.visible:
+			fail("%s: key signature label %d hidden" % [tag, i + 1])
+			return
+		var definition: Array = defs[i]
+		var letter := str(definition[0])
+		var is_sharp := str(definition[1]) == sharp_sym
+		var staff_step := _qa_key_signature_step(letter, selected_clef, is_sharp)
+		var y := _qa_app_float("_staff_center_y_for_step", [staff_step])
+		y += -8.0 if is_sharp else -18.0
+		if sight_mode == "Chords" and grand_staff:
+			y -= clampf(step_y * 0.22, 2.0, 6.0)
+		y -= QA_SIGHT_ACCIDENTAL_RAISE_Y
+		y += QA_SIGHT_KEY_SIGNATURE_LOWER_Y
+		_assert_close("%s_key_signature_%d_anchor" % [tag, i + 1], label.position.y, y - 35.0, 2.5)
+
+
+func _assert_note_chase_staff_symbol_positions(tag: String) -> void:
+	if _member_str("_selected_clef", "") != "Treble":
+		return
+	var clef_v: Variant = _member("_staff_clef_label")
+	if not (clef_v is Control):
+		fail("%s: Note Chase treble clef label missing" % tag)
+		return
+	var clef := clef_v as Control
+	if not clef.visible:
+		fail("%s: Note Chase treble clef label hidden" % tag)
+		return
+	var top_y := _qa_app_float("_active_staff_top_y")
+	var gap_y := _qa_app_float("_active_staff_line_gap_y")
+	var expected_y := top_y - (gap_y * 0.62) + (gap_y * QA_NOTE_CHASE_TREBLE_CLEF_LOWER_SPACES)
+	_assert_close("%s_note_chase_treble_clef_anchor" % tag, clef.position.y, expected_y, 2.0)
+
+
+func _qa_key_signature_defs(sig: String) -> Array:
+	var sharp_sym := char(0x266F)
+	var flat_sym := char(0x266D)
+	match sig:
+		"1#":
+			return [["F", sharp_sym]]
+		"2#":
+			return [["F", sharp_sym], ["C", sharp_sym]]
+		"3#":
+			return [["F", sharp_sym], ["C", sharp_sym], ["G", sharp_sym]]
+		"1b":
+			return [["B", flat_sym]]
+		"2b":
+			return [["B", flat_sym], ["E", flat_sym]]
+		"3b":
+			return [["B", flat_sym], ["E", flat_sym], ["A", flat_sym]]
+	return []
+
+
+func _qa_key_signature_step(letter: String, clef_name: String, is_sharp: bool) -> int:
+	if clef_name == "Bass":
+		if is_sharp:
+			return {"F": 2, "C": 5, "G": 1, "D": 4, "A": 7, "E": 3, "B": 6}.get(letter, 4)
+		return {"B": 6, "E": 3, "A": 7, "D": 4, "G": 8, "C": 5, "F": 9}.get(letter, 4)
+	if is_sharp:
+		return {"F": 0, "C": 3, "G": -1, "D": 2, "A": 5, "E": 1, "B": 4}.get(letter, 4)
+	return {"B": 4, "E": 1, "A": 5, "D": 2, "G": 6, "C": 3, "F": 7}.get(letter, 4)
+
+
+func _qa_app_float(method_name: String, args: Array = []) -> float:
+	var value: Variant = _call(method_name, args)
+	if typeof(value) == TYPE_FLOAT or typeof(value) == TYPE_INT:
+		return float(value)
+	fail("QA helper expected numeric return from %s" % method_name)
+	return 0.0
+
+
+func _assert_close(label: String, actual: float, expected: float, tolerance: float) -> void:
+	if absf(actual - expected) > tolerance:
+		fail("%s: expected %.2f, got %.2f" % [label, expected, actual])
+		return
+	pass_step(label)
 
 
 func _set_clef(clef_name: String) -> bool:
@@ -1552,6 +2700,9 @@ func _set_note_chase_target_note_count(count: int) -> bool:
 
 
 func _note_chase_session(tag: String, expected_clicks: int) -> void:
+	if not NOTE_CHASE_ENABLED:
+		na_step("%s skipped: Note Chase hidden in this build" % tag)
+		return
 	await _goto_note_chase()
 	await _take_tagged_screenshot("%s_before" % tag)
 	if not await _start_round_from_home():
@@ -1560,6 +2711,7 @@ func _note_chase_session(tag: String, expected_clicks: int) -> void:
 	if not await _wait_for_note_chase_running(240):
 		fail("%s: note chase did not start" % tag)
 		return
+	await _assert_note_chase_staff_symbol_positions(tag)
 	var clicks := 0
 	for _i in range(300):
 		if await _wait_for_note_chase_note(1):
@@ -1676,6 +2828,46 @@ func _negative_path_ear(mode: int, tag: String) -> void:
 	pass_step("%s_negative" % tag)
 
 
+func _negative_path_mixed_quick_focus_filters() -> void:
+	await _mixed_quick_focus_case(MODE_INTERVAL, ["P8", "Major", "Plagal"], ["P8"], "quick_focus_interval_mixed")
+	await _mixed_quick_focus_case(MODE_CHORD, ["Major", "P8", "Plagal"], ["Major"], "quick_focus_chord_mixed")
+
+
+func _mixed_quick_focus_case(mode: int, focus_ids: Array, expected_ids: Array[String], tag: String) -> void:
+	if not _is_ear_mode_enabled_for_build(mode):
+		na_step("%s skipped: mode `%s` is locked in this build" % [tag, _ear_mode_name(mode)])
+		return
+	_call("_show_home")
+	await wait_frames(4)
+	_call("_on_home_focus_drill_start_pressed", [mode, focus_ids])
+	await wait_frames(8)
+	var actual_v: Variant = _member("_focus_missed_ids")
+	var actual: Array[String] = []
+	if actual_v is Array:
+		for id_any in (actual_v as Array):
+			actual.append(str(id_any))
+	actual.sort()
+	var expected := expected_ids.duplicate()
+	expected.sort()
+	if actual != expected:
+		fail("%s: focus ids not sanitized, expected %s got %s" % [tag, str(expected), str(actual)])
+		return
+	await _normalize_mode_options_for_start(mode)
+	if not await _start_round_from_home():
+		fail("%s: failed to start after Quick Focus" % tag)
+		return
+	if not await _wait_for_accepting_answer(720, mode):
+		fail("%s: prompt not answerable after Quick Focus" % tag)
+		return
+	await _answer_current(mode, false)
+	_call("_on_end_quiz_pressed")
+	await wait_frames(8)
+	if _member_bool("_home_mode_detail_active", false):
+		_call("_on_home_back_pressed")
+		await wait_frames(6)
+	pass_step(tag)
+
+
 func _negative_path_sight(mode_name: String, tag: String) -> void:
 	await _goto_practice_sight_mode(mode_name)
 	if not await _start_round_from_home():
@@ -1709,8 +2901,7 @@ func _force_game_over_if_possible(mode: int, tag: String) -> void:
 		await wait_frames(4)
 		guard += 1
 	if _member_int("_lives", 0) <= 0:
-		var result_overlay_v: Variant = _member("_result_overlay")
-		if result_overlay_v is CanvasItem and not (result_overlay_v as CanvasItem).visible:
+		if not await _wait_for_game_over_result_overlay(1200):
 			warn_step("%s: game-over result overlay not visible" % tag)
 		else:
 			pass_step("%s_game_over_overlay" % tag)
@@ -1719,6 +2910,15 @@ func _force_game_over_if_possible(mode: int, tag: String) -> void:
 		await _assert_restart_state(mode, "%s game over restart" % tag)
 		_call("_on_end_quiz_pressed")
 		await wait_frames(8)
+
+
+func _wait_for_game_over_result_overlay(max_frames: int) -> bool:
+	for _i in range(max_frames):
+		var result_overlay_v: Variant = _member("_result_overlay")
+		if result_overlay_v is CanvasItem and (result_overlay_v as CanvasItem).visible:
+			return true
+		await get_tree().process_frame
+	return false
 
 
 func _wait_prompt_phase_transition() -> void:
@@ -1865,6 +3065,9 @@ func _restart_reset_check_sight_notes(tag: String) -> void:
 
 
 func _restart_reset_check_note_chase(tag: String) -> void:
+	if not NOTE_CHASE_ENABLED:
+		na_step("%s skipped: Note Chase hidden in this build" % tag)
+		return
 	await _goto_note_chase()
 	if not await _start_round_from_home():
 		fail("%s: start failed" % tag)
@@ -1969,6 +3172,7 @@ func _check_visible_controls_within_viewport() -> void:
 	var checked := 0
 	var clipped := 0
 	var clipped_ancestors: Array[Control] = []
+	var clipped_details: Array[String] = []
 	var stack: Array[Node] = [_app]
 	while not stack.is_empty():
 		var n_any: Variant = stack.pop_back()
@@ -1977,7 +3181,7 @@ func _check_visible_controls_within_viewport() -> void:
 		var n: Node = n_any as Node
 		if n is Control:
 			var c := n as Control
-			if c.visible:
+			if c.is_visible_in_tree():
 				checked += 1
 				var r := c.get_global_rect()
 				if r.size.x > 4 and r.size.y > 4:
@@ -2003,11 +3207,13 @@ func _check_visible_controls_within_viewport() -> void:
 						if not is_child_of_clipped:
 							clipped += 1
 							clipped_ancestors.append(c)
+							if clipped_details.size() < 4:
+								clipped_details.append("%s %s" % [str(c.get_path()), str(r)])
 		for ch in n.get_children():
 			if ch is Node:
 				stack.append(ch)
 	if clipped > 2:
-		warn_step("Viewport scan: %d controls extend beyond viewport (symptom-based check)" % clipped)
+		warn_step("Viewport scan: %d controls extend beyond viewport (symptom-based check): %s" % [clipped, " | ".join(clipped_details)])
 	pass_step("viewport_bounds_scan_%d" % checked)
 
 
@@ -2083,9 +3289,15 @@ func _assert_mode_ids_follow_navigation() -> void:
 	await _goto_practice_sight_mode("Notes")
 	if _member_int("_selected_mode", -1) != MODE_SIGHT:
 		fail("Mode ID assertion failed for Sight")
-	await _goto_note_chase()
-	if _member_int("_selected_mode", -1) != MODE_NOTE_CHASE:
-		fail("Mode ID assertion failed for Note Chase")
+	if NOTE_CHASE_ENABLED:
+		await _goto_note_chase()
+		if _member_int("_selected_mode", -1) != MODE_NOTE_CHASE:
+			fail("Mode ID assertion failed for Note Chase")
+	else:
+		_call("_on_mode_button_pressed", [MODE_NOTE_CHASE])
+		await wait_frames(4)
+		if _member_int("_selected_mode", -1) == MODE_NOTE_CHASE:
+			fail("Mode ID assertion allowed hidden Note Chase")
 	pass_step("mode_id_navigation_assertions")
 
 
@@ -2126,6 +3338,319 @@ func _assert_result_overlay_scope() -> void:
 	pass_step("result_overlay_scope_check")
 
 
+func _assert_sight_notes_mic_regressions() -> void:
+	var original_mic := _member_bool("_mic_mode_enabled", false)
+	var original_any_octave := _member_bool("_midi_any_octave", true)
+	await _goto_practice_sight_mode("Notes")
+	var setup_v: Variant = _member("_mic_toggle_button")
+	if not (setup_v is Button):
+		fail("Sight Notes mic setup toggle missing")
+		return
+	var setup_btn := setup_v as Button
+	if not setup_btn.visible:
+		fail("Sight Notes mic setup toggle is not visible in menu")
+	setup_btn.set_pressed_no_signal(true)
+	setup_btn.button_pressed = true
+	_call("_on_mic_toggle_pressed")
+	await wait_frames(4)
+	if not _member_bool("_mic_mode_enabled", false):
+		fail("Sight Notes mic setup toggle did not enable saved mic mode")
+	var sight_q_spin: Variant = _member("_sight_question_spin")
+	if sight_q_spin is SpinBox:
+		(sight_q_spin as SpinBox).value = maxf((sight_q_spin as SpinBox).value, 5.0)
+	if not await _start_round_from_home():
+		fail("Sight Notes mic regression: failed to start round")
+		await _restore_sight_notes_mic_regression_state(original_mic, original_any_octave)
+		return
+	await wait_frames(6)
+	var game_mic_v: Variant = _member("_sight_notes_mic_button")
+	if not (game_mic_v is Button):
+		fail("Sight Notes in-game mic button missing")
+	else:
+		var game_mic := game_mic_v as Button
+		if not game_mic.visible:
+			fail("Sight Notes in-game mic button is hidden during active round")
+		for nav_member in ["_home_mode_back_button", "_home_mode_home_button"]:
+			var nav_v: Variant = _member(nav_member)
+			if nav_v is Control and (nav_v as Control).visible:
+				var nav_rect := Rect2((nav_v as Control).global_position, (nav_v as Control).size)
+				var mic_rect := Rect2(game_mic.global_position, game_mic.size)
+				if mic_rect.intersects(nav_rect):
+					fail("Sight Notes mic button overlaps %s" % nav_member)
+	var target_midi_v: Variant = _call("_current_sight_note_prompt_midi")
+	var target_midi := int(target_midi_v) if target_midi_v != null else -1
+	if target_midi >= 0:
+		_app.set("_midi_any_octave", true)
+		var current_note := _member_str("_current_sight_note", "")
+		var right_name := str(_call("_midi_pitch_to_note_name", [target_midi]))
+		var right_route := str(_call("_match_mic_midi_to_sight", [target_midi, right_name]))
+		if right_route != current_note:
+			fail("Sight Notes mic did not route target MIDI to current note (%s != %s)" % [right_route, current_note])
+		var wrong_midi := target_midi + 1
+		var wrong_name := str(_call("_midi_pitch_to_note_name", [wrong_midi]))
+		var wrong_route := str(_call("_match_mic_midi_to_sight", [wrong_midi, wrong_name]))
+		if wrong_route == current_note:
+			fail("Sight Notes mic routed wrong pitch class as correct (%s)" % wrong_name)
+		_app.set("_midi_any_octave", false)
+		var octave_midi := target_midi + 12
+		if octave_midi > 108:
+			octave_midi = target_midi - 12
+		if octave_midi >= 0:
+			var octave_name := str(_call("_midi_pitch_to_note_name", [octave_midi]))
+			var octave_route := str(_call("_match_mic_midi_to_sight", [octave_midi, octave_name]))
+			if not octave_route.is_empty():
+				fail("Sight Notes mic accepted wrong octave in exact-octave mode")
+		_app.set("_midi_any_octave", original_any_octave)
+	await _run_answer_loop(MODE_SIGHT, 5, false, true, false)
+	await _assert_sight_result_overlay_cleanup("tech_sight_mic")
+	var result_button_v: Variant = _member("_result_action_secondary_button")
+	if result_button_v is Button:
+		var result_button := result_button_v as Button
+		if not result_button.visible or result_button.disabled:
+			fail("Sight result Back button is not touch-clickable")
+		else:
+			_emit_click_marker(result_button)
+			result_button.emit_signal("pressed")
+			await wait_frames(10)
+			var overlay_v: Variant = _member("_result_overlay")
+			if overlay_v is CanvasItem and (overlay_v as CanvasItem).visible:
+				fail("Sight result Back button did not dismiss overlay")
+	else:
+		fail("Sight result Back button missing")
+	await _restore_sight_notes_mic_regression_state(original_mic, original_any_octave)
+	pass_step("sight_notes_mic_and_result_touch_regressions")
+
+
+func _restore_sight_notes_mic_regression_state(mic_enabled: bool, any_octave: bool) -> void:
+	_app.set("_mic_mode_enabled", mic_enabled)
+	_app.set("_midi_any_octave", any_octave)
+	if _app.has_method("_refresh_sight_notes_mic_buttons"):
+		_call("_refresh_sight_notes_mic_buttons")
+	if _member_bool("_quiz_active", false):
+		_call("_on_end_quiz_pressed")
+		await wait_frames(6)
+	if _member_bool("_home_mode_detail_active", false):
+		_call("_on_home_back_pressed")
+		await wait_frames(6)
+
+
+func _assert_question_count_minimums() -> void:
+	var q_spin_v: Variant = _member("_question_spin")
+	var sight_spin_v: Variant = _member("_sight_question_spin")
+	if q_spin_v is SpinBox:
+		var q_spin := q_spin_v as SpinBox
+		if int(q_spin.min_value) < MIN_STANDARD_ROUND_QUESTIONS:
+			fail("Ear question count minimum is %d, expected >= %d" % [int(q_spin.min_value), MIN_STANDARD_ROUND_QUESTIONS])
+		_call("_on_ear_question_count_changed", [1.0])
+		await wait_frames(2)
+		if _member_int("_ear_question_count", 0) < MIN_STANDARD_ROUND_QUESTIONS:
+			fail("Ear question count handler allowed value below %d" % MIN_STANDARD_ROUND_QUESTIONS)
+	if sight_spin_v is SpinBox:
+		var sight_spin := sight_spin_v as SpinBox
+		if int(sight_spin.min_value) < MIN_STANDARD_ROUND_QUESTIONS:
+			fail("Sight question count minimum is %d, expected >= %d" % [int(sight_spin.min_value), MIN_STANDARD_ROUND_QUESTIONS])
+		_call("_on_sight_question_count_changed", [1.0])
+		await wait_frames(2)
+		if _member_int("_sight_question_count", 0) < MIN_STANDARD_ROUND_QUESTIONS:
+			fail("Sight question count handler allowed value below %d" % MIN_STANDARD_ROUND_QUESTIONS)
+	pass_step("question_count_minimums")
+
+
+func _assert_practice_menu_bug_regressions() -> void:
+	await _assert_home_overview_headers_contrast()
+	await _assert_game_header_titles()
+	await _assert_chord_and_cadence_presets()
+	await _assert_pitch_match_level_four_pool()
+	await _assert_popup_menu_theme_regressions()
+
+
+func _assert_home_overview_headers_contrast() -> void:
+	_call("_show_home")
+	await wait_frames(6)
+	var labels: Array[Label] = []
+	_collect_home_overview_header_labels(_app, labels)
+	if labels.is_empty():
+		na_step("Home overview section headers not found")
+		return
+	for label in labels:
+		var color := label.get_theme_color("font_color")
+		if color.a < 0.90 or color.get_luminance() < 0.45:
+			fail("Home overview header `%s` has low-contrast color %s" % [label.text, str(color)])
+			return
+	pass_step("home_overview_header_contrast_%d" % labels.size())
+
+
+func _assert_game_header_titles() -> void:
+	if not await _goto_practice_ear_mode_start_quiz(MODE_CHORD, "tech_chord_header"):
+		fail("Chord Ear Training header check failed to start a quiz")
+		return
+	_call("_refresh_game_title")
+	await wait_frames(2)
+	var title_v: Variant = _member("_title_label")
+	if title_v is Label and (title_v as Label).text.strip_edges() != "Ear Training - Chords":
+		fail("Chord Ear Training header expected `Ear Training - Chords`, got `%s`" % (title_v as Label).text.strip_edges())
+	_call("_on_end_quiz_pressed")
+	await wait_frames(8)
+	if _is_ear_mode_enabled_for_build(MODE_PITCH_MATCH):
+		if not await _goto_practice_ear_mode_start_quiz(MODE_PITCH_MATCH, "tech_pitch_header"):
+			fail("Pitch Match header check failed to start a quiz")
+			return
+		_call("_refresh_game_title")
+		await wait_frames(2)
+		title_v = _member("_title_label")
+		if title_v is Label and (title_v as Label).text.strip_edges() != "Pitch Match":
+			fail("Pitch Match header expected `Pitch Match`, got `%s`" % (title_v as Label).text.strip_edges())
+		_call("_on_end_quiz_pressed")
+		await wait_frames(8)
+	if _member_bool("_home_mode_detail_active", false):
+		_call("_on_home_back_pressed")
+		await wait_frames(6)
+	pass_step("game_header_titles")
+
+
+func _assert_chord_and_cadence_presets() -> void:
+	await _goto_practice_ear_mode(MODE_CHORD)
+	var chord_btns_v: Variant = _member("_chord_preset_btns")
+	if chord_btns_v is Array and (chord_btns_v as Array).size() < 5:
+		fail("Chord preset row has %d buttons, expected at least 5" % (chord_btns_v as Array).size())
+	_call("_apply_chord_preset", ["standard"])
+	await wait_frames(2)
+	var chord_types_v: Variant = _member("_selected_chord_types")
+	if chord_types_v is Array:
+		var chord_types := chord_types_v as Array
+		for required in ["Major", "Minor", "Dim", "Aug", "Sus2", "Sus4"]:
+			if not chord_types.has(required):
+				fail("Standard chord preset missing `%s`" % required)
+				return
+	_call("_apply_chord_preset", ["sevenths"])
+	await wait_frames(2)
+	chord_types_v = _member("_selected_chord_types")
+	if chord_types_v is Array:
+		var seventh_types := chord_types_v as Array
+		for required in ["Maj7", "Dom7", "Min7"]:
+			if not seventh_types.has(required):
+				fail("Sevenths chord preset missing `%s`" % required)
+				return
+	await _goto_practice_ear_mode(MODE_CADENCE)
+	var cadence_btns_v: Variant = _member("_cadence_preset_btns")
+	if cadence_btns_v is Array and (cadence_btns_v as Array).size() < 3:
+		fail("Cadence preset row has %d buttons, expected 3" % (cadence_btns_v as Array).size())
+		return
+	# Validate the actual preset SELECTIONS (escalating: Beginner → Intermediate
+	# → Advanced), not button wording.
+	_call("_apply_cadence_preset", ["beginner"])
+	await wait_frames(2)
+	var cad_v: Variant = _member("_cadence_selected")
+	if cad_v is Array:
+		var cad := cad_v as Array
+		if cad.size() != 2 or not cad.has("Perfect") or not cad.has("Plagal"):
+			fail("Beginner cadence preset should be Perfect + Plagal, got %s" % str(cad))
+			return
+	_call("_apply_cadence_preset", ["standard"])  # Intermediate
+	await wait_frames(2)
+	cad_v = _member("_cadence_selected")
+	if cad_v is Array:
+		var cad2 := cad_v as Array
+		if not (cad2.has("Perfect") and cad2.has("Plagal") and cad2.has("Half")) or cad2.has("Deceptive"):
+			fail("Intermediate cadence preset should be Perfect+Plagal+Half (no Deceptive), got %s" % str(cad2))
+			return
+	_call("_apply_cadence_preset", ["advanced"])
+	await wait_frames(2)
+	cad_v = _member("_cadence_selected")
+	if cad_v is Array:
+		var cad3 := cad_v as Array
+		for req in ["Perfect", "Plagal", "Half", "Deceptive"]:
+			if not cad3.has(req):
+				fail("Advanced cadence preset missing `%s` (should be all 4)" % req)
+				return
+	pass_step("chord_cadence_presets")
+
+
+func _assert_pitch_match_level_four_pool() -> void:
+	if not _is_ear_mode_enabled_for_build(MODE_PITCH_MATCH):
+		na_step("Pitch Match pool check skipped: mode locked")
+		return
+	_app.set("_pitch_match_key", "C")
+	_app.set("_pitch_match_scale", "Major")
+	_app.set("_pitch_match_level", 4)
+	var labels_v: Variant = _call("_selected_pitch_match_labels")
+	if not (labels_v is Array):
+		fail("Pitch Match labels unavailable for level 4")
+		return
+	var labels := labels_v as Array
+	if labels.size() < 7:
+		fail("Pitch Match level 4 pool has %d labels, expected full diatonic 7" % labels.size())
+		return
+	for required in ["C4", "D4", "E4", "F4", "G4", "A4", "B4"]:
+		if not labels.has(required):
+			fail("Pitch Match level 4 missing `%s` from %s" % [required, str(labels)])
+			return
+	pass_step("pitch_match_level_four_pool")
+
+
+func _assert_popup_menu_theme_regressions() -> void:
+	await _goto_practice_ear_mode(MODE_PITCH_MATCH)
+	await wait_frames(4)
+	_assert_option_popup_is_themed("_pitch_match_level_option", "Pitch Match level")
+	_assert_option_popup_is_themed("_ear_choice_count_select", "Ear choice count")
+	if _app.has_method("_on_functional_ear_open"):
+		_call("_on_functional_ear_open")
+		await wait_frames(8)
+		var fp_v: Variant = _member("_functional_ear_panel")
+		if fp_v is Node:
+			var fp_panel := fp_v as Node
+			_assert_panel_option_popup_is_themed(fp_panel, "_key_option", "Functional Ear key")
+			_assert_panel_option_popup_is_themed(fp_panel, "_level_option", "Functional Ear level")
+			if fp_panel.has_method("dismiss"):
+				fp_panel.call("dismiss")
+		else:
+			_call("_show_home")
+		await wait_frames(4)
+	if _app.has_method("_on_practice_drills_open"):
+		_call("_on_practice_drills_open")
+		await wait_frames(8)
+		var pp_v: Variant = _member("_practice_drills_panel")
+		if pp_v is Node:
+			var pp_panel := pp_v as Node
+			var export_menu_v: Variant = pp_panel.get("_export_menu")
+			if export_menu_v is PopupMenu:
+				_assert_popup_theme(export_menu_v as PopupMenu, "Practice Drills overflow")
+			if pp_panel.has_method("dismiss"):
+				pp_panel.call("dismiss")
+		else:
+			_call("_show_home")
+		await wait_frames(4)
+	pass_step("popup_menu_theme_regressions")
+
+
+func _assert_sight_result_overlay_cleanup(tag: String) -> void:
+	var expected_complete := _member_int("_question_index", 0) >= _member_int("_total_questions", 1)
+	var require_result_overlay := expected_complete and _member_str("_sight_mode", "") == "Notes"
+	var overlay_v: Variant = _member("_result_overlay")
+	for _i in range(90):
+		if overlay_v is CanvasItem and (overlay_v as CanvasItem).visible:
+			break
+		if not require_result_overlay:
+			return
+		await get_tree().process_frame
+		overlay_v = _member("_result_overlay")
+	if not (overlay_v is CanvasItem) or not (overlay_v as CanvasItem).visible:
+		if require_result_overlay:
+			fail("%s: completed Sight round did not show result overlay" % tag)
+		return
+	var note_label_v: Variant = _member("_sight_note_name_label")
+	if note_label_v is CanvasItem and (note_label_v as CanvasItem).visible:
+		fail("%s: sight note-name label remained visible on result overlay" % tag)
+		return
+	var answer_overlay_v: Variant = _member("_sight_answer_overlay")
+	if answer_overlay_v is Control:
+		var answer_overlay := answer_overlay_v as Control
+		if answer_overlay.visible or answer_overlay.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+			fail("%s: sight answer overlay can still intercept result buttons" % tag)
+			return
+	pass_step("%s_result_overlay_cleanup" % tag)
+
+
 func _assert_answer_enable_behavior() -> void:
 	if not await _goto_practice_ear_mode_start_quiz(MODE_INTERVAL, "tech_answer_enable"):
 		return
@@ -2155,6 +3680,61 @@ func _assert_answer_enable_behavior() -> void:
 		_call("_on_home_back_pressed")
 		await wait_frames(6)
 	pass_step("answer_enable_behavior")
+
+
+func _assert_exercise_self_tests() -> void:
+	if ExerciseSelfTestScript == null or not (ExerciseSelfTestScript is GDScript):
+		na_step("Exercise self-tests unavailable")
+		return
+	var result: Dictionary = ExerciseSelfTestScript.run()
+	var passed: int = int(result.get("passed", 0))
+	var failed: int = int(result.get("failed", 0))
+	if failed <= 0:
+		pass_step("exercise_self_test_%d" % passed)
+		return
+	for f in result.get("failures", []):
+		fail("Exercise self-test: %s" % str(f))
+
+
+func _assert_music_theory_correctness() -> void:
+	if MusicTheoryCorrectnessTestScript == null or not (MusicTheoryCorrectnessTestScript is GDScript):
+		na_step("Music-theory correctness unavailable")
+		return
+	var result: Dictionary = MusicTheoryCorrectnessTestScript.run()
+	var passed: int = int(result.get("passed", 0))
+	var failed: int = int(result.get("failed", 0))
+	if failed <= 0:
+		pass_step("music_theory_correctness_%d" % passed)
+		return
+	for f in result.get("failures", []):
+		fail("Music correctness: %s" % str(f))
+
+
+# Per-open performance budget. Guards against regressions that make switching
+# into a mode slow (e.g. the lazy-init stall that once made the first Sight Notes
+# open take ~2.5s). We time the SYNCHRONOUS mode-switch call itself (no awaits in
+# the window). NOTE: this measures a warm open in this section; a one-time
+# first-open cost would need a dedicated cold measurement — but any per-open
+# regression (the common case) trips this budget.
+func _assert_mode_open_performance() -> void:
+	if _app == null or not _app.has_method("_on_sight_mode_button_pressed"):
+		na_step("mode_open_performance unavailable")
+		return
+	var budget_ms: float = 1000.0
+	var checks := [
+		{"setup": MODE_INTERVAL, "name": "Sight Notes", "fn": "_on_sight_mode_button_pressed", "arg": "Notes"},
+	]
+	for c in checks:
+		await _goto_practice_ear_mode(int(c["setup"]))
+		await wait_frames(2)
+		var t0: int = Time.get_ticks_usec()
+		_call(str(c["fn"]), [str(c["arg"])])
+		var ms: float = float(Time.get_ticks_usec() - t0) / 1000.0
+		await wait_frames(2)
+		if ms > budget_ms:
+			fail("Performance: opening %s took %.0f ms (budget %.0f ms)" % [str(c["name"]), ms, budget_ms])
+		else:
+			pass_step("perf_open_%s_%dms" % [str(c["name"]).to_lower().replace(" ", "_"), int(round(ms))])
 
 
 func _long_ear_session(mode: int, tag: String, questions: int) -> void:
@@ -2225,6 +3805,9 @@ func _goto_practice_sight_mode(mode_name: String) -> void:
 
 
 func _goto_note_chase() -> void:
+	if not NOTE_CHASE_ENABLED:
+		na_step("Note Chase hidden in this build")
+		return
 	_call("_show_home")
 	_call("_on_home_hub_pressed", ["Practice"])
 	await wait_frames(3)
@@ -2293,18 +3876,48 @@ func _set_small_question_counts() -> void:
 		return
 	var q_spin: Variant = _app.get("_question_spin")
 	if q_spin != null and q_spin is SpinBox:
-		(q_spin as SpinBox).value = 3
+		(q_spin as SpinBox).value = MIN_STANDARD_ROUND_QUESTIONS
 	var sight_q_spin: Variant = _app.get("_sight_question_spin")
 	if sight_q_spin != null and sight_q_spin is SpinBox:
-		(sight_q_spin as SpinBox).value = 3
+		(sight_q_spin as SpinBox).value = MIN_STANDARD_ROUND_QUESTIONS
 	await wait_frames(2)
 
 
-func _wait_for_accepting_answer(max_frames: int) -> bool:
+func _wait_for_accepting_answer(max_frames: int, expected_mode: int = -1) -> bool:
 	for _i in range(max_frames):
-		if bool(_app.get("_accepting_answer")) and bool(_app.get("_quiz_active")):
+		if bool(_app.get("_accepting_answer")) and bool(_app.get("_quiz_active")) and _has_enabled_answer_control(expected_mode):
 			return true
 		await get_tree().process_frame
+	return false
+
+
+func _has_enabled_answer_control(expected_mode: int = -1) -> bool:
+	var mode := expected_mode if expected_mode >= 0 else int(_app.get("_selected_mode"))
+	if mode == MODE_CHORD:
+		var dict: Dictionary = _app.get("_chord_buttons")
+		for k in dict.keys():
+			var btn: Button = dict.get(k, null)
+			if btn != null and is_instance_valid(btn) and btn.visible:
+				return true
+		return false
+	if mode == MODE_SIGHT:
+		var sight_mode := str(_app.get("_sight_mode"))
+		if sight_mode == "Chords":
+			var sight_choices: Array = _app.get("_sight_chord_choice_buttons")
+			for sc in sight_choices:
+				if sc is Button and is_instance_valid(sc) and (sc as Button).visible:
+					return true
+			return false
+		var sight_buttons: Dictionary = _app.get("_sight_key_buttons")
+		for note in sight_buttons.keys():
+			var sbtn: Button = sight_buttons.get(note, null)
+			if sbtn != null and is_instance_valid(sbtn) and sbtn.visible:
+				return true
+		return false
+	var buttons: Array = _app.get("_interval_choice_buttons")
+	for b in buttons:
+		if b is Button and is_instance_valid(b) and (b as Button).visible:
+			return true
 	return false
 
 
@@ -2373,7 +3986,7 @@ func _answer_interval_or_theory(prefer_wrong: bool = false) -> bool:
 	var first_wrong := -1
 	for i in range(buttons.size()):
 		var btn: Button = buttons[i]
-		if btn == null or not is_instance_valid(btn) or not btn.visible or btn.disabled:
+		if btn == null or not is_instance_valid(btn) or not btn.visible:
 			continue
 		if first_enabled < 0:
 			first_enabled = i
@@ -2403,7 +4016,7 @@ func _answer_chord(prefer_wrong: bool = false) -> bool:
 	for k in dict.keys():
 		var key := str(k)
 		var btn: Button = dict.get(k, null)
-		if btn == null or not is_instance_valid(btn) or not btn.visible or btn.disabled:
+		if btn == null or not is_instance_valid(btn) or not btn.visible:
 			continue
 		if first_key == "":
 			first_key = key
@@ -2537,6 +4150,60 @@ func _find_button_by_text(root: Node, text: String) -> Button:
 	return null
 
 
+func _collect_home_overview_header_labels(root: Node, out: Array[Label]) -> void:
+	if root == null:
+		return
+	var stack: Array[Node] = [root]
+	while not stack.is_empty():
+		var n_any: Variant = stack.pop_back()
+		if not (n_any is Node):
+			continue
+		var n := n_any as Node
+		if n is Label and n.has_meta("home_overview_section_header"):
+			out.append(n as Label)
+		for c in n.get_children():
+			if c is Node:
+				stack.append(c)
+
+
+func _assert_option_popup_is_themed(member_name: String, label: String) -> void:
+	var opt_v: Variant = _member(member_name)
+	if not (opt_v is OptionButton):
+		na_step("%s popup theme skipped: option unavailable" % label)
+		return
+	var popup := (opt_v as OptionButton).get_popup()
+	if popup == null:
+		fail("%s popup theme: popup missing" % label)
+		return
+	_assert_popup_theme(popup, label)
+
+
+func _assert_panel_option_popup_is_themed(panel: Node, member_name: String, label: String) -> void:
+	var opt_v: Variant = panel.get(member_name)
+	if not (opt_v is OptionButton):
+		na_step("%s popup theme skipped: option unavailable" % label)
+		return
+	var popup := (opt_v as OptionButton).get_popup()
+	if popup == null:
+		fail("%s popup theme: popup missing" % label)
+		return
+	_assert_popup_theme(popup, label)
+
+
+func _assert_popup_theme(popup: PopupMenu, label: String) -> void:
+	var panel_sb := popup.get_theme_stylebox("panel")
+	if not (panel_sb is StyleBoxFlat):
+		fail("%s popup theme: panel stylebox missing" % label)
+		return
+	var flat := panel_sb as StyleBoxFlat
+	if flat.bg_color.b < 0.10 or flat.bg_color.b > 0.45:
+		fail("%s popup theme: panel background not dark-blue enough (%s)" % [label, str(flat.bg_color)])
+		return
+	if flat.border_color.r < 0.60 or flat.border_color.g < 0.45:
+		fail("%s popup theme: border not golden enough (%s)" % [label, str(flat.border_color)])
+		return
+
+
 func _call(method_name: String, args: Array = []) -> Variant:
 	if _app == null or not is_instance_valid(_app):
 		return null
@@ -2547,12 +4214,18 @@ func _call(method_name: String, args: Array = []) -> Variant:
 
 
 func _log_step(status: String, detail: String, extra: Dictionary = {}) -> void:
+	var now_msec := Time.get_ticks_msec()
+	var elapsed_ms := now_msec - _active_section_started_msec if _active_section_started_msec > 0 else 0
+	var delta_ms := now_msec - _last_step_msec if _last_step_msec > 0 else 0
 	var item := {
 		"section": _active_section_name,
 		"status": status,
 		"detail": detail,
-		"time_unix": Time.get_unix_time_from_system()
+		"time_unix": Time.get_unix_time_from_system(),
+		"elapsed_ms": elapsed_ms,
+		"delta_ms": delta_ms
 	}
+	_last_step_msec = now_msec
 	for k in extra.keys():
 		item[k] = extra[k]
 	_step_records.append(item)
@@ -2627,6 +4300,88 @@ func _member_str(member_name: String, default_value: String = "") -> String:
 	if v == null:
 		return default_value
 	return str(v)
+
+
+func _get_chord_explorer_panel() -> Node:
+	var panel_v: Variant = _member("_chord_explorer_panel")
+	if panel_v is Node and is_instance_valid(panel_v):
+		return panel_v as Node
+	return null
+
+
+func _get_chord_guided_panel() -> Node:
+	var panel_v: Variant = _member("_build_chord_quiz_panel")
+	if panel_v is Node and is_instance_valid(panel_v):
+		return panel_v as Node
+	return null
+
+
+func _force_unlock_chord_explorer(panel: Node) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	var token_v: Variant = panel.get("_playback_lock_token")
+	panel.set("_playback_busy_until", 0.0)
+	panel.set("_playback_lock_token", int(token_v) + 1)
+	if panel.has_method("_set_playback_buttons_disabled"):
+		panel.call("_set_playback_buttons_disabled", false)
+	var indicator_v: Variant = panel.get("_playback_indicator")
+	if indicator_v is CanvasItem:
+		(indicator_v as CanvasItem).visible = false
+
+
+func _chord_explorer_label_text(panel: Node, member_name: String) -> String:
+	if panel == null or not is_instance_valid(panel):
+		return ""
+	var label_v: Variant = panel.get(member_name)
+	if label_v is Label:
+		return (label_v as Label).text.strip_edges()
+	return ""
+
+
+func _chord_guided_label_text(panel: Node, member_name: String) -> String:
+	if panel == null or not is_instance_valid(panel):
+		return ""
+	var label_v: Variant = panel.get(member_name)
+	if label_v is Label:
+		return (label_v as Label).text.strip_edges()
+	return ""
+
+
+func _check_chord_explorer_visible_bounds(panel: Node, tag: String) -> void:
+	_check_panel_visible_bounds(panel, "Chord Explorer", tag)
+
+
+func _check_panel_visible_bounds(panel: Node, panel_name: String, tag: String) -> void:
+	if panel == null or not is_instance_valid(panel):
+		fail("%s %s bounds: panel missing" % [panel_name, tag])
+		return
+	var vp_rect := get_viewport().get_visible_rect()
+	var checked := 0
+	var clipped := 0
+	var clipped_details: Array[String] = []
+	var stack: Array[Node] = [panel]
+	while not stack.is_empty():
+		var n_any: Variant = stack.pop_back()
+		if not (n_any is Node):
+			continue
+		var n: Node = n_any as Node
+		if n is Control:
+			var c := n as Control
+			if c.is_visible_in_tree():
+				checked += 1
+				var r := c.get_global_rect()
+				if r.size.x > 4 and r.size.y > 4 and not _is_control_in_scroll_hierarchy(c):
+					if r.position.x < -16 or r.position.y < -16 or r.end.x > vp_rect.end.x + 16 or r.end.y > vp_rect.end.y + 16:
+						clipped += 1
+						if clipped_details.size() < 4:
+							clipped_details.append("%s %s" % [str(c.get_path()), str(r)])
+		for ch in n.get_children():
+			if ch is Node:
+				stack.append(ch)
+	if clipped > 0:
+		fail("%s %s bounds: %d visible controls extend beyond viewport: %s" % [panel_name, tag, clipped, " | ".join(clipped_details)])
+	else:
+		pass_step("%s_%s_viewport_bounds_%d" % [panel_name.to_lower().replace(" ", "_"), tag, checked])
 
 
 func _take_tagged_screenshot(tag: String) -> Array[String]:

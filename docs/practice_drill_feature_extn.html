@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice Drill Feature Expansion</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5c6773;
+      --line: #d9e0e8;
+      --paper: #f6f8fb;
+      --card: #ffffff;
+      --accent: #275f8f;
+      --accent-2: #0f766e;
+      --soft-blue: #e8f1fa;
+      --soft-green: #e8f6ef;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 22px 56px;
+    }
+
+    header {
+      padding: 28px 28px 24px;
+      background: linear-gradient(135deg, #ffffff 0%, #eef5fb 100%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(24, 36, 50, 0.06);
+    }
+
+    h1, h2 {
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 40px;
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .meta {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    h2 {
+      margin: 34px 0 14px;
+      font-size: 24px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    p {
+      margin: 0 0 14px;
+      color: #33404d;
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 0 0 14px;
+    }
+
+    .item-title {
+      display: block;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .item-note {
+      display: block;
+      color: #33404d;
+    }
+
+    .panel {
+      margin-top: 18px;
+      padding: 16px 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .tag {
+      display: inline-block;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tag.green { background: var(--soft-green); color: var(--accent-2); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Practice Drill Feature Expansion</h1>
+      <div class="sub">Twenty product upgrades that would make Practice Drills feel pro, measurable, and teacher-ready.</div>
+      <div class="meta">Saved from the design discussion for future implementation planning.</div>
+    </header>
+
+    <section class="panel">
+      <span class="tag">Product</span>
+      <span class="tag green">Practice Drills</span>
+      <p>The list below captures the proposed expansion set for the Practice Drills module.</p>
+
+      <ol>
+        <li><span class="item-title">Smart drill library</span><span class="item-note">A richer catalog of drill types, grouped by technique, level, key, hand, and musical goal.</span></li>
+        <li><span class="item-title">Mistake replay capture</span><span class="item-note">After a miss, record the failed attempt and replay it so students can hear and see exactly what went wrong.</span></li>
+        <li><span class="item-title">Left-hand / right-hand isolation</span><span class="item-note">Let students practice each hand separately, then combine them when each part is stable.</span></li>
+        <li><span class="item-title">Speed accuracy gates</span><span class="item-note">Unlock faster tempos only when the student hits a clean accuracy threshold, so speed is earned, not forced.</span></li>
+        <li><span class="item-title">Visual cue reduction mode</span><span class="item-note">Gradually hide note labels, finger hints, or guide marks as mastery improves so students are not over-supported forever.</span></li>
+        <li><span class="item-title">Randomized variation mode</span><span class="item-note">Keep the same drill concept but vary starting note, inversion, octave, rhythm, or key so students learn the pattern, not just the answer.</span></li>
+        <li><span class="item-title">Teacher difficulty presets</span><span class="item-note">Teachers should be able to save drill profiles like Beginner, Exam Prep, Technical Warmup, or Focused Recovery.</span></li>
+        <li><span class="item-title">Session streak goals</span><span class="item-note">Add goals like "3 clean takes in a row" or "2 minutes at target tempo" to make practice feel structured and measurable.</span></li>
+        <li><span class="item-title">Accessible practice controls</span><span class="item-note">Add large buttons, keyboard shortcuts, MIDI support, and touch-friendly controls so the drills work across devices.</span></li>
+        <li><span class="item-title">Drill history timeline</span><span class="item-note">Show past practice sessions in order so students and teachers can see momentum, regressions, and long-term improvement.</span></li>
+        <li><span class="item-title">Adaptive drill generation</span><span class="item-note">The app should adjust exercise difficulty based on accuracy, tempo stability, and mistake patterns, not just fixed levels.</span></li>
+        <li><span class="item-title">Tempo ramp system</span><span class="item-note">Let students start slow and automatically increase tempo as they succeed, with a clear "ready to move up" flow.</span></li>
+        <li><span class="item-title">Targeted weak-spot practice</span><span class="item-note">After a bad run, isolate the exact pattern, hand, key, or rhythm that failed and drill only that until it improves.</span></li>
+        <li><span class="item-title">Teacher assignments</span><span class="item-note">Teachers should be able to assign specific drills, set target tempo or accuracy, and see completion status per student.</span></li>
+        <li><span class="item-title">Clean performance analytics</span><span class="item-note">Show accuracy, tempo progression, mistake types, time spent, last practiced, and which drill types need attention.</span></li>
+        <li><span class="item-title">Rhythm support with metronome and count-in</span><span class="item-note">Practice drills should support count-in, metronome, and timing feedback so students learn steady rhythm, not just correct notes.</span></li>
+        <li><span class="item-title">Hand and fingering coaching</span><span class="item-note">Show finger numbers, hand-specific guidance, and warning prompts when a student uses an inefficient or incorrect fingering.</span></li>
+        <li><span class="item-title">Loop and retry mode</span><span class="item-note">Let students repeat a phrase, bar, or pattern immediately after a mistake, with a one-tap retry instead of restarting the whole drill.</span></li>
+        <li><span class="item-title">Preset drill tracks</span><span class="item-note">Add structured drill paths like beginner scales, chord breaks, arpeggios, Hanon-style patterns, sight-reading prep, and exam prep.</span></li>
+        <li><span class="item-title">Lesson summary and export</span><span class="item-note">After a session, show a clean summary with what was practiced, how it went, what improved, what needs work, and an exportable teacher report.</span></li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>

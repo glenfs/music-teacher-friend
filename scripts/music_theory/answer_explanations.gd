@@ -97,12 +97,14 @@ static func scale_mode_reason(mode_name: String) -> String:
 
 static func cadence_reason(cadence_label: String) -> String:
 	var n := cadence_label.to_lower()
-	if n.find("perfect") >= 0:
-		return "it resolves strongly from dominant to tonic (V-I)."
-	if n.find("plagal") >= 0:
-		return "it resolves with the church-like IV-I sound."
-	if n.find("half") >= 0:
+	# Check "half"/"imperfect" and "deceptive"/"interrupted" before "perfect"
+	# ("imperfect" contains the substring "perfect").
+	if n.find("half") >= 0 or n.find("imperfect") >= 0:
 		return "it stops on V, so it sounds unfinished."
-	if n.find("deceptive") >= 0:
+	if n.find("deceptive") >= 0 or n.find("interrupted") >= 0:
 		return "it starts like a strong resolution but turns to vi instead of I."
+	if n.find("plagal") >= 0 or n.find("amen") >= 0:
+		return "it resolves with the church-like IV-I sound."
+	if n.find("perfect") >= 0 or n.find("authentic") >= 0:
+		return "it resolves strongly from dominant to tonic (V-I)."
 	return "the ending chord motion matches this cadence type."

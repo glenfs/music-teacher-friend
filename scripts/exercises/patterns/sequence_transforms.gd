@@ -67,6 +67,41 @@ static func pitches_to_eighth_notes(pitches: Array, start_beat: float = 0.0) -> 
 	return notes
 
 
+static func pitches_to_sixteenth_notes(pitches: Array, start_beat: float = 0.0) -> Array:
+	var notes: Array = []
+	var beat: float = start_beat
+	for p in pitches:
+		notes.append({
+			"midi": int(p),
+			"duration_beats": 0.25,
+			"beat_offset": beat,
+			"rest": false,
+		})
+		beat += 0.25
+	return notes
+
+
+# Triplets — three equal subdivisions of one beat. Each note carries
+# duration_beats = 1/3 so the timeline math stays exact; the staff
+# renderer interprets the duration and draws a "3" bracket / triplet
+# beaming. Per spec we cap subdivision at 16th notes; triplets fit that
+# (no 32nds).
+static func pitches_to_triplet_notes(pitches: Array, start_beat: float = 0.0) -> Array:
+	var notes: Array = []
+	var beat: float = start_beat
+	var triplet_dur: float = 1.0 / 3.0
+	for p in pitches:
+		notes.append({
+			"midi": int(p),
+			"duration_beats": triplet_dur,
+			"beat_offset": beat,
+			"rest": false,
+			"triplet": true,
+		})
+		beat += triplet_dur
+	return notes
+
+
 # Same but with quarter notes (1.0 beat each).
 static func pitches_to_quarter_notes(pitches: Array, start_beat: float = 0.0) -> Array:
 	var notes: Array = []
@@ -86,22 +121,38 @@ static func pitches_to_quarter_notes(pitches: Array, start_beat: float = 0.0) ->
 static func pad_to_bar_boundary(notes: Array, beats_per_bar: float, note_duration: float = 0.5) -> Array:
 	if notes.is_empty():
 		return notes
-	var last_note: Dictionary = notes[notes.size() - 1]
-	var current_end: float = float(last_note["beat_offset"]) + float(last_note["duration_beats"])
+	var current_end: float = 0.0
+	for note_any in notes:
+		var note: Dictionary = note_any
+		current_end = maxf(current_end, float(note.get("beat_offset", 0.0)) + float(note.get("duration_beats", 0.0)))
 	var remainder: float = fmod(current_end, beats_per_bar)
 	if remainder < 0.001:
 		return notes
 	var pad_beats: float = beats_per_bar - remainder
 	var beat: float = current_end
+	var end_beat: float = current_end + pad_beats
 	while beat < current_end + pad_beats - 0.001:
+		var remaining: float = end_beat - beat
+		var rest_duration := _largest_rest_duration_for_remaining(remaining, note_duration)
 		notes.append({
 			"midi": -1,
-			"duration_beats": note_duration,
+			"duration_beats": rest_duration,
 			"beat_offset": beat,
 			"rest": true,
 		})
-		beat += note_duration
+		beat += rest_duration
 	return notes
+
+
+static func _largest_rest_duration_for_remaining(remaining: float, note_duration: float) -> float:
+	var min_unit: float = 0.25 if note_duration <= 0.25 else 0.5
+	var durations: Array[float] = [4.0, 2.0, 1.0, 0.5]
+	if min_unit <= 0.25:
+		durations.append(0.25)
+	for duration in durations:
+		if duration <= remaining + 0.001:
+			return duration
+	return remaining
 
 
 # =============================================================================

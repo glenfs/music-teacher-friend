@@ -4,7 +4,10 @@ class_name TechnicalExerciseGenerator
 const HanonComposerScript = preload("res://scripts/exercises/composers/hanon_composer.gd")
 const ScaleComposerScript = preload("res://scripts/exercises/composers/scale_composer.gd")
 const CzernyComposerScript = preload("res://scripts/exercises/composers/czerny_composer.gd")
+const ChordComposerScript = preload("res://scripts/exercises/composers/chord_composer.gd")
+const JazzComposerScript = preload("res://scripts/exercises/composers/jazz_composer.gd")
 const ExerciseLibraryScript = preload("res://scripts/exercises/exercise_library.gd")
+const FingeringRulesScript = preload("res://scripts/exercises/fingering_rules.gd")
 
 # Generates technical practice exercises (scales, arpeggios, five-finger drills)
 # at multiple difficulty levels. Output is a Dictionary that can be rendered
@@ -113,6 +116,35 @@ static func generate(exercise_type: String, key_pc: int, key_is_minor: bool, lev
 			return _stamp_meta(CzernyComposerScript.generate_alberti_etude(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
 		"czerny_sequence":
 			return _stamp_meta(CzernyComposerScript.generate_scale_sequence(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
+		# --- Smart Drill Library expansion: rhythmic variants ---
+		"scale_16ths":
+			return _stamp_meta(ScaleComposerScript.generate_scale_16ths(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
+		"arpeggio_16ths":
+			return _stamp_meta(ScaleComposerScript.generate_arpeggio_16ths(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
+		"scale_triplets":
+			return _stamp_meta(ScaleComposerScript.generate_scale_triplets(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
+		"arpeggio_triplets":
+			return _stamp_meta(ScaleComposerScript.generate_arpeggio_triplets(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
+		"bass_movement_16ths":
+			return _stamp_meta(ScaleComposerScript.generate_bass_movement_16ths(key_pc, key_is_minor, octaves, hand_norm, tempo), effective_seed, exercise_type)
+		# --- Simple chord exercises ---
+		"chord_diatonic_triads":
+			return _stamp_meta(ChordComposerScript.generate_diatonic_triads(key_pc, key_is_minor, hand_norm, tempo), effective_seed, exercise_type)
+		"chord_progression_classical":
+			return _stamp_meta(ChordComposerScript.generate_progression_classical(key_pc, key_is_minor, hand_norm, tempo), effective_seed, exercise_type)
+		"chord_progression_pop":
+			return _stamp_meta(ChordComposerScript.generate_progression_pop(key_pc, key_is_minor, hand_norm, tempo), effective_seed, exercise_type)
+		"chord_diatonic_sevenths":
+			return _stamp_meta(ChordComposerScript.generate_diatonic_sevenths(key_pc, key_is_minor, hand_norm, tempo), effective_seed, exercise_type)
+		# --- Jazz exercises ---
+		"jazz_ii_v_i_major":
+			return _stamp_meta(JazzComposerScript.generate_ii_v_i_major(key_pc, hand_norm, tempo), effective_seed, exercise_type)
+		"jazz_ii_v_i_minor":
+			return _stamp_meta(JazzComposerScript.generate_ii_v_i_minor(key_pc, hand_norm, tempo), effective_seed, exercise_type)
+		"jazz_stride_bass":
+			return _stamp_meta(JazzComposerScript.generate_stride_bass(key_pc, key_is_minor, hand_norm, tempo), effective_seed, exercise_type)
+		"jazz_walking_bass":
+			return _stamp_meta(JazzComposerScript.generate_walking_bass(key_pc, key_is_minor, hand_norm, tempo), effective_seed, exercise_type)
 	var pc: int = ((int(key_pc) % 12) + 12) % 12
 	var key_letter: String = _spell_key_letter(pc, key_is_minor)
 	var fifths: int = _key_to_fifths(pc, key_is_minor)
@@ -121,16 +153,16 @@ static func generate(exercise_type: String, key_pc: int, key_is_minor: bool, lev
 	match exercise_type:
 		"scale":
 			pitches = _build_scale(pc, key_is_minor, octaves, hand)
-			fingerings = _scale_fingerings(octaves, hand)
+			fingerings = FingeringRulesScript.scale_fingerings(fifths, key_is_minor, octaves, hand)
 		"arpeggio":
 			pitches = _build_arpeggio(pc, key_is_minor, octaves, hand)
-			fingerings = _arpeggio_fingerings(octaves, hand)
+			fingerings = FingeringRulesScript.arpeggio_fingerings(octaves, hand)
 		"five_finger":
 			pitches = _build_five_finger(pc, key_is_minor, hand)
-			fingerings = _five_finger_fingerings(hand)
+			fingerings = FingeringRulesScript.five_finger_fingerings(hand)
 		_:
 			pitches = _build_scale(pc, key_is_minor, octaves, hand)
-			fingerings = _scale_fingerings(octaves, hand)
+			fingerings = FingeringRulesScript.scale_fingerings(fifths, key_is_minor, octaves, hand)
 	# Convert pitches to a notes array with eighth-note durations.
 	var notes: Array[Dictionary] = []
 	var beat := 0.0
@@ -241,77 +273,6 @@ static func _build_five_finger(pc: int, key_is_minor: bool, hand: String) -> Arr
 static func _hand_base_midi(hand: String) -> int:
 	# Right-hand exercises start at C4 (MIDI 60); left-hand starts an octave lower at C3 (MIDI 48).
 	return 48 if hand == "left" else 60
-
-
-# Standard piano scale fingerings (assumes C-major style — thumb-under every 4th note).
-# Other key fingerings differ (Bb major LH starts on 4 e.g.), but for v1 this is correct
-# for ~half the common keys and gives students a reasonable cue otherwise.
-static func _scale_fingerings(octaves: int, hand: String) -> Array:
-	# RH 1-octave ascending: 1-2-3-1-2-3-4-5 (8 fingers). RH descending (skip top): 4-3-2-1-3-2-1 (7).
-	# For multi-octave: repeat the 1-3-1-3-4 pattern, with the 5th finger reserved for the very top.
-	var result: Array = []
-	var ascending_rh: Array = []
-	for o in range(octaves):
-		# Per octave 7 notes (the 8th = next octave's 1)
-		var per_oct: Array = [1, 2, 3, 1, 2, 3, 4]
-		for f in per_oct:
-			ascending_rh.append(int(f))
-	ascending_rh.append(5)  # top tonic finger
-	if hand == "left":
-		# LH is the mirror: 5-4-3-2-1-3-2-1 ascending, ending on thumb at top.
-		# Build by reversing each "logical" finger group across the LH layout.
-		var lh_asc: Array = []
-		# LH ascending per octave: 5-4-3-2-1-3-2 (7 fingers per octave), ending on thumb at top.
-		for o in range(octaves):
-			var per_oct_lh: Array = [5, 4, 3, 2, 1, 3, 2]
-			for f in per_oct_lh:
-				lh_asc.append(int(f))
-		lh_asc.append(1)  # thumb on top tonic for LH
-		result = lh_asc
-	else:
-		result = ascending_rh
-	# Build descending half (skip duplicate top — matches scale builder structure)
-	var descending: Array = result.duplicate()
-	descending.reverse()
-	descending = descending.slice(1)
-	for d in descending:
-		result.append(int(d))
-	return result
-
-
-static func _arpeggio_fingerings(octaves: int, hand: String) -> Array:
-	# RH 1-octave (4 notes 1-3-5-8): 1-2-3-5
-	# RH 2-octave (7 notes): 1-2-3-1-2-3-5 (thumb-under between octaves)
-	# LH 1-octave: 5-3-2-1 ascending
-	# LH 2-octave: 5-3-2-1-3-2-1 ascending
-	var result: Array = []
-	if hand == "left":
-		for o in range(octaves):
-			result.append(5)
-			result.append(3)
-			result.append(2)
-		result.append(1)
-	else:
-		for o in range(octaves):
-			result.append(1)
-			result.append(2)
-			result.append(3)
-		result.append(5)
-	# Descending = reverse, skip top duplicate
-	var descending: Array = result.duplicate()
-	descending.reverse()
-	descending = descending.slice(1)
-	for d in descending:
-		result.append(int(d))
-	return result
-
-
-static func _five_finger_fingerings(hand: String) -> Array:
-	# 5 ascending notes + 4 descending (skipping top): 9 notes total
-	if hand == "left":
-		# LH 5-finger position has pinky on lowest note.
-		return [5, 4, 3, 2, 1, 2, 3, 4, 5]
-	return [1, 2, 3, 4, 5, 4, 3, 2, 1]
 
 
 static func _key_to_fifths(pc: int, key_is_minor: bool) -> int:

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Clefira app logo">
+  <rect width="1024" height="1024" fill="#101A36" rx="200"/>
+  <g>
+    <path
+      d="M 760 320 A 300 300 0 1 0 760 704"
+      fill="none"
+      stroke="#79D1CC"
+      stroke-width="140"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path d="M 286 548 C 405 456 548 462 706 380" fill="none" stroke="#101A36" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 312 620 C 434 532 576 542 732 456" fill="none" stroke="#101A36" stroke-width="34" stroke-linecap="round"/>
+    <path d="M 338 692 C 463 610 603 622 756 540" fill="none" stroke="#101A36" stroke-width="34" stroke-linecap="round"/>
+  </g>
+</svg>

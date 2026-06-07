@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Clefira bullseye — original artwork, owned by the Clefira project. -->
+  <circle cx="32" cy="32" r="29" fill="#0E2237" stroke="#F0C24B" stroke-width="2.5"/>
+  <circle cx="32" cy="32" r="21.5" fill="#19395C" stroke="#F0C24B" stroke-width="2"/>
+  <circle cx="32" cy="32" r="14" fill="#0E2237" stroke="#F0C24B" stroke-width="2"/>
+  <circle cx="32" cy="32" r="6.5" fill="#E2574B" stroke="#F7D67A" stroke-width="1.6"/>
+  <circle cx="29.6" cy="29.6" r="1.8" fill="#FFFFFF" opacity="0.65"/>
+</svg>

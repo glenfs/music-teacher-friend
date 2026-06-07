@@ -4,8 +4,10 @@ signal lesson_completed(module_id: String)
 signal back_to_map
 
 const LMD = preload("res://scripts/learning/learning_module_data.gd")
-const FONT_TITLE := preload("res://assets/fonts/Baloo2-SemiBold.ttf")
-const FONT_BODY := preload("res://assets/fonts/Nunito-Regular.ttf")
+# Unified with the main app's Inter family (2026-05-30) — see learning_map.gd
+# for the same swap. Baloo2-SemiBold + Nunito-Regular retired.
+const FONT_TITLE := preload("res://assets/fonts/Inter-Thin.ttf")
+const FONT_BODY := preload("res://assets/fonts/Inter-Light.ttf")
 const CHICKEN_TEXTURE := preload("res://assets/birds/chicken.svg")
 
 const BG_COLOR := Color(0.06, 0.11, 0.19, 1.0)

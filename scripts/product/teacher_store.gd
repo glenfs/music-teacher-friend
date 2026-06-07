@@ -469,6 +469,53 @@ func add_assignment(student_id: String, task: String, due: String, created_at: S
 	}, created_at)
 
 
+# Feat 4 — Practice Drill assignment. Lets a teacher target a specific
+# exercise + key + level for a student, optionally with a target tempo
+# and accuracy gate. Stored alongside generic task assignments — the
+# `kind: "practice_drill"` field is what marks it as Practice-Drill-
+# targeted vs a freeform task. Practice Drills reads these via
+# get_open_practice_drill_assignment_for() to surface an in-context
+# "Assigned" indicator when the loaded exercise matches.
+func add_practice_drill_assignment(student_id: String, exercise_id: String, key_pc: int, key_is_minor: bool, level: int, target_accuracy: float, target_tempo: int, due: String, created_at: String) -> Dictionary:
+	var task_label := "Practice: %s (lvl %d)" % [exercise_id, level]
+	return add_assignment_entry(student_id, {
+		"kind": "practice_drill",
+		"task": task_label,
+		"exercise_id": exercise_id,
+		"key_pc": key_pc,
+		"key_is_minor": key_is_minor,
+		"level": level,
+		"target_accuracy": target_accuracy,
+		"target_tempo": target_tempo,
+		"due": due,
+		"done": false,
+		"created_at": created_at,
+		"done_at": "",
+	}, created_at)
+
+
+# Returns the first OPEN (done==false) practice-drill assignment for the
+# given student whose exercise_id matches, or {} if none. Practice Drills
+# uses this to render a "★ Assigned by your teacher" badge when a student
+# loads an exercise that matches an active assignment.
+func get_open_practice_drill_assignment_for(student_id: String, exercise_id: String) -> Dictionary:
+	var idx: int = find_index_by_id(student_id)
+	if idx < 0:
+		return {}
+	var students: Array = students_array()
+	var student: Dictionary = _dictionary_from_variant(students[idx])
+	var assignments: Array = _array_from_variant(student.get("assignments", []))
+	for a_any in assignments:
+		var a: Dictionary = a_any
+		if str(a.get("kind", "")) != "practice_drill":
+			continue
+		if bool(a.get("done", false)):
+			continue
+		if str(a.get("exercise_id", "")) == exercise_id:
+			return a
+	return {}
+
+
 func add_assignment_entry(student_id: String, assignment: Dictionary, created_at: String) -> Dictionary:
 	var idx: int = find_index_by_id(student_id)
 	if idx < 0:

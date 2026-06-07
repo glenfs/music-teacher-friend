@@ -27,6 +27,10 @@ var note_color: Color = Color(0.13, 0.16, 0.22, 1.0)
 var highlight_color: Color = Color(0.95, 0.65, 0.16, 1.0)
 var ledger_color: Color = Color(0.30, 0.34, 0.42, 0.85)
 var staff_space: float = 11.0
+# Visual cue reduction (Feat 15) — when true, skip drawing fingering
+# digits above noteheads. Used by Practice Drills' "Hide fingerings"
+# toggle so students wean off the help as they internalize the pattern.
+var hide_fingerings: bool = false
 var paper_color: Color = Color(0.99, 0.98, 0.95, 1.0)
 var draw_paper: bool = false
 # When true, rhythm is ignored — every notehead is drawn as a whole note with no stems/flags/beams.
@@ -70,6 +74,15 @@ const PC_TO_NATURAL_LETTER := {0: "C", 1: "C", 2: "D", 3: "D", 4: "E", 5: "F", 6
 # (e.g., G minor, key_fifths=-2) pc=3 (E♭/D♯) must land on the E line, not the
 # D line — otherwise an E♭ from a G-minor scale renders as "D♭" on the staff.
 var _active_key_fifths: int = 0
+# Optional per-pitch-class spelling override: { pc:int -> { "letter":String, "acc":int } }.
+# When a score supplies "spelling_map", these letters/accidentals win over the
+# key-signature default — so chord displays can spell e.g. a C7's b7 as Bb (B + flat)
+# instead of A# (A + sharp). Empty by default → pure key-based spelling (unchanged).
+var _active_spelling_map: Dictionary = {}
+# When a score supplies "color_map" {midi:int -> Color}, each notehead is drawn
+# in its mapped colour (e.g. chord-tone roles: root=gold, 3rd=cyan…). Empty by
+# default → every notehead uses the normal note_color (unchanged).
+var _active_color_map: Dictionary = {}
 # Optical spacing weights (Gould-ish approximation; relative widths per duration).
 const OPTICAL_WIDTH := {
 	4.0: 4.5,   # whole
@@ -79,12 +92,27 @@ const OPTICAL_WIDTH := {
 	0.5: 1.3,   # eighth
 	0.25: 0.85, # sixteenth
 }
+# When an event carries an inline clef change, the clef glyph is drawn to
+# the LEFT of the notehead (~2.35 staff_spaces away, ~3 spaces wide).
+# Without extra room reserved in the optical-width sum, a tightly packed
+# bar of eighths/sixteenths lets the clef glyph overlap the previous
+# note. Adding this many weight units to the event's slice gives the
+# glyph clear breathing room before its notehead.
+const CLEF_CHANGE_EXTRA_WEIGHT := 2.4
 const CLEF_BASELINE_NUDGE_SPACES := -0.48
 const KEY_SIGNATURE_BASELINE_NUDGE_SPACES := -0.28
 const TIME_SIGNATURE_BASELINE_NUDGE_SPACES := -0.86
+# Vertical baseline nudge for accidentals drawn next to noteheads. draw_string's
+# y is the glyph BASELINE (text rises above it), and y grows downward, so a
+# smaller value lifts the accidental. It was +0.26 (≈ a quarter-space too low vs
+# the notehead — the same flat/sharp glyphs in the key signature sit at -0.28);
+# 0.08 centres the accidental on the line/space it alters.
+const EVENT_ACCIDENTAL_BASELINE_NUDGE_SPACES := 0.08
 const BASS_TO_TREBLE_MIN_MIDI := 67 # G4. Three bass-ledger-line passages read better in treble clef.
 const BASS_TO_TREBLE_FORCE_LEDGER_COUNT := 4
 const TREBLE_8VA_MIN_MIDI := 84 # C6. Sustained passages above B5 read better with 8va.
+const TREBLE_8VA_CONTINUE_MIN_MIDI := 79 # G5. Include nearby high arpeggio tones around a C6+ peak in the same 8va phrase.
+const BASS_8VB_MAX_MIDI := 41   # F2. Notes at/below this get rendered an octave higher with an "8vb" bracket.
 
 # --- Internal layout state (recomputed each draw) ---
 var _content_x_start: float = 0.0
@@ -108,6 +136,15 @@ func _on_smufl_font_changed() -> void:
 func _on_resized() -> void:
 	_update_required_height_for_systems()
 	queue_redraw()
+
+
+# Notehead centres (local coords) recorded on the last draw, keyed by MIDI.
+# Lets callers animate voice-leading between chords on the staff.
+var _note_screen_positions: Dictionary = {}
+
+
+func get_note_screen_positions() -> Dictionary:
+	return _note_screen_positions.duplicate()
 
 
 func set_score(s: Dictionary) -> void:
@@ -337,6 +374,7 @@ func set_pitch_curve_points(points: Array) -> void:
 # --- Top-level draw ---
 
 func _draw() -> void:
+	_note_screen_positions = {}
 	if draw_paper:
 		draw_rect(Rect2(Vector2.ZERO, size), paper_color, true)
 	if score.is_empty():
@@ -369,6 +407,10 @@ func _draw_score(staves: Array) -> void:
 	# (_pc_to_letter, _midi_to_staff_y, _midi_letter_index, _accidental_for_pitch)
 	# can place black keys on the correct staff line.
 	_active_key_fifths = key_fifths
+	var smap_v: Variant = score.get("spelling_map", {})
+	_active_spelling_map = smap_v if smap_v is Dictionary else {}
+	var cmap_v: Variant = score.get("color_map", {})
+	_active_color_map = cmap_v if cmap_v is Dictionary else {}
 	var time_num: int = int(score.get("time_sig_num", 4))
 	var time_den: int = int(score.get("time_sig_den", 4))
 
@@ -511,32 +553,14 @@ func _draw_staff_lines(top_y: float, staff_x: float, staff_w: float) -> void:
 # --- Grand staff brace ---
 
 func _draw_grand_staff_brace(x: float, top_y: float, bottom_y: float) -> void:
-	# Draw a curved brace using a polyline (more reliable than scaling a font glyph).
-	var width: float = staff_space * 1.0
-	var center_y: float = (top_y + bottom_y) * 0.5
-	var height: float = bottom_y - top_y
-	var pts := PackedVector2Array()
-	# Sample a curved S-shape brace — two arcs meeting at the center.
-	var num_segs := 24
-	for i in range(num_segs + 1):
-		var t: float = float(i) / float(num_segs)
-		var y: float = top_y + t * height
-		# Curvature peaks at the top, middle, and bottom; pinches at quarter points.
-		var phase: float = t * TAU
-		var bulge: float = sin(phase) * 0.45 + sin(phase * 0.5) * 0.35
-		var px: float = x + width * (0.4 + bulge * 0.6)
-		pts.append(Vector2(px, y))
-	# Mirror to the other side and draw filled.
-	var mirror := PackedVector2Array()
-	for i in range(pts.size() - 1, -1, -1):
-		var p: Vector2 = pts[i]
-		mirror.append(Vector2(x + (x - p.x) * 0.0 + (width - (p.x - x)) * 0.0 + (width * 0.65), p.y))
-	# Simpler approach: draw as a thick polyline with rounded ends.
-	# Use draw_polyline with a wide width so it appears as a brace.
-	draw_polyline(pts, line_color, maxf(2.0, staff_space * 0.20), true)
-	# Add small caps at top and bottom so the brace looks anchored.
-	draw_circle(Vector2(pts[0].x, top_y), staff_space * 0.18, line_color)
-	draw_circle(Vector2(pts[pts.size() - 1].x, bottom_y), staff_space * 0.18, line_color)
+	# Use a straight grand-staff bracket instead of a curly brace so the
+	# left edge reads cleanly across devices and small viewports.
+	var bracket_x: float = x + staff_space * 0.55
+	var cap_w: float = staff_space * 0.34
+	var line_w: float = maxf(2.0, staff_space * 0.20)
+	draw_line(Vector2(bracket_x, top_y), Vector2(bracket_x, bottom_y), line_color, line_w)
+	draw_line(Vector2(bracket_x, top_y), Vector2(bracket_x + cap_w, top_y), line_color, line_w)
+	draw_line(Vector2(bracket_x, bottom_y), Vector2(bracket_x + cap_w, bottom_y), line_color, line_w)
 
 
 # --- Clef rendering ---
@@ -705,6 +729,8 @@ func _draw_staff_notes_subset(staff: Dictionary, staff_top: float, bar_x_positio
 
 	var global_event_idx: int = event_idx_start
 	var display_state := {"clef": clef, "ottava": 0}
+	var measure_event_groups: Array = []
+	var all_events: Array = []
 	for m in range(measures.size()):
 		var measure: Dictionary = measures[m]
 		var notes_in_bar: Array = measure.get("notes", [])
@@ -720,8 +746,14 @@ func _draw_staff_notes_subset(staff: Dictionary, staff_top: float, bar_x_positio
 				ev["x"] = float(shared_map.get(key, bar_x + bar_w_actual * 0.5))
 		else:
 			_assign_event_x_positions(events, bar_x, bar_w_actual, beats_per_bar, m)
-		_prepare_event_display(events, clef, display_state)
-		_draw_ottava_spans(events, staff_top, clef)
+		measure_event_groups.append(events)
+		all_events.append_array(events)
+	if all_events.is_empty():
+		return global_event_idx
+	_prepare_event_display(all_events, clef, display_state)
+	_draw_ottava_spans(all_events, staff_top, clef)
+	for events_any in measure_event_groups:
+		var events: Array = events_any
 		_draw_pitch_curve_subset(events, staff_top, clef, global_event_idx)
 		var beam_groups: Array = []
 		if not cluster_mode:
@@ -748,6 +780,8 @@ func _draw_staff_notes(staff: Dictionary, staff_top: float, bar_x_positions: Arr
 
 	var global_event_idx := 0
 	var display_state := {"clef": clef, "ottava": 0}
+	var measure_event_groups: Array = []
+	var all_events: Array = []
 	for m in range(measures.size()):
 		var measure: Dictionary = measures[m]
 		var notes_in_bar: Array = measure.get("notes", [])
@@ -765,8 +799,14 @@ func _draw_staff_notes(staff: Dictionary, staff_top: float, bar_x_positions: Arr
 				ev["x"] = float(shared_map.get(key, bar_x + bar_w_actual * 0.5))
 		else:
 			_assign_event_x_positions(events, bar_x, bar_w_actual, beats_per_bar, m)
-		_prepare_event_display(events, clef, display_state)
-		_draw_ottava_spans(events, staff_top, clef)
+		measure_event_groups.append(events)
+		all_events.append_array(events)
+	if all_events.is_empty():
+		return
+	_prepare_event_display(all_events, clef, display_state)
+	_draw_ottava_spans(all_events, staff_top, clef)
+	for events_any in measure_event_groups:
+		var events: Array = events_any
 		_draw_pitch_curve_subset(events, staff_top, clef, global_event_idx)
 		# 3) Identify beam groups (consecutive eighths/sixteenths in the same beat group)
 		var beam_groups: Array = []
@@ -799,6 +839,7 @@ func _collect_events(notes: Array) -> Array:
 				"duration_beats": float(n.get("duration_beats", 0.5)),
 				"notes": [],
 				"rest": is_rest,
+				"triplet": bool(n.get("triplet", false)),
 				"x": 0.0,  # filled in later
 			}
 			events.append(current_event)
@@ -806,25 +847,44 @@ func _collect_events(notes: Array) -> Array:
 		# If any note in the event is a non-rest, the event isn't a rest.
 		if not is_rest:
 			current_event["rest"] = false
+		if bool(n.get("triplet", false)):
+			current_event["triplet"] = true
 	return events
 
 
 func _assign_event_x_positions(events: Array, bar_x: float, bar_w: float, beats_per_bar: float, measure_idx: int) -> void:
 	# Optical spacing within a bar: width per event ∝ OPTICAL_WIDTH[duration].
-	# Sum widths, then scale to fit available bar width with small margins on either side.
+	# Sum widths, then scale to fit available bar width with small margins
+	# on either side. Events with an inline clef change get extra weight so
+	# the clef glyph (drawn ~2.35 staff_spaces left of the notehead) doesn't
+	# overlap the previous note when the bar is densely packed (eighths /
+	# sixteenths). The note within a clef-change slice is biased toward the
+	# RIGHT of its slice so the clef has clear room to its left.
+	var weights: Array[float] = []
 	var total_weight: float = 0.0
 	for ev in events:
-		total_weight += _optical_width_for(float(ev.get("duration_beats", 0.5)))
+		var w: float = _optical_width_for(float(ev.get("duration_beats", 0.5)))
+		if bool(ev.get("draw_clef_change", false)):
+			w += CLEF_CHANGE_EXTRA_WEIGHT
+		weights.append(w)
+		total_weight += w
 	if total_weight <= 0.0:
 		total_weight = 1.0
 	var inset: float = bar_w * 0.08  # leading inset for clef-side breathing room
 	var trailing: float = bar_w * 0.06
 	var usable: float = bar_w - inset - trailing
 	var cur_x: float = bar_x + inset
-	for ev in events:
-		var w: float = _optical_width_for(float(ev.get("duration_beats", 0.5))) / total_weight * usable
-		ev["x"] = cur_x + w * 0.5  # event center sits at midpoint of its slice
-		cur_x += w
+	for i in range(events.size()):
+		var ev: Dictionary = events[i]
+		var slice_w: float = weights[i] / total_weight * usable
+		# Place the notehead at the midpoint normally; shift it right inside
+		# a clef-change slice so the glyph has the extra room on its LEFT
+		# (where it actually draws).
+		var center_ratio: float = 0.5
+		if bool(ev.get("draw_clef_change", false)):
+			center_ratio = 0.68
+		ev["x"] = cur_x + slice_w * center_ratio
+		cur_x += slice_w
 
 
 func _draw_pitch_curve_subset(events: Array, staff_top: float, clef: String, event_idx_start: int) -> void:
@@ -919,6 +979,8 @@ func _prepare_event_display(events: Array, staff_clef: String, display_state: Di
 		display_state["clef"] = staff_clef
 	if not display_state.has("ottava"):
 		display_state["ottava"] = 0
+	var initial_clef := str(display_state.get("clef", staff_clef))
+	var initial_ottava := int(display_state.get("ottava", 0))
 	for event_idx in range(events.size()):
 		var event: Dictionary = events[event_idx]
 		if bool(event.get("rest", false)):
@@ -934,9 +996,100 @@ func _prepare_event_display(events: Array, staff_clef: String, display_state: Di
 		event["display_clef"] = display_clef
 		event["ottava_shift"] = ottava_shift
 		event["draw_clef_change"] = display_clef != active_clef
-		event["draw_ottava_mark"] = ottava_shift > 0 and (ottava_shift != active_ottava or display_clef != active_clef)
+		event["draw_ottava_mark"] = ottava_shift != 0 and (ottava_shift != active_ottava or display_clef != active_clef)
 		display_state["clef"] = display_clef
 		display_state["ottava"] = ottava_shift
+	# Keep display transitions aligned to complete rhythmic units. Clef and
+	# ottava changes must not split an eighth-note pair or triplet group.
+	_harmonize_display_for_rhythm_groups(events, initial_clef, initial_ottava, display_state)
+
+
+# =========================================================================
+# DISPLAY TRANSITION + BEAM CONTRACT (applies to ALL exercises)
+# =========================================================================
+# A display signature (clef + ottava shift) must remain stable inside each
+# short-note rhythmic unit. If a threshold is crossed midway through an
+# eighth-note pair, sixteenth-note beat, or triplet, retain the first
+# event's signature and apply the transition at the next rhythmic unit.
+# This runs for every renderer path via _prepare_event_display.
+func _harmonize_display_for_rhythm_groups(
+	events: Array,
+	initial_clef: String,
+	initial_ottava: int,
+	display_state: Dictionary
+) -> void:
+	var i := 0
+	while i < events.size():
+		var ev: Dictionary = events[i]
+		if bool(ev.get("rest", false)) or float(ev.get("duration_beats", 0.5)) > 0.5 + 0.001:
+			i += 1
+			continue
+		var beat_group := _beat_group_for_event(ev)
+		var rhythm_group_size := _rhythm_group_size_for_event(ev)
+		var group_indices: Array[int] = [i]
+		var j := i
+		while j + 1 < events.size() and group_indices.size() < rhythm_group_size:
+			var nxt: Dictionary = events[j + 1]
+			if bool(nxt.get("rest", false)):
+				break
+			if float(nxt.get("duration_beats", 0.5)) > 0.5 + 0.001:
+				break
+			if _beat_group_for_event(nxt) != beat_group:
+				break
+			if _rhythm_group_size_for_event(nxt) != rhythm_group_size:
+				break
+			j += 1
+			group_indices.append(j)
+		if group_indices.size() >= 2:
+			var target_clef := str(ev.get("display_clef", initial_clef))
+			var target_shift := int(ev.get("ottava_shift", initial_ottava))
+			for idx in group_indices:
+				var e2: Dictionary = events[idx]
+				e2["display_clef"] = target_clef
+				e2["ottava_shift"] = target_shift
+		i = j + 1
+	_refresh_display_transition_flags(events, initial_clef, initial_ottava, display_state)
+
+
+func _refresh_display_transition_flags(
+	events: Array,
+	initial_clef: String,
+	initial_ottava: int,
+	display_state: Dictionary
+) -> void:
+	var prev_clef := initial_clef
+	var prev_shift := initial_ottava
+	for ev_any in events:
+		var ev: Dictionary = ev_any
+		if bool(ev.get("rest", false)):
+			ev["display_clef"] = prev_clef
+			ev["ottava_shift"] = prev_shift
+			ev["draw_clef_change"] = false
+			ev["draw_ottava_mark"] = false
+			continue
+		var cur_clef := str(ev.get("display_clef", prev_clef))
+		var cur_shift := int(ev.get("ottava_shift", prev_shift))
+		ev["draw_clef_change"] = cur_clef != prev_clef
+		ev["draw_ottava_mark"] = cur_shift != 0 and (cur_shift != prev_shift or cur_clef != prev_clef)
+		prev_clef = cur_clef
+		prev_shift = cur_shift
+	display_state["clef"] = prev_clef
+	display_state["ottava"] = prev_shift
+
+
+func _beat_group_for_event(event: Dictionary) -> int:
+	return int(floor(float(event.get("beat_offset", 0.0)) + 0.001))
+
+
+func _rhythm_group_size_for_event(event: Dictionary) -> int:
+	if bool(event.get("triplet", false)):
+		return 3
+	var duration := float(event.get("duration_beats", 0.5))
+	if absf(duration - (1.0 / 3.0)) <= 0.001:
+		return 3
+	if duration <= 0.0:
+		return 1
+	return maxi(1, int(round(1.0 / duration)))
 
 
 func _prepared_display_clef_for_event(events: Array, event_idx: int, staff_clef: String, active_clef: String) -> String:
@@ -964,23 +1117,84 @@ func _display_clef_for_event(event: Dictionary, staff_clef: String) -> String:
 
 
 func _ottava_shift_for_event(event: Dictionary, display_clef: String) -> int:
+	# Returns the raw display-MIDI offset for ottava handling. Positive
+	# means render lower on the staff (8va — sounds an octave higher),
+	# negative means render higher on the staff (8vb — sounds an octave
+	# lower). Threshold check is gated by the qualifying-span rule in
+	# _prepared_ottava_shift_for_event so isolated single notes don't
+	# get an ottava bracket.
 	if display_clef == "treble" and _event_max_midi(event) >= TREBLE_8VA_MIN_MIDI:
 		return 12
+	if display_clef == "bass":
+		var min_midi := _event_min_midi(event)
+		if min_midi >= 0 and min_midi <= BASS_8VB_MAX_MIDI:
+			return -12
 	return 0
+
+
+func _event_min_midi(event: Dictionary) -> int:
+	var min_midi := -1
+	var notes: Array = event.get("notes", [])
+	for n in notes:
+		var note: Dictionary = n
+		if bool(note.get("rest", false)):
+			continue
+		var midi := int(note.get("midi", -1))
+		if midi >= 0:
+			if min_midi < 0 or midi < min_midi:
+				min_midi = midi
+	return min_midi
 
 
 func _prepared_ottava_shift_for_event(events: Array, event_idx: int, display_clef: String, active_ottava: int) -> int:
 	var event: Dictionary = events[event_idx]
 	var base_shift := _ottava_shift_for_event(event, display_clef)
-	if base_shift <= 0:
+	if display_clef == "treble":
+		return 12 if _qualifies_for_treble_ottava_phrase(events, event_idx) else 0
+	if base_shift == 0:
 		return 0
-	if active_ottava > 0:
+	# Already inside an active span of the same direction — stay inside.
+	# (signi() returns -1/0/+1; we match the sign of the active span so a
+	# transient note that's high doesn't fall out of an active 8vb run.)
+	if active_ottava != 0 and signi(active_ottava) == signi(base_shift):
 		return base_shift
-	# Do not octave-shift a single peak note in an otherwise unshifted scale run.
-	# That reads like a wrong-note drop. Reserve 8va for sustained high passages.
-	return base_shift if _has_neighbor_event_at_or_above(events, event_idx, TREBLE_8VA_MIN_MIDI) else 0
+	# Direction-specific rule:
+	#   • 8va (treble, above): requires a qualifying run (≥3 notes OR
+	#     ≥1 beat) so an isolated peak doesn't read like a wrong-note jump.
+	#   • 8vb (bass, below): threshold is F2 — the ledger burden is
+	#     below the staff. The ledger burden is heavy enough that 8vb
+	#     even on a single note reads better than the bare notes. So
+	#     we skip the qualifying-run check here per user spec.
+	return base_shift
 
 
+const RUN_LEN_MIN_FOR_8VA := 3
+const RUN_BEATS_MIN_FOR_8VA := 1.0
+
+
+func _qualifies_for_treble_ottava_phrase(events: Array, event_idx: int) -> bool:
+	if events.is_empty() or event_idx < 0 or event_idx >= events.size():
+		return false
+	if _event_max_midi(events[event_idx]) < TREBLE_8VA_CONTINUE_MIN_MIDI:
+		return false
+	var left_idx := event_idx
+	while left_idx > 0 and _event_max_midi(events[left_idx - 1]) >= TREBLE_8VA_CONTINUE_MIN_MIDI:
+		left_idx -= 1
+	var right_idx := event_idx
+	while right_idx < events.size() - 1 and _event_max_midi(events[right_idx + 1]) >= TREBLE_8VA_CONTINUE_MIN_MIDI:
+		right_idx += 1
+	var has_peak := false
+	var run_beats := 0.0
+	for i in range(left_idx, right_idx + 1):
+		var ev: Dictionary = events[i]
+		has_peak = has_peak or _event_max_midi(ev) >= TREBLE_8VA_MIN_MIDI
+		run_beats += float(ev.get("duration_beats", 0.0))
+	var run_len := right_idx - left_idx + 1
+	return has_peak and (run_len >= RUN_LEN_MIN_FOR_8VA or run_beats >= RUN_BEATS_MIN_FOR_8VA)
+
+
+# Kept for the bass-clef → treble-clef hand-up logic (different rule from
+# 8va spans, which now use _qualifies_for_ottava_span).
 func _has_neighbor_event_at_or_above(events: Array, event_idx: int, midi_threshold: int) -> bool:
 	if event_idx > 0:
 		var prev_event: Dictionary = events[event_idx - 1]
@@ -991,6 +1205,131 @@ func _has_neighbor_event_at_or_above(events: Array, event_idx: int, midi_thresho
 		if _event_max_midi(next_event) >= midi_threshold:
 			return true
 	return false
+
+
+# True iff the contiguous run of events around event_idx whose max MIDI is
+# at/above midi_threshold is long enough (in note count OR beat duration)
+# to justify an ottava bracket. Used both at render time and in the
+# offline validator (see _validate_ottava_runs).
+func _qualifies_for_ottava_span(events: Array, event_idx: int, midi_threshold: int) -> bool:
+	if events.is_empty() or event_idx < 0 or event_idx >= events.size():
+		return false
+	# Walk left while events stay at/above the threshold.
+	var left_idx := event_idx
+	while left_idx > 0 and _event_max_midi(events[left_idx - 1]) >= midi_threshold:
+		left_idx -= 1
+	# Walk right same way.
+	var right_idx := event_idx
+	while right_idx < events.size() - 1 and _event_max_midi(events[right_idx + 1]) >= midi_threshold:
+		right_idx += 1
+	var run_len := right_idx - left_idx + 1
+	if run_len >= RUN_LEN_MIN_FOR_8VA:
+		return true
+	# Fallback: long sustained note(s) — measure the span's beat duration.
+	var run_beats := 0.0
+	for i in range(left_idx, right_idx + 1):
+		var ev: Dictionary = events[i]
+		run_beats += float(ev.get("duration_beats", 0.0))
+	return run_beats >= RUN_BEATS_MIN_FOR_8VA
+
+
+# Mirror of _qualifies_for_ottava_span for the 8vb (bass) direction:
+# walks contiguous events whose MIN MIDI is at/below midi_threshold (so a
+# run of low notes counts even if each event also contains a higher
+# voice). Same run-length AND duration thresholds.
+func _qualifies_for_ottava_span_below(events: Array, event_idx: int, midi_threshold: int) -> bool:
+	if events.is_empty() or event_idx < 0 or event_idx >= events.size():
+		return false
+	var left_idx := event_idx
+	while left_idx > 0:
+		var prev_min := _event_min_midi(events[left_idx - 1])
+		if prev_min < 0 or prev_min > midi_threshold:
+			break
+		left_idx -= 1
+	var right_idx := event_idx
+	while right_idx < events.size() - 1:
+		var next_min := _event_min_midi(events[right_idx + 1])
+		if next_min < 0 or next_min > midi_threshold:
+			break
+		right_idx += 1
+	var run_len := right_idx - left_idx + 1
+	if run_len >= RUN_LEN_MIN_FOR_8VA:
+		return true
+	var run_beats := 0.0
+	for i in range(left_idx, right_idx + 1):
+		var ev: Dictionary = events[i]
+		run_beats += float(ev.get("duration_beats", 0.0))
+	return run_beats >= RUN_BEATS_MIN_FOR_8VA
+
+
+# Beam display consistency validator. Runs after _prepare_event_display
+# has done its harmonization pass. If a rhythmic group still has split
+# clef or ottava signatures here, the beam-splitting bug will show on
+# the staff. Returns a list of human-readable warnings (empty == clean).
+#
+# Hookable from QA + exercise_self_test. Skip this and a future
+# composer can ship a beam-breaking ottava regression and you won't
+# notice until a user reports it.
+func validate_beam_ottava_consistency(events: Array) -> Array[String]:
+	var warnings: Array[String] = []
+	if events.is_empty():
+		return warnings
+	var i := 0
+	while i < events.size():
+		var ev: Dictionary = events[i]
+		if bool(ev.get("rest", false)) or float(ev.get("duration_beats", 0.5)) > 0.5 + 0.001:
+			i += 1
+			continue
+		var beat_group := _beat_group_for_event(ev)
+		var rhythm_group_size := _rhythm_group_size_for_event(ev)
+		var group_size := 1
+		var first_sig := "%s:%d" % [str(ev.get("display_clef", "")), int(ev.get("ottava_shift", 0))]
+		var signatures_in_group: Dictionary = {first_sig: true}
+		var j := i
+		while j + 1 < events.size() and group_size < rhythm_group_size:
+			var nxt: Dictionary = events[j + 1]
+			if bool(nxt.get("rest", false)):
+				break
+			if float(nxt.get("duration_beats", 0.5)) > 0.5 + 0.001:
+				break
+			if _beat_group_for_event(nxt) != beat_group:
+				break
+			if _rhythm_group_size_for_event(nxt) != rhythm_group_size:
+				break
+			j += 1
+			group_size += 1
+			var display_sig := "%s:%d" % [str(nxt.get("display_clef", "")), int(nxt.get("ottava_shift", 0))]
+			signatures_in_group[display_sig] = true
+		if group_size >= 2 and signatures_in_group.size() > 1:
+			warnings.append(
+				"Beam group at beat %d (events %d-%d, size=%d) has split display signatures %s. Harmonization missed it." %
+				[beat_group, i, j, group_size, str(signatures_in_group.keys())]
+			)
+		i = j + 1
+	return warnings
+
+
+# Offline validator (returns a list of human-readable warnings). Hookable
+# from the QA harness and the per-exercise self-test in
+# exercise_self_test.gd. Empty array == clean.
+func validate_ottava_runs(events: Array, display_clef: String = "treble") -> Array[String]:
+	var warnings: Array[String] = []
+	# 8va validation runs on treble clefs only. 8vb on bass is now applied
+	# unconditionally for notes ≤ F2 (the ledger burden justifies it even
+	# for single notes), so there's no "isolated" case to flag.
+	if display_clef == "bass":
+		return warnings
+	if display_clef != "treble":
+		return warnings
+	for i in range(events.size()):
+		if _event_max_midi(events[i]) < TREBLE_8VA_MIN_MIDI:
+			continue
+		if not _qualifies_for_treble_ottava_phrase(events, i):
+			warnings.append(
+				"Isolated 8va candidate at event %d — needs a readable G5+ phrase around the C6+ peak."
+				% i
+			)
+	return warnings
 
 
 func _event_max_midi(event: Dictionary) -> int:
@@ -1088,7 +1427,18 @@ func _draw_event(event: Dictionary, clef: String, key_fifths: int, staff_top: fl
 		var head_y_local: float = float(nl["y"])
 		# Ledger lines per note position
 		_draw_ledgers(event_x + col_offset, nl["y"], staff_top)
-		draw_string(font, Vector2(head_x, head_y_local), head_glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, int(staff_space * 4.0), color)
+		# Per-notehead colour when a color_map is supplied (chord-tone roles),
+		# else the normal event colour.
+		var head_color: Color = color
+		var head_midi: int = int(nl.get("midi", -1))
+		if not highlight and _active_color_map.has(head_midi):
+			var hc_v: Variant = _active_color_map[head_midi]
+			if hc_v is Color:
+				head_color = hc_v
+		draw_string(font, Vector2(head_x, head_y_local), head_glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, int(staff_space * 4.0), head_color)
+		# Record the notehead centre (local coords) so callers can animate
+		# voice-leading between chords on the staff.
+		_note_screen_positions[int(nl.get("midi", -1))] = Vector2(head_x + staff_space * 0.55, head_y_local)
 	# Fingering digits — drawn ABOVE the highest notehead in the cluster (one digit per note).
 	# Engraving convention places fingering opposite the stem; for v1 we always place above
 	# the cluster, which is readable and avoids stem-direction conditionals.
@@ -1127,24 +1477,33 @@ func _draw_inline_clef_change(clef: String, x: float, staff_top: float) -> void:
 
 
 func _draw_ottava_spans(events: Array, staff_top: float, default_clef: String) -> void:
+	# Direction-aware: a positive ottava_shift starts an 8va span (rendered
+	# above the staff), a negative one starts an 8vb span (rendered below).
+	# Switching sign closes the current span and opens a new one.
 	var span_start := -1
 	var span_show_label := false
+	var span_shift := 0
 	for event_idx in range(events.size() + 1):
+		var current_shift := 0
 		var is_shifted := false
 		if event_idx < events.size():
 			var event: Dictionary = events[event_idx]
-			is_shifted = int(event.get("ottava_shift", 0)) > 0 and not bool(event.get("rest", false))
-		if is_shifted and span_start < 0:
-			span_start = event_idx
-			var start_event: Dictionary = events[event_idx]
-			span_show_label = bool(start_event.get("draw_ottava_mark", false))
-		elif not is_shifted and span_start >= 0:
-			_draw_ottava_mark(events, span_start, event_idx - 1, staff_top, default_clef, span_show_label)
+			current_shift = int(event.get("ottava_shift", 0))
+			is_shifted = current_shift != 0 and not bool(event.get("rest", false))
+		var closing := span_start >= 0 and (not is_shifted or signi(current_shift) != signi(span_shift))
+		if closing:
+			_draw_ottava_mark(events, span_start, event_idx - 1, staff_top, default_clef, span_show_label, span_shift)
 			span_start = -1
 			span_show_label = false
+			span_shift = 0
+		if is_shifted and span_start < 0:
+			span_start = event_idx
+			span_shift = current_shift
+			var start_event: Dictionary = events[event_idx]
+			span_show_label = bool(start_event.get("draw_ottava_mark", false))
 
 
-func _draw_ottava_mark(events: Array, start_idx: int, end_idx: int, staff_top: float, default_clef: String, show_label: bool = true) -> void:
+func _draw_ottava_mark(events: Array, start_idx: int, end_idx: int, staff_top: float, default_clef: String, show_label: bool = true, span_shift: int = 12) -> void:
 	if start_idx < 0 or end_idx < start_idx or start_idx >= events.size():
 		return
 	end_idx = mini(end_idx, events.size() - 1)
@@ -1157,7 +1516,10 @@ func _draw_ottava_mark(events: Array, start_idx: int, end_idx: int, staff_top: f
 	var end_x := float(end_event.get("x", 0.0)) + staff_space * 2.15
 	if end_x <= start_x:
 		end_x = start_x + staff_space * 2.2
-	var highest_note_y := INF
+	# Find the extreme notehead Y in the span — highest for 8va (mark sits
+	# above), lowest for 8vb (mark sits below the staff).
+	var is_above := span_shift > 0
+	var extreme_y := INF if is_above else -INF
 	for idx in range(start_idx, end_idx + 1):
 		var event: Dictionary = events[idx]
 		var display_clef := str(event.get("display_clef", default_clef))
@@ -1169,21 +1531,44 @@ func _draw_ottava_mark(events: Array, start_idx: int, end_idx: int, staff_top: f
 			if midi < 0 or bool(note.get("rest", false)):
 				continue
 			var note_y := _midi_to_staff_y(midi - ottava_shift, display_clef, staff_top)
-			highest_note_y = minf(highest_note_y, note_y)
-	if highest_note_y == INF:
-		highest_note_y = staff_top
-	var line_y: float = minf(staff_top - staff_space * 2.85, highest_note_y - staff_space * 2.05)
+			if is_above:
+				extreme_y = minf(extreme_y, note_y)
+			else:
+				extreme_y = maxf(extreme_y, note_y)
+	if extreme_y == INF or extreme_y == -INF:
+		extreme_y = staff_top
+	var line_y: float
+	var label_y: float
+	var bracket_dy: float
+	var label_text: String
+	if is_above:
+		line_y = minf(staff_top - staff_space * 2.85, extreme_y - staff_space * 2.05)
+		label_y = line_y + staff_space * 0.30
+		bracket_dy = staff_space * 0.55      # bracket leg drops DOWN from the line
+		label_text = "8va"
+	else:
+		# Bass staff sits ~staff_space * 4 tall; place the line below the
+		# staff floor with a margin clear of the lowest note + ledger lines.
+		var staff_bottom := staff_top + staff_space * 4.0
+		line_y = maxf(staff_bottom + staff_space * 2.85, extreme_y + staff_space * 2.05)
+		label_y = line_y + staff_space * 1.0  # label baseline sits below the line
+		bracket_dy = -staff_space * 0.55     # bracket leg rises UP toward the staff
+		label_text = "8vb"
 	var label_x := start_x - staff_space * 0.15
-	var label_y := line_y + staff_space * 0.30
 	var line_start := start_x
 	if show_label:
-		draw_string(ThemeDB.fallback_font, Vector2(label_x, label_y), "8va", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, mark_color)
-		line_start = label_x + staff_space * 1.75
+		draw_string(ThemeDB.fallback_font, Vector2(label_x, label_y), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, mark_color)
+		line_start = label_x + staff_space * 1.85
 	draw_line(Vector2(line_start, line_y), Vector2(end_x, line_y), mark_color, maxf(1.0, staff_space * 0.08), true)
-	draw_line(Vector2(end_x, line_y), Vector2(end_x, line_y + staff_space * 0.55), mark_color, maxf(1.0, staff_space * 0.08), true)
+	draw_line(Vector2(end_x, line_y), Vector2(end_x, line_y + bracket_dy), mark_color, maxf(1.0, staff_space * 0.08), true)
 
 
 func _draw_event_fingerings(note_layouts: Array, event_x: float, head_advance: float, staff_top: float, color: Color) -> void:
+	# Visual cue reduction (Feat 15): callers (e.g. Practice Drills with
+	# "Hide fingerings" toggled on) can short-circuit fingering rendering
+	# by setting the public hide_fingerings flag on the renderer instance.
+	if hide_fingerings:
+		return
 	# Use the system font (NOT SMuFL) for digits — readable Arabic numerals.
 	var fnt := ThemeDB.fallback_font
 	var size_px: int = int(staff_space * 1.05)
@@ -1302,7 +1687,7 @@ func _draw_event_accidentals(note_layouts: Array, key_fifths: int, event_x: floa
 		var entry: Dictionary = to_draw[i]
 		var glyph := SMuFLFont.glyph(str(entry["name"]))
 		var x: float = current_x - float(i) * advance * 0.55
-		var y: float = float(entry["y"]) + staff_space * 0.4
+		var y: float = float(entry["y"]) + staff_space * EVENT_ACCIDENTAL_BASELINE_NUDGE_SPACES
 		draw_string(font, Vector2(x, y), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, glyph_size, color)
 
 
@@ -1333,7 +1718,7 @@ func _collect_beam_groups(events: Array) -> Array:
 			current_beat_group = -1
 			current_display_sig = ""
 			continue
-		var bg := int(floor(beat))
+		var bg := int(floor(beat + 0.001))
 		var display_sig := "%s:%d" % [str(ev.get("display_clef", "")), int(ev.get("ottava_shift", 0))]
 		if bg != current_beat_group or (not current.is_empty() and display_sig != current_display_sig):
 			if current.size() >= 2:
@@ -1400,6 +1785,22 @@ func _draw_beam_group(group: Array, events: Array, clef: String, staff_top: floa
 	if absf(dy) > max_slope:
 		var sign: float = sign(dy)
 		last_stem_tip_y = first_stem_tip_y + sign * max_slope
+	# A clamped slope can place one end of a descending/ascending arpeggio
+	# almost on its notehead. Shift the whole beam away from the notes until
+	# every member keeps a readable minimum stem length.
+	var min_stem_len: float = staff_space * 2.5
+	var beam_offset: float = 0.0
+	for i in range(ev_layouts.size()):
+		var layout: Dictionary = ev_layouts[i]
+		var t: float = float(i) / float(maxi(1, ev_layouts.size() - 1))
+		var beam_y: float = first_stem_tip_y + t * (last_stem_tip_y - first_stem_tip_y)
+		var anchor_y: float = float(layout["max_y"]) if stem_up else float(layout["min_y"])
+		if stem_up:
+			beam_offset = minf(beam_offset, anchor_y - min_stem_len - beam_y)
+		else:
+			beam_offset = maxf(beam_offset, anchor_y + min_stem_len - beam_y)
+	first_stem_tip_y += beam_offset
+	last_stem_tip_y += beam_offset
 	# Compute the per-event stem X position (consistent with non-beam stem rule).
 	var stems_x: Array[float] = []
 	var stems_far_y: Array[float] = []
@@ -1453,6 +1854,13 @@ func _draw_beam_group(group: Array, events: Array, clef: String, staff_top: floa
 # uses for MusicXML export — the staff renderer now agrees with it.
 func _pc_to_letter(pc: int) -> String:
 	var pc_norm := ((pc % 12) + 12) % 12
+	# Explicit chord-tone spelling wins (e.g. place a C7's b7 on the B line, not A).
+	if _active_spelling_map.has(pc_norm):
+		var entry_v: Variant = _active_spelling_map[pc_norm]
+		if entry_v is Dictionary:
+			var l := str((entry_v as Dictionary).get("letter", ""))
+			if l != "":
+				return l
 	var prefer_flats: bool = _active_key_fifths < 0
 	match pc_norm:
 		0:  return "C"
@@ -1519,8 +1927,40 @@ func _draw_ledgers(note_x: float, note_y: float, staff_top: float) -> void:
 			y2 += staff_space
 
 
+# Returns the accidental a key signature already applies to a given letter:
+# +1 (sharp), -1 (flat), or 0 (none). Used so an explicit spelling only draws an
+# accidental when it differs from what the key signature already implies.
+func _key_implies_accidental(letter: String, key_fifths: int) -> int:
+	if key_fifths > 0:
+		for i in range(mini(key_fifths, 7)):
+			if SHARP_ORDER[i] == letter:
+				return 1
+	elif key_fifths < 0:
+		for i in range(mini(-key_fifths, 7)):
+			if FLAT_ORDER[i] == letter:
+				return -1
+	return 0
+
+
 func _accidental_for_pitch(midi: int, key_fifths: int) -> String:
 	var pc := ((midi % 12) + 12) % 12
+	# Explicit chord-tone spelling: draw the accidental its sign demands, unless
+	# the key signature already applies it (then none), and a natural sign when
+	# the spelling is natural but the key signature would otherwise alter it.
+	if _active_spelling_map.has(pc):
+		var entry_v: Variant = _active_spelling_map[pc]
+		if entry_v is Dictionary:
+			var entry := entry_v as Dictionary
+			var acc := int(entry.get("acc", 0))
+			var sl := str(entry.get("letter", _pc_to_letter(pc)))
+			var implied := _key_implies_accidental(sl, key_fifths)
+			if acc == implied:
+				return ""
+			if acc < 0:
+				return "accidentalFlat"
+			if acc > 0:
+				return "accidentalSharp"
+			return "accidentalNatural"
 	var is_black := pc in [1, 3, 6, 8, 10]
 	if not is_black:
 		return ""

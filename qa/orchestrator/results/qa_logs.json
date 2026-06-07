@@ -1,0 +1,140 @@
+[
+  {
+    "level": "INFO",
+    "seq": 0,
+    "text": "DebugServer listening on http://127.0.0.1:8765",
+    "unix_ms": 4108
+  },
+  {
+    "level": "INFO",
+    "seq": 1,
+    "text": "assert _qa_enabled in [true, false] \u2192 observed=false",
+    "unix_ms": 6336
+  },
+  {
+    "level": "INFO",
+    "seq": 2,
+    "text": "drill started: scale (level=3, hand=right, seed=12345)",
+    "unix_ms": 6601
+  },
+  {
+    "level": "INFO",
+    "seq": 3,
+    "text": "mode switched to 0 (Interval)",
+    "unix_ms": 7262
+  },
+  {
+    "level": "INFO",
+    "seq": 4,
+    "text": "mode switched to 1 (Chord)",
+    "unix_ms": 7614
+  },
+  {
+    "level": "INFO",
+    "seq": 5,
+    "text": "mode switched to 4 (Note Chase)",
+    "unix_ms": 7812
+  },
+  {
+    "level": "INFO",
+    "seq": 6,
+    "text": "drill started: scale (level=2, hand=right, seed=4242)",
+    "unix_ms": 7834
+  },
+  {
+    "level": "INFO",
+    "seq": 7,
+    "text": "assert _practice_drills_panel._midi_grading_active eq true \u2192 observed=true",
+    "unix_ms": 7967
+  },
+  {
+    "level": "INFO",
+    "seq": 8,
+    "text": "midi inject pitch=60 vel=96 hold=80ms",
+    "unix_ms": 7982
+  },
+  {
+    "level": "INFO",
+    "seq": 9,
+    "text": "midi inject pitch=62 vel=96 hold=80ms",
+    "unix_ms": 7997
+  },
+  {
+    "level": "INFO",
+    "seq": 10,
+    "text": "midi inject pitch=64 vel=96 hold=80ms",
+    "unix_ms": 8015
+  },
+  {
+    "level": "INFO",
+    "seq": 11,
+    "text": "midi inject pitch=65 vel=96 hold=80ms",
+    "unix_ms": 8043
+  },
+  {
+    "level": "INFO",
+    "seq": 12,
+    "text": "midi inject pitch=67 vel=96 hold=80ms",
+    "unix_ms": 8050
+  },
+  {
+    "level": "INFO",
+    "seq": 13,
+    "text": "midi inject pitch=69 vel=96 hold=80ms",
+    "unix_ms": 8078
+  },
+  {
+    "level": "INFO",
+    "seq": 14,
+    "text": "midi inject pitch=71 vel=96 hold=80ms",
+    "unix_ms": 8085
+  },
+  {
+    "level": "INFO",
+    "seq": 15,
+    "text": "midi inject pitch=72 vel=96 hold=80ms",
+    "unix_ms": 8105
+  },
+  {
+    "level": "INFO",
+    "seq": 16,
+    "text": "assert _practice_drills_panel._last_accuracy gte 0.0 \u2192 observed=0.13333333333333",
+    "unix_ms": 16116
+  },
+  {
+    "level": "INFO",
+    "seq": 17,
+    "text": "drill started: scale_16ths (level=6, hand=right, seed=9001)",
+    "unix_ms": 16152
+  },
+  {
+    "level": "INFO",
+    "seq": 18,
+    "text": "drill started: jazz_ii_v_i_major (level=5, hand=right, seed=-1)",
+    "unix_ms": 16194
+  },
+  {
+    "level": "INFO",
+    "seq": 19,
+    "text": "drill started: jazz_stride_bass (level=5, hand=left, seed=-1)",
+    "unix_ms": 16900
+  },
+  {
+    "level": "INFO",
+    "seq": 20,
+    "text": "drill started: hanon_1 (level=4, hand=left, seed=-1)",
+    "unix_ms": 16930
+  },
+  {
+    "level": "INFO",
+    "seq": 21,
+    "text": "assert _ear_choice_count gte 2.0 \u2192 observed=4",
+    "unix_ms": 16958
+  },
+  {
+    "level": "INFO",
+    "seq": 22,
+    "text": "assert _ear_choice_count lte 6.0 \u2192 observed=4",
+    "unix_ms": 16965
+  }
+]

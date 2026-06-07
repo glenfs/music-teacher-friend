@@ -261,38 +261,76 @@ func key_sig_letter_steps(sight_key_signature: String) -> Array:
 	return []
 
 
-func key_signature_step_for_letter(letter: String, clef_name: String) -> int:
+func key_signature_step_for_letter(letter: String, clef_name: String, is_sharp: bool = true) -> int:
 	if clef_name == "Treble":
-		match letter:
-			"F":
-				return 0
-			"C":
-				return 3
-			"G":
-				return 1
-			"B":
-				return 4
-			"E":
-				return 1
-			"A":
-				return 7
+		if is_sharp:
+			match letter:
+				"F":
+					return 0
+				"C":
+					return 3
+				"G":
+					return -1
+				"D":
+					return 2
+				"A":
+					return 5
+				"E":
+					return 1
+				"B":
+					return 4
+		else:
+			match letter:
+				"B":
+					return 4
+				"E":
+					return 1
+				"A":
+					return 5
+				"D":
+					return 2
+				"G":
+					return 6
+				"C":
+					return 3
+				"F":
+					return 7
 	if clef_name == "Bass":
-		match letter:
-			"F":
-				return 2
-			"C":
-				return 5
-			"G":
-				return 1
-			"B":
-				return 6
-			"E":
-				return 3
-			"A":
-				return 0
+		if is_sharp:
+			match letter:
+				"F":
+					return 2
+				"C":
+					return 5
+				"G":
+					return 1
+				"D":
+					return 4
+				"A":
+					return 7
+				"E":
+					return 3
+				"B":
+					return 6
+		else:
+			match letter:
+				"B":
+					return 6
+				"E":
+					return 3
+				"A":
+					return 7
+				"D":
+					return 4
+				"G":
+					return 8
+				"C":
+					return 5
+				"F":
+					return 9
 	var best_step := 4
 	var best_dist := 999999
-	for step in range(0, 9):
+	for step in range(-2, 11):
 		if staff_step_name_for_clef(step, clef_name) != letter:
 			continue
 		var distance: int = absi(step - 4)
@@ -310,17 +348,18 @@ func layout_key_signature_labels(
 	sight_mode: String,
 	selected_clef: String,
 	grand_staff_active: bool,
-	sight_key_signature: String,
+	_sight_key_signature: String,
 	staff_clef_label: Label,
 	sight_accidental_raise_y: float,
 	active_staff_step_y: float,
 	active_staff_line_gap_y: float,
 	staff_center_y_for_step: Callable,
-	key_signature_step_for_letter_callable: Callable
+	key_signature_step_for_letter_callable: Callable,
+	key_signature_lower_y: float = 0.0
 ) -> void:
 	if labels.is_empty() or staff_clef_label == null or not staff_center_y_for_step.is_valid():
 		return
-	var show_sig := selected_mode == mode_sight and (sight_mode == "Chords" or sight_mode == "Notes")
+	var show_sig := selected_mode == mode_sight and (sight_mode == "Chords" or sight_mode == "Notes" or sight_mode == "Vanishing")
 	var sharp_sym := char(0x266F)
 	var flat_sym := char(0x266D)
 	for index in range(labels.size()):
@@ -333,9 +372,9 @@ func layout_key_signature_labels(
 		var definition: Array = defs[index]
 		var letter := str(definition[0])
 		var symbol := str(definition[1])
-		var step := key_signature_step_for_letter(letter, selected_clef)
+		var step := key_signature_step_for_letter(letter, selected_clef, symbol == sharp_sym)
 		if key_signature_step_for_letter_callable.is_valid():
-			step = int(key_signature_step_for_letter_callable.call(letter, selected_clef))
+			step = int(key_signature_step_for_letter_callable.call(letter, selected_clef, symbol == sharp_sym))
 		var y := float(staff_center_y_for_step.call(step))
 		if symbol == sharp_sym:
 			y -= 8.0
@@ -345,8 +384,7 @@ func layout_key_signature_labels(
 			y -= clampf(active_staff_step_y * 0.22, 2.0, 6.0)
 		if selected_mode == mode_sight:
 			y -= sight_accidental_raise_y
-		if selected_clef == "Treble" and index == 2 and (sight_key_signature == "3#" or sight_key_signature == "3b"):
-			y -= (active_staff_step_y * 2.0)
+		y += key_signature_lower_y
 		label.text = symbol
 		label.visible = true
 		var clef_size := staff_clef_label.size
@@ -725,7 +763,14 @@ func sight_chord_candidates(
 				var candidate := build_sight_chord_candidate(root_letter, int(root_acc), chord_id, sig_map, chord_definitions, note_name_order)
 				if candidate.is_empty():
 					continue
-				if selected_chord_tier == 1 and not include_tier1_accidentals and not sight_candidate_has_natural_tones(candidate):
+				# Tier 1 (beginner): keep only chords that CONFORM to the selected
+				# key signature (no accidental signs beyond the key sig). The old
+				# `has_natural_tones` test kept absolute white-key triads regardless
+				# of key, so in a sharp/flat key (e.g. 2 sharps) it produced chords
+				# like D minor / A minor that need natural signs on F and C — making
+				# the staff fight the key signature. Filtering on `is_accidental`
+				# instead yields the key's diatonic triads (D, Em, F#m, G, A, Bm …).
+				if selected_chord_tier == 1 and not include_tier1_accidentals and bool(candidate.get("is_accidental", false)):
 					continue
 				var candidate_key := "%s|%s" % [str(candidate.get("name", "")), str(candidate.get("id", ""))]
 				if seen.has(candidate_key):
@@ -919,7 +964,7 @@ func sight_note_snap_x(
 		var left := float(geometry.get("left", staff_left_x))
 		var width := float(geometry.get("width", staff_line_width))
 		var anchor_ratio := 0.36
-		if sight_mode == "Notes" or sight_mode == "Chords":
+		if sight_mode == "Notes" or sight_mode == "Chords" or sight_mode == "Vanishing":
 			anchor_ratio = 0.40
 		if sight_mode == "Continuous":
 			anchor_ratio = 0.30
@@ -1097,6 +1142,7 @@ func position_sight_chord(host, note_centers: Array, chord_def: Dictionary = {},
 	var sig_map: Dictionary = host._key_signature_accidental_map()
 	var sharp_sym := char(0x266F)
 	var flat_sym := char(0x266D)
+	var natural_sym := char(0x266E)
 	var all_note_panels: Array = [host._staff_note]
 	for panel in host._staff_chord_notes:
 		all_note_panels.append(panel)
@@ -1123,16 +1169,27 @@ func position_sight_chord(host, note_centers: Array, chord_def: Dictionary = {},
 		var accidental_value := int(tone_accidentals[i]) if i < tone_accidentals.size() else 0
 		var letter := str(tone_letters[i]) if i < tone_letters.size() else "C"
 		var key_acc := int(sig_map.get(letter, 0))
-		var needed_acc := accidental_value - key_acc
-		if needed_acc == 0:
+		# When the chord-tone accidental matches the key signature, no
+		# explicit accidental glyph is needed — the key signature already
+		# spells the note correctly.
+		if accidental_value == key_acc:
 			accidental_label.visible = false
 			continue
 		var panel = all_note_panels[i]
-		accidental_label.text = sharp_sym if needed_acc > 0 else flat_sym
+		# Pick the glyph by the chord's intended accidental, not by the
+		# delta against the key sig. A natural sign (♮) cancels a key-sig
+		# flat or sharp. ♯/♭ apply when the chord wants an explicit
+		# alteration that the key sig doesn't provide.
+		if accidental_value == 0:
+			accidental_label.text = natural_sym
+		elif accidental_value > 0:
+			accidental_label.text = sharp_sym
+		else:
+			accidental_label.text = flat_sym
 		accidental_label.visible = true
 		var center_y: float = panel.position.y + (panel.size.y * panel.scale.y * 0.5)
 		var note_left: float = panel.position.x
-		var y_adjust := (-8.0 if needed_acc < 0 else -1.0) - sight_accidental_raise_y
+		var y_adjust := (-8.0 if accidental_value < 0 else -1.0) - sight_accidental_raise_y
 		accidental_label.position = Vector2(note_left - sight_accidental_x_offset, center_y - (accidental_label.size.y * 0.5) + y_adjust)
 	host._stop_sight_note_bounce()
 	host._start_sight_note_bounce()
@@ -1169,6 +1226,7 @@ func layout_grand_staff_bass_key_signature(host, bass_top_y: float, gap_y: float
 	var flat_sym := char(0x266D)
 	var step_y: float = gap_y * 0.5
 	var sight_accidental_raise_y: float = float(config.get("sight_accidental_raise_y", 0.0))
+	var key_signature_lower_y: float = float(config.get("sight_key_signature_lower_y", 0.0))
 	for i in range(host._grand_staff_bass_key_sig_labels.size()):
 		var lbl: Label = host._grand_staff_bass_key_sig_labels[i] as Label
 		if lbl == null:
@@ -1179,7 +1237,7 @@ func layout_grand_staff_bass_key_signature(host, bass_top_y: float, gap_y: float
 		var definition: Array = defs[i]
 		var letter: String = str(definition[0])
 		var symbol: String = str(definition[1])
-		var step: int = key_signature_step_for_letter(letter, "Bass")
+		var step: int = key_signature_step_for_letter(letter, "Bass", symbol == sharp_sym)
 		var y: float = bass_top_y + float(step) * step_y
 		if symbol == sharp_sym:
 			y -= 8.0
@@ -1188,6 +1246,7 @@ func layout_grand_staff_bass_key_signature(host, bass_top_y: float, gap_y: float
 		if host._grand_staff_active:
 			y -= clampf(gap_y * 0.20, 2.0, 5.0)
 		y -= sight_accidental_raise_y
+		y += key_signature_lower_y
 		lbl.text = symbol
 		lbl.visible = true
 		var base_x: float = line_x + 68.0

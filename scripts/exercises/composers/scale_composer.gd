@@ -197,6 +197,117 @@ static func generate_contrary(key_pc: int, key_is_minor: bool, octaves: int = 1,
 	return _wrap("scale_contrary", "Contrary Motion Scale", key_pc, key_is_minor, octaves, hand, tempo_bpm, notes)
 
 
+# --- 16th-note + triplet variants (smart-drill-library expansion) ---
+
+
+# 16th-note scale — same scale pitches, half the duration of an eighth-note
+# scale. Doubles the rhythmic density without going above 16ths per spec.
+static func generate_scale_16ths(key_pc: int, key_is_minor: bool, octaves: int = 1, hand: String = "right", tempo_bpm: int = 76) -> Dictionary:
+	var scale: Array = PatternPrimitivesScript.NATURAL_MINOR_SCALE if key_is_minor else PatternPrimitivesScript.MAJOR_SCALE
+	var base_midi: int = 48 if hand == "left" else 60
+	var num_steps: int = 7 * octaves + 1
+	var degrees: Array = []
+	for i in range(num_steps):
+		degrees.append(i + 1)
+	var pitches: Array = PatternPrimitivesScript.degrees_to_midi(degrees, key_pc, scale, base_midi)
+	var back: Array = pitches.duplicate()
+	back.reverse()
+	for i in range(1, back.size()):
+		pitches.append(back[i])
+	var notes: Array = SequenceTransformsScript.pitches_to_sixteenth_notes(pitches)
+	notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 0.25)
+	return _wrap("scale_16ths", "Scale — 16th notes", key_pc, key_is_minor, octaves, hand, tempo_bpm, notes)
+
+
+# 16th-note arpeggio — broken triad (root-3rd-5th-octave) at 16th rate.
+static func generate_arpeggio_16ths(key_pc: int, key_is_minor: bool, octaves: int = 1, hand: String = "right", tempo_bpm: int = 80) -> Dictionary:
+	var scale: Array = PatternPrimitivesScript.NATURAL_MINOR_SCALE if key_is_minor else PatternPrimitivesScript.MAJOR_SCALE
+	var base_midi: int = 48 if hand == "left" else 60
+	# Arpeggio degrees: 1, 3, 5, 8, 10, 12, 15 for two-octave; pattern per octave
+	# is [1, 3, 5, 8]; subsequent octaves chain on at +7 scale degrees.
+	var degrees: Array = []
+	for o in range(octaves):
+		var oct_offset := o * 7
+		degrees.append_array([1 + oct_offset, 3 + oct_offset, 5 + oct_offset])
+	degrees.append(1 + octaves * 7)  # top tonic
+	var pitches: Array = PatternPrimitivesScript.degrees_to_midi(degrees, key_pc, scale, base_midi)
+	var back: Array = pitches.duplicate()
+	back.reverse()
+	for i in range(1, back.size()):
+		pitches.append(back[i])
+	var notes: Array = SequenceTransformsScript.pitches_to_sixteenth_notes(pitches)
+	notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 0.25)
+	return _wrap("arpeggio_16ths", "Arpeggio — 16th notes", key_pc, key_is_minor, octaves, hand, tempo_bpm, notes)
+
+
+# Triplet scale — three notes per beat (eighth-note triplets).
+static func generate_scale_triplets(key_pc: int, key_is_minor: bool, octaves: int = 1, hand: String = "right", tempo_bpm: int = 80) -> Dictionary:
+	var scale: Array = PatternPrimitivesScript.NATURAL_MINOR_SCALE if key_is_minor else PatternPrimitivesScript.MAJOR_SCALE
+	var base_midi: int = 48 if hand == "left" else 60
+	var num_steps: int = 7 * octaves + 1
+	var degrees: Array = []
+	for i in range(num_steps):
+		degrees.append(i + 1)
+	var pitches: Array = PatternPrimitivesScript.degrees_to_midi(degrees, key_pc, scale, base_midi)
+	var back: Array = pitches.duplicate()
+	back.reverse()
+	for i in range(1, back.size()):
+		pitches.append(back[i])
+	var notes: Array = SequenceTransformsScript.pitches_to_triplet_notes(pitches)
+	notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 1.0 / 3.0)
+	return _wrap("scale_triplets", "Scale — Triplets", key_pc, key_is_minor, octaves, hand, tempo_bpm, notes)
+
+
+# Triplet arpeggio — root-3rd-5th in triplets per beat. Classic technical
+# pattern (e.g. broken triad arpeggios in 3-against-4 feel).
+static func generate_arpeggio_triplets(key_pc: int, key_is_minor: bool, octaves: int = 1, hand: String = "right", tempo_bpm: int = 84) -> Dictionary:
+	var scale: Array = PatternPrimitivesScript.NATURAL_MINOR_SCALE if key_is_minor else PatternPrimitivesScript.MAJOR_SCALE
+	var base_midi: int = 48 if hand == "left" else 60
+	# 1-3-5 triplet pattern, sequenced up each octave.
+	var degrees: Array = []
+	for o in range(octaves):
+		var oct_offset := o * 7
+		degrees.append_array([1 + oct_offset, 3 + oct_offset, 5 + oct_offset])
+	degrees.append(1 + octaves * 7)
+	var pitches: Array = PatternPrimitivesScript.degrees_to_midi(degrees, key_pc, scale, base_midi)
+	var back: Array = pitches.duplicate()
+	back.reverse()
+	for i in range(1, back.size()):
+		pitches.append(back[i])
+	var notes: Array = SequenceTransformsScript.pitches_to_triplet_notes(pitches)
+	notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 1.0 / 3.0)
+	return _wrap("arpeggio_triplets", "Arpeggio — Triplets", key_pc, key_is_minor, octaves, hand, tempo_bpm, notes)
+
+
+# 16th-note bass-movement pattern — root-octave-fifth-octave repeating
+# (Alberti-style at 16th resolution). Common bass-hand technical pattern
+# from any beginner-intermediate piano method; not specific to any work.
+static func generate_bass_movement_16ths(key_pc: int, key_is_minor: bool, octaves: int = 1, hand: String = "left", tempo_bpm: int = 72) -> Dictionary:
+	var scale: Array = PatternPrimitivesScript.NATURAL_MINOR_SCALE if key_is_minor else PatternPrimitivesScript.MAJOR_SCALE
+	var base_midi: int = 36 if hand == "left" else 48
+	# Pattern within one beat: root, octave-up, fifth, octave-up (4 sixteenths).
+	# Repeat for each beat, moving the root through I → IV → V → I (4 bars).
+	var pitches: Array = []
+	var chord_roots: Array = [1, 4, 5, 1]  # diatonic roots
+	for bar in range(maxi(1, octaves)):
+		for root_deg in chord_roots:
+			var root_midi: int = int(PatternPrimitivesScript.degrees_to_midi([root_deg], key_pc, scale, base_midi)[0])
+			var fifth_midi: int = int(PatternPrimitivesScript.degrees_to_midi([root_deg + 4], key_pc, scale, base_midi)[0])
+			# Four beats of root-octave-fifth-octave per bar.
+			for _beat in range(4):
+				pitches.append(root_midi)
+				pitches.append(root_midi + 12)
+				pitches.append(fifth_midi)
+				pitches.append(root_midi + 12)
+	var notes: Array = SequenceTransformsScript.pitches_to_sixteenth_notes(pitches)
+	notes = SequenceTransformsScript.pad_to_bar_boundary(notes, 4.0, 0.25)
+	var bass_dict: Dictionary = _wrap("bass_movement_16ths", "Bass Movement — 16th notes", key_pc, key_is_minor, octaves, hand, tempo_bpm, notes)
+	# Octave-leap bass figure: the pattern jumps an octave within each beat and
+	# resets register at bar boundaries — idiomatic and playable for this drill.
+	bass_dict["max_jump"] = 20
+	return bass_dict
+
+
 # --- Internal helpers ---
 
 static func _wrap(type_str: String, label: String, key_pc: int, key_is_minor: bool, octaves: int, hand: String, tempo_bpm: int, notes: Array) -> Dictionary:

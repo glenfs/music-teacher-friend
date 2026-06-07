@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clefira — AI-Orchestrated QA Pipeline</title>
+<style>
+  :root {
+    --fg: #1b1f24;
+    --fg-mute: #4a5160;
+    --bg: #fbfaf6;
+    --accent: #b88a2b;
+    --accent-soft: #f3e6c2;
+    --code-bg: #14202c;
+    --code-fg: #d9e2ec;
+    --hr: #d8d2c0;
+    --good: #1f7a3d;
+    --warn: #a44508;
+  }
+  html { font-size: 16px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.55;
+    margin: 0;
+    padding: 2.5rem 2rem 4rem;
+  }
+  main { max-width: 920px; margin: 0 auto; }
+  header {
+    border-bottom: 1px solid var(--hr);
+    padding-bottom: 1.25rem;
+    margin-bottom: 2rem;
+  }
+  h1 {
+    font-size: 1.85rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+  }
+  .subtitle { color: var(--fg-mute); font-size: 1.02rem; margin: 0; }
+  h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 2.4rem 0 0.85rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--hr);
+    letter-spacing: -0.005em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 1.4rem 0 0.5rem;
+    color: var(--fg);
+  }
+  p { margin: 0.6rem 0; }
+  ul, ol { padding-left: 1.4rem; margin: 0.5rem 0 0.9rem; }
+  li { margin: 0.35rem 0; }
+  code {
+    font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+    font-size: 0.9em;
+    background: var(--accent-soft);
+    color: #4a350c;
+    padding: 0.08em 0.34em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border-radius: 6px;
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin: 0.8rem 0 1rem;
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+  .ascii {
+    background: #0e1822;
+    color: #c9d4e0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  .deliverable {
+    border-left: 3px solid var(--accent);
+    background: #fff7e3;
+    padding: 0.7rem 1rem 0.7rem 1rem;
+    margin: 0.7rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+  .deliverable code:first-of-type { font-weight: 600; font-size: 0.95em; }
+  .pill {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: #594016;
+    border-radius: 999px;
+    padding: 0.1em 0.7em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: 0.4em;
+    vertical-align: middle;
+  }
+  .good { color: var(--good); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--hr);
+    color: var(--fg-mute);
+    font-size: 0.85rem;
+  }
+  a { color: #1e57a0; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>AI-Orchestrated QA Pipeline <span class="pill">Clefira</span></h1>
+  <p class="subtitle">External Python driver that talks to a running <code>Clefira.exe</code> via an in-game HTTP debug API, runs YAML test cases, captures structured results, and hands them to an LLM for triage. Complements the existing in-engine QA harness (<code>qa_run.ps1</code> + <code>scripts/qa/qa_runner.gd</code>).</p>
+</header>
+
+<h2>Architecture</h2>
+
+<pre class="ascii"><code>┌─────────────────────────────────┐
+│  Python Orchestrator (host)     │
+│  qa/orchestrator/               │
+│    qa_orchestrator.py           │
+│    test_cases.yaml              │
+│    midi_mock_setup.py           │
+└──────────────┬──────────────────┘
+               │ HTTP / JSON  (127.0.0.1:8765)
+               ▼
+┌─────────────────────────────────┐    Virtual or       ┌──────────────────┐
+│  Clefira.exe (Godot 4.6)        │    debug-API MIDI   │  loopMIDI / IAC  │
+│  scripts/qa/debug_server.gd     │◄───────────────────►│  (optional)      │
+└─────────────────────────────────┘                     └──────────────────┘
+               │ results/qa_results.json + qa_logs.json + screenshots/
+               ▼
+┌─────────────────────────────────┐
+│  LLM Analysis                   │
+│  llm_qa_analysis_prompt.md      │
+│  → Claude / GPT triage report   │
+└─────────────────────────────────┘
+</code></pre>
+
+<h2>Deliverables</h2>
+
+<p>Each item below is a real file in the repo. Paths are relative to the project root.</p>
+
+<div class="deliverable">
+  <code>scripts/qa/debug_server.gd</code> — Godot 4 GDScript HTTP server. <code>TCPServer</code> + a minimal HTTP request parser (no third-party deps). 11 endpoints: <code>/health</code>, <code>/state</code>, <code>/logs</code>, <code>/mode</code>, <code>/drill/{start,stop,play}</code>, <code>/midi/inject</code>, <code>/audio/probe</code>, <code>/assert</code>, <code>/screenshot</code>, <code>/quit</code>. Bound to <code>127.0.0.1</code> only; opt-in via <code>--debug-server [port]</code> flag (wired into <code>interval_birds.gd</code> next to the existing <code>--qa</code> parsing).
+</div>
+
+<div class="deliverable">
+  <code>qa/orchestrator/qa_orchestrator.py</code> — Python 3.10+ orchestrator. Launches <code>Clefira.exe</code> with <code>--debug-server</code>, polls <code>/health</code> until ready (30 s timeout), reads <code>test_cases.yaml</code>, runs every case step-by-step via the <code>DebugClient</code> wrapper, writes <code>results/qa_results.json</code> + <code>results/qa_logs.json</code> + screenshots. Exit codes: <strong>0</strong> = pass, <strong>1</strong> = test failures, <strong>2</strong> = config error, <strong>3</strong> = unreachable server. Supports <code>--no-launch</code> (attach to running game), <code>--tag</code> and <code>--name</code> filters, <code>--windowed</code> mode.
+</div>
+
+<div class="deliverable">
+  <code>qa/orchestrator/midi_mock_setup.py</code> — <code>MidiSink</code> class that picks the best available backend: real virtual port via <code>mido</code> + <code>python-rtmidi</code> when a driver's available, falls back to <code>debug_server.gd:/midi/inject</code> when not (CI default). Timestamps every send to <code>midi_trace.json</code> for the LLM latency analysis. Includes <code>compute_midi_audio_latency()</code> helper that pairs sent notes with audio-probe events.
+</div>
+
+<div class="deliverable">
+  <code>qa/orchestrator/test_cases.yaml</code> — Data-driven fixtures. 9 cases covering smoke (debug server health, mode transitions, scale generate + play + audio probe), MIDI roundtrip (8 taps against the C major scale checking accuracy ≥ 50%), Smart Drill Library coverage (16ths, jazz ii-V-I, stride bass), 8vb bass rendering, and settings sanity. Marked <code># CUSTOMIZE:</code> lines where teams will tweak thresholds.
+</div>
+
+<div class="deliverable">
+  <code>qa/orchestrator/llm_qa_analysis_prompt.md</code> — Structured Claude / GPT prompt that takes the JSON blobs + screenshots and produces a triage report distinguishing <strong>regressions vs flakes vs state bugs vs MIDI drift</strong>. Forces a fixed Markdown output template so the team can read every report in &lt; 2 minutes. Includes severity mapping (smoke + state-affecting members = blocker, etc.) and a context-window budget rule for large runs.
+</div>
+
+<div class="deliverable">
+  <code>qa/orchestrator/setup_and_run.md</code> — Setup docs: Python deps, optional virtual MIDI driver per OS (loopMIDI / IAC / ALSA), how to export Clefira with debug-server support, three running modes (auto-launch, attach, filtered), GitHub Actions integration, and the <strong>3-step validation checklist</strong>.
+</div>
+
+<div class="deliverable">
+  <code>qa/orchestrator/requirements.txt</code> — Pinned to forward-compatible ranges: <code>requests&lt;3</code>, <code>PyYAML&lt;7</code>, <code>mido&lt;2</code>, <code>python-rtmidi&lt;2</code>.
+</div>
+
+<div class="deliverable">
+  <code>.github/workflows/qa.yml</code> — Extended with a new <code>qa_orchestrator</code> job that runs <strong>after</strong> the existing in-engine harness (so it only fires when compile / scripts are already green). Caches Godot via the existing cache, background-launches Clefira with <code>--debug-server</code>, runs the orchestrator with <code>--no-launch</code>, uploads <code>results/**</code> + the Clefira stdout/stderr logs as <code>qa-orchestrator-${run_id}</code> artifacts, surfaces the pass/fail summary into the GitHub Step Summary.
+</div>
+
+<h2>How to use it</h2>
+
+<h3>Local interactive (sanity check)</h3>
+<pre><code># Terminal 1 — launch Clefira with the debug server enabled
+$env:GODOT_BIN = "C:\Path\To\Godot_v4.6-stable_win64.exe"
+&amp; $env:GODOT_BIN --headless --path . -- --debug-server 8765
+
+# Terminal 2 — install deps + run the orchestrator against it
+cd qa\orchestrator
+python -m pip install -r requirements.txt
+python qa_orchestrator.py --no-launch --port 8765 --tag smoke --verbose</code></pre>
+
+<h3>CI / full run (orchestrator auto-launches Clefira)</h3>
+<pre><code>python qa/orchestrator/qa_orchestrator.py --build build/Clefira.exe --verbose</code></pre>
+
+<h3>LLM analysis</h3>
+<p>After a run, paste <code>llm_qa_analysis_prompt.md</code> + the contents of <code>qa_results.json</code> / <code>qa_logs.json</code> / <code>midi_trace.json</code> into Claude or GPT. The prompt forces a structured triage report distinguishing regressions, state bugs, MIDI drift, and flaky tests.</p>
+
+<h2>3-step validation checklist</h2>
+
+<p>Run these in order after installing. All three should pass before trusting CI integration.</p>
+
+<ol>
+  <li>
+    <strong>Debug server reachable</strong>
+    <pre><code>curl http://127.0.0.1:8765/health</code></pre>
+    Expect HTTP 200 with <code>{"ok": true, ...}</code>. Confirms the export includes <code>debug_server.gd</code> and the <code>--debug-server</code> flag wired in.
+  </li>
+  <li>
+    <strong>Orchestrator runs the smoke tag clean</strong>
+    <pre><code>cd qa/orchestrator
+python qa_orchestrator.py --build ../../build/Clefira.exe --tag smoke --verbose</code></pre>
+    Expect exit 0 and <code>results/qa_results.json</code> showing <code>summary.passed &gt; 0, failed == 0</code>. Confirms the dispatch table works end-to-end.
+  </li>
+  <li>
+    <strong>MIDI smoke</strong>
+    <pre><code>python midi_mock_setup.py</code></pre>
+    Expect a single line <code>midi sink mode was: virtual</code> (or <code>debug_api</code> fallback) plus <code>./midi_smoke_trace.json</code> written with 7 events (4 single notes + a 3-note chord). Confirms either the virtual MIDI driver or the debug-API fallback path is wired.
+  </li>
+</ol>
+
+<h2>Why this complements (not replaces) the in-engine harness</h2>
+
+<ul>
+  <li><strong>In-engine (<code>qa_run.ps1</code>)</strong> — fastest feedback loop, runs scripted scenarios from inside the engine, exits with a pass/fail code. Used for compile-health + per-module QA matrix on every PR.</li>
+  <li><strong>External (this pipeline)</strong> — drives the <em>shipped binary</em> end-to-end. Catches the bug class where scripts compile cleanly but the exported game misbehaves (missing assets, wrong export flags, debug-only autoloads, MIDI device init order, etc.). Also unlocks LLM-assisted triage on long runs.</li>
+</ul>
+
+<p>Smoke QA stays <span class="good">green</span> after the pipeline was added — no existing functionality regressed.</p>
+
+<footer>
+  Source prompt: <code>docs/prompts/ai-orchetrated-qa-pipeline-for-exe.txt</code> ·
+  Implementation files listed above ·
+  Generated 2026-05-29.
+</footer>
+
+</main>
+</body>
+</html>

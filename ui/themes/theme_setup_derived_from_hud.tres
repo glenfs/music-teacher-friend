@@ -1,17 +1,17 @@
 [gd_resource type="Theme" load_steps=7 format=3]
 
-[ext_resource type="FontFile" path="res://assets/fonts/Nunito-Regular.ttf" id="1_body_font"]
-[ext_resource type="FontFile" path="res://assets/fonts/Baloo2-SemiBold.ttf" id="4_title_button_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/Inter-Light.ttf" id="1_body_font"]
+[ext_resource type="FontFile" path="res://assets/fonts/Inter-Thin.ttf" id="4_title_button_font"]
 [ext_resource type="StyleBoxFlat" path="res://ui/styles/setup_card_stylebox.tres" id="2_card"]
 [ext_resource type="StyleBoxFlat" path="res://ui/styles/setup_chip_stylebox.tres" id="3_chip"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip_hover"]
-bg_color = Color(0.13, 0.24, 0.39, 0.82)
+bg_color = Color(0.07, 0.15, 0.27, 0.90)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.96, 0.86, 0.4, 0.4)
+border_color = Color(0.96, 0.77, 0.28, 0.72)
 corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
@@ -20,12 +20,12 @@ shadow_color = Color(0, 0, 0, 0.1)
 shadow_size = 2
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip_pressed"]
-bg_color = Color(0.08, 0.16, 0.28, 0.86)
+bg_color = Color(0.04, 0.09, 0.17, 0.96)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.96, 0.86, 0.4, 0.44)
+border_color = Color(1.0, 0.83, 0.38, 0.76)
 corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
@@ -34,12 +34,12 @@ shadow_color = Color(0, 0, 0, 0.12)
 shadow_size = 2
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_input"]
-bg_color = Color(0.1, 0.19, 0.32, 0.82)
+bg_color = Color(0.05, 0.11, 0.20, 0.94)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.96, 0.86, 0.4, 0.38)
+border_color = Color(0.96, 0.77, 0.28, 0.90)
 corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12

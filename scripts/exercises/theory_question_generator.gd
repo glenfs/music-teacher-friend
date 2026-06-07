@@ -95,7 +95,8 @@ static func build_progression_payload(
 	progression_defs: Dictionary,
 	chord_intervals: Dictionary,
 	review_queue: RefCounted,
-	rng: RandomNumberGenerator
+	rng: RandomNumberGenerator,
+	root_midi: int = 48
 ) -> Dictionary:
 	var progression_ids := selected_progression_ids(progression_selected, progression_defs)
 	var picked_id := str(review_queue.pick_next(progression_ids)) if review_queue != null else ""
@@ -106,7 +107,7 @@ static func build_progression_payload(
 	var progression_notes: Array = []
 	var steps: Array = prog_def.get("steps", [3, 5, 3])
 	for step in steps:
-		progression_notes.append(diatonic_triad_notes(int(step), 48, chord_intervals))
+		progression_notes.append(diatonic_triad_notes(int(step), root_midi, chord_intervals))
 	var progression_choices := ChoiceBuilderScript.progression_label_choices(picked_id, progression_ids, progression_defs, rng)
 	return {
 		"id": "progression:%s" % picked_id,
@@ -124,7 +125,8 @@ static func build_scale_mode_payload(
 	scale_selected_modes: Array,
 	scale_mode_defs: Dictionary,
 	review_queue: RefCounted,
-	rng: RandomNumberGenerator
+	rng: RandomNumberGenerator,
+	root_midi: int = 60
 ) -> Dictionary:
 	var selected_modes := selected_scale_mode_ids(scale_selected_modes, scale_mode_defs)
 	var picked_mode := str(review_queue.pick_next(selected_modes)) if review_queue != null else ""
@@ -133,7 +135,7 @@ static func build_scale_mode_payload(
 	var scale_notes: Array[int] = []
 	var scale_steps: Array = scale_mode_defs.get(picked_mode, scale_mode_defs["Major"])
 	for step in scale_steps:
-		scale_notes.append(60 + int(step))
+		scale_notes.append(root_midi + int(step))
 	return {
 		"id": "scale:%s" % picked_mode,
 		"item_id": picked_mode,

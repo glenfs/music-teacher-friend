@@ -10,6 +10,7 @@ signal piece_removed(student_id: String, piece_idx: int)
 signal lesson_added(student_id: String, entry: Dictionary)
 signal lesson_updated(student_id: String, entry_idx: int, entry: Dictionary)
 signal assignment_added(student_id: String, task: String, due: String)
+signal assignment_added_structured(student_id: String, assignment: Dictionary)
 signal assignment_toggled(student_id: String, idx: int)
 signal assignment_removed(student_id: String, idx: int)
 signal tech_added(student_id: String, item: Dictionary)
@@ -23,8 +24,9 @@ signal onboarding_load_sample_studio
 signal onboarding_skipped
 
 const T = preload("res://scripts/teacher/teacher_dashboard_tokens.gd")
-const FONT_TITLE := preload("res://assets/fonts/Baloo2-SemiBold.ttf")
-const FONT_BODY := preload("res://assets/fonts/Nunito-Regular.ttf")
+# Unified with Inter family (2026-05-30) — Baloo2/Nunito retired across the app.
+const FONT_TITLE := preload("res://assets/fonts/Inter-Thin.ttf")
+const FONT_BODY := preload("res://assets/fonts/Inter-Light.ttf")
 const LessonSessionScript = preload("res://scripts/students/lesson_session.gd")
 const CloudSyncDialogScript = preload("res://scripts/sync/cloud_sync_dialog.gd")
 const PerKeyRadarScript = preload("res://scripts/ui/per_key_radar.gd")
@@ -52,6 +54,17 @@ const TECH_STATUS_COLORS := {
 }
 const MAJOR_SCALE_KEYS := ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"]
 const MINOR_SCALE_KEYS := ["A", "E", "B", "F#", "C#", "G#", "D#", "Bb", "F", "C", "G", "D"]
+const EAR_ASSIGNMENT_MODES := ["Intervals", "Chords", "Pitch Match", "Cadence"]
+const EAR_ASSIGNMENT_PRESETS := {
+	"Intervals": ["Beginner: P1/P4/P5/P8", "Early Piano: M2/M3/P4/P5", "Custom weak areas"],
+	"Chords": ["Chords I: Major/Minor", "Triads", "Advanced colors", "Custom weak areas"],
+	"Pitch Match": ["Diatonic notes", "Triad tones", "Chromatic challenge", "Custom weak areas"],
+	"Cadence": ["Cadences I: Perfect/Plagal", "Common cadences", "Advanced cadences", "Custom weak areas"],
+}
+const SIGHT_ASSIGNMENT_MODES := ["Notes", "Chords"]
+const SIGHT_ASSIGNMENT_CLEFS := ["Treble", "Bass", "Grand Staff"]
+const SIGHT_ASSIGNMENT_KEYS := ["C", "1#", "2#", "1b", "2b"]
+const SIGHT_ASSIGNMENT_RANGES := ["Adaptive", "Middle C-G", "Treble staff", "Bass staff", "Current range"]
 
 var _data: Dictionary = {}
 var _selected_student_id: String = ""
@@ -856,6 +869,9 @@ func _build_tab_overview(student: Dictionary) -> void:
 			date_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			date_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			trend_dates_row.add_child(date_lbl)
+
+	_build_ear_training_analytics_card(vbox, student)
+	_build_common_confusions_card(vbox, student)
 
 	# Quick Note (Task 4) — fast one-field lesson log entry
 	var quick_note_card := _build_content_card()
@@ -2288,6 +2304,147 @@ func _build_since_last_lesson_card(parent: VBoxContainer, student: Dictionary) -
 		v.add_child(plan_lbl)
 
 
+func _build_ear_training_analytics_card(parent: VBoxContainer, student: Dictionary) -> void:
+	var item_stats_any: Variant = student.get("item_stats", {})
+	if typeof(item_stats_any) != TYPE_DICTIONARY:
+		return
+	var item_stats: Dictionary = item_stats_any as Dictionary
+	var categories := ["interval", "chord", "pitch_match", "progression", "scale_mode", "cadence"]
+	var rows: Array[Dictionary] = []
+	for category in categories:
+		var cat_any: Variant = item_stats.get(category, {})
+		if typeof(cat_any) != TYPE_DICTIONARY:
+			continue
+		var asked_total := 0
+		var correct_total := 0
+		var weakest_item := ""
+		var weakest_accuracy := 101
+		var cat_stats: Dictionary = cat_any as Dictionary
+		for item_key in cat_stats:
+			var entry_any: Variant = cat_stats.get(item_key, {})
+			if typeof(entry_any) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = entry_any as Dictionary
+			var asked := int(entry.get("asked", 0))
+			var correct := int(entry.get("correct", 0))
+			if asked <= 0:
+				continue
+			asked_total += asked
+			correct_total += correct
+			if asked >= 3:
+				var item_acc := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+				if item_acc < weakest_accuracy:
+					weakest_accuracy = item_acc
+					weakest_item = str(item_key)
+		if asked_total <= 0:
+			continue
+		var accuracy := int(round(float(correct_total) / float(maxi(1, asked_total)) * 100.0))
+		rows.append({
+			"category": category,
+			"asked": asked_total,
+			"accuracy": accuracy,
+			"weakest": weakest_item,
+			"weakest_accuracy": weakest_accuracy,
+		})
+	if rows.is_empty():
+		return
+
+	var card := _build_content_card()
+	parent.add_child(card)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	card.add_child(vbox)
+	vbox.add_child(_build_section_title("Ear Training Analytics"))
+
+	var chips := HBoxContainer.new()
+	chips.add_theme_constant_override("separation", 8)
+	vbox.add_child(chips)
+	for row in rows:
+		var acc := int(row.get("accuracy", 0))
+		var color: Color = T.ACCENT_GREEN if acc >= 80 else (T.ACCENT_GOLD if acc >= 65 else T.ACCENT_RED)
+		chips.add_child(_build_stat_chip(_format_ear_category(str(row.get("category", ""))), "%d%%" % acc, color))
+
+	for row in rows:
+		var detail := "%s  %d%% over %d questions" % [
+			_format_ear_category(str(row.get("category", ""))),
+			int(row.get("accuracy", 0)),
+			int(row.get("asked", 0))
+		]
+		var weakest := str(row.get("weakest", "")).strip_edges()
+		if weakest != "":
+			detail += "  |  weakest: %s (%d%%)" % [weakest, int(row.get("weakest_accuracy", 0))]
+		vbox.add_child(_build_label(detail, T.FONT_SIZE_SMALL, T.TEXT_SECONDARY))
+
+
+func _build_common_confusions_card(parent: VBoxContainer, student: Dictionary) -> void:
+	var conf_any: Variant = student.get("confusion_stats", {})
+	if typeof(conf_any) != TYPE_DICTIONARY:
+		return
+	var confusions: Dictionary = conf_any as Dictionary
+	var rows: Array[Dictionary] = []
+	for category in confusions:
+		var cat_any: Variant = confusions.get(category, {})
+		if typeof(cat_any) != TYPE_DICTIONARY:
+			continue
+		var cat: Dictionary = cat_any as Dictionary
+		for correct_key in cat:
+			var chosen_any: Variant = cat.get(correct_key, {})
+			if typeof(chosen_any) != TYPE_DICTIONARY:
+				continue
+			var chosen_map: Dictionary = chosen_any as Dictionary
+			for chosen_key in chosen_map:
+				rows.append({
+					"category": str(category),
+					"correct": str(correct_key),
+					"chosen": str(chosen_key),
+					"count": int(chosen_map.get(chosen_key, 0)),
+				})
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("count", 0)) > int(b.get("count", 0)))
+	if rows.is_empty():
+		return
+	if rows.size() > 5:
+		rows.resize(5)
+
+	var card := _build_content_card()
+	parent.add_child(card)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	card.add_child(vbox)
+	vbox.add_child(_build_section_title("Common Confusions"))
+	for row in rows:
+		var line := "%s: %s heard as %s  (%d times)" % [
+			_format_ear_category(str(row.get("category", ""))),
+			str(row.get("correct", "")),
+			str(row.get("chosen", "")),
+			int(row.get("count", 0))
+		]
+		vbox.add_child(_build_label(line, T.FONT_SIZE_SMALL, T.TEXT_SECONDARY))
+
+
+func _format_ear_category(category: String) -> String:
+	match category:
+		"interval":
+			return "Intervals"
+		"chord":
+			return "Chords"
+		"pitch_match":
+			return "Pitch Match"
+		"progression":
+			return "Progressions"
+		"scale_mode":
+			return "Scale/Mode"
+		"cadence":
+			return "Cadences"
+		"sight_note":
+			return "Sight Notes"
+		"sight_chord":
+			return "Sight Chords"
+		"sight_key":
+			return "Sight Key"
+		_:
+			return category.capitalize()
+
+
 func set_per_student_stats_provider(fn: Callable) -> void:
 	_per_student_stats_provider = fn
 	if _content_container != null and _content_container.visible:
@@ -2736,6 +2893,9 @@ func _build_tab_assignments(student: Dictionary) -> void:
 	)
 	form_hbox.add_child(add_btn)
 
+	_build_ear_assignment_form(vbox, student)
+	_build_sight_assignment_form(vbox, student)
+
 	# Open assignments
 	var assignments: Array = student.get("assignments", [])
 	var open_assignments: Array[Dictionary] = []
@@ -2792,6 +2952,408 @@ func _build_tab_assignments(student: Dictionary) -> void:
 	var pad := Control.new()
 	pad.custom_minimum_size = Vector2(0, 20)
 	vbox.add_child(pad)
+
+
+func _build_ear_assignment_form(parent: VBoxContainer, student: Dictionary) -> void:
+	var card := _build_content_card()
+	parent.add_child(card)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	card.add_child(vbox)
+	vbox.add_child(_build_section_title("Ear Training Assignment"))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	vbox.add_child(row)
+
+	row.add_child(_build_field_label("Mode"))
+	var mode_opt := OptionButton.new()
+	mode_opt.name = "ear_assign_mode"
+	mode_opt.custom_minimum_size = Vector2(130, T.INPUT_HEIGHT)
+	for i in range(EAR_ASSIGNMENT_MODES.size()):
+		mode_opt.add_item(EAR_ASSIGNMENT_MODES[i], i)
+		mode_opt.set_item_metadata(i, EAR_ASSIGNMENT_MODES[i])
+	row.add_child(mode_opt)
+
+	row.add_child(_build_field_label("Set"))
+	var preset_opt := OptionButton.new()
+	preset_opt.name = "ear_assign_preset"
+	preset_opt.custom_minimum_size = Vector2(220, T.INPUT_HEIGHT)
+	row.add_child(preset_opt)
+	_populate_ear_assignment_presets(preset_opt, EAR_ASSIGNMENT_MODES[0])
+	mode_opt.item_selected.connect(func(index: int):
+		var mode_name := str(mode_opt.get_item_metadata(index))
+		_populate_ear_assignment_presets(preset_opt, mode_name)
+	)
+
+	row.add_child(_build_field_label("Round"))
+	var q_spin := SpinBox.new()
+	q_spin.name = "ear_assign_questions"
+	q_spin.min_value = 5
+	q_spin.max_value = 40
+	q_spin.step = 5
+	q_spin.value = 10
+	q_spin.custom_minimum_size = Vector2(72, T.INPUT_HEIGHT)
+	row.add_child(q_spin)
+
+	row.add_child(_build_field_label("Target"))
+	var target_spin := SpinBox.new()
+	target_spin.name = "ear_assign_target"
+	target_spin.min_value = 60
+	target_spin.max_value = 100
+	target_spin.step = 5
+	target_spin.value = 80
+	target_spin.custom_minimum_size = Vector2(72, T.INPUT_HEIGHT)
+	row.add_child(target_spin)
+
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 8)
+	vbox.add_child(action_row)
+	action_row.add_child(_build_field_label("Due"))
+	var due_input := _build_input("YYYY-MM-DD", "")
+	due_input.name = "ear_assign_due"
+	due_input.custom_minimum_size = Vector2(112, T.INPUT_HEIGHT)
+	action_row.add_child(due_input)
+
+	var add_btn := _build_button("Assign Ear", T.ACCENT_GOLD, func():
+		_on_add_ear_assignment(card)
+	)
+	action_row.add_child(add_btn)
+
+	var weak_items := _top_weak_ear_items(student, 4)
+	if weak_items.size() > 0:
+		var weak_row := HBoxContainer.new()
+		weak_row.add_theme_constant_override("separation", 8)
+		vbox.add_child(weak_row)
+		weak_row.add_child(_build_label("Weak areas:", T.FONT_SIZE_SMALL, T.TEXT_MUTED))
+		for item in weak_items:
+			var label := "%s %s" % [_format_ear_category(str(item.get("category", ""))), str(item.get("item", ""))]
+			weak_row.add_child(_build_label(label, T.FONT_SIZE_SMALL, T.TEXT_SECONDARY))
+		var weak_btn := _build_button("Assign Weak Areas", T.ACCENT_RED, func():
+			_on_add_weak_ear_assignment(card, weak_items)
+		)
+		weak_row.add_child(weak_btn)
+
+
+func _build_sight_assignment_form(parent: VBoxContainer, student: Dictionary) -> void:
+	var card := _build_content_card()
+	parent.add_child(card)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	card.add_child(vbox)
+	vbox.add_child(_build_section_title("Sight Reading Assignment"))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	vbox.add_child(row)
+
+	row.add_child(_build_field_label("Mode"))
+	var mode_opt := OptionButton.new()
+	mode_opt.name = "sight_assign_mode"
+	mode_opt.custom_minimum_size = Vector2(112, T.INPUT_HEIGHT)
+	for i in range(SIGHT_ASSIGNMENT_MODES.size()):
+		mode_opt.add_item(SIGHT_ASSIGNMENT_MODES[i], i)
+		mode_opt.set_item_metadata(i, SIGHT_ASSIGNMENT_MODES[i])
+	row.add_child(mode_opt)
+
+	row.add_child(_build_field_label("Clef"))
+	var clef_opt := OptionButton.new()
+	clef_opt.name = "sight_assign_clef"
+	clef_opt.custom_minimum_size = Vector2(132, T.INPUT_HEIGHT)
+	for i in range(SIGHT_ASSIGNMENT_CLEFS.size()):
+		clef_opt.add_item(SIGHT_ASSIGNMENT_CLEFS[i], i)
+		clef_opt.set_item_metadata(i, SIGHT_ASSIGNMENT_CLEFS[i])
+	row.add_child(clef_opt)
+
+	row.add_child(_build_field_label("Key"))
+	var key_opt := OptionButton.new()
+	key_opt.name = "sight_assign_key"
+	key_opt.custom_minimum_size = Vector2(86, T.INPUT_HEIGHT)
+	for i in range(SIGHT_ASSIGNMENT_KEYS.size()):
+		key_opt.add_item(SIGHT_ASSIGNMENT_KEYS[i], i)
+		key_opt.set_item_metadata(i, SIGHT_ASSIGNMENT_KEYS[i])
+	row.add_child(key_opt)
+
+	row.add_child(_build_field_label("Range"))
+	var range_opt := OptionButton.new()
+	range_opt.name = "sight_assign_range"
+	range_opt.custom_minimum_size = Vector2(136, T.INPUT_HEIGHT)
+	for i in range(SIGHT_ASSIGNMENT_RANGES.size()):
+		range_opt.add_item(SIGHT_ASSIGNMENT_RANGES[i], i)
+		range_opt.set_item_metadata(i, SIGHT_ASSIGNMENT_RANGES[i])
+	row.add_child(range_opt)
+
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 8)
+	vbox.add_child(row2)
+
+	row2.add_child(_build_field_label("Round"))
+	var q_spin := SpinBox.new()
+	q_spin.name = "sight_assign_questions"
+	q_spin.min_value = 5
+	q_spin.max_value = 40
+	q_spin.step = 5
+	q_spin.value = 10
+	q_spin.custom_minimum_size = Vector2(72, T.INPUT_HEIGHT)
+	row2.add_child(q_spin)
+
+	row2.add_child(_build_field_label("Target"))
+	var target_spin := SpinBox.new()
+	target_spin.name = "sight_assign_target"
+	target_spin.min_value = 60
+	target_spin.max_value = 100
+	target_spin.step = 5
+	target_spin.value = 80
+	target_spin.custom_minimum_size = Vector2(72, T.INPUT_HEIGHT)
+	row2.add_child(target_spin)
+
+	row2.add_child(_build_field_label("Due"))
+	var due_input := _build_input("YYYY-MM-DD", "")
+	due_input.name = "sight_assign_due"
+	due_input.custom_minimum_size = Vector2(112, T.INPUT_HEIGHT)
+	row2.add_child(due_input)
+
+	var add_btn := _build_button("Assign Sight", T.ACCENT_TEAL, func():
+		_on_add_sight_assignment(card)
+	)
+	row2.add_child(add_btn)
+
+	var weak_items := _top_weak_sight_items(student, 4)
+	if weak_items.size() > 0:
+		var weak_row := HBoxContainer.new()
+		weak_row.add_theme_constant_override("separation", 8)
+		vbox.add_child(weak_row)
+		weak_row.add_child(_build_label("Weak reading:", T.FONT_SIZE_SMALL, T.TEXT_MUTED))
+		for item in weak_items:
+			var label := "%s %s" % [_format_ear_category(str(item.get("category", ""))), str(item.get("item", ""))]
+			weak_row.add_child(_build_label(label, T.FONT_SIZE_SMALL, T.TEXT_SECONDARY))
+		var weak_btn := _build_button("Assign Weak Reading", T.ACCENT_RED, func():
+			_on_add_weak_sight_assignment(card, weak_items)
+		)
+		weak_row.add_child(weak_btn)
+
+
+func _populate_ear_assignment_presets(preset_opt: OptionButton, mode_name: String) -> void:
+	preset_opt.clear()
+	var presets_any: Variant = EAR_ASSIGNMENT_PRESETS.get(mode_name, ["Custom weak areas"])
+	var presets: Array = presets_any if typeof(presets_any) == TYPE_ARRAY else ["Custom weak areas"]
+	for i in range(presets.size()):
+		preset_opt.add_item(str(presets[i]), i)
+		preset_opt.set_item_metadata(i, str(presets[i]))
+	if preset_opt.item_count > 0:
+		preset_opt.select(0)
+
+
+func _on_add_ear_assignment(form_card: PanelContainer) -> void:
+	if _selected_student_id == "":
+		return
+	var mode_opt := _find_child_by_name(form_card, "ear_assign_mode") as OptionButton
+	var preset_opt := _find_child_by_name(form_card, "ear_assign_preset") as OptionButton
+	var q_spin := _find_child_by_name(form_card, "ear_assign_questions") as SpinBox
+	var target_spin := _find_child_by_name(form_card, "ear_assign_target") as SpinBox
+	var due_input := _find_child_by_name(form_card, "ear_assign_due") as LineEdit
+	var mode_name := str(mode_opt.get_item_metadata(mode_opt.selected)) if mode_opt != null else "Intervals"
+	var preset_name := str(preset_opt.get_item_metadata(preset_opt.selected)) if preset_opt != null and preset_opt.selected >= 0 else "Custom weak areas"
+	var question_count := int(q_spin.value) if q_spin != null else 10
+	var target_score := int(target_spin.value) if target_spin != null else 80
+	var due_str := due_input.text.strip_edges() if due_input != null else ""
+	var task := "Ear Training: %s | %s | %d questions | Target %d%%" % [mode_name, preset_name, question_count, target_score]
+	var assignment := {
+		"task": task,
+		"due": due_str,
+		"done": false,
+		"done_at": "",
+		"type": "ear_training",
+		"mode": mode_name,
+		"preset": preset_name,
+		"question_count": question_count,
+		"target_score": target_score,
+	}
+	_add_structured_assignment_locally(assignment)
+	assignment_added_structured.emit(_selected_student_id, assignment)
+	data_changed.emit()
+	_refresh_content()
+
+
+func _on_add_weak_ear_assignment(form_card: PanelContainer, weak_items: Array) -> void:
+	if _selected_student_id == "" or weak_items.is_empty():
+		return
+	var q_spin := _find_child_by_name(form_card, "ear_assign_questions") as SpinBox
+	var target_spin := _find_child_by_name(form_card, "ear_assign_target") as SpinBox
+	var due_input := _find_child_by_name(form_card, "ear_assign_due") as LineEdit
+	var question_count := int(q_spin.value) if q_spin != null else 10
+	var target_score := int(target_spin.value) if target_spin != null else 80
+	var due_str := due_input.text.strip_edges() if due_input != null else ""
+	var focus_labels: Array[String] = []
+	for item in weak_items:
+		focus_labels.append("%s %s" % [_format_ear_category(str(item.get("category", ""))), str(item.get("item", ""))])
+	var task := "Ear Training: Weak Areas | %s | %d questions | Target %d%%" % [", ".join(focus_labels), question_count, target_score]
+	var assignment := {
+		"task": task,
+		"due": due_str,
+		"done": false,
+		"done_at": "",
+		"type": "ear_training",
+		"mode": "Weak Areas",
+		"preset": "Custom weak areas",
+		"focus_items": weak_items.duplicate(true),
+		"question_count": question_count,
+		"target_score": target_score,
+	}
+	_add_structured_assignment_locally(assignment)
+	assignment_added_structured.emit(_selected_student_id, assignment)
+	data_changed.emit()
+	_refresh_content()
+
+
+func _on_add_sight_assignment(form_card: PanelContainer) -> void:
+	if _selected_student_id == "":
+		return
+	var mode_opt := _find_child_by_name(form_card, "sight_assign_mode") as OptionButton
+	var clef_opt := _find_child_by_name(form_card, "sight_assign_clef") as OptionButton
+	var key_opt := _find_child_by_name(form_card, "sight_assign_key") as OptionButton
+	var range_opt := _find_child_by_name(form_card, "sight_assign_range") as OptionButton
+	var q_spin := _find_child_by_name(form_card, "sight_assign_questions") as SpinBox
+	var target_spin := _find_child_by_name(form_card, "sight_assign_target") as SpinBox
+	var due_input := _find_child_by_name(form_card, "sight_assign_due") as LineEdit
+	var mode_name := str(mode_opt.get_item_metadata(mode_opt.selected)) if mode_opt != null else "Notes"
+	var clef_name := str(clef_opt.get_item_metadata(clef_opt.selected)) if clef_opt != null else "Treble"
+	if mode_name == "Notes" and clef_name == "Grand Staff":
+		clef_name = "Treble"
+	if mode_name == "Chords" and clef_name != "Grand Staff":
+		clef_name = "Grand Staff"
+	var key_name := str(key_opt.get_item_metadata(key_opt.selected)) if key_opt != null else "C"
+	var range_name := str(range_opt.get_item_metadata(range_opt.selected)) if range_opt != null else "Adaptive"
+	var question_count := int(q_spin.value) if q_spin != null else 10
+	var target_score := int(target_spin.value) if target_spin != null else 80
+	var due_str := due_input.text.strip_edges() if due_input != null else ""
+	var task := "Sight Reading: %s | %s | %s | %s | %d questions | Target %d%%" % [mode_name, clef_name, key_name, range_name, question_count, target_score]
+	var assignment := {
+		"task": task,
+		"due": due_str,
+		"done": false,
+		"done_at": "",
+		"type": "sight_reading",
+		"mode": mode_name,
+		"clef": clef_name,
+		"key_signature": key_name,
+		"range_preset": range_name,
+		"question_count": question_count,
+		"target_score": target_score,
+	}
+	_add_structured_assignment_locally(assignment)
+	assignment_added_structured.emit(_selected_student_id, assignment)
+	data_changed.emit()
+	_refresh_content()
+
+
+func _on_add_weak_sight_assignment(form_card: PanelContainer, weak_items: Array) -> void:
+	if _selected_student_id == "" or weak_items.is_empty():
+		return
+	var q_spin := _find_child_by_name(form_card, "sight_assign_questions") as SpinBox
+	var target_spin := _find_child_by_name(form_card, "sight_assign_target") as SpinBox
+	var due_input := _find_child_by_name(form_card, "sight_assign_due") as LineEdit
+	var question_count := int(q_spin.value) if q_spin != null else 10
+	var target_score := int(target_spin.value) if target_spin != null else 80
+	var due_str := due_input.text.strip_edges() if due_input != null else ""
+	var focus_labels: Array[String] = []
+	var mode_name := "Notes"
+	for item in weak_items:
+		var category := str(item.get("category", ""))
+		if category == "sight_chord":
+			mode_name = "Chords"
+		focus_labels.append("%s %s" % [_format_ear_category(category), str(item.get("item", ""))])
+	var clef_name := "Grand Staff" if mode_name == "Chords" else "Treble"
+	var task := "Sight Reading: Weak Reading | %s | %d questions | Target %d%%" % [", ".join(focus_labels), question_count, target_score]
+	var assignment := {
+		"task": task,
+		"due": due_str,
+		"done": false,
+		"done_at": "",
+		"type": "sight_reading",
+		"mode": mode_name,
+		"clef": clef_name,
+		"key_signature": "C",
+		"range_preset": "Adaptive",
+		"focus_items": weak_items.duplicate(true),
+		"question_count": question_count,
+		"target_score": target_score,
+	}
+	_add_structured_assignment_locally(assignment)
+	assignment_added_structured.emit(_selected_student_id, assignment)
+	data_changed.emit()
+	_refresh_content()
+
+
+func _add_structured_assignment_locally(assignment: Dictionary) -> void:
+	var student := _get_selected_student()
+	if student.is_empty():
+		return
+	if not student.has("assignments"):
+		student["assignments"] = []
+	var assignments: Array = student.get("assignments", [])
+	assignments.append(assignment.duplicate(true))
+	student["assignments"] = assignments
+
+
+func _top_weak_ear_items(student: Dictionary, max_results: int) -> Array:
+	var item_stats_any: Variant = student.get("item_stats", {})
+	if typeof(item_stats_any) != TYPE_DICTIONARY:
+		return []
+	var categories := ["interval", "chord", "pitch_match", "progression", "scale_mode", "cadence"]
+	var out: Array = []
+	var item_stats: Dictionary = item_stats_any as Dictionary
+	for category in categories:
+		var cat_any: Variant = item_stats.get(category, {})
+		if typeof(cat_any) != TYPE_DICTIONARY:
+			continue
+		var cat: Dictionary = cat_any as Dictionary
+		for item_key in cat:
+			var entry_any: Variant = cat.get(item_key, {})
+			if typeof(entry_any) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = entry_any as Dictionary
+			var asked := int(entry.get("asked", 0))
+			var correct := int(entry.get("correct", 0))
+			if asked < 3:
+				continue
+			var accuracy := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+			if accuracy < 75:
+				out.append({"category": category, "item": str(item_key), "accuracy": accuracy, "asked": asked})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("accuracy", 100)) < int(b.get("accuracy", 100)))
+	if out.size() > max_results:
+		out.resize(max_results)
+	return out
+
+
+func _top_weak_sight_items(student: Dictionary, max_results: int) -> Array:
+	var item_stats_any: Variant = student.get("item_stats", {})
+	if typeof(item_stats_any) != TYPE_DICTIONARY:
+		return []
+	var categories := ["sight_note", "sight_chord", "sight_key"]
+	var out: Array = []
+	var item_stats: Dictionary = item_stats_any as Dictionary
+	for category in categories:
+		var cat_any: Variant = item_stats.get(category, {})
+		if typeof(cat_any) != TYPE_DICTIONARY:
+			continue
+		var cat: Dictionary = cat_any as Dictionary
+		for item_key in cat:
+			var entry_any: Variant = cat.get(item_key, {})
+			if typeof(entry_any) != TYPE_DICTIONARY:
+				continue
+			var entry: Dictionary = entry_any as Dictionary
+			var asked := int(entry.get("asked", 0))
+			var correct := int(entry.get("correct", 0))
+			if asked < 3:
+				continue
+			var accuracy := int(round(float(correct) / float(maxi(1, asked)) * 100.0))
+			if accuracy < 75:
+				out.append({"category": category, "item": str(item_key), "accuracy": accuracy, "asked": asked})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("accuracy", 100)) < int(b.get("accuracy", 100)))
+	if out.size() > max_results:
+		out.resize(max_results)
+	return out
 
 
 func _build_assignment_row(assignment: Dictionary, real_idx: int, is_done: bool) -> PanelContainer:

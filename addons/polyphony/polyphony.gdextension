@@ -1,0 +1,15 @@
+[configuration]
+entry_symbol = "polyphony_library_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+windows.debug.x86_64 = "res://addons/polyphony/bin/polyphony.windows.x86_64.dll"
+windows.release.x86_64 = "res://addons/polyphony/bin/polyphony.windows.x86_64.dll"
+android.debug.arm64 = "res://addons/polyphony/bin/libpolyphony.android.arm64-v8a.so"
+android.release.arm64 = "res://addons/polyphony/bin/libpolyphony.android.arm64-v8a.so"
+
+[dependencies]
+windows.debug.x86_64 = { "res://addons/polyphony/bin/onnxruntime.dll" : "" }
+windows.release.x86_64 = { "res://addons/polyphony/bin/onnxruntime.dll" : "" }
+android.debug.arm64 = { "res://addons/polyphony/bin/libonnxruntime.so" : "" }
+android.release.arm64 = { "res://addons/polyphony/bin/libonnxruntime.so" : "" }

@@ -1,0 +1,13 @@
+# Build output
+build/
+*.log
+# Prebuilt ONNX Runtime (downloaded; see README) + extracted tree
+third_party/onnxruntime-win-x64.zip
+third_party/onnxruntime-win-x64-*/
+third_party/onnxruntime-android*/
+# godot-cpp clone (re-clone; see README) and dumped engine API (regenerate)
+godot-cpp/
+godot_api/
+# Parity fixtures (regenerate via dump_reference.py)
+testdata/*.bin
+# Keep: models/nmp.onnx, src/, CMakeLists.txt, *.py, *.md, testdata/*.meta.json
