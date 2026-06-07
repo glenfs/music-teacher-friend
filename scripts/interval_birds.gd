@@ -1788,6 +1788,9 @@ var _skill_heatmap_overlay: ColorRect = null
 var _skill_heatmap_body: VBoxContainer = null
 var _skill_focus_items: Dictionary = {}  # category -> Array[String] to bias toward
 var _skill_progress_button: Button = null
+# Home "My Performance" overview panel (Sight Reading + Ear Training).
+var _performance_overlay: ColorRect = null
+var _performance_body: VBoxContainer = null
 # Confusion drill state: when true, the next session is restricted to items
 # from the student's top confused pairs. Cleared at session end so subsequent
 # sessions go back to normal pool.
@@ -4413,6 +4416,11 @@ func _build_ui() -> void:
 		chord_explorer_card_btn.set_meta("main_menu_mode_key", "ChordExplorer")
 		_home_material_buttons.append(chord_explorer_card_btn)
 		_set_home_selection_state(chord_explorer_card_btn, false)
+	var performance_card_btn := _build_home_overview_card(tools_grid, "My Performance", "Your overall sight-reading & ear-training stats", ICON_PROGRESS_PATH, Color(0.96, 0.78, 0.30, 1.0), _on_performance_open)
+	if performance_card_btn != null:
+		performance_card_btn.set_meta("main_menu_mode_key", "Performance")
+		_home_material_buttons.append(performance_card_btn)
+		_set_home_selection_state(performance_card_btn, false)
 
 	if LEARNING_MODE_ENABLED:
 		var learning_grid := _build_home_overview_section(_home_overview_grid, "Lessons")
@@ -15175,6 +15183,17 @@ func _merge_session_into_lifetime() -> void:
 		_chord_stats_asked,
 		_chord_stats_correct
 	)
+	# Mode-agnostic rollup for the student "My Performance" view: overall accuracy
+	# + session count for the two big categories (Ear Training vs Sight Reading).
+	var perf_cat := ""
+	if _is_ear_training_mode(_selected_mode):
+		perf_cat = "ear"
+	elif _selected_mode == MODE_SIGHT:
+		perf_cat = "sight"
+	if perf_cat != "" and _total_questions > 0:
+		_lifetime_stats["perf_%s_sessions" % perf_cat] = int(_lifetime_stats.get("perf_%s_sessions" % perf_cat, 0)) + 1
+		_lifetime_stats["perf_%s_correct" % perf_cat] = int(_lifetime_stats.get("perf_%s_correct" % perf_cat, 0)) + _score
+		_lifetime_stats["perf_%s_asked" % perf_cat] = int(_lifetime_stats.get("perf_%s_asked" % perf_cat, 0)) + _total_questions
 	# Per-key/mode BPM record (tempo training).
 	# Only records when there were enough questions AND accuracy >= 85%.
 	_record_bpm_session_if_qualifying()
@@ -15194,7 +15213,11 @@ func _bpm_record_key_for_mode() -> String:
 		MODE_CADENCE:
 			return "cadence"
 		MODE_SIGHT:
-			return "sight:%s" % _sight_key_signature
+			# Sight Reading has no true tempo (you answer at your own pace), so the
+			# old "BPM" was just an echo of the Ear-Training tempo slider — meaningless
+			# here. Return "" so no BPM record / tempo-ramp is produced for sight modes.
+			# (Rhythm Flow / Note Flow report their real BPM in their own result line.)
+			return ""
 		_:
 			return ""
 
@@ -15250,9 +15273,15 @@ func _max_bpm_summary_text() -> String:
 	var sorted_keys := _max_bpm_records.keys()
 	sorted_keys.sort()
 	for k in sorted_keys:
+		# Drop legacy "sight:*" entries — Sight Reading has no real tempo, so those
+		# records were meaningless (an echo of the ear-training tempo).
+		if String(k).begins_with("sight:"):
+			continue
 		var label: String = _bpm_record_label_for_key(String(k))
 		var bpm: int = int(_max_bpm_records[k])
 		lines.append("  %s — %d BPM" % [label, bpm])
+	if lines.is_empty():
+		return ""
 	return "Max steady-tempo records:\n%s" % "\n".join(lines)
 
 
@@ -21003,6 +21032,139 @@ func _on_skill_focus_pressed() -> void:
 		_on_start_quiz_pressed()
 
 
+# --- Home "My Performance" overview (Sight Reading + Ear Training) ----------
+func _perf_category(cat: String) -> Dictionary:
+	var sessions := int(_lifetime_stats.get("perf_%s_sessions" % cat, 0))
+	var correct := int(_lifetime_stats.get("perf_%s_correct" % cat, 0))
+	var asked := int(_lifetime_stats.get("perf_%s_asked" % cat, 0))
+	var acc := (float(correct) / float(asked)) if asked > 0 else -1.0
+	return {"sessions": sessions, "correct": correct, "asked": asked, "acc": acc}
+
+
+func _on_performance_open() -> void:
+	_ensure_performance_overlay()
+	_populate_performance()
+	_performance_overlay.visible = true
+	_performance_overlay.move_to_front()
+
+
+func _hide_performance_overlay() -> void:
+	if _performance_overlay != null and is_instance_valid(_performance_overlay):
+		_performance_overlay.visible = false
+
+
+func _ensure_performance_overlay() -> void:
+	if _performance_overlay != null and is_instance_valid(_performance_overlay):
+		return
+	var ov := ColorRect.new()
+	ov.color = Color(0.04, 0.06, 0.10, 0.88)
+	ov.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.z_as_relative = false
+	ov.z_index = 4000
+	ov.visible = false
+	ov.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(ov)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ov.add_child(center)
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(560, 420)
+	center.add_child(card)
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_%s" % side, 22)
+	card.add_child(pad)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 14)
+	pad.add_child(col)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 10)
+	col.add_child(title_row)
+	var title_icon := TextureRect.new()
+	title_icon.texture = load(ICON_PROGRESS_PATH)
+	title_icon.custom_minimum_size = Vector2(32, 32)
+	title_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	title_row.add_child(title_icon)
+	var title := Label.new()
+	title.text = "My Performance"
+	title.add_theme_font_size_override("font_size", 24)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_row.add_child(title)
+	_performance_body = VBoxContainer.new()
+	_performance_body.add_theme_constant_override("separation", 12)
+	col.add_child(_performance_body)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	col.add_child(actions)
+	var detail_btn := Button.new()
+	detail_btn.text = "Note / Interval heatmap"
+	detail_btn.custom_minimum_size = Vector2(220, 44)
+	detail_btn.pressed.connect(func() -> void:
+		_hide_performance_overlay()
+		_show_skill_heatmap())
+	actions.add_child(detail_btn)
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.custom_minimum_size = Vector2(120, 44)
+	close_btn.pressed.connect(_hide_performance_overlay)
+	actions.add_child(close_btn)
+	_performance_overlay = ov
+
+
+func _build_perf_category_row(title_text: String, accent: Color, data: Dictionary) -> void:
+	var sessions := int(data.get("sessions", 0))
+	var acc := float(data.get("acc", -1.0))
+	var row := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.16, 0.23, 0.9)
+	sb.corner_radius_top_left = 12
+	sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_left = 12
+	sb.corner_radius_bottom_right = 12
+	sb.border_width_left = 4
+	sb.border_color = accent
+	row.add_theme_stylebox_override("panel", sb)
+	_performance_body.add_child(row)
+	var pad := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_%s" % side, 12)
+	row.add_child(pad)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	pad.add_child(v)
+	var head := Label.new()
+	head.text = title_text
+	head.add_theme_font_size_override("font_size", 18)
+	head.add_theme_color_override("font_color", Color(0.98, 0.94, 0.78, 1.0))
+	v.add_child(head)
+	var detail := Label.new()
+	detail.add_theme_font_size_override("font_size", 15)
+	if sessions <= 0:
+		detail.text = "No sessions yet — play a round to start tracking."
+		detail.add_theme_color_override("font_color", Color(0.78, 0.82, 0.9, 0.85))
+	else:
+		var acc_pct := int(round(acc * 100.0)) if acc >= 0.0 else 0
+		detail.text = "%d sessions   ·   %d%% accuracy" % [sessions, acc_pct]
+		detail.add_theme_color_override("font_color", _skill_heatmap_color(acc))
+	v.add_child(detail)
+
+
+func _populate_performance() -> void:
+	if _performance_body == null:
+		return
+	for c in _performance_body.get_children():
+		_performance_body.remove_child(c)
+		c.queue_free()
+	_build_perf_category_row("%s  Sight Reading" % char(0x1F3BC), Color(0.45, 0.80, 0.55, 1.0), _perf_category("sight"))
+	_build_perf_category_row("%s  Ear Training" % char(0x1F3B5), Color(0.55, 0.70, 0.98, 1.0), _perf_category("ear"))
+	var streak := Label.new()
+	streak.add_theme_font_size_override("font_size", 14)
+	streak.add_theme_color_override("font_color", Color(0.96, 0.86, 0.52, 0.95))
+	streak.text = "%s  Day streak: %d" % [char(0x1F525), _streak_count]
+	_performance_body.add_child(streak)
+
+
 func _current_sight_grand_staff_chord_midis() -> Array[int]:
 	var out: Array[int] = []
 	if _selected_mode != MODE_SIGHT or _sight_mode != "Chords":
@@ -21073,6 +21235,7 @@ func _apply_answer_mode() -> void:
 		_clear_sight_status_icon()
 	var gate_choices_for_round_start := _awaiting_round_start and (_is_ear_training_mode() or _selected_mode == MODE_SIGHT or _selected_mode == MODE_NOTE_CHASE)
 	var is_ear_mode := _is_ear_training_mode()
+	var sight_answer_runtime_active := _game_panel != null and _game_panel.visible and _quiz_active and not _awaiting_round_start
 	var vp := get_viewport_rect().size
 	var ear_chord_raise_pct := 0.40
 	var ear_chord_bottom_lift_px := clampf(vp.y * 0.04, 20.0, 56.0) if _selected_mode == MODE_CHORD else 0.0
@@ -21271,12 +21434,12 @@ func _apply_answer_mode() -> void:
 
 	for note_name in _sight_key_buttons.keys():
 		var k_btn: Button = _sight_key_buttons[note_name]
-		var show_key := _sight_uses_note_keyboard()
+		var show_key := sight_answer_runtime_active and _sight_uses_note_keyboard()
 		k_btn.visible = show_key
 		k_btn.disabled = not show_key or gate_choices_for_round_start
 		k_btn.modulate = Color(1, 1, 1, 1)
 	if _sight_keyboard_row != null:
-		_sight_keyboard_row.visible = _sight_uses_note_keyboard()
+		_sight_keyboard_row.visible = sight_answer_runtime_active and _sight_uses_note_keyboard()
 	if _sight_notes_mic_button != null:
 		var show_sight_mic := _selected_mode == MODE_SIGHT and _sight_mode == "Notes" and _quiz_active
 		_sight_notes_mic_button.visible = show_sight_mic
@@ -21395,12 +21558,12 @@ func _apply_answer_mode() -> void:
 
 	for i in _sight_chord_choice_buttons.size():
 		var sc_btn: Button = _sight_chord_choice_buttons[i]
-		var show_chord_choice := _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
+		var show_chord_choice := sight_answer_runtime_active and _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
 		sc_btn.visible = show_chord_choice
 		sc_btn.disabled = not show_chord_choice or gate_choices_for_round_start
 		sc_btn.modulate = Color(1, 1, 1, 1)
 	if _sight_chord_choice_row != null:
-		_sight_chord_choice_row.visible = _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
+		_sight_chord_choice_row.visible = sight_answer_runtime_active and _selected_mode == MODE_SIGHT and _sight_mode == "Chords"
 	_refresh_sight_chord_feedback_keyboard_visibility()
 	if _sight_key_label != null:
 		_sight_key_label.visible = _selected_mode == MODE_SIGHT and (_sight_mode == "Chords" or _sight_mode == "Notes" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
@@ -23789,12 +23952,13 @@ func _position_sight_floating_answer_rows() -> void:
 		_hide_interval_reading_answer_row()
 		return
 	var panel_on := _game_panel != null and _game_panel.visible
+	var active_gameplay_panel := panel_on and _quiz_active and not _awaiting_round_start
 	# Landmark variant of Interval Reading answers via the note-name keyboard; Pair
 	# and Phrase variants use the interval choice grid.
 	var landmark_active := _is_interval_reading_mode() and _interval_reading_landmark
-	var show_notes := (_is_sight_note_input_mode() or landmark_active) and panel_on
-	var show_chords := _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and panel_on
-	var show_intervals := _is_interval_reading_mode() and not _interval_reading_landmark and panel_on
+	var show_notes := (_is_sight_note_input_mode() or landmark_active) and active_gameplay_panel
+	var show_chords := _selected_mode == MODE_SIGHT and _sight_mode == "Chords" and active_gameplay_panel
+	var show_intervals := _is_interval_reading_mode() and not _interval_reading_landmark and active_gameplay_panel
 	var show_grand_staff_replay := show_chords and _is_sight_chords_grand_staff_mode() and _replay_button != null and _replay_button.visible and _replay_button.get_parent() == _sight_answer_overlay
 	_sight_answer_overlay.visible = show_notes or show_chords or show_intervals
 	if _sight_keyboard_row != null:
@@ -25475,7 +25639,10 @@ func _reset_mic_capture_buffer() -> void:
 
 
 func _midi_platform_supported() -> bool:
-	return OS.get_name() in ["Windows", "Linux", "macOS", "Android"]
+	# MIDI input is desktop-only. Godot's MIDI support isn't reliable on Android
+	# (USB-host / BLE-MIDI aren't wired through InputEventMIDI), and phone/tablet
+	# users use touch + mic instead — so the "Connect MIDI" UI is hidden there.
+	return OS.get_name() in ["Windows", "Linux", "macOS"]
 
 
 func _score_font_name_to_index(name: String) -> int:
