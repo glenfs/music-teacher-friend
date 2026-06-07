@@ -3609,8 +3609,11 @@ func _assert_popup_menu_theme_regressions() -> void:
 	if _app.has_method("_on_practice_drills_open"):
 		_call("_on_practice_drills_open")
 		await wait_frames(8)
+		# Skip cleanly when Practice Drills is gated off for this build (the open is a
+		# no-op, so the panel never presents).
+		var pp_active: Variant = _member("_practice_drills_active")
 		var pp_v: Variant = _member("_practice_drills_panel")
-		if pp_v is Node:
+		if pp_active == true and pp_v is Node:
 			var pp_panel := pp_v as Node
 			var export_menu_v: Variant = pp_panel.get("_export_menu")
 			if export_menu_v is PopupMenu:

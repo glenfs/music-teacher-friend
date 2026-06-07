@@ -173,6 +173,11 @@ const MIN_STANDARD_ROUND_QUESTIONS := 5
 # re-enabled by flipping this constant; only the home-screen entry point is
 # gated, not the mode itself.
 const NOTE_CHASE_ENABLED := false
+# Practice Drills (scales/arpeggios/technical drills panel) — held out of the
+# first Student release to keep the v1 scope tight. Code + panel stay in place;
+# only the home "Tools" entry point and the open handler are gated, so flipping
+# this back to true fully restores it.
+const PRACTICE_DRILLS_ENABLED := false
 # Edition flag — export-feature driven for the SKU split.
 # Teacher Edition: full app with teacher dashboard, student switching, per-student
 # attribution. Student Edition (export with the "student" feature): solo workflow,
@@ -4392,11 +4397,12 @@ func _build_ui() -> void:
 	_build_mode_card("Ear Training", "Train intervals, chords, and progressions", ICON_EAR_PATH, MODE_INTERVAL, "Ear", MENU_CARD_CREAM_ACCENT, main_practice_grid)
 
 	var tools_grid := _build_home_overview_section(_home_overview_grid, "Tools")
-	var practice_drills_card_btn := _build_home_overview_card(tools_grid, "Practice Drills", "Scales, arpeggios, and technical drills", ICON_PIANO_PATH, Color(0.96, 0.78, 0.42, 1.0), _on_practice_drills_open)
-	if practice_drills_card_btn != null:
-		practice_drills_card_btn.set_meta("main_menu_mode_key", "PracticeDrills")
-		_home_material_buttons.append(practice_drills_card_btn)
-		_set_home_selection_state(practice_drills_card_btn, false)
+	if PRACTICE_DRILLS_ENABLED:
+		var practice_drills_card_btn := _build_home_overview_card(tools_grid, "Practice Drills", "Scales, arpeggios, and technical drills", ICON_PIANO_PATH, Color(0.96, 0.78, 0.42, 1.0), _on_practice_drills_open)
+		if practice_drills_card_btn != null:
+			practice_drills_card_btn.set_meta("main_menu_mode_key", "PracticeDrills")
+			_home_material_buttons.append(practice_drills_card_btn)
+			_set_home_selection_state(practice_drills_card_btn, false)
 	var functional_ear_card_btn := _build_home_overview_card(tools_grid, "Functional Ear Training", "Identify chord roles in a key (I, IV, V, vi)", ICON_EAR_PATH, Color(0.74, 0.66, 0.96, 1.0), _on_functional_ear_open)
 	if functional_ear_card_btn != null:
 		functional_ear_card_btn.set_meta("main_menu_mode_key", "FunctionalEar")
@@ -30382,6 +30388,8 @@ func _practice_get_weakest_skill_family() -> String:
 
 
 func _on_practice_drills_open() -> void:
+	if not PRACTICE_DRILLS_ENABLED:
+		return
 	if _practice_drills_panel == null:
 		return
 	_practice_drills_active = true
