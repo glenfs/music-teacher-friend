@@ -1,0 +1,39 @@
+# Clefira marketing site
+# Note: this only guides WELL-BEHAVED crawlers. Vulnerability/CT-log scanners
+# (the bulk of a new domain's bot noise) ignore robots.txt — use Cloudflare
+# Bot Fight Mode for those.
+
+# Allow normal search engines to index the site.
+User-agent: *
+Allow: /
+
+# Block the noisiest AI-training / SEO crawlers (optional — remove any you want).
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# When you publish a sitemap, point to it here (absolute URL):
+# Sitemap: https://YOUR-DOMAIN/sitemap.xml
