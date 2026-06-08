@@ -29,6 +29,7 @@ driver/enable_input=true
 
 window/size/viewport_width=1366
 window/size/viewport_height=768
+window/handheld/orientation=0
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
