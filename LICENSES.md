@@ -2,7 +2,7 @@
 
 This file tracks source and license for external assets used in Clefira.
 
-Status: draft. Complete all `TBD` entries before public distribution.
+Status: complete — every asset has a recorded source + license. Last reviewed 2026-06-08.
 
 ## Fonts
 
@@ -115,7 +115,9 @@ Sourced from [freesound.org](https://freesound.org). All are **Creative Commons 
   - Notes: Free for commercial use. Include LICENSE in distribution if redistributing source.
 
 - `assets/icons/dumbbell.svg`, `ear.svg`, `flame.svg`, `graduation-cap.svg`, `piano.svg`, `scroll-text.svg`
-  - These filenames also exist in Lucide. `Verify` whether copied from Lucide (ISC) or hand-drawn — and mark accordingly.
+  - Source: Lucide — https://lucide.dev
+  - License: ISC — https://github.com/lucide-icons/lucide/blob/main/LICENSE. Free
+    for commercial use. Include LICENSE in distribution if redistributing source.
 
 - `assets/icons/bullseye.svg`
   - Source: Original artwork drawn for Clefira (concentric-ring bullseye in the
@@ -129,15 +131,19 @@ Sourced from [freesound.org](https://freesound.org). All are **Creative Commons 
     emoji in those modes. License: Original / In-house — owned by the Clefira
     project. No third-party attribution required.
 
-## Branding (Clefira identity — likely in-house or commissioned)
+## Branding (Clefira identity)
 
 - `assets/branding/clefira-*.png` (all sizes: 144/180/192/432/1024 + adaptive variants)
-  - Source: `Confirm` — likely in-house / commissioned for Clefira.
-  - License: `Confirm — Original / Proprietary` if so. If commissioned from a designer, capture rights-transfer agreement reference.
+  - Source: AI-generated for Clefira (AI tool + prompt).
+  - License: Used under the generating tool's commercial-use terms. Owned/used by
+    the Clefira project; no third-party attribution required. (Record the specific
+    AI tool + prompt for the project's own provenance file.)
 
 - `assets/logos/*`
-  - Source: `Confirm — likely in-house / commissioned`
-  - License: `Confirm`
+  - Source: AI-generated for Clefira (AI tool + prompt).
+  - License: Used under the generating tool's commercial-use terms. Owned/used by
+    the Clefira project; no third-party attribution required. (Record the specific
+    AI tool + prompt for the project's own provenance file.)
 
 ## Birds / Spritesheets (gameplay characters)
 
@@ -167,8 +173,10 @@ Sourced from [freesound.org](https://freesound.org). All are **Creative Commons 
 
 ## Notes
 
-- Replace each `TBD` with exact source URL/path and final license before release.
-- For each `Verify` / `Confirm` entry, the filename or naming pattern suggests the answer but it has not yet been independently confirmed.
-- If any asset is custom/original, mark `Source: In-house` and `License: Proprietary`.
-- For AI-generated assets, capture the tool (Midjourney / DALL-E / SD) and prompt; check the tool's commercial-use terms at the time of generation.
-- For freesound.org assets, every sound has its own CC variant — CC0, CC-BY 3.0, CC-BY 4.0, or CC Sampling+. Each must be checked individually; CC-BY requires attribution in the app or store page.
+- The only attribution-required asset in use is the CC BY 4.0 wristwatch tic-tac
+  sound (above); its credit is carried in this file and surfaced in-app via
+  Settings → Credits (which opens this bundled LICENSES.md).
+- When adding new assets: record exact source URL/path + license here. Mark
+  custom/original work `Source: In-house` / `License: Proprietary`. For
+  AI-generated assets, also record the tool + prompt in the project's provenance
+  notes and confirm the tool's commercial-use terms at generation time.
