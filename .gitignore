@@ -53,10 +53,20 @@ builds/**
 !builds/linux/student/.gitkeep
 android/
 *.apk
+*.aab
 *.exe
 *.pck
 *.wasm
 *.zip
+
+# Cloudflare Wrangler cache
+.wrangler/
+
+# Native build intermediates
+native/**/build_android/
+
+# Pre-migration asset backups (kept locally only)
+assets/audio/piano/piano_backup_pre_salamander/
 # Web export bundle — kept locally but never committed
 web/Note Catcher3.*
 web/index.*

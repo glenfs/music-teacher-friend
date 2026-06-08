@@ -4727,9 +4727,8 @@ func _build_ui() -> void:
 	_mic_sensitivity_option.item_selected.connect(Callable(self, "_on_mic_sensitivity_selected"))
 	mic_sens_row.add_child(_mic_sensitivity_option)
 
-	# Diagnostics section — Codex P2 review item: Settings needs to be useful
-	# for real support cases. Build/version, sync, MIDI, mic, support link.
-	_build_settings_diagnostics_section(_ear_settings_screen)
+	# Diagnostics section removed from the Settings screen (per product decision).
+	# _build_settings_diagnostics_section() is retained but no longer wired in.
 
 	var settings_section_spacer := Control.new()
 	settings_section_spacer.custom_minimum_size = Vector2(0, 16)
@@ -17252,7 +17251,6 @@ func _on_ear_settings_pressed() -> void:
 	_sync_home_state_from_runtime()
 	_refresh_ear_settings_subscreen()
 	_refresh_sight_settings_subscreen()
-	_refresh_settings_diagnostics()
 	_on_mode_selected()
 
 

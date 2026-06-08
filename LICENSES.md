@@ -68,7 +68,7 @@ Status: draft. Complete all `TBD` entries before public distribution.
 - `assets/audio/piano/sampled/*.ogg` (fallback / sampled bank, octave overrides) — DEPRECATED
   - Status: superseded by Salamander Grand Piano. Remove this directory before ship if no longer referenced.
 
-## Audio — SFX (mixed: freesound.org + own + TBD)
+## Audio — SFX (freesound.org CC0 + in-house generated)
 
 Files whose filenames follow the `<id>__<user>__<name>` freesound.org convention:
 
@@ -89,18 +89,17 @@ In-house (generated):
 - `assets/audio/sfx/chicken-cluck.wav` — generated programmatically (frequency-sweep chirp). License: Original / In-house.
 - `assets/audio/sfx/clap.wav` — generated programmatically (filtered noise burst). License: Original / In-house.
 
-Origin not yet identified — likely free packs or AI tools:
+Sourced from [freesound.org](https://freesound.org). All are **Creative Commons 0** (public domain — no attribution legally required; credited here as courtesy and for provenance):
 
-- `assets/audio/sfx/correct.mp3` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/fail.mp3` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/success.mp3` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/module-complete.wav` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/new_question.wav` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/powerup.wav` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/transition-whoosh-sound.wav` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/fanfare-2-rpg.wav` — Source: `TBD`, License: `TBD` (RPG suffix suggests an RPG SFX pack — name pack + license)
-- `assets/audio/sfx/ui-basic-click.wav` — Source: `TBD`, License: `TBD`
-- `assets/audio/sfx/ui__snap-click-01.wav` — Source: `TBD`, License: `TBD`
+- `assets/audio/sfx/correct.mp3` — "RightAnswer.mp3" by Gronkjaer — https://freesound.org/s/554055/ — License: CC0
+- `assets/audio/sfx/fail.mp3` — "WrongAnswer.mp3" by Gronkjaer — https://freesound.org/s/554053/ — License: CC0
+- `assets/audio/sfx/module-complete.wav` — "Game Menu Achievement" by CogFireStudios — https://freesound.org/s/619833/ — License: CC0
+- `assets/audio/sfx/new_question.wav` — "ui-submit.wav" by StavSounds — https://freesound.org/s/701704/ — License: CC0
+- `assets/audio/sfx/powerup.wav` — "PowerUp.wav" by kianda — https://freesound.org/s/328120/ — License: CC0
+- `assets/audio/sfx/transition-whoosh-sound.wav` — "Transition whoosh sound.wav" by SKsemi — https://freesound.org/s/432922/ — License: CC0
+- `assets/audio/sfx/fanfare-2-rpg.wav` — "Fanfare 2 - Rpg" by colorsCrimsonTears — https://freesound.org/s/580310/ — License: CC0
+- `assets/audio/sfx/ui-basic-click.wav` — "UI Series: Another basic click" by brandondelehoy — https://freesound.org/s/333429/ — License: CC0
+- `assets/audio/sfx/ui__snap-click-01.wav` — "Snap Click 01.wav" by ironcross32 — https://freesound.org/s/582898/ — License: CC0
 
 ## Icons
 

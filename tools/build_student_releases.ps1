@@ -11,6 +11,7 @@
 #   .\tools\build_student_releases.ps1 -Target Windows       # Windows only
 #   .\tools\build_student_releases.ps1 -Target Android       # Android only
 #   .\tools\build_student_releases.ps1 -AndroidRelease       # release APK (needs signed keystore configured)
+#   .\tools\build_student_releases.ps1 -Target Android -Aab  # Google Play production AAB (signed, internet perm OFF)
 #   .\tools\build_student_releases.ps1 -GodotPath "C:\path\to\Godot.exe"
 #
 # PREREQS:
@@ -28,6 +29,7 @@ param(
 
     [switch]$WindowsDebug,
     [switch]$AndroidRelease,
+    [switch]$Aab,
     [switch]$Clean
 )
 
@@ -138,10 +140,36 @@ if ($Target -eq "Windows" -or $Target -eq "Both") {
 
 if ($Target -eq "Android" -or $Target -eq "Both") {
     try {
+        # -Aab => Google Play production bundle (AAB preset, always release, signed).
+        # Otherwise => sideloadable APK (debug unless -AndroidRelease).
+        if ($Aab.IsPresent) {
+            $androidPreset = "Android - Student AAB"
+            $androidOut    = Join-Path $ProjectRoot "builds\android\student\ClefiraStudent.aab"
+            $androidRel    = $true
+
+            # Headless release signing. Path defaults to the in-repo keystore;
+            # alias + password are secrets and must come from the environment.
+            if ([string]::IsNullOrWhiteSpace($env:GODOT_ANDROID_KEYSTORE_RELEASE_PATH)) {
+                $env:GODOT_ANDROID_KEYSTORE_RELEASE_PATH = (Join-Path $ProjectRoot "keys\clefira-upload.jks")
+            }
+            if ([string]::IsNullOrWhiteSpace($env:GODOT_ANDROID_KEYSTORE_RELEASE_USER) -or
+                [string]::IsNullOrWhiteSpace($env:GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD)) {
+                throw @"
+Release signing not configured. Set these before running with -Aab:
+  `$env:GODOT_ANDROID_KEYSTORE_RELEASE_USER     = '<your-key-alias>'
+  `$env:GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD = '<your-keystore-password>'
+(Path defaults to keys\clefira-upload.jks; override with GODOT_ANDROID_KEYSTORE_RELEASE_PATH.)
+"@
+            }
+        } else {
+            $androidPreset = "Android - Student"
+            $androidOut    = Join-Path $ProjectRoot "builds\android\student\ClefiraStudent.apk"
+            $androidRel    = $AndroidRelease.IsPresent
+        }
         $r = Invoke-Export `
-            -PresetName "Android - Student" `
-            -OutputPath (Join-Path $ProjectRoot "builds\android\student\ClefiraStudent.apk") `
-            -ReleaseBuild $AndroidRelease.IsPresent
+            -PresetName $androidPreset `
+            -OutputPath $androidOut `
+            -ReleaseBuild $androidRel
         $results += $r
     } catch {
         $failures += "Android: $_"
