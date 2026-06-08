@@ -52,8 +52,8 @@ Google Play requires an **Android App Bundle (.aab)** for new apps, not a sidelo
 
 The Student Edition is **fully local**: Cloud Sync lives only in the Teacher Dashboard (Teacher-Edition-only), so the Student build has no sign-in, no cloud, no analytics, and no internet permission. Mic audio is processed on-device for pitch detection and never recorded or transmitted.
 
-- ✅ `docs/PRIVACY.html` updated: placeholders resolved (`contact@clefira.com`, provider = Supabase), added a Student-Edition clarification box, dated 2026-06-08. The public copy at `website/privacy.html` already uses `contact@clefira.com`.
-- 🔵 Host the privacy policy at a public URL (e.g. `https://clefira.com/privacy`) and paste that URL into the Play listing.
+- ✅ `docs/PRIVACY.html` updated: placeholders resolved (`contact@clefira.app`, provider = Supabase), added a Student-Edition clarification box, dated 2026-06-08. The public copy at `website/privacy.html` already uses `contact@clefira.app`.
+- ✅ Privacy policy is live at **https://clefira.app/privacy** (deployed to Cloudflare Pages, production). Paste this URL into the Play listing.
 
 ### Data Safety form — answers for the Student Edition
 
@@ -97,9 +97,9 @@ If this is a **new personal developer account**, Play requires **closed testing 
 ## Remaining in-repo blockers
 
 - ✅ **Asset licensing (`LICENSES.md`)**: all 9 previously-`TBD` SFX traced to freesound.org via `attribution.txt` — every one is **CC0** (public domain, no attribution required), now credited in `LICENSES.md`. Confirmed `fail.mp3` is in use (game-over jingle). `success.mp3` was unused and removed.
-- ✅ **EULA** (`docs/EULA.html`): all placeholders resolved — Licensor = **Glenford Soans**, governing law = **Karnataka, India**, contact = `contact@clefira.com`. (Swap in a company name later if you register one.)
+- ✅ **EULA** (`docs/EULA.html`): all placeholders resolved — Licensor = **Glenford Soans**, governing law = **Karnataka, India**, contact = `contact@clefira.app`. (Swap in a company name later if you register one.)
 
 ## Open questions for you
 
 1. **Pricing / target age band** — free (and which age bands)? This drives whether the Families program applies (§6/§7).
-2. **Privacy URL** — confirm `https://clefira.com/privacy` (or the actual path) so it can be referenced consistently.
+2. **Support email** — `contact@clefira.app` (via Cloudflare Email Routing → forwards to Gmail). Used across the app docs, EULA, and website. Confirm the routing rule is enabled in Cloudflare so the inbox actually receives mail.

@@ -27,6 +27,6 @@ Rebuild that ZIP after every Windows export.
 
 ## Before public launch
 
-- Replace `contact@clefira.com` if the official support inbox is different.
+- Replace `contact@clefira.app` if the official support inbox is different.
 - Connect the Teacher Edition sale button to the selected checkout provider.
 - Add code signing or a trusted distribution channel to reduce Windows SmartScreen friction.
