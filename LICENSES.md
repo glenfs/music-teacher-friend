@@ -73,16 +73,17 @@ Status: draft. Complete all `TBD` entries before public distribution.
 Files whose filenames follow the `<id>__<user>__<name>` freesound.org convention:
 
 - `assets/audio/sfx/178668__hanbaal__snare.wav`
-  - Source: freesound.org, sound id 178668 by user `hanbaal` — https://freesound.org/s/178668/
-  - License: `Verify` — freesound page lists CC0 / CC-BY / CC-Sampling+. Confirm and copy exact license + attribution requirement.
+  - Source: "snare.wav" by Hanbaal — https://freesound.org/s/178668/
+  - License: CC0 (public domain — no attribution required).
 
 - `assets/audio/sfx/268185__andychristen__wristwatchtic-tac.wav`
-  - Source: freesound.org, sound id 268185 by user `andychristen` — https://freesound.org/s/268185/
-  - License: `Verify` — confirm CC variant and attribution.
+  - Source: "Wristwatch.Tic-Tac.wav" by andychristen — https://freesound.org/s/268185/
+  - License: **CC BY 4.0** — attribution required. Credit: "Wristwatch.Tic-Tac.wav"
+    by andychristen (freesound.org), licensed under CC BY 4.0.
 
 - `assets/audio/sfx/50982__matiasreccius__bass2.wav`
-  - Source: freesound.org, sound id 50982 by user `matiasreccius` — https://freesound.org/s/50982/
-  - License: `Verify` — confirm CC variant and attribution.
+  - Source: "bass2.wav" by Matias.Reccius — https://freesound.org/s/50982/
+  - License: CC0 (public domain — no attribution required).
 
 In-house (generated):
 
@@ -142,20 +143,27 @@ Sourced from [freesound.org](https://freesound.org). All are **Creative Commons 
 
 - `assets/birds/chicken.png`, `chicken.svg`, `idle.png`
 - `assets/birds/spritesheet/*.png` (happy / hop / sad / front jump / peack eat)
-  - Source: `Confirm` — likely commissioned art or AI-generated.
-  - License: `Confirm` — capture artist name + license OR document AI tool + prompt used.
+  - Source: Commissioned artwork (Fiverr) — created for Clefira as work-for-hire.
+  - License: Proprietary — full commercial usage rights acquired from the artist
+    via the Fiverr commission. Owned by the Clefira project; no third-party
+    attribution required. Keep the Fiverr order/receipt on file as the
+    rights-transfer reference.
 
 ## Backgrounds
 
 - `assets/backgrounds/blue_gradient.png`, `classroom.png`, `clefire.png`, `farm_scene.png` … `farm_scene_5.png`, `windmill_town.png`
-  - Source: `TBD` — confirm if AI-generated (capture tool + prompt) or stock (capture URL + license) or in-house.
-  - License: `TBD`
+  - Source: AI-generated for Clefira.
+  - License: Used under the generating tool's commercial-use terms. Owned/used by
+    the Clefira project; no third-party attribution required. (Record the specific
+    AI tool + prompt for the project's own provenance file.)
 
 ## Farm / Trees / UI props
 
 - `assets/farm/*`, `assets/trees/*`, `assets/ui/*`
-  - Source: `TBD`
-  - License: `TBD`
+  - Source: AI-generated for Clefira (AI tool + prompt).
+  - License: Used under the generating tool's commercial-use terms. Owned/used by
+    the Clefira project; no third-party attribution required. (Record the specific
+    AI tool + prompt for the project's own provenance file.)
 
 ## Notes
 
