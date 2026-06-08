@@ -20213,6 +20213,43 @@ func _interval_choice_keys() -> Array[String]:
 	return out
 
 
+# Answer buttons to actually SHOW — capped at 8. Always includes the required
+# answer(s) (the current pair's correct answer, or every move's answer in Phrase),
+# then fills with random distractors from the full set and shuffles for display.
+const INTERVAL_MAX_CHOICES := 8
+
+
+func _interval_display_choices() -> Array[String]:
+	var universe := _interval_choice_keys()
+	var required: Array[String] = []
+	if _interval_reading_phrase:
+		for k in _phrase_correct:
+			if not required.has(k):
+				required.append(k)
+	elif _interval_reading_correct != "" and not required.has(_interval_reading_correct):
+		required.append(_interval_reading_correct)
+	if universe.size() <= INTERVAL_MAX_CHOICES:
+		return universe   # already small enough — keep stable ordering
+	# distractor pool = universe minus required, shuffled
+	var pool: Array[String] = []
+	for k in universe:
+		if not required.has(k):
+			pool.append(k)
+	for i in range(pool.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var tmp := pool[i]; pool[i] = pool[j]; pool[j] = tmp
+	var out: Array[String] = required.duplicate()
+	var idx := 0
+	while out.size() < INTERVAL_MAX_CHOICES and idx < pool.size():
+		out.append(pool[idx])
+		idx += 1
+	# shuffle final display order so the correct answer isn't always first
+	for i in range(out.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var tmp := out[i]; out[i] = out[j]; out[j] = tmp
+	return out
+
+
 func _generate_interval_reading_round() -> void:
 	if _interval_reading_phrase:
 		_generate_interval_phrase_round()
@@ -20371,7 +20408,7 @@ func _build_interval_reading_answer_buttons() -> void:
 	_interval_reading_buttons.clear()
 	var up := char(0x2191)
 	var down := char(0x2193)
-	for key in _interval_choice_keys():
+	for key in _interval_display_choices():
 		var b := Button.new()
 		# Swap the ↑/↓ Unicode arrows for the custom interval-direction icons; keep
 		# the full answer key in meta so grading + button lookup stay direction-aware.
@@ -24032,7 +24069,7 @@ func _align_staff_clef_to_five_lines(anchor_x: float) -> void:
 		# which leaves the clef riding high. Nudge it down (~half a staff space) for
 		# these two modes only — no effect on any other mode.
 		if _sight_mode == "Vanishing" or _sight_mode == "Intervals":
-			clef_y += SIGHT_NOTE_CENTER_OFFSET_Y + (gap * 0.5)
+			clef_y += SIGHT_NOTE_CENTER_OFFSET_Y + (gap * 1.0)
 	elif _selected_mode == MODE_NOTE_CHASE and _selected_clef == "Treble":
 		clef_y += gap * NOTE_CHASE_TREBLE_CLEF_LOWER_SPACES
 	var font_sz := int(round(clampf(span * size_factor, 60.0, 172.0)))
@@ -29004,7 +29041,24 @@ func _clear_sight_answer_keyboard_feedback() -> void:
 		if btn == null:
 			continue
 		btn.modulate = Color.WHITE
+		# Fully release any lingering "pressed" look from the previous answer: a stuck
+		# toggle/draw state or an interrupted pop-scale would otherwise keep a key
+		# looking pressed-down into the next question.
+		btn.button_pressed = false
+		btn.scale = Vector2.ONE
 		_sight_big_piano_apply_feedback_style(pitch)
+	# Same reset for the small letter answer keys (their pop animation can leave a
+	# key scaled/pressed if the round advances mid-tween).
+	for note_name in _sight_key_buttons.keys():
+		var kbtn: Button = _sight_key_buttons[note_name] as Button
+		if kbtn == null:
+			continue
+		var pop: Tween = _midi_button_pop_tweens.get(kbtn, null) as Tween
+		if pop != null and pop.is_valid():
+			pop.kill()
+		kbtn.button_pressed = false
+		kbtn.scale = Vector2.ONE
+		kbtn.modulate = Color.WHITE
 
 	if _midi_piano_viz != null:
 		_midi_piano_viz.clear_all()
