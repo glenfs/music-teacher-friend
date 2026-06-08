@@ -4419,6 +4419,9 @@ func _build_ui() -> void:
 	var performance_card_btn := _build_home_overview_card(tools_grid, "My Performance", "Your overall sight-reading & ear-training stats", ICON_PROGRESS_PATH, Color(0.96, 0.78, 0.30, 1.0), _on_performance_open)
 	if performance_card_btn != null:
 		performance_card_btn.set_meta("main_menu_mode_key", "Performance")
+		# progress.svg is multi-colour artwork — keep its real colours instead of
+		# the dark mono tint the other (line-art) card icons get.
+		performance_card_btn.set_meta("mode_card_keep_icon_color", true)
 		_home_material_buttons.append(performance_card_btn)
 		_set_home_selection_state(performance_card_btn, false)
 
@@ -11524,7 +11527,10 @@ func _set_home_selection_state(btn: Button, selected: bool) -> void:
 		if btn.has_meta("mode_card_icon"):
 			var card_icon: TextureRect = btn.get_meta("mode_card_icon")
 			if card_icon != null and is_instance_valid(card_icon):
-				if mode_card_flat:
+				if btn.has_meta("mode_card_keep_icon_color") and bool(btn.get_meta("mode_card_keep_icon_color")):
+					# Full-colour icon (e.g. the progress chart) — never apply the mono tint.
+					card_icon.modulate = Color(1, 1, 1, 1)
+				elif mode_card_flat:
 					if learning_main_menu_card:
 						card_icon.modulate = Color(0.90, 0.97, 0.99, 0.96)
 					elif main_menu_card:
@@ -17100,13 +17106,19 @@ func _reset_sight_notes_mic_pending() -> void:
 
 
 func _sight_notes_mic_detection_confirmed(midi: int) -> bool:
+	# Confirm by PITCH CLASS, not exact MIDI. Low notes (A3, bass clef) often
+	# octave-flicker between e.g. A3 and A4 frame-to-frame (sub-harmonics), which
+	# used to keep resetting the same-MIDI counter so the note never confirmed.
+	# Pitch class is stable, and the answer is letter-based anyway.
 	var now := Time.get_ticks_msec()
-	if midi != _sight_notes_mic_pending_midi or now - _sight_notes_mic_pending_first_msec > _SIGHT_NOTES_MIC_CONFIRM_WINDOW_MSEC:
+	var same_pc := _sight_notes_mic_pending_midi != -999 and posmod(midi, 12) == posmod(_sight_notes_mic_pending_midi, 12)
+	if not same_pc or now - _sight_notes_mic_pending_first_msec > _SIGHT_NOTES_MIC_CONFIRM_WINDOW_MSEC:
 		_sight_notes_mic_pending_midi = midi
 		_sight_notes_mic_pending_count = 1
 		_sight_notes_mic_pending_first_msec = now
 		return _SIGHT_NOTES_MIC_CONFIRMATIONS <= 1
 	_sight_notes_mic_pending_count += 1
+	_sight_notes_mic_pending_midi = midi  # remember the latest octave seen
 	return _sight_notes_mic_pending_count >= _SIGHT_NOTES_MIC_CONFIRMATIONS and now - _sight_notes_mic_pending_first_msec >= _SIGHT_NOTES_MIC_MIN_CONFIRM_AGE_MSEC
 
 
@@ -17180,7 +17192,17 @@ func _on_sight_notes_mic_note_detected(midi: int, note_name: String, full_name: 
 			_mic_status_label.visible = true
 			_mic_status_label.text = "Mic: confirming %s..." % (full_name if not full_name.is_empty() else note_name)
 		return
-	var matched: String = _match_mic_midi_to_sight(midi, note_name)
+	# Sight-note answers are by LETTER (pitch class) — the keyboard has no octave,
+	# and octave detection is unreliable on low notes. So match on pitch class,
+	# ignoring octave: if the played/sung note's class matches the printed note's
+	# class, accept it; otherwise route the detected letter so a genuinely wrong
+	# note still registers (as a wrong answer).
+	var sight_target_midi := _current_sight_note_prompt_midi()
+	var matched: String = ""
+	if sight_target_midi >= 0 and posmod(midi, 12) == posmod(sight_target_midi, 12):
+		matched = _current_sight_note
+	else:
+		matched = _match_mic_note_to_sight(note_name)
 	if matched.is_empty() or not _sight_key_buttons.has(matched):
 		return
 	_reset_sight_notes_mic_pending()
@@ -19990,8 +20012,9 @@ func _finish_vanishing_round(is_correct: bool, chosen_note: String, feedback_btn
 	# then repaint just the quizzed slot green/red as the verdict.
 	_reveal_vanishing_sequence(Color(1, 1, 1, 1))
 	var target_panel: Panel = _vanishing_note_panels[target_idx] if target_idx < _vanishing_note_panels.size() else null
-	# #7 — record which note name was tested, for the weakness heatmap.
-	_record_skill_result("note", _note_letter_only(expected), is_correct)
+	# #7 — record the staff POSITION tested (clef:register band), for the heatmap.
+	var nr_step := int((_vanishing_sequence[target_idx] as Dictionary).get("step", 4)) if not _vanishing_sequence.is_empty() else 4
+	_record_skill_result("note", _note_register_key(nr_step, _selected_clef), is_correct)
 	if is_correct:
 		_score += 1
 		_streak += 1
@@ -20784,7 +20807,8 @@ func _on_interval_landmark_chosen(note_name: String, chosen_btn_override: Button
 	_set_answer_buttons_enabled(false)
 	_replay_button.disabled = true
 	_restart_button.disabled = true
-	_record_skill_result("note", _note_letter_only(_landmark_answer), is_correct)
+	# Record the TARGET note's staff position (clef:register band) for the heatmap.
+	_record_skill_result("note", _note_register_key(_current_sight_display_step, _selected_clef), is_correct)
 	var prev_streak := _streak
 	var prev_xp := _xp
 	if _interval_reading_midi2 >= 0:
@@ -20856,6 +20880,36 @@ func _note_letter_only(name: String) -> String:
 func _interval_item_only(key: String) -> String:
 	# Aggregate up/down into one bucket: "3rd ↑" -> "3rd", "Step ↓" -> "Step".
 	return key.replace(" %s" % char(0x2191), "").replace(" %s" % char(0x2193), "").strip_edges()
+
+
+# Maps a staff step to a register BAND, so the note heatmap reflects *position*
+# (the real driver of reading difficulty) instead of just letter. Steps increase
+# downward (step 0 = top line, 8 = bottom line); <0 = ledger above, >8 = below.
+func _note_register_band(step: int) -> String:
+	if step < 0:
+		return "above"
+	if step <= 4:
+		return "upper"
+	if step <= 8:
+		return "lower"
+	return "below"
+
+
+# Heatmap key for a note: "<clef>:<band>" (e.g. "Treble:above"). Clef matters —
+# the same letter is a different read in treble vs bass. Grand Staff folds to its
+# component clefs is out of scope here (single-clef note modes only).
+func _note_register_key(step: int, clef: String) -> String:
+	var c := "Bass" if clef == "Bass" else "Treble"
+	return "%s:%s" % [c, _note_register_band(step)]
+
+
+const NOTE_REGISTER_BANDS := ["above", "upper", "lower", "below"]  # high -> low
+const NOTE_REGISTER_BAND_LABELS := {
+	"above": "Above staff",
+	"upper": "Upper staff",
+	"lower": "Lower staff",
+	"below": "Below staff",
+}
 
 
 func _skill_heatmap_color(acc: float) -> Color:
@@ -21000,8 +21054,64 @@ func _populate_skill_heatmap() -> void:
 	for c in _skill_heatmap_body.get_children():
 		_skill_heatmap_body.remove_child(c)
 		c.queue_free()
-	_build_skill_heatmap_section("Note Reading", "note", ["C", "D", "E", "F", "G", "A", "B"])
+	_build_note_register_section()
 	_build_skill_heatmap_section("Interval Reading", "interval", ["Same", "Step", "Skip", "2nd", "3rd", "4th", "5th", "6th", "7th", "Octave"])
+
+
+func _build_note_register_section() -> void:
+	# Note reading shown by STAFF POSITION (clef + register band), high -> low —
+	# this is where reading difficulty actually lives (ledger lines, extremes),
+	# which a flat letter view can't surface.
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", 6)
+	var hdr := Label.new()
+	hdr.text = "Note Reading — by staff position"
+	hdr.add_theme_font_size_override("font_size", 17)
+	hdr.add_theme_color_override("font_color", Color(0.98, 0.92, 0.66, 1.0))
+	section.add_child(hdr)
+	var clefs_row := HBoxContainer.new()
+	clefs_row.add_theme_constant_override("separation", 22)
+	section.add_child(clefs_row)
+	var any_data := false
+	for clef in ["Treble", "Bass"]:
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 4)
+		clefs_row.add_child(col)
+		var clef_lbl := Label.new()
+		clef_lbl.text = "%s clef" % clef
+		clef_lbl.add_theme_font_size_override("font_size", 13)
+		clef_lbl.add_theme_color_override("font_color", Color(0.82, 0.86, 0.94, 0.9))
+		col.add_child(clef_lbl)
+		for band in NOTE_REGISTER_BANDS:
+			var key := "%s:%s" % [clef, band]
+			var acc := _skill_accuracy("note", key)
+			if acc >= 0.0:
+				any_data = true
+			var cell := Panel.new()
+			cell.custom_minimum_size = Vector2(154, 32)
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = _skill_heatmap_color(acc)
+			sb.corner_radius_top_left = 7
+			sb.corner_radius_top_right = 7
+			sb.corner_radius_bottom_left = 7
+			sb.corner_radius_bottom_right = 7
+			cell.add_theme_stylebox_override("panel", sb)
+			var lbl := Label.new()
+			lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			lbl.add_theme_font_size_override("font_size", 12)
+			lbl.add_theme_color_override("font_color", Color(0.06, 0.08, 0.06, 1.0))
+			lbl.text = "%s   %s" % [str(NOTE_REGISTER_BAND_LABELS.get(band, band)), ("%d%%" % int(round(acc * 100.0)) if acc >= 0.0 else "—")]
+			cell.add_child(lbl)
+			col.add_child(cell)
+	if not any_data:
+		var none := Label.new()
+		none.text = "No data yet — play Note Recall or Sight Notes and check back."
+		none.add_theme_font_size_override("font_size", 13)
+		none.add_theme_color_override("font_color", Color(0.78, 0.82, 0.9, 0.85))
+		section.add_child(none)
+	_skill_heatmap_body.add_child(section)
 
 
 func _show_skill_heatmap() -> void:
@@ -21042,6 +21152,10 @@ func _perf_category(cat: String) -> Dictionary:
 
 
 func _on_performance_open() -> void:
+	# Boot loads progress before the active student is resolved, so the in-memory
+	# copy can be stale (empty). Re-read the active student's saved file now so the
+	# panel always reflects every previously-completed session.
+	_load_progress_data()
 	_ensure_performance_overlay()
 	_populate_performance()
 	_performance_overlay.visible = true
@@ -31215,6 +31329,10 @@ func _on_sight_key_chosen(note_name: String, chosen_btn_override: Button = null)
 	_sight_per_key_asked[_pk] = int(_sight_per_key_asked.get(_pk, 0)) + 1
 	if is_correct:
 		_sight_per_key_correct[_pk] = int(_sight_per_key_correct.get(_pk, 0)) + 1
+	# #7 — feed Sight Notes into the staff-position heatmap (this is the mode that
+	# actually uses ledger lines + a wide range).
+	if _sight_mode == "Notes":
+		_record_skill_result("note", _note_register_key(_current_sight_display_step, _selected_clef), is_correct)
 	# Immediately float the correct note name above the note head — no wait. The
 	# label stays visible through the feedback animation and is cleared the
 	# moment the next round repositions the staff note.
