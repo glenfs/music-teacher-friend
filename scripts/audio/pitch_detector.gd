@@ -65,6 +65,12 @@ const SOFT_RMS_THRESHOLD := 0.0012
 const SOFT_NOISE_GATE_MULT := 2.25
 const ANALYSIS_TARGET_RMS := 0.035
 const ANALYSIS_GAIN_MAX := 12.0
+# Live auto-gain (instrument mode): gentler than the offline soft pass, so quiet
+# or far-mic notes are normalised toward a usable level without over-amplifying
+# room noise. YIN is amplitude-independent — this just lifts borderline notes over
+# the confidence bar so mic distance/placement matters less.
+const LIVE_GAIN_TARGET_RMS := 0.018
+const LIVE_GAIN_MAX := 6.0
 # HPF cutoff — 85 Hz kills HVAC rumble, computer fan whine, and most 60/50 Hz
 # mains hum without clipping bass voices (E2 = 82 Hz is below the cutoff and
 # gets ~6 dB attenuation; A2 = 110 Hz passes essentially unattenuated).
@@ -196,6 +202,13 @@ var _samples_since_yin: int = 0
 # "no adaptation yet — use full MIN_FREQ..MAX_FREQ range."
 var _voice_period_min: int = -1
 var _voice_period_max: int = -1
+# Adaptive range narrowing is a singing optimisation (lock onto the voice's range
+# after a few notes). It backfires for INSTRUMENT input, where the player jumps
+# octaves freely: once it learns a mid range it stops searching low, so bass notes
+# below the learned range never get found. Disabled in instrument mode.
+var _adaptive_range_enabled: bool = true
+# Live capped auto-gain — on for instrument input, off for voice/offline.
+var _live_auto_gain: bool = false
 # Per-window cached HPF alpha (depends on _sample_rate, computed once at setup).
 var _hpf_alpha_cached: float = 0.0
 
@@ -399,15 +412,22 @@ func configure_pitch_range(min_freq: float, max_freq: float, hpf_cutoff_hz: floa
 
 
 # Preset for low monophonic INSTRUMENT input (e.g. piano bass clef). Reaches down
-# to ~C2 (65 Hz) without forcing the player to play hard.
+# to ~C2 (65 Hz) without forcing the player to play hard. Adaptive range narrowing
+# is turned off so the full range is always searched (octave jumps + bass notes).
 func configure_for_instrument() -> void:
 	configure_pitch_range(58.0, MAX_FREQ, 48.0, 2048)
+	_adaptive_range_enabled = false
+	_live_auto_gain = true
+	_voice_period_min = -1
+	_voice_period_max = -1
 
 
 # Preset for singing VOICE — restores the historical tuning (rumble-rejecting HPF,
-# voice-range floor, compact window).
+# voice-range floor, compact window) and re-enables adaptive range narrowing.
 func configure_for_voice() -> void:
 	configure_pitch_range(MIN_FREQ, MAX_FREQ, HPF_CUTOFF_HZ, WINDOW_SIZE)
+	_adaptive_range_enabled = true
+	_live_auto_gain = false
 
 
 func start_take_recording() -> void:
@@ -925,9 +945,19 @@ func _run_yin_step_for_analysis() -> Dictionary:
 
 
 func _analysis_window(mono: PackedFloat32Array, rms: float) -> PackedFloat32Array:
-	if not _soft_pitch_mode or mono.is_empty() or rms <= 0.000001:
+	if mono.is_empty() or rms <= 0.000001:
 		return mono
-	var gain := clampf(ANALYSIS_TARGET_RMS / rms, 1.0, ANALYSIS_GAIN_MAX)
+	var target := 0.0
+	var max_gain := 1.0
+	if _soft_pitch_mode:
+		target = ANALYSIS_TARGET_RMS
+		max_gain = ANALYSIS_GAIN_MAX
+	elif _live_auto_gain:
+		target = LIVE_GAIN_TARGET_RMS
+		max_gain = LIVE_GAIN_MAX
+	else:
+		return mono
+	var gain := clampf(target / rms, 1.0, max_gain)
 	if gain <= 1.001:
 		return mono
 	var boosted := PackedFloat32Array()
@@ -1007,7 +1037,7 @@ func _record_voice_sample(midi: int) -> void:
 	# After the warmup, derive a YIN search range from observed voice MIDIs.
 	# We span ~7 semitones above and below the observed extremes so legitimate
 	# leaps still get matched.
-	if _voice_midi_samples.size() >= VOICE_RANGE_WARMUP:
+	if _adaptive_range_enabled and _voice_midi_samples.size() >= VOICE_RANGE_WARMUP:
 		var lo_midi: int = 127
 		var hi_midi: int = 0
 		for m in _voice_midi_samples:

@@ -861,6 +861,11 @@ var _mic_listening := false
 var _mic_status_label: Label = null
 var _midi_enabled := false
 var _midi_any_octave := true
+# Mic input sensitivity (#3): adjusts the detector's loudness gate so quiet/far
+# mics still register (High) or noisy/close mics reject bleed (Low). 0=Low,1=Normal,2=High.
+var _mic_sensitivity := 1
+var _mic_sensitivity_option: OptionButton = null
+const MIC_SENSITIVITY_NAMES := ["Low (close mic / noisy room)", "Normal", "High (quiet / far mic)"]
 var _score_font_name := "Leland"  # SMuFL font for music notation rendering; default Leland (modern clean), user-selectable in home Settings
 var _score_font_options: Array[OptionButton] = []  # all dropdown instances (kept in sync)
 var _midi_inputs_open := false
@@ -4702,6 +4707,25 @@ func _build_ui() -> void:
 	font_pick_row.add_theme_constant_override("separation", 10)
 	_ear_settings_more_panel.add_child(font_pick_row)
 	_build_score_font_picker(font_pick_row)
+
+	# Mic Sensitivity (#3) — lets quiet/far mics register, or noisy/close mics
+	# stay strict. Lives here in Settings (not on any menu screen).
+	var mic_sens_row := HBoxContainer.new()
+	mic_sens_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	mic_sens_row.add_theme_constant_override("separation", 10)
+	_ear_settings_more_panel.add_child(mic_sens_row)
+	var mic_sens_label := Label.new()
+	mic_sens_label.text = "Mic sensitivity"
+	mic_sens_label.set_meta("settings_small_label", true)
+	mic_sens_label.tooltip_text = "Raise if the mic misses quiet or distant notes; lower in a noisy room or with a close mic."
+	mic_sens_row.add_child(mic_sens_label)
+	_mic_sensitivity_option = OptionButton.new()
+	for sens_name in MIC_SENSITIVITY_NAMES:
+		_mic_sensitivity_option.add_item(str(sens_name))
+	_mic_sensitivity_option.selected = clampi(_mic_sensitivity, 0, MIC_SENSITIVITY_NAMES.size() - 1)
+	_mic_sensitivity_option.custom_minimum_size = Vector2(240, 34)
+	_mic_sensitivity_option.item_selected.connect(Callable(self, "_on_mic_sensitivity_selected"))
+	mic_sens_row.add_child(_mic_sensitivity_option)
 
 	# Diagnostics section — Codex P2 review item: Settings needs to be useful
 	# for real support cases. Build/version, sync, MIDI, mic, support link.
@@ -14573,6 +14597,8 @@ func _load_ear_settings() -> void:
 		_interval_reading_landmark = iv == "landmark"
 	if d.has("interval_use_harmonic"):
 		_interval_reading_use_harmonic = bool(d["interval_use_harmonic"])
+	if d.has("mic_sensitivity"):
+		_mic_sensitivity = clampi(int(d["mic_sensitivity"]), 0, MIC_SENSITIVITY_NAMES.size() - 1)
 	if d.has("interval_sizes") and typeof(d["interval_sizes"]) == TYPE_ARRAY:
 		_interval_custom_sizes.clear()
 		for s in (d["interval_sizes"] as Array):
@@ -14718,6 +14744,7 @@ func _save_ear_settings() -> void:
 		"interval_variant": ("phrase" if _interval_reading_phrase else ("landmark" if _interval_reading_landmark else "pair")),
 		"interval_use_harmonic": _interval_reading_use_harmonic,
 		"interval_sizes": _interval_custom_sizes,
+		"mic_sensitivity": _mic_sensitivity,
 		"note_chase_intro_seen": _note_chase_intro_seen,
 		"cadence_intro_seen": _cadence_intro_seen,
 		"rhythm_flow_intro_seen": _rhythm_flow_intro_seen,
@@ -24621,11 +24648,15 @@ func _play_current_prompt() -> void:
 				return
 		elif _sight_mode == "Notes":
 			var sight_note_midi := _current_sight_note_prompt_midi()
-			if sight_note_midi >= 0:
+			# Don't sound the note while the mic is listening: the speaker bleeds into
+			# the mic and auto-submits the correct answer with no input from the player
+			# (and hearing the note would let them answer by ear anyway).
+			var sight_mic_on: bool = _sight_notes_mic_listener != null and bool(_sight_notes_mic_listener.is_listening())
+			if sight_note_midi >= 0 and not sight_mic_on:
 				var sight_note_len := clampf(_current_note_duration(), 0.18, 0.55)
 				await _play_note(sight_note_midi, sight_note_len)
 				await _push_silence(0.05)
-				return
+			return
 		elif _sight_mode == "Vanishing":
 			_reveal_vanishing_sequence(Color(1, 1, 1, 1))
 			_set_status_message("Memorise the notes…", ICON_MEMORIZE_PATH)
@@ -25730,6 +25761,7 @@ func _start_mic_listening() -> void:
 			_pitch_detector.call("configure_for_voice")
 	elif _pitch_detector.has_method("configure_for_instrument"):
 		_pitch_detector.call("configure_for_instrument")
+	_apply_mic_sensitivity()
 	_pitch_detector.start_listening()
 	_mic_listening = _pitch_detector.is_listening()
 	if _mic_status_label != null:
@@ -27651,6 +27683,8 @@ func _build_settings_diagnostics_section(parent: VBoxContainer) -> void:
 
 
 func _refresh_settings_diagnostics() -> void:
+	if _mic_sensitivity_option != null:
+		_mic_sensitivity_option.selected = clampi(_mic_sensitivity, 0, MIC_SENSITIVITY_NAMES.size() - 1)
 	if _settings_diag_version_label != null:
 		var build_id: String = "%s · Godot %s" % [OS.get_name(), Engine.get_version_info().get("string", "?")]
 		_settings_diag_version_label.text = "Build: %s" % build_id
@@ -31119,10 +31153,32 @@ func _panel_mic_start() -> bool:
 	# tuning (90 Hz floor / 85 Hz HPF) silently drops most bass-clef fundamentals.
 	if _pitch_detector.has_method("configure_for_instrument"):
 		_pitch_detector.call("configure_for_instrument")
+	_apply_mic_sensitivity()
 	if _pitch_detector.has_method("reset_voice_state"):
 		_pitch_detector.call("reset_voice_state")
 	_pitch_detector.start_listening()
 	return _pitch_detector.is_listening()
+
+
+func _apply_mic_sensitivity() -> void:
+	# #3 — map the user's sensitivity choice onto the detector's loudness gate.
+	# Higher sensitivity = lower gate (quiet/far mics register); lower = stricter
+	# (close mic / noisy room rejects bleed).
+	if _pitch_detector == null or not _pitch_detector.has_method("set_gate_sensitivity"):
+		return
+	match clampi(_mic_sensitivity, 0, 2):
+		0:
+			_pitch_detector.call("set_gate_sensitivity", 0.0020, 3.0)
+		2:
+			_pitch_detector.call("set_gate_sensitivity", 0.0005, 2.0)
+		_:
+			_pitch_detector.call("set_gate_sensitivity", 0.0010, 2.5)
+
+
+func _on_mic_sensitivity_selected(idx: int) -> void:
+	_mic_sensitivity = clampi(idx, 0, MIC_SENSITIVITY_NAMES.size() - 1)
+	_apply_mic_sensitivity()
+	_save_ear_settings()
 
 
 func _panel_mic_stop() -> void:
