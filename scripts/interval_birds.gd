@@ -900,6 +900,12 @@ var _sight_key_sig_label: Label
 var _sight_selected_chord_tier := 1
 var _sight_chord_tier_row: HBoxContainer
 var _sight_chord_tier_buttons: Dictionary = {}
+# Sight Reader selectors are dropdowns (OptionButton) rather than button rows.
+# The legacy *_buttons dicts above are left empty; their refresh/style loops
+# no-op and these dropdowns are driven by the same refresh functions.
+var _sight_clef_option: OptionButton
+var _sight_key_sig_option: OptionButton
+var _sight_chord_tier_option: OptionButton
 var _sight_accidentals_toggle: CheckButton
 var _sight_accidentals_row: HBoxContainer
 var _sight_adaptive_row: HBoxContainer
@@ -5575,33 +5581,12 @@ func _build_ui() -> void:
 	clef_row.add_child(clef_label)
 	_sight_clef_label = clef_label
 
-	var treble_btn := Button.new()
-	treble_btn.text = "Treble"
-	treble_btn.custom_minimum_size = Vector2(140, 34)
-	treble_btn.set_meta("compact_btn", true)
-	treble_btn.pressed.connect(_on_clef_button_pressed.bind("Treble"))
-	clef_row.add_child(treble_btn)
-	_clef_buttons["Treble"] = treble_btn
-	_home_material_buttons.append(treble_btn)
-
-	var bass_btn := Button.new()
-	bass_btn.text = "Bass"
-	bass_btn.custom_minimum_size = Vector2(140, 34)
-	bass_btn.set_meta("compact_btn", true)
-	bass_btn.pressed.connect(_on_clef_button_pressed.bind("Bass"))
-	clef_row.add_child(bass_btn)
-	_clef_buttons["Bass"] = bass_btn
-	_home_material_buttons.append(bass_btn)
-
-	var grand_staff_btn := Button.new()
-	grand_staff_btn.text = "Grand Staff"
-	grand_staff_btn.custom_minimum_size = Vector2(160, 34)
-	grand_staff_btn.set_meta("compact_btn", true)
-	grand_staff_btn.visible = _mvp_is_sight_clef_enabled("Grand Staff", _sight_mode)
-	grand_staff_btn.pressed.connect(_on_clef_button_pressed.bind("Grand Staff"))
-	clef_row.add_child(grand_staff_btn)
-	_clef_buttons["Grand Staff"] = grand_staff_btn
-	_home_material_buttons.append(grand_staff_btn)
+	_sight_clef_option = OptionButton.new()
+	_sight_clef_option.custom_minimum_size = Vector2(190, 34)
+	_style_practice_setup_input_control(_sight_clef_option)
+	_sight_clef_option.item_selected.connect(_on_sight_clef_option_selected)
+	clef_row.add_child(_sight_clef_option)
+	_populate_sight_clef_option()
 
 	# Move the Round-length stepper into the clef row so it sits on the same
 	# line as Treble/Bass with a visual separator. Single line is cleaner than
@@ -5632,74 +5617,12 @@ func _build_ui() -> void:
 	_sight_key_sig_row.add_child(key_sig_label)
 	_sight_key_sig_label = key_sig_label
 
-	var sig_none_btn := Button.new()
-	sig_none_btn.text = "C"
-	sig_none_btn.custom_minimum_size = Vector2(140, 34)
-	sig_none_btn.set_meta("compact_btn", true)
-	sig_none_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("C"))
-	_sight_key_sig_row.add_child(sig_none_btn)
-	_sight_key_sig_buttons["C"] = sig_none_btn
-	_home_material_buttons.append(sig_none_btn)
-
-	var sig_1s_btn := Button.new()
-	sig_1s_btn.text = "1" + char(0x266F)
-	sig_1s_btn.custom_minimum_size = Vector2(140, 34)
-	sig_1s_btn.set_meta("compact_btn", true)
-	sig_1s_btn.visible = _mvp_is_sight_key_signature_enabled("1#", _sight_mode)
-	sig_1s_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("1#"))
-	_sight_key_sig_row.add_child(sig_1s_btn)
-	_sight_key_sig_buttons["1#"] = sig_1s_btn
-	_home_material_buttons.append(sig_1s_btn)
-
-	var sig_2s_btn := Button.new()
-	sig_2s_btn.text = "2" + char(0x266F)
-	sig_2s_btn.custom_minimum_size = Vector2(140, 34)
-	sig_2s_btn.set_meta("compact_btn", true)
-	sig_2s_btn.visible = _mvp_is_sight_key_signature_enabled("2#", _sight_mode)
-	sig_2s_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("2#"))
-	_sight_key_sig_row.add_child(sig_2s_btn)
-	_sight_key_sig_buttons["2#"] = sig_2s_btn
-	_home_material_buttons.append(sig_2s_btn)
-
-	var sig_3s_btn := Button.new()
-	sig_3s_btn.text = "3" + char(0x266F)
-	sig_3s_btn.custom_minimum_size = Vector2(140, 34)
-	sig_3s_btn.set_meta("compact_btn", true)
-	sig_3s_btn.visible = _mvp_is_sight_key_signature_enabled("3#", _sight_mode)
-	sig_3s_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("3#"))
-	_sight_key_sig_row.add_child(sig_3s_btn)
-	_sight_key_sig_buttons["3#"] = sig_3s_btn
-	_home_material_buttons.append(sig_3s_btn)
-
-	var sig_1b_btn := Button.new()
-	sig_1b_btn.text = "1" + char(0x266D)
-	sig_1b_btn.custom_minimum_size = Vector2(140, 34)
-	sig_1b_btn.set_meta("compact_btn", true)
-	sig_1b_btn.visible = _mvp_is_sight_key_signature_enabled("1b", _sight_mode)
-	sig_1b_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("1b"))
-	_sight_key_sig_row.add_child(sig_1b_btn)
-	_sight_key_sig_buttons["1b"] = sig_1b_btn
-	_home_material_buttons.append(sig_1b_btn)
-
-	var sig_2b_btn := Button.new()
-	sig_2b_btn.text = "2" + char(0x266D)
-	sig_2b_btn.custom_minimum_size = Vector2(140, 34)
-	sig_2b_btn.set_meta("compact_btn", true)
-	sig_2b_btn.visible = _mvp_is_sight_key_signature_enabled("2b", _sight_mode)
-	sig_2b_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("2b"))
-	_sight_key_sig_row.add_child(sig_2b_btn)
-	_sight_key_sig_buttons["2b"] = sig_2b_btn
-	_home_material_buttons.append(sig_2b_btn)
-
-	var sig_3b_btn := Button.new()
-	sig_3b_btn.text = "3" + char(0x266D)
-	sig_3b_btn.custom_minimum_size = Vector2(140, 34)
-	sig_3b_btn.set_meta("compact_btn", true)
-	sig_3b_btn.visible = _mvp_is_sight_key_signature_enabled("3b", _sight_mode)
-	sig_3b_btn.pressed.connect(_on_sight_key_sig_button_pressed.bind("3b"))
-	_sight_key_sig_row.add_child(sig_3b_btn)
-	_sight_key_sig_buttons["3b"] = sig_3b_btn
-	_home_material_buttons.append(sig_3b_btn)
+	_sight_key_sig_option = OptionButton.new()
+	_sight_key_sig_option.custom_minimum_size = Vector2(170, 34)
+	_style_practice_setup_input_control(_sight_key_sig_option)
+	_sight_key_sig_option.item_selected.connect(_on_sight_key_sig_option_selected)
+	_sight_key_sig_row.add_child(_sight_key_sig_option)
+	_populate_sight_key_sig_option()
 
 	# MIDI card: full-width row below the controls. Collapsible — defaults to
 	# collapsed when MIDI is off so it never crops out of view.
@@ -5797,15 +5720,12 @@ func _build_ui() -> void:
 	sight_tier_label.text = "Tier:"
 	sight_tier_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sight_tier_row.add_child(sight_tier_label)
-	for tier in range(1, SIGHT_CHORD_MAX_TIER + 1):
-		var tier_btn := Button.new()
-		tier_btn.text = str(SIGHT_CHORD_TIER_NAMES.get(tier, "Tier %d" % tier))
-		tier_btn.custom_minimum_size = Vector2(128, 42)
-		tier_btn.set_meta("compact_btn", true)
-		tier_btn.pressed.connect(_on_sight_chord_tier_button_pressed.bind(tier))
-		sight_tier_row.add_child(tier_btn)
-		_sight_chord_tier_buttons[tier] = tier_btn
-		_home_material_buttons.append(tier_btn)
+	_sight_chord_tier_option = OptionButton.new()
+	_sight_chord_tier_option.custom_minimum_size = Vector2(200, 40)
+	_style_practice_setup_input_control(_sight_chord_tier_option)
+	_sight_chord_tier_option.item_selected.connect(_on_sight_chord_tier_option_selected)
+	sight_tier_row.add_child(_sight_chord_tier_option)
+	_populate_sight_chord_tier_option()
 
 	var sight_acc_row := HBoxContainer.new()
 	sight_acc_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -8724,6 +8644,10 @@ func _apply_pro_style() -> void:
 			var bold_sys_font := SystemFont.new()
 			bold_sys_font.font_names = PackedStringArray(["Inter", "Helvetica Neue", "Segoe UI"])
 			_ui_bold_font = bold_sys_font
+	# Slightly embolden the body + title fonts so menu text reads a touch heavier.
+	# Wraps the freshly-loaded base each call, so the embolden never compounds.
+	_ui_font = _embolden_font(_ui_font, 0.16)
+	_ui_title_font = _embolden_font(_ui_title_font, 0.20)
 	_apply_menu_setup_theme_to_home()
 	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {"text_primary": Color(0.98, 0.96, 0.88), "panel_bg": Color(0.10, 0.14, 0.11, 0.74)}
 
@@ -16775,6 +16699,96 @@ func _on_sight_chord_tier_button_pressed(tier: int) -> void:
 	_save_ear_settings()
 
 
+# --- Sight Reader dropdown selectors (clef / key signature / chord tier) ---
+# Populate helpers rebuild items from the current per-sub-mode enablement and
+# select the active value. Selecting programmatically does not emit item_selected,
+# so there is no recursion with the *_option_selected handlers below.
+func _populate_sight_clef_option() -> void:
+	if _sight_clef_option == null:
+		return
+	_sight_clef_option.clear()
+	var sel := 0
+	for clef_name in ["Treble", "Bass", "Grand Staff"]:
+		if not _mvp_is_sight_clef_enabled(clef_name, _sight_mode):
+			continue
+		var idx := _sight_clef_option.item_count
+		_sight_clef_option.add_item(clef_name)
+		_sight_clef_option.set_item_metadata(idx, clef_name)
+		if clef_name == _selected_clef:
+			sel = idx
+	if _sight_clef_option.item_count > 0:
+		_sight_clef_option.select(sel)
+
+
+func _populate_sight_key_sig_option() -> void:
+	if _sight_key_sig_option == null:
+		return
+	var sharp := char(0x266F)
+	var flat := char(0x266D)
+	var labels := {"C": "C", "1#": "G (1%s)" % sharp, "2#": "D (2%s)" % sharp, "3#": "A (3%s)" % sharp, "1b": "F (1%s)" % flat, "2b": "B%s (2%s)" % [flat, flat], "3b": "E%s (3%s)" % [flat, flat]}
+	_sight_key_sig_option.clear()
+	var sel := 0
+	for sig in ["C", "1#", "2#", "3#", "1b", "2b", "3b"]:
+		if not _mvp_is_sight_key_signature_enabled(sig, _sight_mode):
+			continue
+		var idx := _sight_key_sig_option.item_count
+		_sight_key_sig_option.add_item(str(labels.get(sig, sig)))
+		_sight_key_sig_option.set_item_metadata(idx, sig)
+		if sig == _sight_key_signature:
+			sel = idx
+	if _sight_key_sig_option.item_count > 0:
+		_sight_key_sig_option.select(sel)
+
+
+func _populate_sight_chord_tier_option() -> void:
+	if _sight_chord_tier_option == null:
+		return
+	_sight_chord_tier_option.clear()
+	var sel := 0
+	for tier in range(1, SIGHT_CHORD_MAX_TIER + 1):
+		var idx := _sight_chord_tier_option.item_count
+		_sight_chord_tier_option.add_item(str(SIGHT_CHORD_TIER_NAMES.get(tier, "Tier %d" % tier)))
+		_sight_chord_tier_option.set_item_metadata(idx, tier)
+		if tier == _sight_selected_chord_tier:
+			sel = idx
+	if _sight_chord_tier_option.item_count > 0:
+		_sight_chord_tier_option.select(sel)
+
+
+func _on_sight_clef_option_selected(idx: int) -> void:
+	if _sight_clef_option == null:
+		return
+	var v: String = str(_sight_clef_option.get_item_metadata(idx))
+	if v != "":
+		_on_clef_button_pressed(v)
+
+
+func _on_sight_key_sig_option_selected(idx: int) -> void:
+	if _sight_key_sig_option == null:
+		return
+	var v: String = str(_sight_key_sig_option.get_item_metadata(idx))
+	if v != "":
+		_on_sight_key_sig_button_pressed(v)
+
+
+func _on_sight_chord_tier_option_selected(idx: int) -> void:
+	if _sight_chord_tier_option == null:
+		return
+	var v_var: Variant = _sight_chord_tier_option.get_item_metadata(idx)
+	_on_sight_chord_tier_button_pressed(int(v_var))
+
+
+# Wrap a base font in a FontVariation with a slight synthetic embolden so menu
+# text reads a touch heavier without changing glyph metrics (no layout reflow).
+func _embolden_font(base: Font, amount: float) -> Font:
+	if base == null:
+		return base
+	var fv := FontVariation.new()
+	fv.base_font = base
+	fv.variation_embolden = amount
+	return fv
+
+
 func _on_sight_accidentals_toggled(enabled: bool) -> void:
 	_style_menu_toggle(_sight_accidentals_toggle, enabled, _sight_accidentals_toggle != null and _sight_accidentals_toggle.disabled)
 	_refresh_practice_setup_theme()
@@ -18494,6 +18508,7 @@ func _refresh_clef_buttons(final_pass: bool = true) -> void:
 		btn.visible = not locked
 		_set_home_selection_state(btn, not locked and clef_label == _selected_clef)
 		_apply_mvp_locked_button_visual(btn, locked)
+	_populate_sight_clef_option()
 	if final_pass:
 		_refresh_sight_notes_setup_menu_style()
 		_refresh_practice_setup_theme()
@@ -18573,13 +18588,10 @@ func _refresh_sight_mode_buttons(final_pass: bool = true) -> void:
 		# is reachable; clef-specific children (Treble/Bass/Grand Staff buttons)
 		# are individually hidden for Sight Singing below.
 		_sight_clef_row.visible = sight_active and (_sight_mode == "Notes" or _sight_mode == "Continuous" or _sight_mode == "Chords" or _sight_mode == "Sight Singing" or _sight_mode == "Vanishing" or _sight_mode == "Intervals")
-		# Hide clef-specific controls when Sight Singing — only the round-length
+		# Hide the clef dropdown when Sight Singing — only the round-length
 		# stepper at the end of the row remains visible.
-		for clef_name in _clef_buttons.keys():
-			var b: Button = _clef_buttons[clef_name]
-			if b != null:
-				if sight_singing_mode:
-					b.visible = false
+		if _sight_clef_option != null:
+			_sight_clef_option.visible = not sight_singing_mode
 	if _sight_chord_options_group != null:
 		_sight_chord_options_group.visible = chord_mode
 	if _sight_chord_options_title_label != null:
@@ -18688,6 +18700,7 @@ func _refresh_sight_chord_tier_buttons(final_pass: bool = true) -> void:
 			continue
 		var tier_id := int(key)
 		_set_home_selection_state(tier_btn, tier_id == _sight_selected_chord_tier)
+	_populate_sight_chord_tier_option()
 	if final_pass:
 		_refresh_practice_setup_theme()
 
@@ -18700,6 +18713,7 @@ func _refresh_sight_key_sig_buttons(final_pass: bool = true) -> void:
 		btn.visible = not locked
 		_set_home_selection_state(btn, not locked and sig_name == _sight_key_signature)
 		_apply_mvp_locked_button_visual(btn, locked)
+	_populate_sight_key_sig_option()
 	if final_pass:
 		_refresh_sight_notes_setup_menu_style()
 		_refresh_practice_setup_theme()
