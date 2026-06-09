@@ -51,6 +51,12 @@ Status: complete — every asset has a recorded source + license. Last reviewed 
   - License: SIL Open Font License 1.1
   - License text: https://github.com/steinbergmedia/petaluma/blob/master/redist/LICENSE.txt
 
+- `assets/fonts/NotoEmoji.ttf` (monochrome emoji glyph fallback for the Web build)
+  - Source: Google Noto Emoji (monochrome) — https://github.com/googlefonts/noto-emoji
+  - License: SIL Open Font License 1.1
+  - Notes: Web-only fallback so emoji (🎵 🏆 🔥 ⭐ etc.) render as monochrome
+    glyphs in the browser, where Godot has no OS emoji font to fall back to.
+
 - `assets/fonts/DejaVuSans.ttf` (Unicode symbol glyph fallback for the Web build)
   - Source: DejaVu Fonts project — https://dejavu-fonts.github.io
   - License: Bitstream Vera Fonts License + DejaVu changes (public-domain-friendly,

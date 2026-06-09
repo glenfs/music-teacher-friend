@@ -16800,11 +16800,14 @@ func _install_web_glyph_fallbacks() -> void:
 		return
 	var dejavu := ResourceLoader.load("res://assets/fonts/DejaVuSans.ttf") as Font
 	var bravura := ResourceLoader.load("res://assets/fonts/Bravura.otf") as Font
+	var noto_emoji := ResourceLoader.load("res://assets/fonts/NotoEmoji.ttf") as Font
 	var fbs: Array[Font] = []
 	if dejavu != null:
-		fbs.append(dejavu)   # general symbols + inline accidentals
+		fbs.append(dejavu)       # general symbols + inline accidentals
 	if bravura != null:
-		fbs.append(bravura)  # music glyphs (clefs 𝄞 𝄢, beamed notes)
+		fbs.append(bravura)      # music glyphs (clefs 𝄞 𝄢, beamed notes)
+	if noto_emoji != null:
+		fbs.append(noto_emoji)   # monochrome emoji (🎵 🏆 🔥 ⭐ …)
 	if fbs.is_empty():
 		return
 	for f in [_ui_font, _ui_title_font, _ui_bold_font]:
