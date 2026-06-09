@@ -1859,6 +1859,16 @@ var _startup_boot_started_at_sec := 0.0
 
 
 func _ready() -> void:
+	# Web: lock the logical viewport to the 16:9 design size and letterbox to fit
+	# the browser. Without this, stretch aspect "expand" inflates the logical
+	# height in non-16:9 (e.g. square) browser windows — vp.y balloons well past
+	# 768 and every height/spacer calc inflates. KEEP makes vp a stable 1366x768
+	# so the proven desktop layout applies as-is. Native desktop/Android keep
+	# "expand" (project default).
+	if OS.has_feature("web"):
+		var win := get_window()
+		if win != null:
+			win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	if CLEFIRA_LOGO_TEXTURE == null:
 		if ResourceLoader.exists(_CLEFIRA_LOGO_PATH):
 			CLEFIRA_LOGO_TEXTURE = load(_CLEFIRA_LOGO_PATH)
@@ -3556,18 +3566,13 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	var viewport_scale := minf(width_scale, height_scale)
 	if is_tablet:
 		viewport_scale = clampf(viewport_scale, 0.78, 1.08)
-	# Web: replicate the 1366x768 desktop-app control density. The "expand" stretch
-	# grows the logical viewport on big browser canvases, and the scaler is built to
-	# enlarge controls on big (tablet) screens — which reads as oversized buttons in
-	# a desktop browser. Cap the scale and force the compact-height paths so web
-	# matches the desktop baseline (~35px buttons), while expand keeps native-res
-	# layout + horizontal space. Native desktop/Android are unaffected.
+	# Web uses KEEP aspect (see _ready): the logical viewport is locked to the
+	# 1366x768 design size and letterboxed to fit the browser, so vp here is always
+	# ~1366x768 and the standard desktop scaling applies directly — no web override.
 	var is_web := OS.has_feature("web")
-	if is_web:
-		viewport_scale = 0.72
 	large_scale *= viewport_scale
-	var compact_height_ui := vp.y < 930.0 or is_web
-	var very_compact_height_ui := vp.y < 860.0 or is_web
+	var compact_height_ui := vp.y < 930.0
+	var very_compact_height_ui := vp.y < 860.0
 	var ultra_compact_height_ui := vp.y < 780.0
 	var continuous_compact_ui := vp.y < 1040.0
 	var continuous_very_compact_ui := vp.y < 980.0
@@ -6017,13 +6022,13 @@ func _build_ui_game_panel() -> void:
 		return
 	_game_card = PanelContainer.new()
 	_game_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_game_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_game_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if OS.has_feature("web") else Control.SIZE_EXPAND_FILL
 	_game_card.visible = false
 	main_col.add_child(_game_card)
 
 	_game_panel = VBoxContainer.new()
 	_game_panel.add_theme_constant_override("separation", 10)
-	_game_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_game_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if OS.has_feature("web") else Control.SIZE_EXPAND_FILL
 	_game_card.add_child(_game_panel)
 
 	var hud_row := HBoxContainer.new()
@@ -6310,7 +6315,7 @@ func _build_ui_game_panel() -> void:
 	_sight_container.add_child(_sight_top_spacer)
 
 	var sight_staff_row := HBoxContainer.new()
-	sight_staff_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	sight_staff_row.alignment = BoxContainer.ALIGNMENT_BEGIN if OS.has_feature("web") else BoxContainer.ALIGNMENT_CENTER
 	sight_staff_row.add_theme_constant_override("separation", 18)
 	_sight_container.add_child(sight_staff_row)
 
@@ -6330,7 +6335,7 @@ func _build_ui_game_panel() -> void:
 
 	_sight_side_controls = VBoxContainer.new()
 	_sight_side_controls.add_theme_constant_override("separation", 16)
-	_sight_side_controls.alignment = BoxContainer.ALIGNMENT_CENTER
+	_sight_side_controls.alignment = BoxContainer.ALIGNMENT_BEGIN if OS.has_feature("web") else BoxContainer.ALIGNMENT_CENTER
 	sight_staff_row.add_child(_sight_side_controls)
 
 	_note_chase_side_panel = PanelContainer.new()
@@ -22155,7 +22160,7 @@ func _apply_answer_mode() -> void:
 	if _sight_bottom_spacer != null:
 		_sight_bottom_spacer.visible = anchor_sight_bottom_controls
 		_sight_bottom_spacer.custom_minimum_size = Vector2(0, 0)
-		_sight_bottom_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL if anchor_sight_bottom_controls else Control.SIZE_SHRINK_BEGIN
+		_sight_bottom_spacer.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if OS.has_feature("web") else (Control.SIZE_EXPAND_FILL if anchor_sight_bottom_controls else Control.SIZE_SHRINK_BEGIN)
 	if _bird_sprite != null:
 		var hide_chicken := _selected_mode == MODE_READ or _selected_mode == MODE_NOTE_CHASE or _selected_mode == MODE_PITCH_MATCH or (_selected_mode == MODE_SIGHT and (_sight_mode == "Continuous" or _sight_mode == "Rhythm Flow" or _sight_mode == "Sight Singing"))
 		_bird_sprite.visible = not hide_chicken
