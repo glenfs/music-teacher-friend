@@ -50,6 +50,15 @@ Status: complete — every asset has a recorded source + license. Last reviewed 
   - Author: Anthony Hughes
   - License: SIL Open Font License 1.1
   - License text: https://github.com/steinbergmedia/petaluma/blob/master/redist/LICENSE.txt
+
+- `assets/fonts/DejaVuSans.ttf` (Unicode symbol glyph fallback for the Web build)
+  - Source: DejaVu Fonts project — https://dejavu-fonts.github.io
+  - License: Bitstream Vera Fonts License + DejaVu changes (public-domain-friendly,
+    permissive; redistribution allowed). https://dejavu-fonts.github.io/License.html
+  - Notes: Used only on the Web export as a glyph fallback (arrows, geometric
+    shapes, gear, checks, accidentals) since the browser sandbox has no OS fonts
+    for Godot's TextServer to fall back to. Bundled font, no attribution required
+    in-app but credited here.
   - Notes: Hand-drawn / jazz lead-sheet style. Casual look ideal for jazz and
     lead-sheet exercises. Free for any use including commercial.
 

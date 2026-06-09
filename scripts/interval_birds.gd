@@ -8648,6 +8648,7 @@ func _apply_pro_style() -> void:
 	# Wraps the freshly-loaded base each call, so the embolden never compounds.
 	_ui_font = _embolden_font(_ui_font, 0.16)
 	_ui_title_font = _embolden_font(_ui_title_font, 0.20)
+	_install_web_glyph_fallbacks()
 	_apply_menu_setup_theme_to_home()
 	var colors: Dictionary = _home_tokens.colors(false) if _home_tokens != null else {"text_primary": Color(0.98, 0.96, 0.88), "panel_bg": Color(0.10, 0.14, 0.11, 0.74)}
 
@@ -16787,6 +16788,33 @@ func _embolden_font(base: Font, amount: float) -> Font:
 	fv.base_font = base
 	fv.variation_embolden = amount
 	return fv
+
+
+# Web builds run in a browser sandbox with no OS fonts, so Godot's TextServer
+# can't auto-fall-back for the Unicode glyphs the UI uses (clefs, accidentals,
+# gear, progress dots, arrows, checks). Bundle DejaVu Sans (general symbols) +
+# Bravura (music symbols) as explicit fallbacks on both the app fonts and the
+# global default font. Desktop/Android keep OS fallback, so this is web-only.
+func _install_web_glyph_fallbacks() -> void:
+	if not OS.has_feature("web"):
+		return
+	var dejavu := ResourceLoader.load("res://assets/fonts/DejaVuSans.ttf") as Font
+	var bravura := ResourceLoader.load("res://assets/fonts/Bravura.otf") as Font
+	var fbs: Array[Font] = []
+	if dejavu != null:
+		fbs.append(dejavu)   # general symbols + inline accidentals
+	if bravura != null:
+		fbs.append(bravura)  # music glyphs (clefs 𝄞 𝄢, beamed notes)
+	if fbs.is_empty():
+		return
+	for f in [_ui_font, _ui_title_font, _ui_bold_font]:
+		if f != null:
+			f.set_fallbacks(fbs.duplicate())
+	# Controls without an explicit font (e.g. the staff clef label, header icon
+	# buttons) resolve to the global default font — give it the fallbacks too.
+	var tdb_font: Font = ThemeDB.fallback_font
+	if tdb_font != null:
+		tdb_font.set_fallbacks(fbs.duplicate())
 
 
 func _on_sight_accidentals_toggled(enabled: bool) -> void:
