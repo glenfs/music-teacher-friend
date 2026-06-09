@@ -16,6 +16,8 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Clefira"
 config/description="Clefira — Music Learning that actually sticks"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Clefira"
 run/main_scene="res://scenes/ui/SplashScreen.tscn"
 config/features=PackedStringArray("4.6")
 boot_splash/show_image=false

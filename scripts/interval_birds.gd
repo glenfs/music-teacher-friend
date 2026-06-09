@@ -14840,31 +14840,39 @@ func _resolve_progress_data_path() -> String:
 const LEGACY_USERDATA_NAME := "MusicEd - Interval Birds"
 
 func _migrate_legacy_user_data_if_needed() -> void:
-	# Resolve current + legacy absolute paths. user_data_dir is the Godot-native
-	# resolution of user://; the legacy folder is a sibling under app_userdata.
+	# The app now uses a custom user dir (e.g. %APPDATA%/Clefira on Windows) so the
+	# save path no longer sits under Godot's app_userdata folder. Earlier builds
+	# wrote under <data>/Godot/app_userdata/<name>/. This copies the most recent
+	# legacy data into the new location IFF the new one is empty, so existing
+	# practice/teacher data carries over. Safe to call every launch.
 	var current_dir: String = OS.get_user_data_dir()
 	if current_dir == "":
 		return
 	var current_dir_n: String = current_dir.replace("\\", "/")
+	# Don't clobber: if the new path already has real data, the user has worked
+	# under it — skip entirely.
+	if FileAccess.file_exists("user://teacher_data.json") or FileAccess.file_exists("user://ear_settings.json") or DirAccess.dir_exists_absolute(current_dir + "/students"):
+		return
 	var parent: String = current_dir_n.get_base_dir()
-	var legacy_dir: String = "%s/%s" % [parent, LEGACY_USERDATA_NAME]
-	# Bail if the legacy dir doesn't exist or is the same as current (rename
-	# already happened via custom_user_dir, or migration was previously done).
-	if not DirAccess.dir_exists_absolute(legacy_dir):
-		return
-	if legacy_dir == current_dir_n:
-		return
-	# Don't clobber: if current already has teacher_data.json OR a students/
-	# subfolder, the user has already done work under the new path. Skip.
-	if FileAccess.file_exists("user://teacher_data.json"):
-		return
-	if DirAccess.dir_exists_absolute(current_dir + "/students"):
-		return
-	# Copy. Recursive (one folder level deep is enough — students/<id>/ is the
-	# deepest the app writes). Logs counts so the dev can confirm.
-	var copied: int = _copy_dir_recursive(legacy_dir, current_dir)
-	if copied > 0:
-		print("[Migration] Copied %d legacy files from %s → %s" % [copied, legacy_dir, current_dir])
+	# Candidate legacy locations, newest-first. After moving to a custom user dir,
+	# `parent` is the platform data root (e.g. %APPDATA%), and the previous data
+	# lived under Godot's app_userdata.
+	var candidates: Array[String] = [
+		"%s/Godot/app_userdata/Clefira" % parent,
+		"%s/godot/app_userdata/Clefira" % parent,
+		"%s/Godot/app_userdata/%s" % [parent, LEGACY_USERDATA_NAME],
+		"%s/godot/app_userdata/%s" % [parent, LEGACY_USERDATA_NAME],
+		"%s/%s" % [parent, LEGACY_USERDATA_NAME],
+	]
+	for legacy_dir in candidates:
+		if legacy_dir == current_dir_n:
+			continue
+		if not DirAccess.dir_exists_absolute(legacy_dir):
+			continue
+		var copied: int = _copy_dir_recursive(legacy_dir, current_dir)
+		if copied > 0:
+			print("[Migration] Copied %d legacy files from %s → %s" % [copied, legacy_dir, current_dir])
+			return
 
 
 func _copy_dir_recursive(src_dir: String, dst_dir: String) -> int:
@@ -14935,7 +14943,7 @@ func _init_session_log() -> void:
 	live.store_line("=== Clefira session log ===")
 	live.store_line("started_at: %s" % Time.get_datetime_string_from_system())
 	live.store_line("app_version: %s" % APP_VERSION_LABEL)
-	live.store_line("godot: %s" % str(v.get("string", "?")))
+	live.store_line("engine: %s" % str(v.get("string", "?")))
 	live.store_line("os: %s" % OS.get_name())
 	live.store_line("edition: %s" % EDITION_LABEL)
 	live.store_line("user_data_dir: %s" % OS.get_user_data_dir())
@@ -27721,7 +27729,7 @@ func _refresh_settings_diagnostics() -> void:
 	if _mic_sensitivity_option != null:
 		_mic_sensitivity_option.selected = clampi(_mic_sensitivity, 0, MIC_SENSITIVITY_NAMES.size() - 1)
 	if _settings_diag_version_label != null:
-		var build_id: String = "%s · Godot %s" % [OS.get_name(), Engine.get_version_info().get("string", "?")]
+		var build_id: String = "%s · Engine %s" % [OS.get_name(), Engine.get_version_info().get("string", "?")]
 		_settings_diag_version_label.text = "Build: %s" % build_id
 	if _settings_diag_sync_label != null:
 		if _sync_provider == null:

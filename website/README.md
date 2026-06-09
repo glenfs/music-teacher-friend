@@ -14,7 +14,7 @@ Static marketing and download site for Clefira.
 
 ## Windows download package
 
-The Godot Windows build requires both files in the same folder:
+The Windows build requires both files in the same folder:
 
 - `ClefiraStudent.exe`
 - `ClefiraStudent.pck`

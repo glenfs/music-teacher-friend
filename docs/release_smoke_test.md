@@ -1,6 +1,6 @@
 # Clefira Desktop Release — Manual Smoke Test Checklist
 
-Run this on a **clean Windows machine** (or at minimum: rename your existing `%APPDATA%\Godot\app_userdata\Clefira\` folder so the app sees a first-launch state) before every release.
+Run this on a **clean Windows machine** (or at minimum: rename your existing `%APPDATA%\Clefira\` folder so the app sees a first-launch state) before every release.
 
 Mark each check as ✓ or ✗ with a note for any failures.
 
@@ -121,8 +121,8 @@ Mark each check as ✓ or ✗ with a note for any failures.
 
 ## 12. Data migration (only if testing on a machine with legacy data)
 
-- [ ] Put a `teacher_data.json` in `%APPDATA%\Godot\app_userdata\MusicEd - Interval Birds\`
-- [ ] Delete `%APPDATA%\Godot\app_userdata\Clefira\` (so it's empty)
+- [ ] Put a `teacher_data.json` in a legacy location, e.g. `%APPDATA%\Godot\app_userdata\Clefira\`
+- [ ] Delete the new `%APPDATA%\Clefira\` folder (so it's empty)
 - [ ] Launch Clefira
 - [ ] Check console / `session.log` — should mention `[Migration] Copied N legacy files`
 - [ ] Verify `app_userdata/Clefira/` now has the legacy teacher_data.json
