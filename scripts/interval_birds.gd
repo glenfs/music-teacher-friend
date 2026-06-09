@@ -1859,6 +1859,15 @@ var _startup_boot_started_at_sec := 0.0
 
 
 func _ready() -> void:
+	# Web: the project uses stretch aspect "expand", so on a large browser canvas
+	# the logical viewport grows past the desktop baseline (768h) and the
+	# responsive scaler inflates controls (tall buttons). Lock the logical height
+	# to the project's 768 on web so all desktop-tuned sizing applies as-is; width
+	# stays responsive. Native desktop/Android keep "expand".
+	if OS.has_feature("web"):
+		var win := get_window()
+		if win != null:
+			win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP_HEIGHT
 	if CLEFIRA_LOGO_TEXTURE == null:
 		if ResourceLoader.exists(_CLEFIRA_LOGO_PATH):
 			CLEFIRA_LOGO_TEXTURE = load(_CLEFIRA_LOGO_PATH)
