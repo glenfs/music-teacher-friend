@@ -3317,27 +3317,39 @@ func _update_game_card_layout() -> void:
 	if _game_card == null:
 		return
 	var vp := get_viewport_rect().size
+	var is_web := OS.has_feature("web")
 	_refresh_device_profile(vp)
 	var is_large := vp.y >= 720.0 or vp.x >= 1100.0
 	var horiz_margin := clampf(vp.x * 0.018, 10.0, 24.0)
 	var target_w := maxf(320.0, vp.x - (horiz_margin * 2.0))
-	var target_h := clampf(vp.y * (0.80 if is_large else 0.68), 320.0, vp.y - 72.0)
+	var target_h := clampf(vp.y * (0.54 if is_web else (0.80 if is_large else 0.68)), 280.0 if is_web else 320.0, vp.y - (120.0 if is_web else 72.0))
 	_game_card.custom_minimum_size = Vector2(target_w, target_h)
 	if _home_card != null:
+		_home_card.size_flags_vertical = Control.SIZE_FILL if is_web and _is_home_ui_active() else Control.SIZE_EXPAND_FILL
 		var overview_active := _is_main_menu_overview_active()
 		var footer_h := 72.0 if overview_active else 56.0
 		if _home_footer_bar != null:
 			footer_h = maxf(footer_h, _home_footer_bar.custom_minimum_size.y)
 		var home_h := 0.0
 		if overview_active:
-			home_h = clampf(target_h - (footer_h + 78.0), 220.0, vp.y - (footer_h + 88.0))
+			if is_web:
+				var max_web_overview_h := maxf(300.0, vp.y - (footer_h + 190.0))
+				var min_web_overview_h := minf(420.0, max_web_overview_h)
+				home_h = clampf(vp.y * 0.58, min_web_overview_h, max_web_overview_h)
+			else:
+				home_h = clampf(target_h - (footer_h + 78.0), 220.0, vp.y - (footer_h + 88.0))
 		else:
 			var header_h := 84.0
 			if _header_card != null:
 				header_h = maxf(header_h, _header_card.custom_minimum_size.y)
 			var shell_gap := clampf(vp.y * 0.035, 22.0, 46.0)
-			var available_h := vp.y - (header_h + footer_h + shell_gap)
-			home_h = clampf(available_h, 260.0, vp.y - (footer_h + 24.0))
+			if is_web:
+				var max_web_detail_h := maxf(280.0, vp.y - (header_h + footer_h + shell_gap + 92.0))
+				var min_web_detail_h := minf(340.0, max_web_detail_h)
+				home_h = clampf(vp.y * (0.54 if _first_run_assessment_pending else 0.58), min_web_detail_h, max_web_detail_h)
+			else:
+				var available_h := vp.y - (header_h + footer_h + shell_gap)
+				home_h = clampf(available_h, 260.0, vp.y - (footer_h + 24.0))
 		_home_card.custom_minimum_size = Vector2(target_w, home_h)
 	_apply_responsive_touch_scaling(vp)
 	_layout_game_top_buttons(vp)
@@ -3552,7 +3564,7 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	# layout + horizontal space. Native desktop/Android are unaffected.
 	var is_web := OS.has_feature("web")
 	if is_web:
-		viewport_scale = clampf(viewport_scale, 0.78, 0.96)
+		viewport_scale = 0.72
 	large_scale *= viewport_scale
 	var compact_height_ui := vp.y < 930.0 or is_web
 	var very_compact_height_ui := vp.y < 860.0 or is_web
@@ -3613,6 +3625,9 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 		_apply_home_overview_anchor_margins(vp, overview_visible)
 	if _home_mode_buttons_row != null:
 		_home_mode_buttons_row.add_theme_constant_override("separation", int(roundf((16 if is_tablet else 10) * viewport_scale)))
+	if _home_start_action_row != null:
+		_home_start_action_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_home_start_action_row.add_theme_constant_override("separation", int(roundf((10.0 if is_web else 12.0) * viewport_scale)))
 	if _home_overview_grid != null:
 		_home_overview_grid.add_theme_constant_override("h_separation", int(roundf((18 if is_tablet else 12) * viewport_scale)))
 		_home_overview_grid.add_theme_constant_override("v_separation", int(roundf((18 if is_tablet else 12) * viewport_scale)))
@@ -3620,18 +3635,18 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	if _home_hub_row != null:
 		_home_hub_row.add_theme_constant_override("separation", int(roundf((18 if is_tablet else 12) * viewport_scale)))
 	if _home_footer_row != null:
-		_home_footer_row.add_theme_constant_override("separation", int(roundf((16 if is_tablet else 12) * viewport_scale)))
+		_home_footer_row.add_theme_constant_override("separation", int(roundf((10.0 if is_web else (16.0 if is_tablet else 12.0)) * viewport_scale)))
 	if _home_footer_bar != null:
 		var main_overview := _is_main_menu_overview_active()
 		var footer_h := 0.0
 		if main_overview:
-			footer_h = (70.0 if is_tablet else 44.0) * clampf(viewport_scale, 0.90, 1.08)
+			footer_h = (42.0 if is_web else (70.0 if is_tablet else 44.0)) * (viewport_scale if is_web else clampf(viewport_scale, 0.90, 1.08))
 			if (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible):
-				footer_h = (96.0 if is_tablet else 82.0) * clampf(viewport_scale, 0.90, 1.08)
+				footer_h = (46.0 if is_web else (96.0 if is_tablet else 82.0)) * (viewport_scale if is_web else clampf(viewport_scale, 0.90, 1.08))
 		else:
-			footer_h = (58.0 if is_tablet else 38.0) * clampf(viewport_scale, 0.90, 1.08)
+			footer_h = (36.0 if is_web else (58.0 if is_tablet else 38.0)) * (viewport_scale if is_web else clampf(viewport_scale, 0.90, 1.08))
 			if (_home_start_button != null and _home_start_button.visible) or (_rhythm_flow_demo_home_button != null and _rhythm_flow_demo_home_button.visible):
-				footer_h = (70.0 if is_tablet else 56.0) * clampf(viewport_scale, 0.90, 1.08)
+				footer_h = (42.0 if is_web else (70.0 if is_tablet else 56.0)) * (viewport_scale if is_web else clampf(viewport_scale, 0.90, 1.08))
 		_home_footer_bar.custom_minimum_size = Vector2(0, roundf(footer_h))
 	for b in _home_material_buttons:
 		if b == null:
@@ -3650,10 +3665,19 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 			new_w *= 0.82
 		elif b.has_meta("compact_btn"):
 			min_h = btn_h * 0.78
-		b.custom_minimum_size = Vector2(new_w, maxf(base_size.y, min_h))
+		var base_h := base_size.y
+		if is_web:
+			base_h *= viewport_scale
+			new_w = roundf(base_w * clampf(viewport_scale, 0.72, 0.82))
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var final_h := maxf(base_h, min_h)
+		var is_web_footer_button := is_web and ((_home_footer_row != null and b.get_parent() == _home_footer_row) or (_home_start_action_row != null and b.get_parent() == _home_start_action_row))
+		if is_web_footer_button:
+			final_h = 30.0 if (b == _home_start_button or b == _rhythm_flow_demo_home_button) else 26.0
+		b.custom_minimum_size = Vector2(new_w, final_h)
 		b.add_theme_font_size_override("font_size", int(roundf((24 if is_tablet else 17) * large_scale)))
 	var overview_card_w := _home_overview_card_width_for_viewport(vp)
-	var overview_card_h := clampf(vp.y * (0.19 if is_tablet else 0.21), 126.0, 212.0)
+	var overview_card_h := clampf(vp.y * (0.14 if is_web else (0.19 if is_tablet else 0.21)), 88.0 if is_web else 126.0, 132.0 if is_web else 212.0)
 	if _home_title_label != null:
 		_home_title_label.custom_minimum_size = Vector2(roundf(overview_card_w), 0)
 		if _home_title_label.has_meta("home_title_separator"):
@@ -3679,17 +3703,22 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 			if card_desc != null:
 				card_desc.add_theme_font_size_override("font_size", int(roundf((15 if is_tablet else 12) * large_scale)))
 	if _home_settings_button != null:
-		_home_settings_button.custom_minimum_size = Vector2(roundf((182.0 if is_tablet else 156.0) * clampf(viewport_scale, 0.90, 1.08)), roundf((60.0 if is_tablet else 52.0) * clampf(viewport_scale, 0.90, 1.06)))
+		var settings_scale := viewport_scale if is_web else clampf(viewport_scale, 0.90, 1.08)
+		_home_settings_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_home_settings_button.custom_minimum_size = Vector2(roundf((182.0 if is_tablet else 156.0) * settings_scale), roundf((60.0 if is_tablet else 52.0) * (viewport_scale if is_web else clampf(viewport_scale, 0.90, 1.06))))
 		_home_settings_button.add_theme_font_size_override("font_size", int(roundf((20 if is_tablet else 15) * large_scale)))
-	var nav_btn_size := int(roundf((54.0 if is_tablet else 46.0) * clampf(viewport_scale, 0.86, 1.12)))
-	var nav_icon_font := int(roundf((30.0 if is_tablet else 24.0) * clampf(viewport_scale, 0.86, 1.10)))
+	var nav_btn_size := int(roundf((54.0 if is_tablet else 46.0) * (viewport_scale if is_web else clampf(viewport_scale, 0.86, 1.12))))
+	var nav_icon_font := int(roundf((30.0 if is_tablet else 24.0) * (viewport_scale if is_web else clampf(viewport_scale, 0.86, 1.10))))
 	if _home_mode_back_button != null:
+		_home_mode_back_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_home_mode_back_button.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
 		_home_mode_back_button.add_theme_font_size_override("font_size", nav_icon_font)
 	if _home_mode_home_button != null:
+		_home_mode_home_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_home_mode_home_button.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
 		_home_mode_home_button.add_theme_font_size_override("font_size", nav_icon_font)
 	if _sight_settings_button != null:
+		_sight_settings_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		_sight_settings_button.custom_minimum_size = Vector2(nav_btn_size, nav_btn_size)
 		_sight_settings_button.add_theme_font_size_override("font_size", nav_icon_font)
 	if _sight_lives_title_label != null:
@@ -6262,7 +6291,7 @@ func _build_ui_game_panel() -> void:
 
 	_sight_container = VBoxContainer.new()
 	_sight_container.add_theme_constant_override("separation", 0)
-	_sight_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_sight_container.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if OS.has_feature("web") else Control.SIZE_EXPAND_FILL
 	_sight_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_sight_container.visible = false
 	_game_panel.add_child(_sight_container)
@@ -9354,6 +9383,9 @@ func _style_button(btn: Button) -> void:
 func _style_settings_button(btn: Button) -> void:
 	if btn == null:
 		return
+	if btn.has_meta("hud_nav_btn"):
+		_style_sight_header_icon_button(btn, char(0x2699), null)
+		return
 	_ensure_button_style_cache()
 	var pal := _theme_button_palette()
 	var settings_text := _pick_readable_text_color(pal["settings_bg"])
@@ -10035,6 +10067,26 @@ func _build_home_flow_card(target_parent: Control, hub_name: String, description
 func _style_material_button(btn: Button) -> void:
 	if btn == null:
 		return
+	if btn.has_meta("hud_nav_btn"):
+		return
+	var is_web_footer_button := OS.has_feature("web") and ((_home_footer_row != null and btn.get_parent() == _home_footer_row) or (_home_start_action_row != null and btn.get_parent() == _home_start_action_row))
+	if is_web_footer_button:
+		btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		btn.custom_minimum_size.y = 30.0 if (btn == _home_start_button or btn == _rhythm_flow_demo_home_button) else 26.0
+		if btn != _home_start_button and btn != _rhythm_flow_demo_home_button:
+			var empty := StyleBoxEmpty.new()
+			btn.add_theme_stylebox_override("normal", empty)
+			btn.add_theme_stylebox_override("hover", empty)
+			btn.add_theme_stylebox_override("pressed", empty)
+			var web_footer_text := Color(0.16, 0.22, 0.32, 0.82)
+			btn.add_theme_color_override("font_color", web_footer_text)
+			btn.add_theme_color_override("font_hover_color", web_footer_text.darkened(0.12))
+			btn.add_theme_color_override("font_pressed_color", web_footer_text.darkened(0.20))
+			btn.add_theme_constant_override("outline_size", 0)
+			if not btn.has_meta("_hover_feedback_connected"):
+				btn.set_meta("_hover_feedback_connected", true)
+				_connect_button_hover_feedback(btn)
+			return
 	# Footer action buttons have dedicated styling and should not be overridden.
 	if btn == _home_start_button or btn == _rhythm_flow_demo_home_button or btn == _home_settings_button:
 		return
@@ -10132,6 +10184,9 @@ func _style_home_footer_bar() -> void:
 func _style_home_footer_button(btn: Button, accent: Color, fill_alpha: float = 0.22) -> void:
 	if btn == null:
 		return
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if OS.has_feature("web") and ((_home_footer_row != null and btn.get_parent() == _home_footer_row) or (_home_start_action_row != null and btn.get_parent() == _home_start_action_row)):
+		btn.custom_minimum_size.y = 30.0 if (btn == _home_start_button or btn == _rhythm_flow_demo_home_button) else 26.0
 	var pal := _theme_button_palette()
 	var contract := _menu_style_contract()
 	var is_play_cta := btn == _home_start_button or btn == _rhythm_flow_demo_home_button
@@ -11908,10 +11963,15 @@ func _apply_clefira_nav_home_button_style(btn: Button) -> void:
 func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: Texture2D = null) -> void:
 	if btn == null:
 		return
+	var web_home_header_button := OS.has_feature("web") and (btn == _home_mode_back_button or btn == _home_mode_home_button or btn == _sight_settings_button)
+	var button_size := 34 if web_home_header_button else 46
+	var icon_font_size := 18 if web_home_header_button else (24 if icon_tex == null else 18)
+	var corner_radius := int(roundf(float(button_size) * 0.5))
 	var contract := _menu_style_contract()
 	btn.text = icon_text
 	btn.icon = icon_tex
 	btn.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if icon_tex != null:
 		btn.text = ""
 		# Keep SVG icons at native size to avoid pixelation from stretch-up.
@@ -11921,23 +11981,25 @@ func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: T
 	else:
 		btn.expand_icon = false
 		btn.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	btn.custom_minimum_size = Vector2(46, 46)
+	btn.custom_minimum_size = Vector2(button_size, button_size)
 	btn.clip_text = false
-	btn.add_theme_font_size_override("font_size", 24 if icon_tex == null else 18)
-	btn.add_theme_constant_override("icon_max_width", 28)
+	btn.add_theme_font_size_override("font_size", icon_font_size)
+	btn.add_theme_constant_override("icon_max_width", 22 if web_home_header_button else 28)
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color(contract.get("btn_inactive_bg", Color(0.09, 0.17, 0.29, 0.86)))
-	normal.corner_radius_top_left = 23
-	normal.corner_radius_top_right = 23
-	normal.corner_radius_bottom_left = 23
-	normal.corner_radius_bottom_right = 23
+	if web_home_header_button:
+		normal.bg_color.a = 0.0
+	normal.corner_radius_top_left = corner_radius
+	normal.corner_radius_top_right = corner_radius
+	normal.corner_radius_bottom_left = corner_radius
+	normal.corner_radius_bottom_right = corner_radius
 	normal.border_color = Color(contract.get("btn_selected_border", Color(0.92, 0.78, 0.32, 0.92)))
-	normal.border_width_left = 2
-	normal.border_width_top = 2
-	normal.border_width_right = 2
-	normal.border_width_bottom = 2
+	normal.border_width_left = 0 if web_home_header_button else 2
+	normal.border_width_top = 0 if web_home_header_button else 2
+	normal.border_width_right = 0 if web_home_header_button else 2
+	normal.border_width_bottom = 0 if web_home_header_button else 2
 	normal.shadow_color = Color(0.0, 0.0, 0.0, float(contract.get("shadow_nav_alpha", 0.0)))
-	normal.shadow_size = int(contract.get("shadow_nav_size", 0))
+	normal.shadow_size = 0 if web_home_header_button else int(contract.get("shadow_nav_size", 0))
 	normal.content_margin_left = 0
 	normal.content_margin_right = 0
 	normal.content_margin_top = 0
@@ -11946,12 +12008,20 @@ func _style_sight_header_icon_button(btn: Button, icon_text: String, icon_tex: T
 	var hover := normal.duplicate()
 	hover.bg_color = Color(contract.get("btn_inactive_hover", Color(0.12, 0.23, 0.38, 0.92)))
 	hover.border_color = Color(contract.get("panel_border_strong", Color(0.98, 0.84, 0.40, 0.98)))
-	hover.shadow_size = int(contract.get("shadow_nav_hover_size", 0))
+	if web_home_header_button:
+		hover.bg_color.a = 0.14
+		hover.border_width_left = 0
+		hover.border_width_top = 0
+		hover.border_width_right = 0
+		hover.border_width_bottom = 0
+	hover.shadow_size = 0 if web_home_header_button else int(contract.get("shadow_nav_hover_size", 0))
 	btn.add_theme_stylebox_override("hover", hover)
 	var pressed := normal.duplicate()
 	pressed.bg_color = Color(contract.get("btn_inactive_pressed", Color(0.06, 0.12, 0.21, 0.94)))
 	pressed.border_color = Color(contract.get("btn_selected_border", Color(0.86, 0.70, 0.26, 0.96)))
-	pressed.shadow_size = int(contract.get("shadow_nav_pressed_size", 0))
+	if web_home_header_button:
+		pressed.bg_color.a = 0.22
+	pressed.shadow_size = 0 if web_home_header_button else int(contract.get("shadow_nav_pressed_size", 0))
 	btn.add_theme_stylebox_override("pressed", pressed)
 	var is_settings_button: bool = btn == _sight_settings_button
 	var base_icon_color: Color = Color(1.0, 1.0, 1.0, 1.0) if is_settings_button else Color(0.98, 0.94, 0.84, 1.0)
@@ -12245,7 +12315,7 @@ func _apply_sight_notes_chords_skin() -> void:
 	if _sight_settings_button != null:
 		# Settings button stays on home only — skin functions used to force-show it
 		# during gameplay which made it compete with the answer surface.
-		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active
+		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active and not _first_run_assessment_pending
 	# Neon stat cards
 	var desktop_hybrid := _sight_skin_is_desktop_hybrid_profile()
 	var icon_glow_alpha := 0.72 if desktop_hybrid else 0.42
@@ -12281,6 +12351,59 @@ func _apply_sight_notes_chords_skin() -> void:
 		_sight_streak_value_label.add_theme_constant_override("shadow_offset_y", 0)
 	if _sight_streak_score_label != null:
 		_sight_streak_score_label.add_theme_color_override("font_color", Color(0.98, 0.86, 0.54, 0.98))
+	var vp := get_viewport_rect().size
+	var web_sight_gameplay_layout := OS.has_feature("web") and _selected_mode == MODE_SIGHT and _game_panel != null and _game_panel.visible
+	if web_sight_gameplay_layout:
+		if _game_panel != null:
+			_game_panel.add_theme_constant_override("separation", 6)
+		if _hud_left_box != null:
+			_hud_left_box.custom_minimum_size = Vector2(188, 48)
+		if _hud_center_box != null:
+			_hud_center_box.custom_minimum_size = Vector2(296, 62)
+		if _hud_right_box != null:
+			_hud_right_box.custom_minimum_size = Vector2(138, 62)
+		if _lives_label != null:
+			_lives_label.add_theme_font_size_override("font_size", 18)
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.add_theme_font_size_override("font_size", 10)
+		if _sight_lives_hearts_label != null:
+			_sight_lives_hearts_label.add_theme_font_size_override("font_size", 24)
+		if _sight_feed_chip != null:
+			_sight_feed_chip.custom_minimum_size = Vector2(96, 30)
+		if _sight_shield_chip != null:
+			_sight_shield_chip.custom_minimum_size = Vector2(96, 30)
+		if _sight_feed_chip_icon != null:
+			_sight_feed_chip_icon.custom_minimum_size = Vector2(20, 20)
+		if _sight_feed_chip_label != null:
+			_sight_feed_chip_label.add_theme_font_size_override("font_size", 12)
+		if _sight_shield_chip_label != null:
+			_sight_shield_chip_label.add_theme_font_size_override("font_size", 12)
+		if _score_label != null:
+			_score_label.add_theme_font_size_override("font_size", 18)
+		if _progress_label != null:
+			_progress_label.add_theme_font_size_override("font_size", 14)
+		if _sight_key_label != null:
+			_sight_key_label.add_theme_font_size_override("font_size", 12)
+		if _streak_label != null:
+			_streak_label.add_theme_font_size_override("font_size", 16)
+		if _xp_label != null:
+			_xp_label.add_theme_font_size_override("font_size", 16)
+		if _sight_streak_title_label != null:
+			_sight_streak_title_label.add_theme_font_size_override("font_size", 10)
+		if _sight_streak_value_label != null:
+			_sight_streak_value_label.add_theme_font_size_override("font_size", 28)
+		if _sight_streak_score_label != null:
+			_sight_streak_score_label.add_theme_font_size_override("font_size", 12)
+		if _note_chase_level_label != null:
+			_note_chase_level_label.add_theme_font_size_override("font_size", 16)
+		if _replay_button != null:
+			_replay_button.custom_minimum_size = Vector2(116, 36)
+		if _pitch_match_play_tonic_button != null:
+			_pitch_match_play_tonic_button.custom_minimum_size = Vector2(116, 36)
+		if _round_start_button != null:
+			_round_start_button.custom_minimum_size = Vector2(126, 36)
+		if _session_broken_btn != null:
+			_session_broken_btn.custom_minimum_size = Vector2(88, 36)
 	if _lives_label != null:
 		_lives_label.add_theme_color_override("font_color", Color(0.94, 0.98, 1.0, 1.0))
 		_lives_label.visible = false
@@ -12310,6 +12433,10 @@ func _apply_sight_notes_chords_skin() -> void:
 	_sight_staff_frame_border_color = Color(0.90, 0.55, 0.96, 0.92) if _sight_mode == "Chords" else Color(0.38, 0.94, 1.0, 0.92)
 	_refresh_sight_lives_feed_shield_ui()
 	_refresh_sight_streak_panel_ui()
+	if web_sight_gameplay_layout and _sight_progress_track != null:
+		_sight_progress_track.custom_minimum_size = Vector2(0, 7)
+	if web_sight_gameplay_layout and _staff_area != null:
+		_staff_area.custom_minimum_size = Vector2(_staff_area.custom_minimum_size.x, clampf(vp.y * 0.24, 200.0, 250.0))
 	if _staff_area != null:
 		_note_chase_realign_staff_frame()
 
@@ -12357,7 +12484,7 @@ func _restore_sight_notes_chords_skin() -> void:
 		_home_mode_home_button.visible = true
 	if _sight_settings_button != null:
 		# Home-only — skip during gameplay (see _apply_sight_notes_chords_skin note).
-		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active
+		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active and not _first_run_assessment_pending
 	if _sight_lives_panel != null:
 		_sight_lives_panel.visible = false
 	if _sight_streak_panel != null:
@@ -12404,7 +12531,7 @@ func _refresh_sight_notes_chords_skin() -> void:
 	elif _sight_settings_button != null:
 		# Settings gear is HOME-OVERVIEW ONLY. Hidden on mode-detail setup
 		# screens, in-game, and any other in-app surface.
-		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active
+		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active and not _first_run_assessment_pending
 	var in_continuous_game := _is_continuous_flow_sight_mode() and _game_panel != null and _game_panel.visible
 	if in_continuous_game:
 		_apply_continuous_sight_skin()
@@ -12460,7 +12587,7 @@ func _apply_continuous_sight_skin() -> void:
 		_home_mode_home_button.visible = true
 	if _sight_settings_button != null:
 		# Home-only (Codex UI item: settings button was appearing during gameplay).
-		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active
+		_sight_settings_button.visible = _is_home_ui_active() and not _home_mode_detail_active and not _first_run_assessment_pending
 	# Neon HUD boxes — same palette as Notes/Chords
 	var desktop_hybrid := _sight_skin_is_desktop_hybrid_profile()
 	var icon_glow_alpha := 0.72 if desktop_hybrid else 0.42
@@ -12526,6 +12653,59 @@ func _apply_continuous_sight_skin() -> void:
 	if _sight_streak_score_label != null:
 		_sight_streak_score_label.text = "ACC %d%%" % int(round((float(_continuous_sight_runtime.correct_hits) / float(maxi(1, _continuous_sight_runtime.total_hits))) * 100.0)) if is_rhythm else ("Score: %d" % _score)
 		_sight_streak_score_label.add_theme_color_override("font_color", Color(0.98, 0.86, 0.54, 0.98))
+	var vp := get_viewport_rect().size
+	var web_sight_gameplay_layout := OS.has_feature("web") and _selected_mode == MODE_SIGHT and _game_panel != null and _game_panel.visible
+	if web_sight_gameplay_layout:
+		if _game_panel != null:
+			_game_panel.add_theme_constant_override("separation", 6)
+		if _hud_left_box != null:
+			_hud_left_box.custom_minimum_size = Vector2(188, 48)
+		if _hud_center_box != null:
+			_hud_center_box.custom_minimum_size = Vector2(296, 62)
+		if _hud_right_box != null:
+			_hud_right_box.custom_minimum_size = Vector2(138, 62)
+		if _lives_label != null:
+			_lives_label.add_theme_font_size_override("font_size", 18)
+		if _sight_lives_title_label != null:
+			_sight_lives_title_label.add_theme_font_size_override("font_size", 10)
+		if _sight_lives_hearts_label != null:
+			_sight_lives_hearts_label.add_theme_font_size_override("font_size", 24)
+		if _sight_feed_chip != null:
+			_sight_feed_chip.custom_minimum_size = Vector2(96, 30)
+		if _sight_shield_chip != null:
+			_sight_shield_chip.custom_minimum_size = Vector2(96, 30)
+		if _sight_feed_chip_icon != null:
+			_sight_feed_chip_icon.custom_minimum_size = Vector2(20, 20)
+		if _sight_feed_chip_label != null:
+			_sight_feed_chip_label.add_theme_font_size_override("font_size", 12)
+		if _sight_shield_chip_label != null:
+			_sight_shield_chip_label.add_theme_font_size_override("font_size", 12)
+		if _score_label != null:
+			_score_label.add_theme_font_size_override("font_size", 18)
+		if _progress_label != null:
+			_progress_label.add_theme_font_size_override("font_size", 14)
+		if _sight_key_label != null:
+			_sight_key_label.add_theme_font_size_override("font_size", 12)
+		if _streak_label != null:
+			_streak_label.add_theme_font_size_override("font_size", 16)
+		if _xp_label != null:
+			_xp_label.add_theme_font_size_override("font_size", 16)
+		if _sight_streak_title_label != null:
+			_sight_streak_title_label.add_theme_font_size_override("font_size", 10)
+		if _sight_streak_value_label != null:
+			_sight_streak_value_label.add_theme_font_size_override("font_size", 28)
+		if _sight_streak_score_label != null:
+			_sight_streak_score_label.add_theme_font_size_override("font_size", 12)
+		if _note_chase_level_label != null:
+			_note_chase_level_label.add_theme_font_size_override("font_size", 16)
+		if _replay_button != null:
+			_replay_button.custom_minimum_size = Vector2(116, 36)
+		if _pitch_match_play_tonic_button != null:
+			_pitch_match_play_tonic_button.custom_minimum_size = Vector2(116, 36)
+		if _round_start_button != null:
+			_round_start_button.custom_minimum_size = Vector2(126, 36)
+		if _session_broken_btn != null:
+			_session_broken_btn.custom_minimum_size = Vector2(88, 36)
 	# Center box labels
 	if _lives_label != null:
 		_lives_label.visible = false
@@ -12542,6 +12722,10 @@ func _apply_continuous_sight_skin() -> void:
 	if not is_rhythm:
 		_refresh_sight_lives_feed_shield_ui()
 		_refresh_sight_streak_panel_ui()
+	if web_sight_gameplay_layout and _sight_progress_track != null:
+		_sight_progress_track.custom_minimum_size = Vector2(0, 7)
+	if web_sight_gameplay_layout and _staff_area != null:
+		_staff_area.custom_minimum_size = Vector2(_staff_area.custom_minimum_size.x, clampf(vp.y * 0.24, 200.0, 250.0))
 	if _staff_area != null:
 		_note_chase_realign_staff_frame()
 
@@ -15765,6 +15949,9 @@ func _on_mode_selected() -> void:
 	# about home-button visibility so nothing leaks behind them.
 	if _chord_explorer_active or _practice_drills_active or _functional_ear_active:
 		_hide_home_overlay_buttons()
+	if OS.has_feature("web"):
+		_last_responsive_vp = Vector2(-1.0, -1.0)
+		call_deferred("_update_game_card_layout")
 	call_deferred("_setup_home_focus_navigation")
 
 
@@ -21566,12 +21753,13 @@ func _apply_answer_mode() -> void:
 		_staff_note.mouse_filter = Control.MOUSE_FILTER_STOP if (_selected_mode == MODE_SIGHT and (_sight_mode == "Placement" or _sight_mode == "Chords")) or _in_tutorial else Control.MOUSE_FILTER_IGNORE
 		if _selected_mode != MODE_SIGHT or _sight_mode != "Chords" or _awaiting_round_start:
 			_hide_sight_chord_note_chip()
-		if _sight_container != null:
-			var begin_align := _selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or anchor_sight_bottom_controls))
-			if begin_align:
-				_sight_container.alignment = BoxContainer.ALIGNMENT_BEGIN
-			else:
-				_sight_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	if _sight_container != null:
+		var web_sight_mode := OS.has_feature("web") and _selected_mode == MODE_SIGHT
+		var begin_align := web_sight_mode or _selected_mode == MODE_NOTE_CHASE or (_selected_mode == MODE_SIGHT and (_sight_mode == "Rhythm Flow" or anchor_sight_bottom_controls))
+		if web_sight_mode or begin_align:
+			_sight_container.alignment = BoxContainer.ALIGNMENT_BEGIN
+		else:
+			_sight_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	else:
 		if _replay_button.get_parent() != _control_row:
 			if _replay_button.get_parent() != null:
@@ -21937,6 +22125,8 @@ func _apply_answer_mode() -> void:
 					sight_staff_h = clampf(vp.y * continuous_ratio_loose, 250.0, continuous_max_h_loose)
 				if _sight_mode == "Sight Singing":
 					sight_staff_h = maxf(sight_staff_h, 390.0 if is_large else 370.0)
+				if OS.has_feature("web"):
+					sight_staff_h = clampf(sight_staff_h, 220.0, 250.0)
 				_staff_area.custom_minimum_size = Vector2(980, sight_staff_h) if is_large else Vector2(760, sight_staff_h)
 		else:
 			_staff_area.custom_minimum_size = Vector2(1040, 620) if is_large else Vector2(740, 460)
@@ -22517,6 +22707,7 @@ func _force_home_top_ui_state() -> void:
 		_header_gradient_bg.visible = false
 		_header_gradient_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _sight_settings_button != null:
+		_sight_settings_button.visible = not _first_run_assessment_pending and not _home_mode_detail_active
 		_sight_settings_button.disabled = false
 		_sight_settings_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		_sight_settings_button.z_as_relative = false
@@ -28039,8 +28230,25 @@ func _show_end_of_lesson_dialog(finished: Dictionary) -> void:
 
 
 
-func _style_eol_primary_button(btn: Button) -> void:
+func _modal_density_scale() -> float:
+	if not OS.has_feature("web"):
+		return 1.0
+	return 0.72
+
+
+func _modal_px(value: float, density_scale: float) -> int:
+	return int(roundf(value * clampf(density_scale, 0.70, 1.0)))
+
+
+func _modal_size(w: float, h: float, density_scale: float) -> Vector2:
+	var s := clampf(density_scale, 0.70, 1.0)
+	return Vector2(roundf(w * s), roundf(h * s))
+
+
+func _style_eol_primary_button(btn: Button, density_scale: float = 1.0) -> void:
 	# Teal CTA — clearest action in the modal (Save Lesson Note).
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var scale := clampf(density_scale, 0.70, 1.0)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.475, 0.82, 0.80, 0.92)
 	sb.border_color = Color(0.62, 0.95, 0.88, 1.0)
@@ -28048,16 +28256,16 @@ func _style_eol_primary_button(btn: Button) -> void:
 	sb.border_width_top = 1
 	sb.border_width_right = 1
 	sb.border_width_bottom = 2
-	sb.corner_radius_top_left = 10
-	sb.corner_radius_top_right = 10
-	sb.corner_radius_bottom_left = 10
-	sb.corner_radius_bottom_right = 10
-	sb.content_margin_left = 16
-	sb.content_margin_right = 16
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 8
+	sb.corner_radius_top_left = _modal_px(10.0, scale)
+	sb.corner_radius_top_right = _modal_px(10.0, scale)
+	sb.corner_radius_bottom_left = _modal_px(10.0, scale)
+	sb.corner_radius_bottom_right = _modal_px(10.0, scale)
+	sb.content_margin_left = _modal_px(16.0, scale)
+	sb.content_margin_right = _modal_px(16.0, scale)
+	sb.content_margin_top = _modal_px(8.0, scale)
+	sb.content_margin_bottom = _modal_px(8.0, scale)
 	sb.shadow_color = Color(0.475, 0.82, 0.80, 0.30)
-	sb.shadow_size = 4
+	sb.shadow_size = _modal_px(4.0, scale)
 	btn.add_theme_stylebox_override("normal", sb)
 	var hover: StyleBoxFlat = sb.duplicate()
 	hover.bg_color = Color(0.55, 0.92, 0.88, 0.96)
@@ -28074,9 +28282,12 @@ func _style_eol_primary_button(btn: Button) -> void:
 # welcome prompt, profile prompt). Mirrors the dialog/end-of-lesson palette
 # so all branded modals share one visual identity. Pass the dismiss/primary
 # action button to also restyle it as the teal CTA.
-func _apply_clefira_overlay_panel_style(panel: PanelContainer, dismiss_btn: Button = null, accent_override: Color = Color(0.0, 0.0, 0.0, 0.0)) -> void:
+func _apply_clefira_overlay_panel_style(panel: PanelContainer, dismiss_btn: Button = null, accent_override: Color = Color(0.0, 0.0, 0.0, 0.0), density_scale: float = 1.0) -> void:
 	if panel == null:
 		return
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var scale := clampf(density_scale, 0.70, 1.0)
 	var accent: Color = Color(0.475, 0.82, 0.80, 0.92) if accent_override.a == 0.0 else accent_override
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.10, 0.14, 0.20, 0.98)
@@ -28085,20 +28296,20 @@ func _apply_clefira_overlay_panel_style(panel: PanelContainer, dismiss_btn: Butt
 	sb.border_width_top = 1
 	sb.border_width_right = 1
 	sb.border_width_bottom = 3
-	sb.corner_radius_top_left = 18
-	sb.corner_radius_top_right = 18
-	sb.corner_radius_bottom_left = 18
-	sb.corner_radius_bottom_right = 18
+	sb.corner_radius_top_left = _modal_px(18.0, scale)
+	sb.corner_radius_top_right = _modal_px(18.0, scale)
+	sb.corner_radius_bottom_left = _modal_px(18.0, scale)
+	sb.corner_radius_bottom_right = _modal_px(18.0, scale)
 	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.60)
-	sb.shadow_size = 18
-	sb.shadow_offset = Vector2(0, 6)
-	sb.content_margin_left = 28
-	sb.content_margin_right = 28
-	sb.content_margin_top = 22
-	sb.content_margin_bottom = 22
+	sb.shadow_size = _modal_px(18.0, scale)
+	sb.shadow_offset = Vector2(0, _modal_px(6.0, scale))
+	sb.content_margin_left = _modal_px(28.0, scale)
+	sb.content_margin_right = _modal_px(28.0, scale)
+	sb.content_margin_top = _modal_px(22.0, scale)
+	sb.content_margin_bottom = _modal_px(22.0, scale)
 	panel.add_theme_stylebox_override("panel", sb)
 	if dismiss_btn != null:
-		_style_eol_primary_button(dismiss_btn)
+		_style_eol_primary_button(dismiss_btn, scale)
 
 
 # Apply Clefira-branded styling to any stock AcceptDialog/ConfirmationDialog
@@ -28149,8 +28360,10 @@ func _apply_clefira_dialog_style(dlg: AcceptDialog) -> void:
 			cancel_btn.custom_minimum_size = Vector2(120, 38)
 
 
-func _style_eol_secondary_button(btn: Button) -> void:
+func _style_eol_secondary_button(btn: Button, density_scale: float = 1.0) -> void:
 	# Outlined button — Send Parent Summary. Less weight than the CTA.
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var scale := clampf(density_scale, 0.70, 1.0)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.62, 0.86, 0.96, 0.10)
 	sb.border_color = Color(0.62, 0.86, 0.96, 0.80)
@@ -28158,14 +28371,14 @@ func _style_eol_secondary_button(btn: Button) -> void:
 	sb.border_width_top = 1
 	sb.border_width_right = 1
 	sb.border_width_bottom = 1
-	sb.corner_radius_top_left = 10
-	sb.corner_radius_top_right = 10
-	sb.corner_radius_bottom_left = 10
-	sb.corner_radius_bottom_right = 10
-	sb.content_margin_left = 16
-	sb.content_margin_right = 16
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 8
+	sb.corner_radius_top_left = _modal_px(10.0, scale)
+	sb.corner_radius_top_right = _modal_px(10.0, scale)
+	sb.corner_radius_bottom_left = _modal_px(10.0, scale)
+	sb.corner_radius_bottom_right = _modal_px(10.0, scale)
+	sb.content_margin_left = _modal_px(16.0, scale)
+	sb.content_margin_right = _modal_px(16.0, scale)
+	sb.content_margin_top = _modal_px(8.0, scale)
+	sb.content_margin_bottom = _modal_px(8.0, scale)
 	btn.add_theme_stylebox_override("normal", sb)
 	var hover: StyleBoxFlat = sb.duplicate()
 	hover.bg_color = Color(0.62, 0.86, 0.96, 0.20)
@@ -28250,6 +28463,8 @@ func _html_escape(s: String) -> String:
 func _show_terms_acceptance_modal() -> void:
 	if _terms_modal_overlay != null and is_instance_valid(_terms_modal_overlay):
 		return
+	var modal_scale := _modal_density_scale()
+	var is_web_modal := OS.has_feature("web")
 	_terms_modal_overlay = ColorRect.new()
 	_terms_modal_overlay.set_anchors_preset(PRESET_FULL_RECT)
 	_terms_modal_overlay.color = Color(0.0, 0.0, 0.0, 0.72)
@@ -28263,17 +28478,19 @@ func _show_terms_acceptance_modal() -> void:
 	_terms_modal_overlay.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(560, 0)
+	panel.custom_minimum_size = Vector2(maxf(430.0, roundf(560.0 * modal_scale)), 0)
 	center.add_child(panel)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_theme_constant_override("separation", _modal_px(12.0, modal_scale))
 	panel.add_child(col)
 
 	var title := Label.new()
 	title.text = "Welcome to Clefira"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 26)
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	title.add_theme_font_size_override("font_size", _modal_px(26.0, modal_scale))
 	title.add_theme_color_override("font_color", Color(0.62, 0.95, 0.88, 1.0))
 	if _ui_title_font != null:
 		title.add_theme_font_override("font", _ui_title_font)
@@ -28282,8 +28499,11 @@ func _show_terms_acceptance_modal() -> void:
 	var body := Label.new()
 	body.text = "Before you start, please review the End-User License Agreement and Privacy Policy.\n\nBy continuing, you agree to both. You can re-open them anytime from Settings → About."
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if is_web_modal:
+		body.text = "Before you start, please review the End-User License Agreement and Privacy Policy.\nBy continuing, you agree to both. You can re-open them anytime from Settings > About."
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.add_theme_font_size_override("font_size", 14)
+	body.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	body.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
 	body.add_theme_color_override("font_color", Color(0.92, 0.95, 0.98, 0.95))
 	if _ui_font != null:
 		body.add_theme_font_override("font", _ui_font)
@@ -28292,22 +28512,25 @@ func _show_terms_acceptance_modal() -> void:
 	# Link row — open EULA / Privacy in the default browser.
 	var links_row := HBoxContainer.new()
 	links_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	links_row.add_theme_constant_override("separation", 16)
+	links_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	links_row.add_theme_constant_override("separation", _modal_px(12.0, modal_scale))
 	col.add_child(links_row)
 
 	var eula_btn := Button.new()
-	eula_btn.text = "%s View Terms" % char(0x1F4C4)
-	eula_btn.custom_minimum_size = Vector2(180, 38)
-	_style_eol_secondary_button(eula_btn)
+	eula_btn.text = "View Terms" if is_web_modal else "%s View Terms" % char(0x1F4C4)
+	eula_btn.custom_minimum_size = _modal_size(170.0, 34.0, modal_scale)
+	eula_btn.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
+	_style_eol_secondary_button(eula_btn, modal_scale)
 	eula_btn.pressed.connect(func() -> void:
 		_open_local_doc("docs/EULA.html")
 	)
 	links_row.add_child(eula_btn)
 
 	var privacy_btn := Button.new()
-	privacy_btn.text = "%s View Privacy Policy" % char(0x1F510)
-	privacy_btn.custom_minimum_size = Vector2(220, 38)
-	_style_eol_secondary_button(privacy_btn)
+	privacy_btn.text = "View Privacy Policy" if is_web_modal else "%s View Privacy Policy" % char(0x1F510)
+	privacy_btn.custom_minimum_size = _modal_size(210.0, 34.0, modal_scale)
+	privacy_btn.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
+	_style_eol_secondary_button(privacy_btn, modal_scale)
 	privacy_btn.pressed.connect(func() -> void:
 		_open_local_doc("docs/PRIVACY.html")
 	)
@@ -28315,17 +28538,19 @@ func _show_terms_acceptance_modal() -> void:
 
 	# Spacer
 	var sp := Control.new()
-	sp.custom_minimum_size = Vector2(0, 4)
+	sp.custom_minimum_size = Vector2(0, _modal_px(2.0, modal_scale))
 	col.add_child(sp)
 
 	# Accept row — the only way forward.
 	var accept_row := HBoxContainer.new()
 	accept_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	accept_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	col.add_child(accept_row)
 	var accept_btn := Button.new()
-	accept_btn.text = "%s  Accept & Continue" % char(0x2713)
-	accept_btn.custom_minimum_size = Vector2(260, 46)
-	_style_eol_primary_button(accept_btn)
+	accept_btn.text = "Accept & Continue" if is_web_modal else "%s  Accept & Continue" % char(0x2713)
+	accept_btn.custom_minimum_size = _modal_size(240.0, 38.0, modal_scale)
+	accept_btn.add_theme_font_size_override("font_size", _modal_px(15.0, modal_scale))
+	_style_eol_primary_button(accept_btn, modal_scale)
 	if _ui_title_font != null:
 		accept_btn.add_theme_font_override("font", _ui_title_font)
 	accept_btn.pressed.connect(func() -> void:
@@ -28340,7 +28565,7 @@ func _show_terms_acceptance_modal() -> void:
 	)
 	accept_row.add_child(accept_btn)
 
-	_apply_clefira_overlay_panel_style(panel)
+	_apply_clefira_overlay_panel_style(panel, null, Color(0.0, 0.0, 0.0, 0.0), modal_scale)
 
 
 # Opens a bundled doc file in the user's default browser. In exported builds
@@ -28397,6 +28622,7 @@ func _show_profile_prompt(edit_mode: bool = false) -> void:
 
 
 func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
+	var modal_scale := _modal_density_scale()
 	_profile_prompt_overlay = ColorRect.new()
 	_profile_prompt_overlay.set_anchors_preset(PRESET_FULL_RECT)
 	_profile_prompt_overlay.color = Color(0.0, 0.0, 0.0, 0.62)
@@ -28408,18 +28634,20 @@ func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
 	center.set_anchors_preset(PRESET_FULL_RECT)
 	_profile_prompt_overlay.add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(520, 0)
+	panel.custom_minimum_size = Vector2(maxf(420.0, roundf(520.0 * modal_scale)), 0)
 	center.add_child(panel)
 	# Apply the shared Clefira finish — same dark navy + teal accent as every
 	# other branded modal in the app.
-	_apply_clefira_overlay_panel_style(panel)
+	_apply_clefira_overlay_panel_style(panel, null, Color(0.0, 0.0, 0.0, 0.0), modal_scale)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 14)
+	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	col.add_theme_constant_override("separation", _modal_px(12.0, modal_scale))
 	panel.add_child(col)
 	var title := Label.new()
 	title.text = "Edit Your Profile" if edit_mode else "Welcome to Clefira!"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 22)
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	title.add_theme_font_size_override("font_size", _modal_px(22.0, modal_scale))
 	title.add_theme_color_override("font_color", Color(0.96, 0.98, 1.0, 1.0))
 	if _ui_title_font != null:
 		title.add_theme_font_override("font", _ui_title_font)
@@ -28431,34 +28659,43 @@ func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
 		body.text = "Tell us a bit about you so we can personalise the home screen.\nYou can skip this and set it later in Settings."
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.add_theme_font_size_override("font_size", 14)
+	body.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	body.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
 	body.add_theme_color_override("font_color", Color(0.86, 0.92, 0.99, 0.92))
 	if _ui_font != null:
 		body.add_theme_font_override("font", _ui_font)
 	col.add_child(body)
 	# Name row
 	var name_row := HBoxContainer.new()
-	name_row.add_theme_constant_override("separation", 10)
+	name_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_row.add_theme_constant_override("separation", _modal_px(8.0, modal_scale))
 	col.add_child(name_row)
 	var name_label := Label.new()
 	name_label.text = "Your name"
-	name_label.custom_minimum_size = Vector2(96, 0)
+	name_label.custom_minimum_size = Vector2(_modal_px(96.0, modal_scale), 0)
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_label.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
 	name_label.add_theme_color_override("font_color", Color(0.82, 0.90, 0.98, 1.0))
 	name_row.add_child(name_label)
 	var name_input := LineEdit.new()
 	name_input.placeholder_text = "e.g. Maya"
 	name_input.max_length = 24
-	name_input.custom_minimum_size = Vector2(280, 36)
+	name_input.custom_minimum_size = _modal_size(280.0, 32.0, modal_scale)
 	name_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_input.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	name_input.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
 	name_input.text = _player_name  # empty on first run; current name in edit mode
 	name_row.add_child(name_input)
 	# Level row — three radio-style buttons in a group
 	var level_row := HBoxContainer.new()
-	level_row.add_theme_constant_override("separation", 10)
+	level_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	level_row.add_theme_constant_override("separation", _modal_px(8.0, modal_scale))
 	col.add_child(level_row)
 	var level_label := Label.new()
 	level_label.text = "Level"
-	level_label.custom_minimum_size = Vector2(96, 0)
+	level_label.custom_minimum_size = Vector2(_modal_px(96.0, modal_scale), 0)
+	level_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	level_label.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
 	level_label.add_theme_color_override("font_color", Color(0.82, 0.90, 0.98, 1.0))
 	level_row.add_child(level_label)
 	var level_group := ButtonGroup.new()
@@ -28468,8 +28705,10 @@ func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
 		b.text = lvl
 		b.toggle_mode = true
 		b.button_group = level_group
-		b.custom_minimum_size = Vector2(112, 36)
+		b.custom_minimum_size = _modal_size(112.0, 32.0, modal_scale)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		b.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
 		_style_button(b)
 		if lvl == _player_level:
 			b.button_pressed = true
@@ -28481,17 +28720,20 @@ func _build_profile_prompt_overlay(edit_mode: bool = false) -> void:
 	# Action row
 	var actions := HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_END
-	actions.add_theme_constant_override("separation", 12)
+	actions.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	actions.add_theme_constant_override("separation", _modal_px(10.0, modal_scale))
 	col.add_child(actions)
 	var skip_btn := Button.new()
 	skip_btn.text = "Cancel" if edit_mode else "Skip"
-	skip_btn.custom_minimum_size = Vector2(120, 42)
-	_style_eol_secondary_button(skip_btn)
+	skip_btn.custom_minimum_size = _modal_size(120.0, 36.0, modal_scale)
+	skip_btn.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
+	_style_eol_secondary_button(skip_btn, modal_scale)
 	actions.add_child(skip_btn)
 	var save_btn := Button.new()
 	save_btn.text = "Save" if edit_mode else "Save & Continue"
-	save_btn.custom_minimum_size = Vector2(180, 42)
-	_style_eol_primary_button(save_btn)
+	save_btn.custom_minimum_size = _modal_size(180.0, 36.0, modal_scale)
+	save_btn.add_theme_font_size_override("font_size", _modal_px(14.0, modal_scale))
+	_style_eol_primary_button(save_btn, modal_scale)
 	actions.add_child(save_btn)
 	skip_btn.pressed.connect(func() -> void:
 		_player_profile_seen = true
@@ -28758,7 +29000,8 @@ func _layout_sight_big_piano() -> void:
 		return
 	var vp := get_viewport()
 	var screen_w: float = vp.get_visible_rect().size.x if vp != null else 1366.0
-	var target_total_w: float = screen_w * SIGHT_BIG_PIANO_WIDTH_PCT
+	var is_web := OS.has_feature("web")
+	var target_total_w: float = screen_w * (0.58 if is_web else SIGHT_BIG_PIANO_WIDTH_PCT)
 	# Count white keys to derive per-key width
 	var num_whites: int = 0
 	for p in range(SIGHT_BIG_PIANO_LOW, SIGHT_BIG_PIANO_HIGH + 1):
@@ -28766,21 +29009,21 @@ func _layout_sight_big_piano() -> void:
 			num_whites += 1
 	if num_whites <= 0:
 		return
-	var pad: float = SIGHT_BIG_PIANO_FRAME_PAD
+	var pad: float = 4.0 if is_web else SIGHT_BIG_PIANO_FRAME_PAD
 	var keys_w_avail: float = maxf(num_whites * 8.0, target_total_w - pad * 2.0)
 	var white_w: float = keys_w_avail / float(num_whites)
 	var black_w: float = white_w * SIGHT_BIG_PIANO_BLACK_RATIO
-	var white_h: float = SIGHT_BIG_PIANO_WHITE_H
-	var black_h: float = SIGHT_BIG_PIANO_BLACK_H
+	var white_h: float = 92.0 if is_web else SIGHT_BIG_PIANO_WHITE_H
+	var black_h: float = 60.0 if is_web else SIGHT_BIG_PIANO_BLACK_H
 	var keys_w: float = float(num_whites) * white_w
 	var frame_w: float = keys_w + pad * 2.0
-	var frame_h: float = white_h + pad * 2.0 + 6.0
+	var frame_h: float = white_h + pad * 2.0 + (4.0 if is_web else 6.0)
 
 	# Outer piano control: centered + sized to frame
 	_sight_big_piano.offset_left = -frame_w * 0.5
 	_sight_big_piano.offset_right = frame_w * 0.5
-	_sight_big_piano.offset_top = -frame_h - 4.0
-	_sight_big_piano.offset_bottom = -4.0
+	_sight_big_piano.offset_top = -frame_h - (2.0 if is_web else 4.0)
+	_sight_big_piano.offset_bottom = -2.0 if is_web else -4.0
 	_sight_big_piano.custom_minimum_size = Vector2(frame_w, frame_h)
 
 	# Frame + felt + keys_root sizes/positions
@@ -28822,7 +29065,7 @@ func _layout_sight_big_piano() -> void:
 	# Scale the white-key letter font down on narrow keys so text fits
 	# (clamped 10-16pt). Then reapply persistent label styling so the deep
 	# navy color + bottom-of-key position stick after any layout shuffle.
-	var font_size: int = clampi(int(white_w * 0.42), 10, 16)
+	var font_size: int = clampi(int(white_w * (0.34 if is_web else 0.42)), 9, 16)
 	for pitch in _sight_big_piano_keys.keys():
 		if _ce_pitch_is_black(int(pitch)):
 			continue
@@ -28840,7 +29083,7 @@ func _bias_button_text_to_bottom(btn: Button) -> void:
 	# treats its top as much taller than reality — text drops to the bottom.
 	# Using ~82% of key height as the top margin puts the letter ~10% from the
 	# key bottom regardless of how small the key is rendered.
-	var key_h: float = maxf(btn.size.y, SIGHT_BIG_PIANO_WHITE_H)
+	var key_h: float = btn.size.y if OS.has_feature("web") else maxf(btn.size.y, SIGHT_BIG_PIANO_WHITE_H)
 	var top_margin: float = key_h * 0.78
 	var bottom_margin: float = maxf(4.0, key_h * 0.04)
 	var states: Array[String] = ["normal", "hover", "pressed", "focus", "disabled"]
