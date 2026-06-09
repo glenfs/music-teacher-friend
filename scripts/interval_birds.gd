@@ -1859,15 +1859,6 @@ var _startup_boot_started_at_sec := 0.0
 
 
 func _ready() -> void:
-	# Web: the project uses stretch aspect "expand", so on a large browser canvas
-	# the logical viewport grows past the desktop baseline (768h) and the
-	# responsive scaler inflates controls (tall buttons). Lock the logical height
-	# to the project's 768 on web so all desktop-tuned sizing applies as-is; width
-	# stays responsive. Native desktop/Android keep "expand".
-	if OS.has_feature("web"):
-		var win := get_window()
-		if win != null:
-			win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP_HEIGHT
 	if CLEFIRA_LOGO_TEXTURE == null:
 		if ResourceLoader.exists(_CLEFIRA_LOGO_PATH):
 			CLEFIRA_LOGO_TEXTURE = load(_CLEFIRA_LOGO_PATH)
@@ -3553,9 +3544,18 @@ func _apply_responsive_touch_scaling(vp: Vector2) -> void:
 	var viewport_scale := minf(width_scale, height_scale)
 	if is_tablet:
 		viewport_scale = clampf(viewport_scale, 0.78, 1.08)
+	# Web: replicate the 1366x768 desktop-app control density. The "expand" stretch
+	# grows the logical viewport on big browser canvases, and the scaler is built to
+	# enlarge controls on big (tablet) screens — which reads as oversized buttons in
+	# a desktop browser. Cap the scale and force the compact-height paths so web
+	# matches the desktop baseline (~35px buttons), while expand keeps native-res
+	# layout + horizontal space. Native desktop/Android are unaffected.
+	var is_web := OS.has_feature("web")
+	if is_web:
+		viewport_scale = clampf(viewport_scale, 0.78, 0.96)
 	large_scale *= viewport_scale
-	var compact_height_ui := vp.y < 930.0
-	var very_compact_height_ui := vp.y < 860.0
+	var compact_height_ui := vp.y < 930.0 or is_web
+	var very_compact_height_ui := vp.y < 860.0 or is_web
 	var ultra_compact_height_ui := vp.y < 780.0
 	var continuous_compact_ui := vp.y < 1040.0
 	var continuous_very_compact_ui := vp.y < 980.0
